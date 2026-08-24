@@ -100,3 +100,27 @@
 - 2026-08-24, replace_test.go: I added a strings.ToUpper call in a new
   test without adding the strings import, so the build failed once.
   I fixed the import list right after.
+
+- 2026-08-24, go1/revera/capture.go: my first translation of the
+  capture solver kept unbounded arenas with int32 offsets. On
+  ((a*){250}){250} over 300 characters the kid arena passed 2^31
+  entries and the offsets went negative. go0 survives the same input
+  only because it burns 20 GB before the work limit reports ESpace.
+  I added solverArenaLimit so go1 reports ESpace early and cleanly.
+
+- 2026-08-24, go1/revera: my first Vego translation broke four of my
+  own subset rules: a break whose target was a switch, a function
+  with three results, a const declared inside a function, and a
+  uint conversion. My own vego2json checker caught all of them, which
+  is the point of having it, but I should have followed the
+  specification exactly while writing the code.
+
+- 2026-08-24, go1 review pass: swival found real gaps I had left. The
+  locale loader validated section bounds but not the offsets stored
+  inside sections, so a malformed blob could panic instead of being
+  rejected. The subset checker also under-enforced its own spec:
+  pointer locals and results, writable-slice escapes of globals,
+  rune-semantics string conversions, a crash on malformed range
+  statements, and zero-argument append all slipped through. I fixed
+  the code, tightened the checker, aligned the spec, and added tests
+  for every case.

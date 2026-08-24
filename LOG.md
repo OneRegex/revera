@@ -324,3 +324,64 @@ Skipped: a search-from-offset engine primitive (too large for this
 pass), pooling the pmatch slice (unsafe with user callbacks), and
 folding limit into the callback (the counter is the single shared
 spot already). Full tests, vet, and gofmt pass.
+
+**Request:** rewrite the go0/ ERE engine in a simplified Go subset in
+go1/, with a full specification of the subset, and a tool that
+translates subset programs into JSON, so that Rust, C++, and Zig
+implementations can later be generated from the JSON and the JSON can
+be proven correct with LEAN4. Keep progress in a markdown file.
+
+**Done:** the subset is named Vego and specified in
+go1/VEGO-SPECIFICATION.md: fixed-width integers, immutable strings,
+slices with a single-owner buffer model, structs, free functions, no
+pointers in data, no maps, no closures, no imports. The engine lives
+in go1/revera as one flat package, locale handling included; trees
+became index arenas, the memo maps became open-addressing tables
+written in the subset, callbacks became a MatchIter iterator, and
+go:embed moved to a *_host.go shim. go1/cmd/vego2json checks the
+subset with go/ast and go/types and emits the JSON form
+(go1/revera.vego.json); go1/cmd/json2go regenerates Go from the JSON
+as the reference converter. Differential tests compare go1 with go0
+over locales, UTF-8, random and fixed pattern corpora, replacement,
+and iteration; the regenerated-from-JSON engine passes the same
+suite. Findings live in go1/PROGRESS.md. Tests, vet, and gofmt pass.
+
+**Request:** (continued) review the go1 work with swival and fix
+what it finds.
+
+**Done:** swival reported six findings and I fixed all of them.
+LocaleOpen now rejects every malformed blob through a full
+cross-section validation pass instead of panicking, with a
+corruption test. The vego2json checker now enforces pointer types
+as parameter-only, & as a direct call argument only, no slice-typed
+or sliceable globals, uint8-only string conversions, safe handling
+of malformed range statements, and a minimum append arity; the
+specification text matches. The JSON was regenerated and the
+regenerated-from-JSON engine passes the full differential suite
+again. Tests, vet, and gofmt pass.
+
+**Request:** /simplify pass over the go1 work.
+
+**Done:** four parallel review agents looked at reuse,
+simplification, efficiency, and altitude. Applied: the vego2json
+global rules now go through one globalBase helper (closing paren,
+nested-index, and address-of-field gaps), its operator tables are
+package-level, and the break stack is boolean; the capture solver
+seeds one scratch arena slot so the failure paths lost their
+per-allocator dances, kid windows grow in bulk without a dead fill,
+and both head-plus-tail sites share kidPrepend; locale loading split
+into LocaleLoad and LocaleSelect so the host Open validates the
+embedded blob once; a shared indexOfByte replaced four hand-rolled
+scans; the preimage dedup uses runesContain; dead code went away
+(validUTF8, LocaleIsPOSIX, the localeIndex field); CollatingPrefix
+is exported again for go0 parity; runPhaseA lost its pooling-era
+wrapper; ReplaceAllFunc now drives MatchAll; json2go merged its
+const/var emitters and picks conversion parens by JSON kind; the
+tests dropped their hand-rolled UTF-8 decoding for the stdlib and
+share a g0Code helper. Skipped: merging minMatchChars into
+computeLengths (different saturation caps; merging would change the
+oversized-pattern fallback against go0 on multi-gigabyte subjects)
+and removing the Regexp.multi field (inherited go0 shape, read once
+at compile time). The JSON was regenerated; the full differential
+suite and the regenerated-from-JSON engine both pass, with vet and
+gofmt clean.
