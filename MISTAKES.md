@@ -96,3 +96,7 @@
   Only instructions that cannot be pruned, such as a pattern with over
   a million literal characters, pass the cap and leave prog nil. The
   test now compiles such a literal.
+
+- 2026-08-24, replace_test.go: I added a strings.ToUpper call in a new
+  test without adding the strings import, so the build failed once.
+  I fixed the import list right after.

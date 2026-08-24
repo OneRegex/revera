@@ -37,6 +37,37 @@ The API mirrors `regcomp()`/`regexec()`:
   the pattern byte offset.
 - A compiled `Regexp` is immutable and safe for concurrent `Exec` calls.
 
+### Global operations
+
+`MatchAll` walks every non-overlapping match, left to right, and calls
+a callback with the filled `pmatch` slice. The callback returns false
+to stop early. `ReplaceAll` rewrites every match with a sed-style
+replacement text: `&` inserts the whole match, `\1` through `\9`
+insert one group, and a backslash escapes the next character.
+`ReplaceAllFunc` asks a callback for each replacement instead; the
+returned text is inserted literally.
+
+Each function takes a limit on the number of matches, before the
+flags. A negative limit means no bound, like the `preg_replace`
+limit. With `ReplaceAll` and `ReplaceAllFunc`, the subject past the
+last counted match stays as it is.
+
+```go
+result, err := re.ReplaceAll("aabb xab", `\2\1`, -1, 0)
+err = re.MatchAll(subject, -1, 0, func(pmatch []revera.Match) bool {
+    fmt.Println(subject[pmatch[0].So:pmatch[0].Eo])
+    return true
+})
+result, err = re.ReplaceAllFunc(subject, -1, 0, func(pmatch []revera.Match) string {
+    return strings.ToUpper(subject[pmatch[0].So:pmatch[0].Eo])
+})
+```
+
+All three follow the usual global-substitution rule: the next search
+starts at the previous match end, and a null match there is skipped.
+All three need offsets, so they refuse an expression compiled with
+`NoSub`.
+
 ### Resource contracts
 
 `CompileWithContract` compiles like `Compile` and also returns a

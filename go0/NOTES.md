@@ -23,6 +23,9 @@ This file tracks the Go cleanroom implementation of
 - [x] Parser with POSIX error codes; spec section 16 tests pass.
 - [x] Oracle matcher (`oracle.go`), the exhaustive reference.
 - [x] Public API: `Compile`, `Exec`, `NumSub`, flags, errors.
+- [x] Global operations: `MatchAll`, `ReplaceAll`, `ReplaceAllFunc`.
+      They follow the sed iteration rule for null matches and take a
+      match limit, where a negative value means no bound.
 - [x] Phase A engine: single-pass parallel NFA, pooled workspace,
       zero allocations on the match-only path.
 - [x] Phase B capture solver: memoized best parse over the fixed span.

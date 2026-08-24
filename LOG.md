@@ -251,3 +251,59 @@ OnePass branches in the aggregate accessors, and precomputing the
 pattern-independent preimage product, which reads better as a loop.
 Full tests, the race detector, the 386 vet, and the benchmarks all
 pass unchanged.
+
+**Request:** in go0, add a ReplaceAll function and a MatchAll function
+with a callback for every match.
+
+**Done:** added go0/replace.go with both entry points. MatchAll scans
+the subject left to right and calls the callback with an absolute,
+reused pmatch slice; false stops the scan. It follows the sed global
+rule: the next search starts at the match end, a null match there is
+skipped, and a counted null match advances one character. Restarts
+clear NotBOL only after a newline under the Newline flag, so anchors
+keep their meaning mid-subject. ReplaceAll builds on MatchAll with a
+sed-style replacement text: & is the whole match, \1..\9 are groups
+(parsed once into parts), backslash escapes the next character, and a
+reference past NumSub reports ESubReg. Both refuse NoSub expressions.
+Tests cover spans, groups, early stop, anchors, multibyte null-match
+advance, replacement escapes, and the error paths. README documents
+the API. Full suite, vet, and gofmt pass.
+
+**Request:** also add a ReplaceAllFunc variant, like Go's regexp.
+
+**Done:** ReplaceAllFunc takes a callback that receives the same
+pmatch slice as MatchAll and returns the replacement text, inserted
+literally. The rewrite loop moved into a shared replaceAll helper
+that ReplaceAll and ReplaceAllFunc both use. Tests cover the literal
+insertion, group access, and the NoSub refusal. README updated.
+
+**Request:** rename MatchAll for consistency with the Func naming.
+
+**Done:** renamed it to MatchAllFunc, which mirrors ReplaceAllFunc:
+All says it visits every match, Func says it takes a callback. Plain
+MatchFunc would read as a predicate variant of a Match method. The
+rename covers replace.go, the tests, and the README. Tests, vet, and
+gofmt pass.
+
+**Request:** reconsider the names against the PCRE preg_* set, or
+idiomatic Go.
+
+**Done:** settled on MatchAll, ReplaceAll, and ReplaceAllFunc. The
+replace pair uses the exact Go stdlib regexp names, which also map
+one-to-one onto preg_replace and preg_replace_callback. MatchAll
+mirrors preg_match_all and the original goal. No separate Match
+function: Exec already plays the preg_match role, and Match is
+already the offsets type. This reverted the MatchAllFunc rename.
+Full tests, vet, and gofmt pass.
+
+**Request:** add an optional match limit to MatchAll, ReplaceAll, and
+ReplaceAllFunc, and bring all documentation up to date.
+
+**Done:** each function now takes a limit int before the flags, like
+the preg_replace limit and the n of Go's FindAll. Negative means no
+bound, zero reports nothing, and a skipped null match does not count.
+With the replace functions, the subject past the last counted match
+stays unchanged. Tests cover limits on all three functions. The
+README section shows the new signatures, NOTES.md lists the global
+operations, and a wrong preg_match_all mention in a doc comment
+became preg_replace. Full tests, vet, and gofmt pass.
