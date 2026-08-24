@@ -82,3 +82,17 @@
   percent. Reverted with a comment explaining why the loop stays.
   Lesson: in a hot path, benchmark a "trivial" stdlib substitution
   before keeping it.
+- The first queue-dedupe attempt for the resource contract put the
+  membership check inside relax. That pushed relax past the inliner
+  budget (cost 90 over budget 80) and cost 12 percent on the
+  ambiguous-star benchmark. The check moved to a cold compaction pass
+  that runs only when the queue passes twice the program length, and
+  the hot append stayed inlined. Lesson: the engine comments say which
+  functions are inline-tuned; verify with -gcflags=-m after any edit
+  near them.
+- A contract test assumed nested intervals like ((((a{200}){200})...)
+  leave a nil program. They do not: emitRepeat prunes each oversized
+  subtree to a dead end, and the program stays real with a failMin.
+  Only instructions that cannot be pruned, such as a pattern with over
+  a million literal characters, pass the cap and leave prog nil. The
+  test now compiles such a literal.

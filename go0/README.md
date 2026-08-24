@@ -37,6 +37,29 @@ The API mirrors `regcomp()`/`regexec()`:
   the pattern byte offset.
 - A compiled `Regexp` is immutable and safe for concurrent `Exec` calls.
 
+### Resource contracts
+
+`CompileWithContract` compiles like `Compile` and also returns a
+`Contract`: worst-case bounds on heap, stack, and abstract steps for one
+`Exec` call on a subject of at most `maxInput` bytes. The figures come
+per backend (the phase A matcher, the one-pass capture walk, the capture
+solver), and the `HeapBytes`, `StackBytes`, and `Steps` methods combine
+them for a whole call. An application can compare the figures against
+its budget and refuse a pattern before it ever runs.
+
+```go
+re, c, err := revera.CompileWithContract(pattern, loc, 0, 1<<16)
+if err == nil && (c.HeapBytes() > heapBudget || c.Steps() > stepBudget) {
+    // refuse the expression
+}
+```
+
+Heap figures count the explicit allocations the engine performs, with
+fixed 64-bit field sizes, so they are identical on every platform.
+Allocator rounding, object headers, and garbage collection are not
+counted. Steps are abstract unit-cost operations, not time; they are
+worst-case bounds, and ordinary subjects stay far below them.
+
 ## Input model
 
 Patterns and subjects are UTF-8, length-delimited strings.
@@ -55,9 +78,11 @@ to a flat instruction program. Execution has two phases:
   end. It runs all viable paths in lockstep, so it is linear in the
   subject for a fixed pattern. Its workspace is pooled; the match-only
   path performs zero allocations per call in steady state.
-- Phase B runs only when capture offsets are requested. It computes the
-  best parse of the selected span under the section 4.3 selection order
-  with a memoized search.
+- Phase B runs only when capture offsets are requested. When compile-time
+  analysis proves the pattern has at most one parse per span, a one-pass
+  walk reads the group spans directly. Otherwise a memoized search
+  computes the best parse of the selected span under the section 4.3
+  selection order.
 
 Shortest-preferring repetitions ride along as small counter vectors in
 phase A, so `REG_MINIMAL` and the repetition modifier change selection
@@ -72,7 +97,7 @@ without a separate engine.
   a nullable anchor-free pattern still answers existence queries, and
   only a subject that could really need the oversized program reports
   `ESpace`.
-- Subjects up to 2 GiB are supported; larger ones report `ESpace`.
+- Subjects must be shorter than 2 GiB; longer ones report `ESpace`.
 
 ## Conformance testing
 
@@ -82,8 +107,11 @@ without a separate engine.
   it across flags, locales, and multi-character collating elements.
 - A second differential compares whole-match selection with Go's
   `regexp.CompilePOSIX` on long subjects, within the common subset.
-- The locale tables are validated bit-for-bit against the C
-  implementation in this repository.
+- A third differential, gated on cgo and macOS, compares full capture
+  vectors with the host `regcomp()` and `regexec()`.
+- The locale blob is generated from the C tables at the repository root.
+  A lookup dump over 19 locale selections came out bit-identical to the
+  C implementation.
 
 The chosen outcomes for undefined and unspecified constructs are listed
 in [`NOTES.md`](NOTES.md).

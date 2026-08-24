@@ -36,7 +36,8 @@ func decodeSubject(s string) decoded {
 }
 
 // decodeWindow decodes s[so:eo]. Both offsets sit on character
-// boundaries.
+// boundaries. captureHeap in the resource contract counts these
+// allocations.
 func decodeWindow(s string, so, eo int) decoded {
 	d := decoded{
 		runes:          make([]rune, 0, eo-so),
@@ -111,6 +112,7 @@ func (re *Regexp) atEOL(d *decoded, i int, eflags ExecFlags) bool {
 }
 
 // ptree is one parse of a pattern node over a character span.
+// The resource contract counts its 64-bit size as ptreeBytes.
 type ptree struct {
 	n      *node
 	i, j   int

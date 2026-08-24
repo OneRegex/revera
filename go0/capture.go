@@ -8,6 +8,8 @@ package revera
 // parse of a node over a span does not depend on its context, and
 // memoization per (node, span) is valid.
 
+// mapEntryBytes in the resource contract must cover the largest memo
+// record below; a size test anchors that relation.
 type concatKey struct {
 	n    *node
 	idx  int

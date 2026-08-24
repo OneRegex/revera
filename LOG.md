@@ -200,3 +200,54 @@ shrink the known-divergence count, and the test would still pass. The
 test now asserts the exact count of 18 for the seeded corpus, and a
 table test pins one exemplar per divergence class with the expected
 result on both sides, so convergence toward libc fails loudly.
+
+The user then asked for resource contracts: a Compile variant that also
+returns, for a given maximum input length, the upper bound of stack
+usage, heap usage, and algorithmic complexity per backend, so an
+application can refuse an expensive expression before running it.
+CompileWithContract in go0/contract.go now returns a Contract with one
+BackendContract (heap, stack, steps) for the phase A matcher, one for
+the one-pass capture walk when the proof holds, and one for the capture
+solver, which stays the guaranteed ceiling because the walk falls back
+to it. Heap counts the explicit allocations with fixed 64-bit sizes, as
+requested; allocator and collector overhead stays out. Stack multiplies
+the deepest call chain by a fixed frame estimate, and steps count
+abstract operations, clamped by the solver work limit. To make the
+matcher bound linear, the phase A closure queue now compacts duplicate
+entries once it passes twice the program length. A first attempt
+checked queue membership inside relax; that broke its inlining and cost
+12 percent on the ambiguous benchmark, so the check moved to the cold
+compaction pass and the benchmarks returned to noise. Two swival review
+rounds ran. The first found a flaky pool assertion and a test that
+bypassed the Exec path; phase A gained runPhaseAWith so a test can own
+its workspace. The second found real undercounts: the solver arenas
+hand out whole 256-element chunks, the one-pass walk clears nested
+groups per visit, the equivalence-class test recurses per element
+character, the decoded window struct escapes, and the oversized-program
+fallback can allocate an error. Every formula now covers these, the
+clamped MaxInput is reported back, and a unit test pins the queue
+compaction semantics. Full tests, the race detector, 386 and no-cgo
+builds, and a 30-second fuzz run with 6.5 million executions all pass.
+
+The user then ran the simplify pass: four parallel review agents
+covering reuse, simplification, efficiency, and altitude. The applied
+fixes: subjectLimit now lives once in regexp.go next to the int32
+rationale and Exec uses it; the matcher workspace arithmetic moved
+into workspaceHeapBound in engine.go beside prepare, so both change
+together; the compaction threshold became the named queueCompactFactor
+constant, which the heap bound and the queue test both derive from;
+the onq scratch shrank to a byte per instruction as a bool slice;
+astSize reuses the walk helper; solverDepth merged its duplicated
+child-max loops; the magic 17 in bracketAtomCost got a name and an
+explanation; and a new size-constant test anchors every mirrored
+64-bit layout (ptree, the memo records, Match, Error, slotTable,
+engineWS, decoded) with unsafe.Sizeof, so a grown type fails a test
+instead of silently shrinking a contract. Cross-comments now point
+from the measured types to the contract. The tests compile each
+pattern once instead of per size, and the compaction unit test uses
+slices.Equal. Skipped on purpose: exposing the contract as a Regexp
+method (the goal asks for a Compile variant), removing the defensive
+OnePass branches in the aggregate accessors, and precomputing the
+pattern-independent preimage product, which reads better as a loop.
+Full tests, the race detector, the 386 vet, and the benchmarks all
+pass unchanged.

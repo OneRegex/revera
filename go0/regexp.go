@@ -93,6 +93,11 @@ func Compile(pattern string, loc locale.Locale, flags CompileFlags) (*Regexp, er
 	return re, nil
 }
 
+// subjectLimit is the largest subject Exec accepts, in bytes. Thread
+// payloads store match starts as int32, so a longer subject reports
+// ESpace. The resource contract clamps its input bound to it.
+const subjectLimit = int64(1)<<31 - 1
+
 // lengthCap saturates minimum-length arithmetic well above any real
 // subject size.
 const lengthCap = int64(1) << 40
@@ -199,14 +204,14 @@ func (re *Regexp) trivialNullMatch(pmatch []Match) bool {
 // with NoSub, or pmatch is empty, pmatch stays untouched.
 // It returns false when no match exists.
 func (re *Regexp) Exec(subject string, pmatch []Match, eflags ExecFlags) (bool, error) {
-	if int64(len(subject)) >= 1<<31 {
-		// Thread payloads store starts as int32.
+	if int64(len(subject)) > subjectLimit {
 		return false, compileError(ESpace, -1)
 	}
 	if re.prog == nil {
 		// The expanded program passed the size cap. A subject with
 		// fewer bytes than the minimum match length cannot match; a
-		// longer one would really need the huge program.
+		// longer one would really need the huge program. The nil-prog
+		// branch of matcherContract mirrors this fallback's cost.
 		if int64(len(subject)) < re.minLen {
 			return false, nil
 		}

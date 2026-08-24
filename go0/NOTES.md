@@ -73,6 +73,18 @@ Open items:
       as the old manual run in `tmp/`, classifies the two documented
       divergence classes, and fails on anything else. The current count
       is exactly the 18 known cases.
+- [x] Resource contracts (`contract.go`). `CompileWithContract` returns
+      worst-case heap, stack, and step bounds per backend for one Exec
+      call on a subject of at most `maxInput` bytes, so an application
+      can refuse an expression before it runs. Heap counts the explicit
+      allocations with fixed 64-bit sizes; stack multiplies the deepest
+      call chain by a fixed frame estimate; steps count abstract
+      operations. The solver bound folds in the work limit, and its
+      per-step cost pays for the candidate tree comparisons the work
+      counter does not see. To keep the matcher bound linear, the
+      closure queue now compacts duplicates past twice the program
+      length; the hot push stays a bare inlineable append, and the
+      benchmarks stayed within noise.
 
 ## Design decisions
 

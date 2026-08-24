@@ -1,12 +1,13 @@
 # re-vera2
 
-This repository is the beginning of a clean-room POSIX.1-2024 Extended Regular
-Expression (ERE) implementation. It currently contains the implementation
-contract, source-backed studies of existing engines, and the first runtime
-component: locale data for ERE character classes, case mappings, collating
-elements, and equivalence classes.
+This repository is a clean-room POSIX.1-2024 Extended Regular Expression
+(ERE) implementation. It contains the implementation contract, source-backed
+studies of existing engines, a C locale runtime, and a complete Go
+implementation of the contract.
 
-It does not yet contain a complete regular-expression compiler or matcher.
+The C side currently covers only the locale runtime: character classes, case
+mappings, collating elements, and equivalence classes. The Go module in
+[`go0/`](go0/) implements the full ERE language on top of the same data.
 
 ## Repository contents
 
@@ -40,6 +41,15 @@ It does not yet contain a complete regular-expression compiler or matcher.
   [`tests/test_locale_internal.c`](tests/test_locale_internal.c) checks the
   generated tables and their invariants.
 
+### Go implementation
+
+- [`go0/`](go0/) holds `revera`, a complete Go implementation of the ERE
+  contract: parser, engine, capture resolution, resource contracts, and an
+  embedded copy of the locale data.
+- [`go0/README.md`](go0/README.md) documents its API, input model, and
+  conformance testing. [`go0/NOTES.md`](go0/NOTES.md) records the chosen
+  outcomes for undefined and unspecified constructs.
+
 ### Reference engines
 
 The `ref/` directory contains independent upstream trees used as evidence and
@@ -60,10 +70,9 @@ updated deliberately.
 - [`Makefile`](Makefile) builds and runs the locale tests.
 - [`LICENSES/Unicode-3.0.txt`](LICENSES/Unicode-3.0.txt) is the license for the
   generated Unicode and CLDR-derived data.
-- [`LOG.md`](LOG.md) and [`MISTAKES.md`](MISTAKES.md) record the work performed
-  and corrections made during specification and implementation research.
-- [`AGENTS.md`](AGENTS.md) contains repository guidance for automated
-  contributors.
+- [`LOG.md`](LOG.md), [`MISTAKES.md`](MISTAKES.md), and
+  [`api-faq.md`](api-faq.md) record the work performed and the corrections
+  made along the way.
 
 ## Build and test
 
@@ -77,6 +86,12 @@ Remove the ordinary test binaries with:
 
 ```sh
 make clean
+```
+
+The Go module tests only need a Go toolchain:
+
+```sh
+cd go0 && go test ./...
 ```
 
 Regenerating `src/rv_locale_data.inc` additionally requires JDK 17 or later

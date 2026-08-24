@@ -40,8 +40,10 @@ type slotTable struct {
 }
 
 type engineWS struct {
-	slots   []slotTable
-	queue   []uint32
+	slots []slotTable
+	queue []uint32
+	// onq is scratch for compactQueue. It is all false between calls.
+	onq     []bool
 	bestCtr []uint32
 	ctrBuf  []uint32
 	zeros   []uint32
@@ -61,7 +63,8 @@ func (re *Regexp) putWS(ws *engineWS) {
 	re.pool.Put(ws)
 }
 
-// prepare sizes the workspace for this program.
+// prepare sizes the workspace for this program. workspaceHeapBound
+// mirrors this sizing for the resource contract; keep them in step.
 func (ws *engineWS) prepare(prog *program, k, ring int) {
 	if ws.base > 0xf000_0000 {
 		for i := range ws.slots {
@@ -85,12 +88,33 @@ func (ws *engineWS) prepare(prog *program, k, ring int) {
 		t.active = t.active[:0]
 		t.gen = 0
 	}
+	if len(ws.onq) < n {
+		ws.onq = make([]bool, n)
+	}
 	if len(ws.bestCtr) < k {
 		ws.bestCtr = make([]uint32, k)
 		ws.ctrBuf = make([]uint32, k)
 		ws.zeros = make([]uint32, k)
 	}
 	ws.queue = ws.queue[:0]
+}
+
+// workspaceHeapBound bounds the bytes prepare and the closure queue
+// can allocate for a program of n instructions with k counter slots
+// and the given ring size. It uses fixed 64-bit sizes, so the resource
+// contract can report the same figure on every platform. Update it
+// together with prepare and the workspace fields.
+func workspaceHeapBound(n, k, ring int64) int64 {
+	// Per ring slot: the stamp, start, and active arrays, and the
+	// counter matrix. The active array grows by append, and doubling
+	// can leave twice the needed room.
+	heap := cMul(ring, cMul(n, 16+4*k))
+	// The queue and its compaction marks.
+	heap = cAdd(heap, 8*(queueCompactFactor*n+2)+n)
+	// The slot structs, the workspace struct, the three counter
+	// vectors, and the lookahead buffer.
+	heap = cAdd(heap, cMul(ring, 112)+256)
+	return cAdd(heap, 12*k+4*maxElemAhead)
 }
 
 // ctrLess compares two counter vectors lexicographically. It stays a
@@ -137,6 +161,13 @@ type phaseA struct {
 
 func (re *Regexp) runPhaseA(subject string, eflags ExecFlags) engineResult {
 	ws := re.getWS()
+	result := re.runPhaseAWith(ws, subject, eflags)
+	re.putWS(ws)
+	return result
+}
+
+// runPhaseAWith runs phase A on the given workspace.
+func (re *Regexp) runPhaseAWith(ws *engineWS, subject string, eflags ExecFlags) engineResult {
 	e := phaseA{
 		re:      re,
 		prog:    re.prog,
@@ -154,7 +185,6 @@ func (re *Regexp) runPhaseA(subject string, eflags ExecFlags) engineResult {
 	e.bestCtr = ws.bestCtr[:e.k]
 	e.run()
 	ws.base = e.gen(e.ci) + uint32(e.ring) + 1
-	re.putWS(ws)
 	return engineResult{matched: e.matched, so: e.so, eo: e.eo}
 }
 
@@ -243,9 +273,42 @@ func (e *phaseA) relax(t *slotTable, pc uint32, start int32, ctr []uint32) {
 	}
 }
 
+// queueCompactFactor sets the compaction threshold as a multiple of
+// the program length. The queue can pass it by two pushes before the
+// next pop checks, and append doubling can leave twice the needed
+// room; workspaceHeapBound and the queue test derive their figures
+// from this factor.
+const queueCompactFactor = 2
+
+// compactQueue drops duplicate queue entries. A duplicate is harmless: a
+// pop reads the current slot payload, so one entry per instruction does
+// the same work. Dropping them keeps the queue linear in the program, a
+// bound the resource contract relies on. The onq marks live only inside
+// this function.
+func (e *phaseA) compactQueue() {
+	kept := e.ws.queue[:0]
+	for _, pc := range e.ws.queue {
+		if !e.ws.onq[pc] {
+			e.ws.onq[pc] = true
+			kept = append(kept, pc)
+		}
+	}
+	for _, pc := range kept {
+		e.ws.onq[pc] = false
+	}
+	e.ws.queue = kept
+}
+
 // closure drains the relaxation queue over the epsilon instructions.
+// The queue may hold duplicates; past twice the program length it gets
+// compacted, so its memory stays linear and the hot push stays a bare
+// append.
 func (e *phaseA) closure(t *slotTable) {
+	limit := queueCompactFactor * len(e.prog.ins)
 	for len(e.ws.queue) > 0 {
+		if len(e.ws.queue) > limit {
+			e.compactQueue()
+		}
 		pc := e.ws.queue[len(e.ws.queue)-1]
 		e.ws.queue = e.ws.queue[:len(e.ws.queue)-1]
 		if t.stamp[pc] != t.gen {
