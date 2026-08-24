@@ -46,3 +46,76 @@ hard-coded `LC_CTYPE` and ERE-specific `LC_COLLATE` tables. It covers all
 `POSIX` locale. The allocation-free C runtime, public behavior tests, complete
 selector audit, table invariants, deterministic regeneration check, and
 sanitizer runs pass.
+
+The user set a goal: build a cleanroom Go implementation of the ERE
+specification in `go0/`, memory efficient, UTF-8 only, with the CLDR
+locale tables. I created the `revera` Go module and its `locale` package.
+A generator converts `src/rv_locale_data.inc` into a compact little-endian
+blob embedded with `go:embed`. All lookups read the blob in place and
+allocate nothing. A differential dump over 19 locale selections produced
+output bit-identical to the C implementation. Progress notes live in
+`go0/NOTES.md`.
+
+Continued the Go implementation. Wrote the ERE parser with the POSIX
+error codes, the bracket-expression compiler, and a reference matcher
+that enumerates every parse and applies the section 4.3 selection order
+directly. Then built the real engine: phase A is a single-pass parallel
+NFA that finds the selected start and end with minimal-repetition
+counters and a pooled, allocation-free workspace; phase B resolves
+captures with a memoized best-parse search over the selected span only.
+Conformance tests cover every spec section 16 example. Differential
+tests compare the engine against the reference on thousands of random
+patterns across ICase, Newline, and Minimal, against Go regexp's POSIX
+mode for whole-match selection on long subjects, and against the cs
+locale's ch collating element. The race detector is clean and the module
+cross-compiles for 386, arm64, and s390x. Benchmarks show zero
+allocations per match on the capture-free path.
+
+A swival review of the module found two real bugs. The capture solver
+could panic on equivalence-class spans longer than eight scalars, and
+interval expansion rejected 20-byte patterns against the 256-byte
+capacity rule. Both are fixed: the span bound now lives in the matcher,
+and oversized expansions compile without a program, answer through a
+minimum-match-length fallback, and report ESpace only when the subject
+could actually need the huge program. The 64-slot counter mask became an
+overflow list. I then added a scan fast path derived from the start
+closure: when no thread is live, the executor skips to the next possible
+first byte. Literal search went from 82 MB/s to about 10 GB/s and
+no-match scans to about 50 GB/s. A native fuzz target compared engine
+and oracle over 12 million cases without a mismatch. A full-Unicode
+round-trip test validates the inverse case tables.
+
+A 20,000-case differential against macOS libc, with full capture
+vectors, anchors, and negated classes, exposed a misreading of the
+empty-occurrence rule: a null repetition must take one null occurrence
+when its operand can match null. Both engines now implement the fixed
+reading; agreement with libc is 19,982 of 20,000, and every remaining
+difference falls into two documented libc quirks (interval
+nonparticipation and skipped leftmost empty matches) where this
+implementation follows the specification text. The capture solver is
+now pooled, staticcheck is clean, and dead code is removed.
+
+The second swival round reported two more findings, now fixed with
+regression tests: the minimum-length fallback undercounted brackets that
+hold only multi-character collating symbols, and overflow counter slots
+wrapped at 65,536 because of a uint16 narrowing.
+
+The third swival round found that capture requests hit the work limit on
+ordinary patterns: ((a|aa)*) with captures failed at 600 characters. The
+repetition memo key now folds counts past the minimum for unbounded
+maxima, and split loops are clamped by precomputed per-node length
+bounds; the same case now runs 5,000 characters in 36 milliseconds. The
+oversized-expansion fallback was reworked from whole-program to subtree
+granularity: a huge repetition compiles to a dead-end instruction and
+the program stays exact for subjects shorter than that subtree's
+minimum match length, so (x|huge) matches "x" instead of reporting
+ESpace. Added Kelvin-sign case-closure tests and re-ran the full
+validation set: differentials, fuzzing, race detector, staticcheck, and
+the 20,000-case libc comparison all pass.
+
+The fourth swival round audited the new clamping, folding, and pruning
+mechanisms. It confirmed them sound and found one bug: satAdd could
+overflow on 32-bit platforms before its saturation clamp. Fixed with
+int64 arithmetic and re-verified with 386 and s390x cross-builds. The
+remaining conservative ESpace behaviors of the pruned-program gate are
+documented in go0/NOTES.md.
