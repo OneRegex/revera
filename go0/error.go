@@ -20,6 +20,9 @@ const (
 	ERange                   // invalid range endpoint
 	ESpace                   // insufficient memory or capacity
 	BadRpt                   // repetition without a valid operand
+	// ENoSub is an extension with no <regex.h> counterpart: a call
+	// needed match offsets from an expression compiled with NoSub.
+	ENoSub
 )
 
 var codeText = map[Code]string{
@@ -36,6 +39,7 @@ var codeText = map[Code]string{
 	ERange:   "invalid range endpoint",
 	ESpace:   "capacity limit reached",
 	BadRpt:   "repetition without an operand",
+	ENoSub:   "offsets requested from a NoSub expression",
 }
 
 // String returns a short printable message for the code.

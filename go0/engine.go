@@ -457,6 +457,20 @@ func (e *phaseA) bolAt(prev rune) bool {
 		(e.nlMode && prev == '\n')
 }
 
+// continuationFlags adapts eflags for a search that restarts at pos on
+// a sliced subject, keeping the bolAt rule above: a restart is never
+// the true start, and only a preceding newline in newline mode leaves
+// a line boundary before it.
+func (re *Regexp) continuationFlags(subject string, pos int, eflags ExecFlags) ExecFlags {
+	if pos == 0 {
+		return eflags
+	}
+	if re.flags&Newline != 0 && subject[pos-1] == '\n' {
+		return eflags &^ NotBOL
+	}
+	return eflags | NotBOL
+}
+
 func (e *phaseA) run() {
 	var prev rune = -2
 	zeros := e.ws.zeros[:e.k]

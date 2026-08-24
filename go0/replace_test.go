@@ -1,10 +1,9 @@
 package revera
 
 import (
+	"slices"
 	"strings"
 	"testing"
-
-	"revera/locale"
 )
 
 func matchAllSpans(t *testing.T, re *Regexp, subject string, eflags ExecFlags) []Match {
@@ -38,13 +37,8 @@ func TestMatchAllSpans(t *testing.T) {
 	for _, tc := range cases {
 		re := compileOK(t, tc.pattern, 0)
 		got := matchAllSpans(t, re, tc.subject, 0)
-		if len(got) != len(tc.want) {
+		if !slices.Equal(got, tc.want) {
 			t.Fatalf("%q on %q: got %v, want %v", tc.pattern, tc.subject, got, tc.want)
-		}
-		for idx := range got {
-			if got[idx] != tc.want[idx] {
-				t.Fatalf("%q on %q: got %v, want %v", tc.pattern, tc.subject, got, tc.want)
-			}
 		}
 	}
 }
@@ -53,9 +47,7 @@ func TestMatchAllGroups(t *testing.T) {
 	re := compileOK(t, "(a+)(b?)", 0)
 	var all [][]Match
 	err := re.MatchAll("aab a", -1, 0, func(pmatch []Match) bool {
-		row := make([]Match, len(pmatch))
-		copy(row, pmatch)
-		all = append(all, row)
+		all = append(all, slices.Clone(pmatch))
 		return true
 	})
 	if err != nil {
@@ -65,15 +57,8 @@ func TestMatchAllGroups(t *testing.T) {
 		{{0, 3}, {0, 2}, {2, 3}},
 		{{4, 5}, {4, 5}, {5, 5}},
 	}
-	if len(all) != len(want) {
+	if !slices.EqualFunc(all, want, slices.Equal) {
 		t.Fatalf("got %v, want %v", all, want)
-	}
-	for i := range all {
-		for j := range all[i] {
-			if all[i][j] != want[i][j] {
-				t.Fatalf("match %d: got %v, want %v", i, all[i], want[i])
-			}
-		}
 	}
 }
 
@@ -96,27 +81,20 @@ func TestMatchAllAnchors(t *testing.T) {
 	// Without the Newline flag, ^ holds only at the true start.
 	re := compileOK(t, "^a", 0)
 	got := matchAllSpans(t, re, "aaa", 0)
-	if len(got) != 1 || got[0] != (Match{0, 1}) {
+	if !slices.Equal(got, []Match{{0, 1}}) {
 		t.Fatalf("^a spans = %v", got)
 	}
 
 	// With the Newline flag, ^ also holds after each newline.
 	re = compileOK(t, "^a", Newline)
 	got = matchAllSpans(t, re, "ab\nab\na", 0)
-	want := []Match{{0, 1}, {3, 4}, {6, 7}}
-	if len(got) != len(want) {
+	if !slices.Equal(got, []Match{{0, 1}, {3, 4}, {6, 7}}) {
 		t.Fatalf("newline ^a spans = %v", got)
-	}
-	for idx := range got {
-		if got[idx] != want[idx] {
-			t.Fatalf("newline ^a spans = %v", got)
-		}
 	}
 
 	// NotBOL applies to the first position only.
-	re = compileOK(t, "^a", Newline)
 	got = matchAllSpans(t, re, "a\na", NotBOL)
-	if len(got) != 1 || got[0] != (Match{2, 3}) {
+	if !slices.Equal(got, []Match{{2, 3}}) {
 		t.Fatalf("NotBOL ^a spans = %v", got)
 	}
 }
@@ -125,8 +103,7 @@ func TestMatchAllMultibyteAdvance(t *testing.T) {
 	// Null matches must advance one character, not one byte.
 	re := compileOK(t, "x*", 0)
 	got := matchAllSpans(t, re, "é", 0)
-	want := []Match{{0, 0}, {2, 2}}
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+	if !slices.Equal(got, []Match{{0, 0}, {2, 2}}) {
 		t.Fatalf("multibyte spans = %v", got)
 	}
 }
@@ -134,8 +111,8 @@ func TestMatchAllMultibyteAdvance(t *testing.T) {
 func TestMatchAllNoSub(t *testing.T) {
 	re := compileOK(t, "a", NoSub)
 	err := re.MatchAll("a", -1, 0, func(pmatch []Match) bool { return true })
-	if err == nil {
-		t.Fatal("MatchAll accepted a NoSub expression")
+	if e, ok := err.(*Error); !ok || e.Code != ENoSub {
+		t.Fatalf("NoSub error = %v", err)
 	}
 }
 
@@ -171,8 +148,7 @@ func TestMatchAllLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Match{{0, 1}, {2, 2}}
-	if len(spans) != len(want) || spans[0] != want[0] || spans[1] != want[1] {
+	if !slices.Equal(spans, []Match{{0, 1}, {2, 2}}) {
 		t.Fatalf("limited spans = %v", spans)
 	}
 }
@@ -232,8 +208,9 @@ func TestReplaceAll(t *testing.T) {
 
 func TestReplaceAllFunc(t *testing.T) {
 	re := compileOK(t, "a+", 0)
-	got, err := re.ReplaceAllFunc("baaac ad", -1, 0, func(pmatch []Match) string {
-		return strings.ToUpper("baaac ad"[pmatch[0].So:pmatch[0].Eo])
+	subject := "baaac ad"
+	got, err := re.ReplaceAllFunc(subject, -1, 0, func(pmatch []Match) string {
+		return strings.ToUpper(subject[pmatch[0].So:pmatch[0].Eo])
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -255,7 +232,7 @@ func TestReplaceAllFunc(t *testing.T) {
 
 	// Groups are visible through pmatch.
 	re = compileOK(t, "(a+)(b+)", 0)
-	subject := "aabb xab"
+	subject = "aabb xab"
 	got, err = re.ReplaceAllFunc(subject, -1, 0, func(pmatch []Match) string {
 		return subject[pmatch[2].So:pmatch[2].Eo] + subject[pmatch[1].So:pmatch[1].Eo]
 	})
@@ -266,10 +243,7 @@ func TestReplaceAllFunc(t *testing.T) {
 		t.Fatalf("group result = %q", got)
 	}
 
-	re, cerr := Compile("a", locale.POSIX(), NoSub)
-	if cerr != nil {
-		t.Fatal(cerr)
-	}
+	re = compileOK(t, "a", NoSub)
 	if _, err := re.ReplaceAllFunc("a", -1, 0, func(pmatch []Match) string { return "" }); err == nil {
 		t.Fatal("ReplaceAllFunc accepted a NoSub expression")
 	}
@@ -290,10 +264,7 @@ func TestReplaceAllErrors(t *testing.T) {
 	} else if e, ok := err.(*Error); !ok || e.Code != EEscape {
 		t.Fatalf("trailing backslash error = %v", err)
 	}
-	re, err := Compile("a", locale.POSIX(), NoSub)
-	if err != nil {
-		t.Fatal(err)
-	}
+	re = compileOK(t, "a", NoSub)
 	if _, err := re.ReplaceAll("a", "-", -1, 0); err == nil {
 		t.Fatal("ReplaceAll accepted a NoSub expression")
 	}

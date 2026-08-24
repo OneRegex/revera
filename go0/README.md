@@ -65,8 +65,8 @@ result, err = re.ReplaceAllFunc(subject, -1, 0, func(pmatch []revera.Match) stri
 
 All three follow the usual global-substitution rule: the next search
 starts at the previous match end, and a null match there is skipped.
-All three need offsets, so they refuse an expression compiled with
-`NoSub`.
+All three need offsets, so an expression compiled with `NoSub`
+reports `ENoSub`.
 
 ### Resource contracts
 

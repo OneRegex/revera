@@ -307,3 +307,20 @@ stays unchanged. Tests cover limits on all three functions. The
 README section shows the new signatures, NOTES.md lists the global
 operations, and a wrong preg_match_all mention in a doc comment
 became preg_replace. Full tests, vet, and gofmt pass.
+
+**Request:** /simplify pass over the ReplaceAll/MatchAll commit.
+
+**Done:** four parallel review agents looked at reuse, simplification,
+efficiency, and altitude. Applied: the restart boundary rule moved
+into continuationFlags in engine.go, next to bolAt, so the newline
+logic has one home; the NoSub refusal got a dedicated ENoSub code
+instead of misusing BadPat; the null-match advance now uses the
+package decodeRune helper; the limit parameter decrements in place,
+dropping the count variable; parseReplacement flushes literals in one
+place, lost the group -1 sentinel, and preallocates; replaceAll grows
+its builder once, on the first match. Tests now use slices.Equal and
+compileOK, check the ENoSub code, and hoist a repeated subject.
+Skipped: a search-from-offset engine primitive (too large for this
+pass), pooling the pmatch slice (unsafe with user callbacks), and
+folding limit into the callback (the counter is the single shared
+spot already). Full tests, vet, and gofmt pass.
