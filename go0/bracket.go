@@ -1,7 +1,8 @@
 package revera
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -10,13 +11,25 @@ import (
 
 type runeRange struct{ lo, hi rune }
 
-// bracketSet is the compiled form of one bracket expression.
+// maxPreimages sizes the stack buffers for case preimages. It is only a
+// hint: a character with more preimages spills to the heap through append.
+const maxPreimages = 4
+
+// bracketSet is the compiled form of one bracket expression. The locale
+// and the flags that shape matching are bound at compile time, so every
+// matcher tests membership with the same context.
 type bracketSet struct {
 	negated   bool
+	loc       locale.Locale
+	icase     bool
+	nlMode    bool
 	ranges    []runeRange // sorted, non-overlapping single-character members
 	classMask uint16      // union of standard LC_CTYPE classes
 	elems     [][]rune    // explicit multi-character collating symbols
 	equivs    [][]rune    // named equivalence-class elements
+	// multiLens has bit L set when a multi-character match of length L is
+	// possible, so the executor only probes those lengths.
+	multiLens uint16
 }
 
 type bracketItemKind uint8
@@ -39,7 +52,11 @@ type bracketItem struct {
 func (p *parser) parseBracket() (*node, *Error) {
 	start := p.pos
 	p.pos++
-	b := &bracketSet{}
+	b := &bracketSet{
+		loc:    p.loc,
+		icase:  p.flags&ICase != 0,
+		nlMode: p.flags&Newline != 0,
+	}
 	if p.peekByte() == '^' {
 		b.negated = true
 		p.pos++
@@ -171,23 +188,29 @@ func (p *parser) scanInner(closer string, emptyCode Code) ([]rune, *Error) {
 	if !utf8.ValidString(content) {
 		return nil, compileError(BadPat, start)
 	}
-	seq := make([]rune, 0, 4)
-	for _, r := range content {
-		seq = append(seq, r)
-	}
-	return seq, nil
+	return []rune(content), nil
 }
 
-// finalize sorts and merges the single-character ranges.
+// finalize sorts and merges the single-character ranges, and records the
+// lengths a multi-character match can take.
 func (b *bracketSet) finalize() {
+	if b.hasMultiMembers() {
+		for _, e := range b.elems {
+			b.multiLens |= 1 << len(e)
+		}
+		if len(b.equivs) > 0 {
+			// An equivalence class can match any collating element with
+			// an equal primary weight, whatever its length.
+			for length := 2; length <= locale.MaxElementLength(); length++ {
+				b.multiLens |= 1 << length
+			}
+		}
+	}
 	if len(b.ranges) < 2 {
 		return
 	}
-	sort.Slice(b.ranges, func(i, j int) bool {
-		if b.ranges[i].lo != b.ranges[j].lo {
-			return b.ranges[i].lo < b.ranges[j].lo
-		}
-		return b.ranges[i].hi < b.ranges[j].hi
+	slices.SortFunc(b.ranges, func(x, y runeRange) int {
+		return cmp.Or(cmp.Compare(x.lo, y.lo), cmp.Compare(x.hi, y.hi))
 	})
 	merged := b.ranges[:1]
 	for _, r := range b.ranges[1:] {
@@ -205,36 +228,30 @@ func (b *bracketSet) finalize() {
 
 // inRanges tests range membership with a binary search.
 func (b *bracketSet) inRanges(c rune) bool {
-	low, high := 0, len(b.ranges)
-	for low < high {
-		middle := low + (high-low)/2
-		if c > b.ranges[middle].hi {
-			low = middle + 1
-		} else if c < b.ranges[middle].lo {
-			high = middle
-		} else {
-			return true
+	_, ok := slices.BinarySearchFunc(b.ranges, c, func(r runeRange, c rune) int {
+		switch {
+		case r.hi < c:
+			return -1
+		case r.lo > c:
+			return 1
 		}
-	}
-	return false
+		return 0
+	})
+	return ok
 }
 
 // positiveSingle tests case-sensitive membership of one character in the
 // positive list, ignoring multi-character elements.
-func (b *bracketSet) positiveSingle(c rune, loc locale.Locale) bool {
+func (b *bracketSet) positiveSingle(c rune) bool {
 	if b.inRanges(c) {
 		return true
 	}
-	if b.classMask != 0 {
-		for class := range locale.Class(12) {
-			if b.classMask&(1<<class) != 0 && loc.IsClass(class, c) {
-				return true
-			}
-		}
+	if b.classMask != 0 && b.loc.ClassMask(c)&b.classMask != 0 {
+		return true
 	}
 	for _, eq := range b.equivs {
 		single := [1]rune{c}
-		if loc.PrimaryEqual(single[:], eq) {
+		if b.loc.PrimaryEqual(single[:], eq) {
 			return true
 		}
 	}
@@ -243,40 +260,27 @@ func (b *bracketSet) positiveSingle(c rune, loc locale.Locale) bool {
 
 // matchesOne tests whether the bracket accepts the single character c.
 // Under ICase the closure applies after inversion for a negated list,
-// exactly as section 10.2 requires.
-func (b *bracketSet) matchesOne(c rune, loc locale.Locale, icase, newlineMode bool) bool {
+// exactly as section 10.2 requires: the character matches when some case
+// variant of it lands on the accepted side of the positive list.
+func (b *bracketSet) matchesOne(c rune) bool {
 	if c < 0 {
 		// The invalid-byte sentinel matches nothing, not even a
 		// negated list.
 		return false
 	}
-	if b.negated {
-		if newlineMode && c == '\n' {
-			return false
-		}
-		if !b.positiveSingle(c, loc) {
-			return true
-		}
-		if !icase {
-			return false
-		}
-		var buffer [maxElemAhead]rune
-		for _, m := range loc.AppendCasePreimages(buffer[:0], c) {
-			if !b.positiveSingle(m, loc) {
-				return true
-			}
-		}
+	if b.negated && b.nlMode && c == '\n' {
 		return false
 	}
-	if b.positiveSingle(c, loc) {
+	want := !b.negated
+	if b.positiveSingle(c) == want {
 		return true
 	}
-	if !icase {
+	if !b.icase {
 		return false
 	}
-	var buffer [maxElemAhead]rune
-	for _, m := range loc.AppendCasePreimages(buffer[:0], c) {
-		if b.positiveSingle(m, loc) {
+	var buffer [maxPreimages]rune
+	for _, m := range b.loc.AppendCasePreimages(buffer[:0], c) {
+		if b.positiveSingle(m) == want {
 			return true
 		}
 	}
@@ -285,14 +289,14 @@ func (b *bracketSet) matchesOne(c rune, loc locale.Locale, icase, newlineMode bo
 
 // counterpartMatch tests one subject character against one element
 // character under the ICase replacement rule.
-func counterpartMatch(t, e rune, loc locale.Locale, icase bool) bool {
+func (b *bracketSet) counterpartMatch(t, e rune) bool {
 	if t == e {
 		return true
 	}
-	if !icase {
+	if !b.icase {
 		return false
 	}
-	return t == loc.ToUpper(e) || t == loc.ToLower(e)
+	return t == b.loc.ToUpper(e) || t == b.loc.ToLower(e)
 }
 
 // hasMultiMembers reports whether the bracket can consume more than one
@@ -304,7 +308,7 @@ func (b *bracketSet) hasMultiMembers() bool {
 
 // matchesMulti tests a multi-character candidate against the explicit
 // elements and equivalence classes of a positive list.
-func (b *bracketSet) matchesMulti(t []rune, loc locale.Locale, icase bool) bool {
+func (b *bracketSet) matchesMulti(t []rune) bool {
 	if len(t) > locale.MaxElementLength() {
 		// No collating element is longer than the data's limit.
 		return false
@@ -315,7 +319,7 @@ func (b *bracketSet) matchesMulti(t []rune, loc locale.Locale, icase bool) bool 
 		}
 		all := true
 		for i := range e {
-			if !counterpartMatch(t[i], e[i], loc, icase) {
+			if !b.counterpartMatch(t[i], e[i]) {
 				all = false
 				break
 			}
@@ -327,45 +331,54 @@ func (b *bracketSet) matchesMulti(t []rune, loc locale.Locale, icase bool) bool 
 	if len(b.equivs) == 0 {
 		return false
 	}
-	if !icase {
-		if !loc.IsCollatingElement(t) {
-			return false
-		}
-		for _, eq := range b.equivs {
-			if loc.PrimaryEqual(t, eq) {
-				return true
-			}
-		}
-		return false
-	}
 	var candidate [maxElemAhead]rune
-	return b.equivCandidate(t, candidate[:len(t)], 0, loc)
+	return b.equivCandidate(t, candidate[:len(t)], 0)
 }
 
 // equivCandidate enumerates case preimages per position and tests each
-// candidate sequence for membership in some equivalence class.
-func (b *bracketSet) equivCandidate(t, candidate []rune, at int, loc locale.Locale) bool {
+// candidate sequence for membership in some equivalence class. Without
+// ICase the only candidate is the subject sequence itself.
+func (b *bracketSet) equivCandidate(t, candidate []rune, at int) bool {
 	if at == len(t) {
-		if !loc.IsCollatingElement(candidate) {
+		if !b.loc.IsCollatingElement(candidate) {
 			return false
 		}
 		for _, eq := range b.equivs {
-			if loc.PrimaryEqual(candidate, eq) {
+			if b.loc.PrimaryEqual(candidate, eq) {
 				return true
 			}
 		}
 		return false
 	}
 	candidate[at] = t[at]
-	if b.equivCandidate(t, candidate, at+1, loc) {
+	if b.equivCandidate(t, candidate, at+1) {
 		return true
 	}
-	var buffer [maxElemAhead]rune
-	for _, m := range loc.AppendCasePreimages(buffer[:0], t[at]) {
+	if !b.icase {
+		return false
+	}
+	var buffer [maxPreimages]rune
+	for _, m := range b.loc.AppendCasePreimages(buffer[:0], t[at]) {
 		candidate[at] = m
-		if b.equivCandidate(t, candidate, at+1, loc) {
+		if b.equivCandidate(t, candidate, at+1) {
 			return true
 		}
 	}
 	return false
+}
+
+// matchesSpan tests whether the bracket accepts exactly the character
+// span [i, j). The capture solver and the oracle share it.
+func (b *bracketSet) matchesSpan(runes []rune, i, j int) bool {
+	k := j - i
+	if k < 1 {
+		return false
+	}
+	if k == 1 {
+		return b.matchesOne(runes[i])
+	}
+	if !b.hasMultiMembers() {
+		return false
+	}
+	return b.matchesMulti(runes[i:j])
 }

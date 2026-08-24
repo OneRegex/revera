@@ -44,6 +44,9 @@ type Regexp struct {
 	minLen int64
 	// anchors is true when the pattern contains ^ or $ anywhere.
 	anchors bool
+	// onePass is true when every span has at most one parse, so the
+	// capture walk in onepass.go replaces the phase B solver.
+	onePass bool
 	pool    sync.Pool
 	capPool sync.Pool
 }
@@ -75,9 +78,10 @@ func Compile(pattern string, loc locale.Locale, flags CompileFlags) (*Regexp, er
 		case opBOL, opEOL:
 			re.anchors = true
 		}
-	}, func(n *node) {})
+	})
 	collectNested(root, &groupStack, re.nested)
 	computeLengths(root)
+	re.onePass = onePassNode(root)
 	prog, cerr := compileProgram(re)
 	if cerr != nil {
 		return nil, cerr
@@ -131,27 +135,31 @@ func minMatchChars(n *node) int64 {
 }
 
 // bracketMinChars returns the smallest character count one bracket match
-// can consume. Only a list made of nothing but multi-character collating
-// symbols needs more than one character.
+// can consume. Only a positive list made of nothing but multi-character
+// collating symbols and equivalence classes can need more than one
+// character. An equivalence class contributes the length of the shortest
+// element in its class; ICase never changes match lengths.
 func bracketMinChars(b *bracketSet) int64 {
 	if b.negated || len(b.ranges) > 0 || b.classMask != 0 ||
-		len(b.equivs) > 0 || len(b.elems) == 0 {
+		(len(b.elems) == 0 && len(b.equivs) == 0) {
 		return 1
 	}
-	best := int64(len(b.elems[0]))
-	for _, e := range b.elems[1:] {
+	best := int64(lenInf)
+	for _, e := range b.elems {
 		best = min(best, int64(len(e)))
+	}
+	for _, eq := range b.equivs {
+		best = min(best, int64(b.loc.MinEquivLength(eq)))
 	}
 	return best
 }
 
-// walk visits every node in pre-order, then calls after in post-order.
-func walk(n *node, before, after func(*node)) {
-	before(n)
+// walk visits every node in pre-order.
+func walk(n *node, visit func(*node)) {
+	visit(n)
 	for _, child := range n.ch {
-		walk(child, before, after)
+		walk(child, visit)
 	}
-	after(n)
 }
 
 // collectNested records, for each group, the group numbers inside it.
@@ -173,6 +181,14 @@ func collectNested(n *node, stack *[]int, nested [][]int) {
 // NumSub returns the number of parenthesized subexpressions, like re_nsub.
 func (re *Regexp) NumSub() int {
 	return re.nsub
+}
+
+// trivialNullMatch reports whether existence alone answers an Exec call:
+// a nullable, anchor-free pattern matches the null string at the start of
+// any subject, and the caller asked for no offsets.
+func (re *Regexp) trivialNullMatch(pmatch []Match) bool {
+	return re.root.minL == 0 && !re.anchors &&
+		(re.flags&NoSub != 0 || len(pmatch) == 0)
 }
 
 // Exec searches subject for the POSIX-selected match.
@@ -198,30 +214,30 @@ func (re *Regexp) Exec(subject string, pmatch []Match, eflags ExecFlags) (bool, 
 			// The byte count passed, but lengths compare in characters.
 			return false, nil
 		}
-		if re.minLen == 0 && !re.anchors &&
-			(re.flags&NoSub != 0 || len(pmatch) == 0) {
-			// A nullable, anchor-free pattern matches the null string
-			// at the start of any subject; existence is all the
-			// caller asked for.
+		if re.trivialNullMatch(pmatch) {
 			return true, nil
 		}
 		return false, compileError(ESpace, -1)
 	}
-	if re.prog.failMin < lenInf &&
+	if re.prog.failMin != failMinNone &&
 		int64(len(subject)) >= int64(re.prog.failMin) &&
 		utf8.RuneCountInString(subject) >= re.prog.failMin {
 		// An oversized subtree was pruned and this subject is long
-		// enough to reach it.
-		if re.root.minL == 0 && !re.anchors &&
-			(re.flags&NoSub != 0 || len(pmatch) == 0) {
+		// enough to reach it, so the program may miss matches or pick
+		// the wrong spans. Pruning removes possibilities and adds
+		// none, so a match the program still finds proves existence;
+		// a miss proves nothing, and offsets would need the full
+		// program.
+		if re.trivialNullMatch(pmatch) {
+			return true, nil
+		}
+		if (re.flags&NoSub != 0 || len(pmatch) == 0) &&
+			re.runPhaseA(subject, eflags).matched {
 			return true, nil
 		}
 		return false, compileError(ESpace, -1)
 	}
-	result, err := re.runPhaseA(subject, eflags)
-	if err != nil {
-		return false, err
-	}
+	result := re.runPhaseA(subject, eflags)
 	if !result.matched {
 		return false, nil
 	}

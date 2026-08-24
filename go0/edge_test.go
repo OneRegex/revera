@@ -134,6 +134,69 @@ func TestPrunedBranchStillMatches(t *testing.T) {
 	}
 }
 
+func TestPrunedBranchExistencePastFailMin(t *testing.T) {
+	// The huge branch is pruned with a minimum match length of two.
+	// A subject at least that long may reach the pruned subtree, but
+	// a match through the surviving branch still proves existence.
+	re, err := Compile("x|(a((b{0,255}){255}){255}){2}", locale.POSIX(), 0)
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	if re.prog == nil || re.prog.failMin != 2 {
+		t.Fatalf("expected a pruned program with failMin 2, got %+v", re.prog)
+	}
+	matched, err := re.Exec("xx", nil, 0)
+	if err != nil || !matched {
+		t.Fatalf("existence: %v %v", matched, err)
+	}
+
+	// A miss proves nothing: the pruned subtree could have matched.
+	if _, err = re.Exec("zz", nil, 0); err == nil ||
+		err.(*Error).Code != ESpace {
+		t.Fatalf("miss past failMin: err = %v, want ESpace", err)
+	}
+
+	// Offsets would need the full program; the spans the pruned
+	// program selects could be wrong.
+	pmatch := make([]Match, 1)
+	if _, err = re.Exec("xx", pmatch, 0); err == nil ||
+		err.(*Error).Code != ESpace {
+		t.Fatalf("offset request past failMin: err = %v, want ESpace", err)
+	}
+
+	// Below the pruned subtree's minimum length the program is exact.
+	matched, err = re.Exec("x", pmatch, 0)
+	if err != nil || !matched || pmatch[0] != (Match{0, 1}) {
+		t.Fatalf("exact case: %v %v %v", matched, err, pmatch)
+	}
+}
+
+func TestHugeExpansionEquivMinLength(t *testing.T) {
+	cs, ok := locale.Open("cs", "")
+	if !ok {
+		t.Fatal("cs locale missing")
+	}
+	// No single character is primary equal to Czech ch, so the minimum
+	// match length counts two characters per [[=ch=]]. A subject below
+	// that bound answers no-match instead of ESpace.
+	re, err := Compile("(([[=ch=]]{255}){255}){255}", cs, 0)
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	const wantMin = 2 * 255 * 255 * 255
+	if re.prog == nil || re.prog.failMin != wantMin {
+		t.Fatalf("expected a pruned program with failMin %d, got %+v",
+			wantMin, re.prog)
+	}
+	matched, err := re.Exec(strings.Repeat("ch", 10_000_000), nil, 0)
+	if err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if matched {
+		t.Fatal("matched below the minimum length")
+	}
+}
+
 func TestCaptureLongAmbiguousSubject(t *testing.T) {
 	// A plain ambiguous pattern with captures must handle long
 	// subjects; the split ranges are clamped by node length bounds.

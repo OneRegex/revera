@@ -116,7 +116,12 @@ func init() {
 	if cursor != len(blob) {
 		panic("locale: trailing bytes in data blob")
 	}
+	maxSeqLen = int(u32At(secScalars, 0))
 }
+
+// maxSeqLen caches the scalar section's maximum sequence length, so the
+// match loops do not re-read the blob for it.
+var maxSeqLen int
 
 func u32Raw(off int) uint32 {
 	return uint32(blob[off]) | uint32(blob[off+1])<<8 |
@@ -147,7 +152,7 @@ func byteString(sec, off int) string {
 }
 
 func maxSequenceLength() int {
-	return int(u32At(secScalars, 0))
+	return maxSeqLen
 }
 
 // MaxElementLength returns the largest character count of any
@@ -307,7 +312,7 @@ func Open(name, collationType string) (Locale, bool) {
 	if hasModifier && collationType != "" {
 		return Locale{}, false
 	}
-	if collationType == "" && hasModifier {
+	if hasModifier {
 		collationType = modifier
 	}
 	normalizedType, ok := normalizeType(collationType)
@@ -361,35 +366,19 @@ func Open(name, collationType string) (Locale, bool) {
 	return Locale{}, false
 }
 
+// classNames lists the standard class names in Class value order.
+var classNames = [numClasses]string{
+	"alnum", "alpha", "blank", "cntrl", "digit", "graph",
+	"lower", "print", "punct", "space", "upper", "xdigit",
+}
+
 // ClassByName maps a standard class name to its identifier.
 func ClassByName(name string) (Class, bool) {
-	switch name {
-	case "alnum":
-		return Alnum, true
-	case "alpha":
-		return Alpha, true
-	case "blank":
-		return Blank, true
-	case "cntrl":
-		return Cntrl, true
-	case "digit":
-		return Digit, true
-	case "graph":
-		return Graph, true
-	case "lower":
-		return Lower, true
-	case "print":
-		return Print, true
-	case "punct":
-		return Punct, true
-	case "space":
-		return Space, true
-	case "upper":
-		return Upper, true
-	case "xdigit":
-		return Xdigit, true
+	index := slices.Index(classNames[:], name)
+	if index < 0 {
+		return 0, false
 	}
-	return 0, false
+	return Class(index), true
 }
 
 func posixMask(r rune) uint16 {
@@ -445,19 +434,22 @@ func posixMask(r rune) uint16 {
 	return mask
 }
 
+// ClassMask returns the set of standard LC_CTYPE classes that contain r,
+// one bit per Class value.
+func (l Locale) ClassMask(r rune) uint16 {
+	if !l.valid || !validScalar(r) {
+		return 0
+	}
+	if l.posix {
+		return posixMask(r)
+	}
+	block := int(u16At(secCtypeStage1, int(r>>8)))
+	return u16At(secCtypeBlocks, block*256+int(r&0xff))
+}
+
 // IsClass tests one Unicode scalar against a standard LC_CTYPE class.
 func (l Locale) IsClass(class Class, r rune) bool {
-	if !l.valid || class >= numClasses || !validScalar(r) {
-		return false
-	}
-	var mask uint16
-	if l.posix {
-		mask = posixMask(r)
-	} else {
-		block := int(u16At(secCtypeStage1, int(r>>8)))
-		mask = u16At(secCtypeBlocks, block*256+int(r&0xff))
-	}
-	return mask&(1<<class) != 0
+	return class < numClasses && l.ClassMask(r)&(1<<class) != 0
 }
 
 // findCase does a binary search in a case-map section of u32 triples.
@@ -559,11 +551,7 @@ func (l Locale) AppendCasePreimages(dst []rune, r rune) []rune {
 	// Drop duplicates and r itself; the appended runs are tiny.
 	out := dst[:start]
 	for _, candidate := range dst[start:] {
-		seen := candidate == r
-		if slices.Contains(out[start:], candidate) {
-			seen = true
-		}
-		if !seen {
+		if candidate != r && !slices.Contains(out[start:], candidate) {
 			out = append(out, candidate)
 		}
 	}
@@ -587,7 +575,7 @@ func compareSequence(seq []rune, index int) int {
 	off := int(u32At(secSequences, 2*index))
 	length := int(u32At(secSequences, 2*index+1))
 	common := min(length, len(seq))
-	for i := 0; i < common; i++ {
+	for i := range common {
 		stored := rune(u32At(secSeqCodepoints, off+i))
 		if seq[i] < stored {
 			return -1
@@ -684,20 +672,27 @@ func (l Locale) isContraction(element uint32) bool {
 	return !u32Contains(secContractionRemoves, removeFirst, removeCount, element)
 }
 
+// collatingElementID maps seq to its element ID when seq is one collating
+// element in this locale.
+func (l Locale) collatingElementID(seq []rune) (uint32, bool) {
+	element, ok := elementID(seq)
+	if !ok {
+		return 0, false
+	}
+	if len(seq) > 1 && !l.isContraction(element) {
+		return 0, false
+	}
+	return element, true
+}
+
 // IsCollatingElement tests whether a scalar sequence is one collating
 // element in this locale.
 func (l Locale) IsCollatingElement(seq []rune) bool {
 	if !l.valid {
 		return false
 	}
-	element, ok := elementID(seq)
-	if !ok {
-		return false
-	}
-	if len(seq) == 1 {
-		return true
-	}
-	return l.isContraction(element)
+	_, ok := l.collatingElementID(seq)
+	return ok
 }
 
 // CollatingPrefix returns the length in scalars of the longest
@@ -706,10 +701,7 @@ func (l Locale) CollatingPrefix(seq []rune) int {
 	if !l.valid || len(seq) == 0 {
 		return 0
 	}
-	maximum := len(seq)
-	if limit := maxSequenceLength(); maximum > limit {
-		maximum = limit
-	}
+	maximum := min(len(seq), maxSequenceLength())
 	for candidate := maximum; candidate >= 2; candidate-- {
 		if l.IsCollatingElement(seq[:candidate]) {
 			return candidate
@@ -760,14 +752,11 @@ func (l Locale) PrimaryEqual(left, right []rune) bool {
 	if !l.valid {
 		return false
 	}
-	if !l.IsCollatingElement(left) || !l.IsCollatingElement(right) {
-		return false
-	}
-	leftElement, ok := elementID(left)
+	leftElement, ok := l.collatingElementID(left)
 	if !ok {
 		return false
 	}
-	rightElement, ok := elementID(right)
+	rightElement, ok := l.collatingElementID(right)
 	if !ok {
 		return false
 	}
@@ -778,6 +767,60 @@ func (l Locale) PrimaryEqual(left, right []rune) bool {
 		return false
 	}
 	return l.primaryToken(leftElement) == l.primaryToken(rightElement)
+}
+
+// MinEquivLength returns the smallest scalar count of any collating
+// element whose primary weight equals the element seq in this locale.
+// The bracket compiler uses it as the minimum length of an
+// equivalence-class match.
+func (l Locale) MinEquivLength(seq []rune) int {
+	if !l.valid {
+		return len(seq)
+	}
+	element, ok := l.collatingElementID(seq)
+	if !ok {
+		return len(seq)
+	}
+	if element < firstSequenceID {
+		return 1
+	}
+	if l.posix {
+		return len(seq)
+	}
+	// Every element that is not seq itself and shares its primary
+	// weight appears in the equivalence pair sections; an unlisted
+	// element keeps its own ID as its token, which cannot collide.
+	token := l.primaryToken(element)
+	best := len(seq)
+	overrideFirst, overrideCount, _, _, _, _ :=
+		collationProfileRow(int(l.collationProfile))
+	best = l.minTokenLength(secCollationOverrides, overrideFirst,
+		overrideCount, token, best)
+	if best == 1 {
+		return 1
+	}
+	rootCount := sectionLen(secRootEquivalences) / 8
+	return l.minTokenLength(secRootEquivalences, 0, rootCount, token, best)
+}
+
+// minTokenLength scans one (element, representative) pair section and
+// lowers best to the shortest collating element with the given token.
+func (l Locale) minTokenLength(sec, first, count int, token uint64, best int) int {
+	for i := first; i < first+count; i++ {
+		candidate := u32At(sec, 2*i)
+		if l.primaryToken(candidate) != token {
+			continue
+		}
+		if candidate < firstSequenceID {
+			return 1
+		}
+		if !l.isContraction(candidate) {
+			continue
+		}
+		index := int(candidate - firstSequenceID)
+		best = min(best, int(u32At(secSequences, 2*index+1)))
+	}
+	return best
 }
 
 // SupportsRanges reports whether bracket ranges are defined in this locale.

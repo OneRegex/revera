@@ -2,6 +2,7 @@ package revera
 
 import (
 	"slices"
+	"strings"
 	"unicode/utf8"
 
 	"revera/locale"
@@ -44,6 +45,9 @@ type node struct {
 	// opConcat only.
 	sufMin []int
 	sufMax []int
+	// firsts holds the branch first sets of a one-pass alternation
+	// that needs lookahead to select its branch.
+	firsts [][]rune
 }
 
 // lenInf saturates node length bounds far above any supported span.
@@ -142,9 +146,6 @@ func (p *parser) peekByteAt(ahead int) byte {
 func (p *parser) nextRune() (rune, *Error) {
 	r, size := utf8.DecodeRuneInString(p.src[p.pos:])
 	if r == utf8.RuneError && size <= 1 {
-		if size == 0 {
-			return 0, compileError(BadPat, p.pos)
-		}
 		return 0, compileError(BadPat, p.pos)
 	}
 	p.pos += size
@@ -379,10 +380,8 @@ func (p *parser) parseInterval() (int, int, *Error) {
 
 // intervalError picks EBrace when the brace never closes, else BadBR.
 func (p *parser) intervalError(start int) *Error {
-	for i := p.pos; i < len(p.src); i++ {
-		if p.src[i] == '}' {
-			return compileError(BadBR, start)
-		}
+	if strings.IndexByte(p.src[p.pos:], '}') >= 0 {
+		return compileError(BadBR, start)
 	}
 	return compileError(EBrace, start)
 }

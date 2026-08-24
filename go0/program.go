@@ -4,6 +4,12 @@ package revera
 // phase A executor. Phase A only needs the match relation, the minimal
 // repetition counters, and anchors; groups compile to nothing here.
 
+import (
+	"math"
+	"slices"
+	"unicode/utf8"
+)
+
 type iop uint8
 
 const (
@@ -41,8 +47,9 @@ type program struct {
 	// failMin is the smallest minimum match length over every subtree
 	// that was pruned to iFail for size. The program is exact for any
 	// subject with fewer characters, because a pruned subtree cannot
-	// participate in a match of such a subject. lenInf means nothing
-	// was pruned.
+	// participate in a match of such a subject. failMinNone means
+	// nothing was pruned; a pruned subtree's saturated minimum can
+	// legitimately reach lenInf, so lenInf cannot be the sentinel.
 	failMin int
 	scan    scanFilter
 }
@@ -103,16 +110,8 @@ func (p *program) closureScan(bol, eol bool, visit func(pc uint32)) (matchReacha
 func (p *program) buildScanFilter(newlineMode bool) {
 	ok := true
 	addRune := func(r rune) {
-		switch {
-		case r < 0x80:
-			p.scan.stop[byte(r)] = true
-		case r < 0x800:
-			p.scan.stop[0xc0|byte(r>>6)] = true
-		case r < 0x10000:
-			p.scan.stop[0xe0|byte(r>>12)] = true
-		default:
-			p.scan.stop[0xf0|byte(r>>18)] = true
-		}
+		var buf [4]byte
+		p.scan.stop[utf8.AppendRune(buf[:0], r)[0]] = true
 	}
 	matchReachable := p.closureScan(false, false, func(pc uint32) {
 		ins := &p.ins[pc]
@@ -145,6 +144,9 @@ func (p *program) buildScanFilter(newlineMode bool) {
 	}
 	p.scan.single = count == 1
 }
+
+// failMinNone marks a program with no pruned subtree.
+const failMinNone = math.MaxInt
 
 // maxProgram caps the expanded program size. Interval expansion can
 // multiply nested counts. Compilation still succeeds past the cap; the
@@ -219,7 +221,7 @@ func instrEstimate(n *node) int64 {
 // the expansion passed the size cap; execution then uses the
 // minimum-length fallback.
 func compileProgram(re *Regexp) (*program, *Error) {
-	b := &progBuilder{re: re, prog: &program{}, failMin: lenInf}
+	b := &progBuilder{re: re, prog: &program{}, failMin: failMinNone}
 	body := b.emit(re.root, 0, nil)
 	if b.err != nil {
 		return nil, b.err
@@ -357,9 +359,9 @@ func (b *progBuilder) emitRepeat(n *node, mask uint64, extra []uint32) frag {
 		if n.index < maskWidth {
 			mask |= 1 << uint(n.index)
 		} else {
-			grown := make([]uint32, len(extra), len(extra)+1)
-			copy(grown, extra)
-			extra = append(grown, uint32(n.index))
+			// Clip forces a copy, so sibling fragments never share the
+			// grown list.
+			extra = append(slices.Clip(extra), uint32(n.index))
 		}
 	}
 	child := n.ch[0]

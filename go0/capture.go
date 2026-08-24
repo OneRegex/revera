@@ -21,16 +21,20 @@ type repKey struct {
 	hasEmpty bool
 }
 
+// repResult memoizes one bestRep outcome. ok distinguishes "no parse"
+// from a found parse with zero instances, whose kids list is nil too.
+type repResult struct {
+	kids []*ptree
+	ok   bool
+}
+
 type capSolver struct {
 	re     *Regexp
 	d      *decoded
 	eflags ExecFlags
 	memo   map[memoKey]*ptree
-	seen   map[memoKey]bool
 	cmemo  map[concatKey][]*ptree
-	cseen  map[concatKey]bool
-	rmemo  map[repKey][]*ptree
-	rseen  map[repKey]bool
+	rmemo  map[repKey]repResult
 	ctrA   []int
 	ctrB   []int
 	work   int
@@ -110,8 +114,8 @@ func (s *capSolver) cmpCand(a, b *ptree) int {
 		cb := s.ctrB[:s.re.minSlots]
 		clear(ca)
 		clear(cb)
-		addCountersInt(a, ca)
-		addCountersInt(b, cb)
+		addCounters(a, ca)
+		addCounters(b, cb)
 		for idx := range s.re.minSlots {
 			if ca[idx] != cb[idx] {
 				return ca[idx] - cb[idx]
@@ -121,15 +125,6 @@ func (s *capSolver) cmpCand(a, b *ptree) int {
 	return structCmp(a, b)
 }
 
-func addCountersInt(t *ptree, out []int) {
-	if t.n.op == opRepeat && t.n.minimal {
-		out[t.n.index] += t.j - t.i
-	}
-	for _, kid := range t.kids {
-		addCountersInt(kid, out)
-	}
-}
-
 // bestParse returns the best parse of n over exactly [i, j), or nil.
 func (s *capSolver) bestParse(n *node, i, j int) *ptree {
 	// A saturated maxL means unbounded, never an actual limit.
@@ -137,8 +132,8 @@ func (s *capSolver) bestParse(n *node, i, j int) *ptree {
 		return nil
 	}
 	key := memoKey{n, i, j}
-	if s.seen[key] {
-		return s.memo[key]
+	if cached, ok := s.memo[key]; ok {
+		return cached
 	}
 	if !s.step() {
 		return nil
@@ -154,7 +149,7 @@ func (s *capSolver) bestParse(n *node, i, j int) *ptree {
 			best = s.newTree(ptree{n: n, i: i, j: j})
 		}
 	case opBracket:
-		if s.bracketSpanOK(n, i, j) {
+		if n.br.matchesSpan(s.d.runes, i, j) {
 			best = s.newTree(ptree{n: n, i: i, j: j})
 		}
 	case opBOL:
@@ -212,25 +207,8 @@ func (s *capSolver) bestParse(n *node, i, j int) *ptree {
 			best = s.newTree(ptree{n: n, i: i, j: j, kids: kids})
 		}
 	}
-	s.seen[key] = true
 	s.memo[key] = best
 	return best
-}
-
-func (s *capSolver) bracketSpanOK(n *node, i, j int) bool {
-	k := j - i
-	if k < 1 {
-		return false
-	}
-	newlineMode := s.re.flags&Newline != 0
-	icase := s.re.flags&ICase != 0
-	if k == 1 {
-		return n.br.matchesOne(s.d.runes[i], s.re.loc, icase, newlineMode)
-	}
-	if !n.br.hasMultiMembers() {
-		return false
-	}
-	return n.br.matchesMulti(s.d.runes[i:j], s.re.loc, icase)
 }
 
 // bestConcat returns the best child parses of n.ch[idx:] covering [i, j),
@@ -246,8 +224,8 @@ func (s *capSolver) bestConcat(n *node, idx, i, j int) []*ptree {
 		return kids
 	}
 	key := concatKey{n, idx, i, j}
-	if s.cseen[key] {
-		return s.cmemo[key]
+	if cached, ok := s.cmemo[key]; ok {
+		return cached
 	}
 	if !s.step() {
 		return nil
@@ -284,7 +262,6 @@ func (s *capSolver) bestConcat(n *node, idx, i, j int) []*ptree {
 			best = kids
 		}
 	}
-	s.cseen[key] = true
 	s.cmemo[key] = best
 	return best
 }
@@ -301,15 +278,8 @@ func (s *capSolver) bestRep(n *node, i, j, done int, hasEmpty bool) ([]*ptree, b
 		done = n.min
 	}
 	key := repKey{n, i, j, done, hasEmpty}
-	if s.rseen[key] {
-		result := s.rmemo[key]
-		if result == nil {
-			return nil, false
-		}
-		if len(result) == 1 && result[0] == nil {
-			return nil, true
-		}
-		return result, true
+	if cached, ok := s.rmemo[key]; ok {
+		return cached.kids, cached.ok
 	}
 	if !s.step() {
 		return nil, false
@@ -368,17 +338,8 @@ func (s *capSolver) bestRep(n *node, i, j, done int, hasEmpty bool) ([]*ptree, b
 			tryCandidate(kids)
 		}
 	}
-	s.rseen[key] = true
-	if !found {
-		s.rmemo[key] = nil
-		return nil, false
-	}
-	if best == nil {
-		s.rmemo[key] = []*ptree{nil}
-		return nil, true
-	}
-	s.rmemo[key] = best
-	return best, true
+	s.rmemo[key] = repResult{best, found}
+	return best, found
 }
 
 // getSolver reuses a pooled solver; the maps keep their buckets across
@@ -386,26 +347,34 @@ func (s *capSolver) bestRep(n *node, i, j, done int, hasEmpty bool) ([]*ptree, b
 func (re *Regexp) getSolver() *capSolver {
 	if s, ok := re.capPool.Get().(*capSolver); ok {
 		clear(s.memo)
-		clear(s.seen)
 		clear(s.cmemo)
-		clear(s.cseen)
 		clear(s.rmemo)
-		clear(s.rseen)
 		s.work = 0
 		s.failed = false
 		s.resetArenas()
 		return s
 	}
 	return &capSolver{
-		memo: make(map[memoKey]*ptree), seen: make(map[memoKey]bool),
-		cmemo: make(map[concatKey][]*ptree), cseen: make(map[concatKey]bool),
-		rmemo: make(map[repKey][]*ptree), rseen: make(map[repKey]bool),
-		ctrA: make([]int, re.minSlots), ctrB: make([]int, re.minSlots),
+		memo:  make(map[memoKey]*ptree),
+		cmemo: make(map[concatKey][]*ptree),
+		rmemo: make(map[repKey]repResult),
+		ctrA:  make([]int, re.minSlots), ctrB: make([]int, re.minSlots),
 	}
 }
 
 // solveCaptures fills caps (character spans) for the fixed span [so, eo).
 func (re *Regexp) solveCaptures(d *decoded, so, eo int, eflags ExecFlags, caps []Match) *Error {
+	if re.onePass {
+		for idx := range caps {
+			caps[idx] = Match{-1, -1}
+		}
+		caps[0] = Match{so, eo}
+		if re.onePassCaps(d, re.root, so, eo, eflags, caps) {
+			return nil
+		}
+		// The walk hit an inconsistency; the solver below re-derives
+		// everything, so a failure here only costs speed.
+	}
 	s := re.getSolver()
 	s.re, s.d, s.eflags = re, d, eflags
 	defer func() {
@@ -428,6 +397,10 @@ func (re *Regexp) solveCaptures(d *decoded, so, eo int, eflags ExecFlags, caps [
 	return nil
 }
 
+// assignCaps records group spans from the winning parse. Entering a
+// group clears every group nested inside it, which implements the
+// recursive last-participation rule of section 12.7. The oracle uses it
+// too.
 func assignCaps(re *Regexp, t *ptree, caps []Match) {
 	if t.n.op == opGroup {
 		for _, inner := range re.nested[t.n.index] {

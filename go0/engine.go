@@ -10,13 +10,25 @@ package revera
 // only grow, so the merge preserves the selected candidate.
 
 import (
+	"fmt"
+	"math/bits"
 	"slices"
 	"strings"
+
+	"revera/locale"
 )
 
 // maxElemAhead is the largest character count one transition can consume.
-// It matches the locale data's longest collating element.
+// It must cover the locale data's longest collating element; init checks
+// that the data still fits after a regeneration.
 const maxElemAhead = 8
+
+func init() {
+	if locale.MaxElementLength() > maxElemAhead {
+		panic(fmt.Sprintf("maxElemAhead = %d is smaller than the longest collating element (%d)",
+			maxElemAhead, locale.MaxElementLength()))
+	}
+}
 
 // slotTable holds the payloads for one character boundary.
 type slotTable struct {
@@ -25,7 +37,6 @@ type slotTable struct {
 	ctr    []uint32
 	active []uint32
 	gen    uint32
-	count  int
 }
 
 type engineWS struct {
@@ -73,7 +84,6 @@ func (ws *engineWS) prepare(prog *program, k, ring int) {
 		}
 		t.active = t.active[:0]
 		t.gen = 0
-		t.count = 0
 	}
 	if len(ws.bestCtr) < k {
 		ws.bestCtr = make([]uint32, k)
@@ -83,7 +93,9 @@ func (ws *engineWS) prepare(prog *program, k, ring int) {
 	ws.queue = ws.queue[:0]
 }
 
-// ctrLess compares two counter vectors lexicographically.
+// ctrLess compares two counter vectors lexicographically. It stays a
+// hand-written loop instead of slices.Compare so prune and store keep
+// fitting in the inline budget; they run on every transition.
 func ctrLess(a, b []uint32) bool {
 	for i := range a {
 		if a[i] != b[i] {
@@ -109,7 +121,6 @@ type phaseA struct {
 	eflags  ExecFlags
 	k       int
 	ring    int
-	icase   bool
 	nlMode  bool
 
 	ci   int
@@ -124,7 +135,7 @@ type phaseA struct {
 	bestCtr []uint32
 }
 
-func (re *Regexp) runPhaseA(subject string, eflags ExecFlags) (engineResult, *Error) {
+func (re *Regexp) runPhaseA(subject string, eflags ExecFlags) engineResult {
 	ws := re.getWS()
 	e := phaseA{
 		re:      re,
@@ -134,7 +145,6 @@ func (re *Regexp) runPhaseA(subject string, eflags ExecFlags) (engineResult, *Er
 		eflags:  eflags,
 		k:       re.minSlots,
 		ring:    2,
-		icase:   re.flags&ICase != 0,
 		nlMode:  re.flags&Newline != 0,
 	}
 	if e.prog.multi {
@@ -145,7 +155,7 @@ func (re *Regexp) runPhaseA(subject string, eflags ExecFlags) (engineResult, *Er
 	e.run()
 	ws.base = e.gen(e.ci) + uint32(e.ring) + 1
 	re.putWS(ws)
-	return engineResult{matched: e.matched, so: e.so, eo: e.eo}, nil
+	return engineResult{matched: e.matched, so: e.so, eo: e.eo}
 }
 
 func (e *phaseA) gen(boundary int) uint32 {
@@ -217,7 +227,6 @@ func (e *phaseA) store(t *slotTable, pc uint32, start int32, ctr []uint32) bool 
 	} else {
 		t.stamp[pc] = t.gen
 		t.active = append(t.active, pc)
-		t.count++
 	}
 	t.starts[pc] = start
 	if e.k > 0 {
@@ -277,27 +286,21 @@ func (e *phaseA) arrive(pc uint32, delta int, start int32, ctr []uint32) {
 	if future.gen != g {
 		future.gen = g
 		future.active = future.active[:0]
-		future.count = 0
 	}
 	newCtr := ctr
-	if e.k > 0 {
-		ins := &e.prog.ins[pc]
+	ins := &e.prog.ins[pc]
+	if e.k > 0 && (ins.mask != 0 || len(ins.extra) > 0) {
 		buffer := e.ws.ctrBuf[:e.k]
 		copy(buffer, ctr)
-		if ins.mask != 0 {
-			limit := min(e.k, maskWidth)
-			for slot := range limit {
-				if ins.mask&(1<<uint(slot)) != 0 {
-					buffer[slot] += uint32(delta)
-				}
-			}
+		for m := ins.mask; m != 0; m &= m - 1 {
+			buffer[bits.TrailingZeros64(m)] += uint32(delta)
 		}
 		for _, slot := range ins.extra {
 			buffer[slot] += uint32(delta)
 		}
 		newCtr = buffer
 	}
-	e.store(future, e.prog.ins[pc].next, start, newCtr)
+	e.store(future, ins.next, start, newCtr)
 }
 
 // consume advances every consuming instruction over the current
@@ -329,10 +332,10 @@ func (e *phaseA) consume(t *slotTable) {
 			}
 		case iBracket:
 			br := e.prog.brackets[ins.arg]
-			if br.matchesOne(e.cur, e.re.loc, e.icase, e.nlMode) {
+			if br.matchesOne(e.cur) {
 				e.arrive(pc, 1, start, ctr)
 			}
-			if !br.hasMultiMembers() {
+			if br.multiLens == 0 {
 				continue
 			}
 			if !aheadReady {
@@ -340,7 +343,10 @@ func (e *phaseA) consume(t *slotTable) {
 				aheadReady = true
 			}
 			for length := 2; length <= len(e.ws.ahead); length++ {
-				if br.matchesMulti(e.ws.ahead[:length], e.re.loc, e.icase) {
+				if br.multiLens&(1<<length) == 0 {
+					continue
+				}
+				if br.matchesMulti(e.ws.ahead[:length]) {
 					e.arrive(pc, length, start, ctr)
 				}
 			}
@@ -381,27 +387,30 @@ func (e *phaseA) scanAhead() int {
 	return len(s)
 }
 
+// bolAt reports whether a line begins at the current position, given the
+// preceding character.
+func (e *phaseA) bolAt(prev rune) bool {
+	return (e.pos == 0 && e.eflags&NotBOL == 0) ||
+		(e.nlMode && prev == '\n')
+}
+
 func (e *phaseA) run() {
 	var prev rune = -2
 	zeros := e.ws.zeros[:e.k]
 	for {
 		t := &e.ws.slots[e.ci%e.ring]
 		t.gen = e.gen(e.ci)
-		t.count = 0
 		live := t.active[:0]
 		for _, pc := range t.active {
 			if t.stamp[pc] == t.gen {
 				live = append(live, pc)
-				t.count++
 			}
 		}
 		t.active = live
 
-		if t.count == 0 && !e.matched && e.prog.scan.enabled &&
+		if len(t.active) == 0 && !e.matched && e.prog.scan.enabled &&
 			e.pos < len(e.subject) {
-			bolHere := (e.pos == 0 && e.eflags&NotBOL == 0) ||
-				(e.nlMode && prev == '\n')
-			if !bolHere {
+			if !e.bolAt(prev) {
 				// No thread is live and no match can begin on a byte
 				// outside the filter, so jump to the next stop byte.
 				next := e.scanAhead()
@@ -422,8 +431,7 @@ func (e *phaseA) run() {
 		if !atEnd {
 			e.cur, e.size = decodeRune(e.subject[e.pos:])
 		}
-		e.bol = (e.pos == 0 && e.eflags&NotBOL == 0) ||
-			(e.nlMode && prev == '\n')
+		e.bol = e.bolAt(prev)
 		e.eol = (atEnd && e.eflags&NotEOL == 0) ||
 			(e.nlMode && e.cur == '\n')
 
@@ -443,7 +451,7 @@ func (e *phaseA) run() {
 			pendingWork := false
 			for delta := 1; delta < e.ring; delta++ {
 				future := &e.ws.slots[(e.ci+delta)%e.ring]
-				if future.gen == e.gen(e.ci+delta) && future.count > 0 {
+				if future.gen == e.gen(e.ci+delta) && len(future.active) > 0 {
 					pendingWork = true
 					break
 				}

@@ -257,6 +257,38 @@ func TestPrimaryEqual(t *testing.T) {
 	}
 }
 
+func TestMinEquivLength(t *testing.T) {
+	cases := []struct {
+		locale string
+		seq    string
+		want   int
+	}{
+		// No single character shares the primary weight of these
+		// digraphs, so their classes need two characters.
+		{"cs", "ch", 2},
+		{"hu", "cs", 2},
+		{"cy", "ch", 2},
+		// Danish aa is primary equal to the single character å.
+		{"da", "aa", 1},
+		{"cs", "a", 1},
+		{"C", "a", 1},
+	}
+	for _, tc := range cases {
+		l, ok := Open(tc.locale, "")
+		if !ok {
+			t.Fatalf("Open(%q) failed", tc.locale)
+		}
+		if got := l.MinEquivLength([]rune(tc.seq)); got != tc.want {
+			t.Errorf("%s [[=%s=]]: MinEquivLength = %d, want %d",
+				tc.locale, tc.seq, got, tc.want)
+		}
+	}
+	da, _ := Open("da", "")
+	if !da.PrimaryEqual([]rune{'å'}, []rune("aa")) {
+		t.Fatal("da å/aa must be primary equal")
+	}
+}
+
 func TestNames(t *testing.T) {
 	if Count() != 1122 {
 		t.Fatalf("Count() = %d", Count())

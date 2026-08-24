@@ -8,10 +8,12 @@
 package main
 
 import (
+	"cmp"
 	"encoding/binary"
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 )
 
@@ -87,17 +89,10 @@ func caseInverse(rows [][3]uint32, toUpper bool) []uint64 {
 			pairs = append(pairs, pair{target, row[0]})
 		}
 	}
-	sortPairs := func(a, b pair) bool {
-		if a.target != b.target {
-			return a.target < b.target
-		}
-		return a.source < b.source
-	}
-	for i := 1; i < len(pairs); i++ {
-		for j := i; j > 0 && sortPairs(pairs[j], pairs[j-1]); j-- {
-			pairs[j], pairs[j-1] = pairs[j-1], pairs[j]
-		}
-	}
+	slices.SortFunc(pairs, func(a, b pair) int {
+		return cmp.Or(cmp.Compare(a.target, b.target),
+			cmp.Compare(a.source, b.source))
+	})
 	out := make([]uint64, 0, 2*len(pairs))
 	for _, p := range pairs {
 		out = append(out, uint64(p.target), uint64(p.source))
@@ -180,44 +175,30 @@ func run(inputPath, outputPath string) error {
 	}
 
 	type section struct {
-		name  string
-		width int // row width in values; 0 means a byte pool
-		bits  int // element size in bits for width-1 tables
+		name    string
+		width   int  // row width in values; 0 means a byte pool
+		bits    int  // element size in bits for width-1 tables
+		counted bool // the source declares a row count to verify
 	}
 	layout := []section{
-		{"rv_ctype_stage1", 1, 16},
-		{"rv_ctype_blocks", 1, 16},
-		{"rv_case_default", 3, 32},
-		{"rv_case_turkic", 3, 32},
-		{"rv_sequence_codepoints", 1, 32},
-		{"rv_sequences", 2, 32},
-		{"rv_root_contractions", 1, 32},
-		{"rv_root_equivalences", 2, 32},
-		{"rv_collation_overrides", 2, 32},
-		{"rv_contraction_adds", 1, 32},
-		{"rv_contraction_removes", 1, 32},
-		{"rv_collation_profiles", 6, 32},
-		{"rv_type_names", 0, 8},
-		{"rv_type_name_offsets", 1, 32},
-		{"rv_locale_names", 0, 8},
-		{"rv_locale_name_offsets", 1, 32},
-		{"rv_locales", 5, 32},
-		{"rv_locale_types", 2, 16},
-	}
-
-	counted := map[string]int{
-		"rv_case_default":        3,
-		"rv_case_turkic":         3,
-		"rv_sequence_codepoints": 1,
-		"rv_sequences":           2,
-		"rv_root_contractions":   1,
-		"rv_root_equivalences":   2,
-		"rv_collation_overrides": 2,
-		"rv_contraction_adds":    1,
-		"rv_contraction_removes": 1,
-		"rv_collation_profiles":  6,
-		"rv_locales":             5,
-		"rv_locale_types":        2,
+		{"rv_ctype_stage1", 1, 16, false},
+		{"rv_ctype_blocks", 1, 16, false},
+		{"rv_case_default", 3, 32, true},
+		{"rv_case_turkic", 3, 32, true},
+		{"rv_sequence_codepoints", 1, 32, true},
+		{"rv_sequences", 2, 32, true},
+		{"rv_root_contractions", 1, 32, true},
+		{"rv_root_equivalences", 2, 32, true},
+		{"rv_collation_overrides", 2, 32, true},
+		{"rv_contraction_adds", 1, 32, true},
+		{"rv_contraction_removes", 1, 32, true},
+		{"rv_collation_profiles", 6, 32, true},
+		{"rv_type_names", 0, 8, false},
+		{"rv_type_name_offsets", 1, 32, true},
+		{"rv_locale_names", 0, 8, false},
+		{"rv_locale_name_offsets", 1, 32, true},
+		{"rv_locales", 5, 32, true},
+		{"rv_locale_types", 2, 16, true},
 	}
 
 	blob := []byte("RVLOC001")
@@ -226,8 +207,8 @@ func run(inputPath, outputPath string) error {
 		if err != nil {
 			return err
 		}
-		if width, ok := counted[entry.name]; ok {
-			if err := checkCount(scalars, entry.name, len(values), width); err != nil {
+		if entry.counted {
+			if err := checkCount(scalars, entry.name, len(values), entry.width); err != nil {
 				return err
 			}
 		}
@@ -253,16 +234,6 @@ func run(inputPath, outputPath string) error {
 	maxSequence, ok := scalars["rv_max_sequence_length"]
 	if !ok {
 		return fmt.Errorf("missing rv_max_sequence_length")
-	}
-	nameOffsets := tables["rv_locale_name_offsets"]
-	declaredNames := scalars["rv_locale_name_offsets_count"]
-	if uint64(len(nameOffsets)) != declaredNames {
-		return fmt.Errorf("locale name offset count mismatch")
-	}
-	typeOffsets := tables["rv_type_name_offsets"]
-	declaredTypes := scalars["rv_type_name_offsets_count"]
-	if uint64(len(typeOffsets)) != declaredTypes {
-		return fmt.Errorf("type name offset count mismatch")
 	}
 	blob = appendSection(blob, encode32([]uint64{maxSequence}))
 

@@ -119,3 +119,84 @@ overflow on 32-bit platforms before its saturation clamp. Fixed with
 int64 arithmetic and re-verified with 386 and s390x cross-builds. The
 remaining conservative ESpace behaviors of the pruned-program gate are
 documented in go0/NOTES.md.
+
+The user then ran /simplify on the go0 import commit. Four review
+agents (reuse, simplification, efficiency, altitude) produced about
+thirty distinct findings. I applied most of them. The verbatim
+duplicates between the capture solver and the oracle (addCountersInt,
+bracketSpanOK, assignCaptures) are gone; the solver and the oracle now
+share addCounters, assignCaps, and a bracketSet.matchesSpan method.
+The hand-rolled UTF-8 decoder now wraps utf8.DecodeRuneInString. The
+solver's three seen/memo map pairs collapsed into single maps with
+comma-ok lookups, and the []*ptree{nil} sentinel became a small
+repResult struct. Bracket matching context (locale, ICase, Newline) is
+now bound into bracketSet at compile time, so the three per-call
+derivation sites disappeared. The locale package gained ClassMask (one
+table lookup instead of up to twelve), an internal collatingElementID
+that halves PrimaryEqual work, a cached max sequence length, and a
+table-driven ClassByName. The executor probes only the multi-character
+lengths a bracket can actually take, skips the counter copy on
+maskless instructions, and an init check ties maxElemAhead to the
+locale data. Smaller cleanups: clear(), min(), slices.SortFunc,
+BinarySearchFunc, []rune conversion, strings.IndexByte,
+utf8.AppendRune, slices.Clip, a shared trivialNullMatch helper, a
+bolAt helper, and dead weight removal (slotTable.count, runPhaseA's
+always-nil error, walk's unused post-order callback). The genlocale
+generator lost its insertion sort and its duplicate count tables; the
+regenerated blob is byte-identical. Skipped with reasons: folding
+minMatchChars into minL (the caps differ on purpose), sort.Search for
+the locale binary searches (hot paths), self-identifying blob
+sections (format change), byte-slice blob (string is deliberate), and
+counter caching on parse trees (needs benchmark-driven design). All
+tests, the race detector, and the differential suite pass; every
+benchmark is equal or better, captures are 30 percent faster with one
+less allocation.
+
+The user then asked me to fix the two pre-existing issues that swival
+had flagged. First, the failMin gate returned ESpace without trying
+the surviving branches. Exec now runs the pruned program for
+existence-only calls past the failMin bound; a match it finds is
+genuine because pruning only removes possibilities. A miss and any
+offset request still report ESpace. Second, an equivalence class
+counted a minimum of one character even when no single character
+belongs to it. The locale package gained MinEquivLength, which scans
+the equivalence pair sections for the shortest primary-equal element,
+and bracketMinChars uses it. An exhaustive scan over all scalars
+confirmed the pair-section result for Czech ch (two characters);
+Danish aa reports one through å. Added regression tests that assert
+the pruned failMin values, so they cannot pass vacuously, plus locale
+tests for MinEquivLength. Updated NOTES.md. Full tests, the race
+detector, and a swival review pass.
+
+The user then asked me to address the open items from go0/NOTES.md.
+Two boxes were open: one-pass detection and the manual libc harness.
+For one-pass, Compile now proves parse uniqueness instead of analyzing
+selection orderings, which satisfies the study document's proof
+obligation directly. A node qualifies through fixed-length repetition
+operands, at most one variable-length concatenation child, and
+alternations selected by span length or one-character lookahead over
+exact disjoint first sets. When the proof succeeds, phase B fills the
+groups from one verified deterministic walk in onepass.go; any
+inconsistency falls back to the solver, so a walk defect can only cost
+speed. On a 4,000-character span the walk runs in 30 microseconds with
+zero allocations where the solver needs 17 milliseconds and 68 MB.
+The libc harness became a real test: internal/libcre wraps regcomp and
+regexec through cgo, and libc_differential_test.go (macOS only)
+replays the seeded 20,000-case corpus, classifying the two documented
+divergence classes and failing on anything else; it reproduces exactly
+the 18 known cases. I also fixed a sentinel dual-use the previous
+swival review pointed out: failMin now uses failMinNone instead of
+lenInf, which a saturated pruned minimum can legitimately reach, and
+the one-pass length rules refuse saturated bounds for the same reason.
+New tests cover detection, the section 12.7 clearing in the walk, and
+a three-way random comparison of walk, solver, and oracle. Full tests,
+the race detector, a 30-second fuzz run with 5.5 million executions,
+no-cgo and 386 cross builds all pass.
+
+The closing swival review found no soundness hole in the one-pass
+path and endorsed the failMinNone sentinel. It flagged one blind spot
+in the new libc test: a regression that copies a libc bug would only
+shrink the known-divergence count, and the test would still pass. The
+test now asserts the exact count of 18 for the seeded corpus, and a
+table test pins one exemplar per divergence class with the expected
+result on both sides, so convergence toward libc fails loudly.

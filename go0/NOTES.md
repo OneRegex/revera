@@ -45,22 +45,34 @@ This file tracks the Go cleanroom implementation of
 
 Current benchmarks (Apple M4, `go test -bench .`):
 
-| Benchmark             | Speed      | Allocations       |
-| --------------------- | ---------- | ----------------- |
-| Literal tail search   | ~11 GB/s   | 0 per op          |
-| No-match literal scan | ~60 GB/s   | 0 per op          |
-| Ambiguous `(a|b)*abb` | ~23 MB/s   | 0 per op          |
-| Class-heavy pattern   | ~30 MB/s   | 0 per op          |
-| Small-span captures   | ~1.6 us/op | 5 (266 B) per op  |
+| Benchmark               | Speed      | Allocations       |
+| ----------------------- | ---------- | ----------------- |
+| Literal tail search     | ~20 GB/s   | 0 per op          |
+| No-match literal scan   | ~60 GB/s   | 0 per op          |
+| Ambiguous `(a|b)*abb`   | ~25 MB/s   | 0 per op          |
+| Class-heavy pattern     | ~35 MB/s   | 0 per op          |
+| Small-span captures     | ~1.3 us/op | 4 (192 B) per op  |
+| One-pass capture walk   | ~30 us     | 0 per op          |
+| Same span, forced solver| ~17 ms     | 3,771 (68 MB)     |
 
 Open items:
 
-- [ ] One-pass detection is not built. Ambiguous patterns keep every
-      viable thread live, at about 20-30 MB/s.
+- [x] One-pass captures. Compile-time analysis proves that every span
+      has at most one parse; phase B then reads the groups from one
+      deterministic walk instead of the memoized solver. See the
+      engine-architecture section for the eligibility rules. Phase A
+      stays parallel: a genuinely ambiguous pattern still keeps every
+      viable thread live at NFA speed, and a lazy DFA remains the
+      future lever for that case.
 - [x] Phase B parse trees and child lists come from pooled bump arenas;
       the maps and scratch are pooled too. It runs only when the caller
       asks for group captures, and only over the selected span.
-- [ ] The libc differential harness lives in `tmp/` and is manual.
+- [x] The libc differential harness is a cgo test now
+      (`libc_differential_test.go`, macOS only, with the C wrapper in
+      `internal/libcre`). It replays the same seeded 20,000-case corpus
+      as the old manual run in `tmp/`, classifies the two documented
+      divergence classes, and fails on anything else. The current count
+      is exactly the 18 known cases.
 
 ## Design decisions
 
@@ -136,6 +148,39 @@ pattern over the same start compare like this:
   context-free and memoization is valid.
 - The test oracle enumerates all parses and applies the comparison
   directly. It validates both phases differentially.
+
+### One-pass captures
+
+The techniques study requires a strong proof before one-pass execution:
+no two successful derivations may differ in POSIX ordering or captures.
+Parse uniqueness implies that directly, so `Compile` proves uniqueness
+instead of analyzing orderings. A node is one-pass when:
+
+- it is an atom, an anchor, or a bracket without multi-character
+  elements (a multi-character element makes the consumed length
+  ambiguous);
+- it is a concatenation of one-pass children with at most one
+  variable-length child, so every split point follows from the span
+  length by arithmetic;
+- it is a repetition whose operand has a fixed nonempty length, which
+  forces the instance count and rules out null occurrences;
+- it is an alternation whose branches have pairwise-disjoint length
+  ranges, or exact pairwise-disjoint first sets with at most one
+  nullable branch, so the span length or one lookahead character
+  selects the branch.
+
+Length classifications never trust saturated bounds: two lengths
+saturated at `lenInf` compare equal without being exact. When the proof
+succeeds, phase B walks the selected span once, verifies every step,
+and fills the groups with zero allocations. Any inconsistency makes
+the walk report failure and the solver take over, so a defect in the
+walk can only cost speed. The walk-versus-solver comparison runs in the
+one-pass tests over random eligible patterns, and the ordinary
+differential tests cover the path against the oracle as well.
+
+Concatenations with several variable-length children stay on the
+solver even when a separator would make them unambiguous, as in
+`(a*)-(b*)`; follow-set analysis could admit them later.
 
 ### Chosen outcomes in undefined or unspecified areas
 
@@ -243,3 +288,18 @@ with libc on the full capture vectors except 18 cases in two classes:
   answer, and an equivalence-class-only bracket contributes a minimum
   of one character because the class membership is not enumerable.
   These conservative outcomes are errors, never wrong match results.
+- A later review noted that `lenInf` served as both the "nothing was
+  pruned" sentinel and a saturated bound, so a pruned subtree whose
+  minimum length saturates at `lenInf` would masquerade as no pruning
+  at all. The sentinel is now the distinct `failMinNone`.
+- Both conservative behaviors were later narrowed. Past the `failMin`
+  bound, an existence-only call now runs the pruned program anyway:
+  pruning removes possibilities and adds none, so a match it still
+  finds is a genuine match. A miss keeps reporting `ESpace`, and so
+  does a request for offsets, because the pruned program could select
+  the wrong spans. Equivalence classes now contribute their exact
+  minimum length: every element that shares a primary weight with
+  another appears in the equivalence pair sections, so
+  `locale.MinEquivLength` scans them for the shortest member. Czech
+  `[[=ch=]]` counts two characters; Danish `[[=aa=]]` counts one,
+  through `å`.

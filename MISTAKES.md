@@ -76,3 +76,9 @@
   32-bit platform the sum can overflow and corrupt the length bounds
   that the capture solver trusts. The arithmetic now runs in int64.
   Found by the fourth review.
+- Replacing the hand-rolled ctrLess loop with generic slices.Compare
+  looked like pure cleanup, but it pushed prune and store past the
+  inliner budget and slowed the ambiguous-star benchmark by 25
+  percent. Reverted with a comment explaining why the loop stays.
+  Lesson: in a hot path, benchmark a "trivial" stdlib substitution
+  before keeping it.

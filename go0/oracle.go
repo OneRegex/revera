@@ -5,7 +5,10 @@ package revera
 // is correct by construction. It is exponential in the worst case and
 // exists as the semantic baseline; the fast engine must agree with it.
 
-import "slices"
+import (
+	"slices"
+	"unicode/utf8"
+)
 
 // decoded is a subject window decoded into characters with byte
 // boundaries. The edge flags carry the anchor context of the text
@@ -54,39 +57,11 @@ func decodeWindow(s string, so, eo int) decoded {
 }
 
 // decodeRune decodes one UTF-8 character, mapping encoding errors to the
-// invalid-byte sentinel one byte at a time.
+// invalid-byte sentinel one byte at a time. An encoded U+FFFD comes back
+// from the stdlib decoder with size 3, so it stays distinguishable.
 func decodeRune(s string) (rune, int) {
-	c := s[0]
-	if c < 0x80 {
-		return rune(c), 1
-	}
-	var size int
-	var r rune
-	switch {
-	case c&0xe0 == 0xc0:
-		size, r = 2, rune(c&0x1f)
-	case c&0xf0 == 0xe0:
-		size, r = 3, rune(c&0x0f)
-	case c&0xf8 == 0xf0:
-		size, r = 4, rune(c&0x07)
-	default:
-		return invalidRune, 1
-	}
-	if len(s) < size {
-		return invalidRune, 1
-	}
-	for i := 1; i < size; i++ {
-		if s[i]&0xc0 != 0x80 {
-			return invalidRune, 1
-		}
-		r = r<<6 | rune(s[i]&0x3f)
-	}
-	if r > 0x10ffff || (r >= 0xd800 && r <= 0xdfff) {
-		return invalidRune, 1
-	}
-	// Reject overlong encodings; they would alias shorter characters.
-	minValue := [5]rune{0, 0, 0x80, 0x800, 0x10000}[size]
-	if r < minValue {
+	r, size := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError && size <= 1 {
 		return invalidRune, 1
 	}
 	return r, size
@@ -189,7 +164,7 @@ func (o *oracle) parses(n *node, i, j int) []*ptree {
 			out = append(out, &ptree{n: n, i: i, j: j})
 		}
 	case opBracket:
-		if o.bracketSpanOK(n, i, j) {
+		if n.br.matchesSpan(o.d.runes, i, j) {
 			out = append(out, &ptree{n: n, i: i, j: j})
 		}
 	case opBOL:
@@ -241,22 +216,6 @@ func (o *oracle) parses(n *node, i, j int) []*ptree {
 	}
 	o.memo[key] = out
 	return out
-}
-
-func (o *oracle) bracketSpanOK(n *node, i, j int) bool {
-	k := j - i
-	if k < 1 {
-		return false
-	}
-	newlineMode := o.re.flags&Newline != 0
-	icase := o.re.flags&ICase != 0
-	if k == 1 {
-		return n.br.matchesOne(o.d.runes[i], o.re.loc, icase, newlineMode)
-	}
-	if !n.br.hasMultiMembers() {
-		return false
-	}
-	return n.br.matchesMulti(o.d.runes[i:j], o.re.loc, icase)
 }
 
 // concatParses enumerates child parse lists covering [i, j) in order.
@@ -403,21 +362,6 @@ func (o *oracle) betterCandidate(a, b *ptree, ca, cb []int) bool {
 	return structCmp(a, b) < 0
 }
 
-// assignCaptures records group spans from the winning parse. Entering a
-// group clears every group nested inside it, which implements the
-// recursive last-participation rule of section 12.7.
-func (o *oracle) assignCaptures(t *ptree, caps []Match) {
-	if t.n.op == opGroup {
-		for _, inner := range o.re.nested[t.n.index] {
-			caps[inner] = Match{-1, -1}
-		}
-		caps[t.n.index] = Match{t.i, t.j}
-	}
-	for _, kid := range t.kids {
-		o.assignCaptures(kid, caps)
-	}
-}
-
 // oracleExec runs the reference matcher. Capture offsets come back in
 // character positions; the caller converts them to bytes.
 func (re *Regexp) oracleExec(d *decoded, eflags ExecFlags) (bool, []Match, error) {
@@ -429,9 +373,7 @@ func (re *Regexp) oracleExec(d *decoded, eflags ExecFlags) (bool, []Match, error
 		counters := make([]int, re.minSlots)
 		for end := start; end <= n; end++ {
 			for _, tree := range o.parses(re.root, start, end) {
-				for idx := range counters {
-					counters[idx] = 0
-				}
+				clear(counters)
 				addCounters(tree, counters)
 				if best == nil || o.betterCandidate(tree, best, counters, bestCounters) {
 					best = tree
@@ -448,7 +390,7 @@ func (re *Regexp) oracleExec(d *decoded, eflags ExecFlags) (bool, []Match, error
 				caps[idx] = Match{-1, -1}
 			}
 			caps[0] = Match{best.i, best.j}
-			o.assignCaptures(best, caps)
+			assignCaps(re, best, caps)
 			return true, caps, nil
 		}
 	}
