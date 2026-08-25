@@ -1,0 +1,3676 @@
+{
+ "consts": [
+  {
+   "k": "const",
+   "name": "minI64",
+   "type": null,
+   "value": {
+    "k": "unary",
+    "op": "-",
+    "x": {
+     "k": "int",
+     "value": "9223372036854775808"
+    }
+   }
+  }
+ ],
+ "funcs": [
+  {
+   "body": [
+    {
+     "k": "incdec",
+     "lhs": {
+      "k": "field",
+      "name": "n",
+      "x": {
+       "k": "ident",
+       "name": "c"
+      }
+     },
+     "op": "++"
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "log",
+       "x": {
+        "k": "ident",
+        "name": "c"
+       }
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "field",
+        "name": "log",
+        "x": {
+         "k": "ident",
+         "name": "c"
+        }
+       },
+       {
+        "k": "ident",
+        "name": "tag"
+       }
+      ],
+      "fn": "append",
+      "k": "builtin",
+      "spread": false,
+      "type": null
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "conv",
+       "type": {
+        "k": "named",
+        "name": "int64"
+       },
+       "x": {
+        "k": "ident",
+        "name": "tag"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "bump",
+   "params": [
+    {
+     "name": "c",
+     "type": {
+      "k": "ptr",
+      "name": "Counter"
+     }
+    },
+    {
+     "name": "tag",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "v"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "v"
+        }
+       ],
+       "value": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "v"
+         },
+         "y": {
+          "k": "int",
+          "value": "10"
+         }
+        },
+        "y": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "index": {
+           "k": "ident",
+           "name": "i"
+          },
+          "k": "index",
+          "x": {
+           "k": "field",
+           "name": "log",
+           "x": {
+            "k": "ident",
+            "name": "c"
+           }
+          }
+         }
+        }
+       }
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "field",
+         "name": "log",
+         "x": {
+          "k": "ident",
+          "name": "c"
+         }
+        }
+       ],
+       "fn": "len",
+       "k": "builtin",
+       "spread": false,
+       "type": null
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "ident",
+         "name": "v"
+        },
+        "y": {
+         "k": "int",
+         "value": "100"
+        }
+       },
+       "y": {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int64"
+        },
+        "x": {
+         "k": "field",
+         "name": "n",
+         "x": {
+          "k": "ident",
+          "name": "c"
+         }
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "logCode",
+   "params": [
+    {
+     "name": "c",
+     "type": {
+      "k": "ptr",
+      "name": "Counter"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "/",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       },
+       "y": {
+        "k": "ident",
+        "name": "b"
+       }
+      },
+      {
+       "k": "binary",
+       "op": "%",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       },
+       "y": {
+        "k": "ident",
+        "name": "b"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "DivMod",
+   "params": [
+    {
+     "name": "a",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "b",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    },
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "/",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       },
+       "y": {
+        "k": "ident",
+        "name": "b"
+       }
+      },
+      {
+       "k": "binary",
+       "op": "%",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       },
+       "y": {
+        "k": "ident",
+        "name": "b"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "DivMod32",
+   "params": [
+    {
+     "name": "a",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    },
+    {
+     "name": "b",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int32"
+    },
+    {
+     "k": "named",
+     "name": "int32"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "b"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "uint8"
+       },
+       "k": "slice"
+      },
+      "x": {
+       "k": "ident",
+       "name": "s"
+      }
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "\u003e",
+      "x": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "b"
+        }
+       ],
+       "fn": "len",
+       "k": "builtin",
+       "spread": false,
+       "type": null
+      },
+      "y": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "index": {
+          "k": "int",
+          "value": "0"
+         },
+         "k": "index",
+         "x": {
+          "k": "ident",
+          "name": "b"
+         }
+        }
+       ],
+       "value": {
+        "k": "char",
+        "value": "88"
+       }
+      }
+     ]
+    },
+    {
+     "k": "define",
+     "names": [
+      "t"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "t"
+        }
+       ],
+       "value": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "t"
+         },
+         "y": {
+          "k": "int",
+          "value": "31"
+         }
+        },
+        "y": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "index": {
+           "k": "ident",
+           "name": "i"
+          },
+          "k": "index",
+          "x": {
+           "k": "ident",
+           "name": "b"
+          }
+         }
+        }
+       }
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "b"
+        }
+       ],
+       "fn": "len",
+       "k": "builtin",
+       "spread": false,
+       "type": null
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "t"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "BytesProbe",
+   "params": [
+    {
+     "name": "s",
+     "type": {
+      "k": "named",
+      "name": "string"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "incdec",
+     "lhs": {
+      "k": "field",
+      "name": "n",
+      "x": {
+       "k": "ident",
+       "name": "c"
+      }
+     },
+     "op": "++"
+    },
+    {
+     "k": "define",
+     "names": [
+      "out"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "n"
+       }
+      ],
+      "fn": "make",
+      "k": "builtin",
+      "spread": false,
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "int32"
+       },
+       "k": "slice"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "index": {
+          "k": "ident",
+          "name": "i"
+         },
+         "k": "index",
+         "x": {
+          "k": "ident",
+          "name": "out"
+         }
+        }
+       ],
+       "value": {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int32"
+        },
+        "x": {
+         "k": "binary",
+         "op": "+",
+         "x": {
+          "k": "ident",
+          "name": "i"
+         },
+         "y": {
+          "k": "int",
+          "value": "1"
+         }
+        }
+       }
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "k": "ident",
+       "name": "n"
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "out"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "sliceFrom",
+   "params": [
+    {
+     "name": "c",
+     "type": {
+      "k": "ptr",
+      "name": "Counter"
+     }
+    },
+    {
+     "name": "n",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "elem": {
+      "k": "named",
+      "name": "int32"
+     },
+     "k": "slice"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "t"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "ident",
+        "name": "t"
+       },
+       "op": "+=",
+       "value": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "k": "ident",
+          "name": "i"
+         }
+        },
+        "y": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "k": "ident",
+          "name": "v"
+         }
+        }
+       }
+      },
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "i"
+        }
+       ],
+       "value": {
+        "k": "int",
+        "value": "100"
+       }
+      }
+     ],
+     "idx": "i",
+     "k": "range",
+     "over": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "c"
+       },
+       {
+        "k": "int",
+        "value": "4"
+       }
+      ],
+      "fn": "sliceFrom",
+      "k": "call"
+     },
+     "val": "v"
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "ident",
+         "name": "t"
+        },
+        "y": {
+         "k": "int",
+         "value": "10"
+        }
+       },
+       "y": {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int64"
+        },
+        "x": {
+         "k": "field",
+         "name": "n",
+         "x": {
+          "k": "ident",
+          "name": "c"
+         }
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "RangeProbe",
+   "params": [
+    {
+     "name": "c",
+     "type": {
+      "k": "ptr",
+      "name": "Counter"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "t"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "v"
+        }
+       ],
+       "value": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "ident",
+         "name": "v"
+        },
+        "y": {
+         "k": "int",
+         "value": "1"
+        }
+       }
+      },
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "ident",
+        "name": "t"
+       },
+       "op": "+=",
+       "value": {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int64"
+        },
+        "x": {
+         "k": "ident",
+         "name": "v"
+        }
+       }
+      }
+     ],
+     "idx": "_",
+     "k": "range",
+     "over": {
+      "k": "ident",
+      "name": "xs"
+     },
+     "val": "v"
+    },
+    {
+     "body": [
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "ident",
+        "name": "t"
+       },
+       "op": "+=",
+       "value": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "index": {
+           "k": "ident",
+           "name": "i"
+          },
+          "k": "index",
+          "x": {
+           "k": "ident",
+           "name": "xs"
+          }
+         }
+        },
+        "y": {
+         "k": "int",
+         "value": "100"
+        }
+       }
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "xs"
+        }
+       ],
+       "fn": "len",
+       "k": "builtin",
+       "spread": false,
+       "type": null
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "t"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "RangeValProbe",
+   "params": [
+    {
+     "name": "xs",
+     "type": {
+      "elem": {
+       "k": "named",
+       "name": "int32"
+      },
+      "k": "slice"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "t"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "t"
+        }
+       ],
+       "value": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "t"
+         },
+         "y": {
+          "k": "int",
+          "value": "2"
+         }
+        },
+        "y": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "k": "ident",
+          "name": "i"
+         }
+        }
+       }
+      }
+     ],
+     "idx": "i",
+     "k": "range",
+     "over": {
+      "k": "ident",
+      "name": "n"
+     },
+     "val": null
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "t"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "RangeIntProbe",
+   "params": [
+    {
+     "name": "n",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "a"
+     ],
+     "value": {
+      "elems": [
+       {
+        "k": "int",
+        "value": "7"
+       },
+       {
+        "k": "int",
+        "value": "9"
+       }
+      ],
+      "k": "composite",
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "int64"
+       },
+       "k": "array",
+       "len": {
+        "k": "int",
+        "value": "5"
+       }
+      }
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "names"
+     ],
+     "value": {
+      "elems": [
+       {
+        "k": "str",
+        "value": "a"
+       }
+      ],
+      "k": "composite",
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "string"
+       },
+       "k": "array",
+       "len": {
+        "k": "int",
+        "value": "3"
+       }
+      }
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "t"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "t"
+        }
+       ],
+       "value": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "t"
+         },
+         "y": {
+          "k": "int",
+          "value": "10"
+         }
+        },
+        "y": {
+         "index": {
+          "k": "ident",
+          "name": "i"
+         },
+         "k": "index",
+         "x": {
+          "k": "ident",
+          "name": "a"
+         }
+        }
+       }
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "k": "int",
+       "value": "5"
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "t"
+         },
+         "y": {
+          "k": "int",
+          "value": "10"
+         }
+        },
+        "y": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "args": [
+           {
+            "index": {
+             "k": "int",
+             "value": "1"
+            },
+            "k": "index",
+            "x": {
+             "k": "ident",
+             "name": "names"
+            }
+           }
+          ],
+          "fn": "len",
+          "k": "builtin",
+          "spread": false,
+          "type": null
+         }
+        }
+       },
+       "y": {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int64"
+        },
+        "x": {
+         "args": [
+          {
+           "index": {
+            "k": "int",
+            "value": "0"
+           },
+           "k": "index",
+           "x": {
+            "k": "ident",
+            "name": "names"
+           }
+          }
+         ],
+         "fn": "len",
+         "k": "builtin",
+         "spread": false,
+         "type": null
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "PartialArray",
+   "params": [],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "==",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       },
+       "y": {
+        "k": "ident",
+        "name": "b"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "TaggedEq",
+   "params": [
+    {
+     "name": "a",
+     "type": {
+      "k": "struct_ref",
+      "name": "Tagged"
+     }
+    },
+    {
+     "name": "b",
+     "type": {
+      "k": "struct_ref",
+      "name": "Tagged"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "bool"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "a"
+         },
+         "y": {
+          "k": "int",
+          "value": "100"
+         }
+        },
+        "y": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "b"
+         },
+         "y": {
+          "k": "int",
+          "value": "10"
+         }
+        }
+       },
+       "y": {
+        "k": "ident",
+        "name": "x"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "three",
+   "params": [
+    {
+     "name": "a",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "b",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "x",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "args": [
+         {
+          "args": [
+           {
+            "k": "ident",
+            "name": "c"
+           },
+           {
+            "k": "int",
+            "value": "1"
+           }
+          ],
+          "fn": "bump",
+          "k": "call"
+         },
+         {
+          "args": [
+           {
+            "k": "ident",
+            "name": "c"
+           },
+           {
+            "k": "int",
+            "value": "2"
+           }
+          ],
+          "fn": "bump",
+          "k": "call"
+         },
+         {
+          "args": [
+           {
+            "k": "ident",
+            "name": "c"
+           },
+           {
+            "k": "int",
+            "value": "3"
+           }
+          ],
+          "fn": "bump",
+          "k": "call"
+         }
+        ],
+        "fn": "three",
+        "k": "call"
+       },
+       "y": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "c"
+         }
+        ],
+        "fn": "logCode",
+        "k": "call"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "OrderArgs",
+   "params": [
+    {
+     "name": "c",
+     "type": {
+      "k": "ptr",
+      "name": "Counter"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "v"
+     ],
+     "value": {
+      "k": "binary",
+      "op": "-",
+      "x": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "c"
+        },
+        {
+         "k": "int",
+         "value": "4"
+        }
+       ],
+       "fn": "bump",
+       "k": "call"
+      },
+      "y": {
+       "k": "binary",
+       "op": "*",
+       "x": {
+        "k": "int",
+        "value": "2"
+       },
+       "y": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "c"
+         },
+         {
+          "k": "int",
+          "value": "5"
+         }
+        ],
+        "fn": "bump",
+        "k": "call"
+       }
+      }
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "ident",
+         "name": "v"
+        },
+        "y": {
+         "k": "int",
+         "value": "10000"
+        }
+       },
+       "y": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "c"
+         }
+        ],
+        "fn": "logCode",
+        "k": "call"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "OrderBinary",
+   "params": [
+    {
+     "name": "c",
+     "type": {
+      "k": "ptr",
+      "name": "Counter"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "s"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "c"
+       },
+       {
+        "k": "int",
+        "value": "6"
+       }
+      ],
+      "fn": "sliceFrom",
+      "k": "call"
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "v"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "index": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "c"
+         },
+         {
+          "k": "int",
+          "value": "2"
+         }
+        ],
+        "fn": "bump",
+        "k": "call"
+       },
+       "k": "index",
+       "x": {
+        "k": "ident",
+        "name": "s"
+       }
+      }
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "ident",
+         "name": "v"
+        },
+        "y": {
+         "k": "int",
+         "value": "10000"
+        }
+       },
+       "y": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "c"
+         }
+        ],
+        "fn": "logCode",
+        "k": "call"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "OrderIndex",
+   "params": [
+    {
+     "name": "c",
+     "type": {
+      "k": "ptr",
+      "name": "Counter"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "s"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "int",
+        "value": "0"
+       },
+       {
+        "k": "int",
+        "value": "4"
+       }
+      ],
+      "fn": "make",
+      "k": "builtin",
+      "spread": false,
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "int64"
+       },
+       "k": "slice"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "s"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "s"
+       },
+       {
+        "k": "int",
+        "value": "5"
+       }
+      ],
+      "fn": "append",
+      "k": "builtin",
+      "spread": false,
+      "type": null
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "s"
+      }
+     ],
+     "value": {
+      "hi": {
+       "k": "int",
+       "value": "4"
+      },
+      "k": "slice_expr",
+      "lo": null,
+      "x": {
+       "k": "ident",
+       "name": "s"
+      }
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "t"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "t"
+        }
+       ],
+       "value": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "+",
+         "x": {
+          "k": "binary",
+          "op": "*",
+          "x": {
+           "k": "ident",
+           "name": "t"
+          },
+          "y": {
+           "k": "int",
+           "value": "10"
+          }
+         },
+         "y": {
+          "index": {
+           "k": "ident",
+           "name": "i"
+          },
+          "k": "index",
+          "x": {
+           "k": "ident",
+           "name": "s"
+          }
+         }
+        },
+        "y": {
+         "k": "int",
+         "value": "1"
+        }
+       }
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "s"
+        }
+       ],
+       "fn": "len",
+       "k": "builtin",
+       "spread": false,
+       "type": null
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "g"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "int",
+        "value": "0"
+       },
+       {
+        "k": "int",
+        "value": "2"
+       }
+      ],
+      "fn": "make",
+      "k": "builtin",
+      "spread": false,
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "int64"
+       },
+       "k": "slice"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "g"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "g"
+       },
+       {
+        "k": "int",
+        "value": "1"
+       }
+      ],
+      "fn": "append",
+      "k": "builtin",
+      "spread": false,
+      "type": null
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "g"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "g"
+       },
+       {
+        "k": "int",
+        "value": "2"
+       }
+      ],
+      "fn": "append",
+      "k": "builtin",
+      "spread": false,
+      "type": null
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "g"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "g"
+       },
+       {
+        "k": "int",
+        "value": "3"
+       }
+      ],
+      "fn": "append",
+      "k": "builtin",
+      "spread": false,
+      "type": null
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "\u003e=",
+      "x": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "g"
+        }
+       ],
+       "fn": "cap",
+       "k": "builtin",
+       "spread": false,
+       "type": null
+      },
+      "y": {
+       "k": "int",
+       "value": "4"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "g"
+        }
+       ],
+       "value": {
+        "hi": {
+         "k": "int",
+         "value": "4"
+        },
+        "k": "slice_expr",
+        "lo": null,
+        "x": {
+         "k": "ident",
+         "name": "g"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "t"
+        }
+       ],
+       "value": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "+",
+         "x": {
+          "k": "binary",
+          "op": "*",
+          "x": {
+           "k": "ident",
+           "name": "t"
+          },
+          "y": {
+           "k": "int",
+           "value": "10"
+          }
+         },
+         "y": {
+          "index": {
+           "k": "ident",
+           "name": "i"
+          },
+          "k": "index",
+          "x": {
+           "k": "ident",
+           "name": "g"
+          }
+         }
+        },
+        "y": {
+         "k": "int",
+         "value": "1"
+        }
+       }
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "k": "int",
+       "value": "4"
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "t"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "SpareProbe",
+   "params": [],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "var_decl",
+     "name": "s",
+     "type": {
+      "elem": {
+       "k": "named",
+       "name": "int32"
+      },
+      "k": "slice"
+     },
+     "value": null
+    },
+    {
+     "k": "define",
+     "names": [
+      "t"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "==",
+      "x": {
+       "k": "ident",
+       "name": "s"
+      },
+      "y": {
+       "k": "ident",
+       "name": "nil"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "incdec",
+       "lhs": {
+        "k": "ident",
+        "name": "t"
+       },
+       "op": "++"
+      }
+     ]
+    },
+    {
+     "k": "define",
+     "names": [
+      "s2"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "int",
+        "value": "0"
+       }
+      ],
+      "fn": "make",
+      "k": "builtin",
+      "spread": false,
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "int32"
+       },
+       "k": "slice"
+      }
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "!=",
+      "x": {
+       "k": "ident",
+       "name": "s2"
+      },
+      "y": {
+       "k": "ident",
+       "name": "nil"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "ident",
+        "name": "t"
+       },
+       "op": "+=",
+       "value": {
+        "k": "int",
+        "value": "2"
+       }
+      }
+     ]
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "s"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "s"
+       },
+       {
+        "k": "int",
+        "value": "5"
+       }
+      ],
+      "fn": "append",
+      "k": "builtin",
+      "spread": false,
+      "type": null
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "!=",
+      "x": {
+       "k": "ident",
+       "name": "s"
+      },
+      "y": {
+       "k": "ident",
+       "name": "nil"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "ident",
+        "name": "t"
+       },
+       "op": "+=",
+       "value": {
+        "k": "int",
+        "value": "4"
+       }
+      }
+     ]
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "t"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "NilProbe",
+   "params": [],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "-",
+       "x": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "a"
+         },
+         "y": {
+          "k": "ident",
+          "name": "b"
+         }
+        },
+        "y": {
+         "k": "ident",
+         "name": "a"
+        }
+       },
+       "y": {
+        "k": "ident",
+        "name": "b"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "WrapProbe",
+   "params": [
+    {
+     "name": "a",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "b",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "-",
+        "x": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "a"
+         },
+         "y": {
+          "k": "ident",
+          "name": "b"
+         }
+        },
+        "y": {
+         "k": "binary",
+         "op": "/",
+         "x": {
+          "k": "ident",
+          "name": "a"
+         },
+         "y": {
+          "k": "ident",
+          "name": "b"
+         }
+        }
+       },
+       "y": {
+        "k": "binary",
+        "op": "%",
+        "x": {
+         "k": "ident",
+         "name": "a"
+        },
+        "y": {
+         "k": "ident",
+         "name": "b"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "Narrow32",
+   "params": [
+    {
+     "name": "a",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    },
+    {
+     "name": "b",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int32"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "*",
+       "x": {
+        "k": "binary",
+        "op": "-",
+        "x": {
+         "k": "ident",
+         "name": "a"
+        },
+        "y": {
+         "k": "ident",
+         "name": "b"
+        }
+       },
+       "y": {
+        "k": "int",
+        "value": "3"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "WrapU8",
+   "params": [
+    {
+     "name": "a",
+     "type": {
+      "k": "named",
+      "name": "uint8"
+     }
+    },
+    {
+     "name": "b",
+     "type": {
+      "k": "named",
+      "name": "uint8"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "uint8"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "op_assign",
+     "lhs": {
+      "k": "ident",
+      "name": "a"
+     },
+     "op": "\u0026^=",
+     "value": {
+      "k": "ident",
+      "name": "b"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "\u0026^",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       },
+       "y": {
+        "k": "binary",
+        "op": "\u003e\u003e",
+        "x": {
+         "k": "ident",
+         "name": "b"
+        },
+        "y": {
+         "k": "int",
+         "value": "1"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "AndNotProbe",
+   "params": [
+    {
+     "name": "a",
+     "type": {
+      "k": "named",
+      "name": "uint32"
+     }
+    },
+    {
+     "name": "b",
+     "type": {
+      "k": "named",
+      "name": "uint32"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "uint32"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "\u003e\u003e",
+       "x": {
+        "k": "binary",
+        "op": "\u003c\u003c",
+        "x": {
+         "k": "ident",
+         "name": "x"
+        },
+        "y": {
+         "k": "ident",
+         "name": "n"
+        }
+       },
+       "y": {
+        "k": "binary",
+        "op": "/",
+        "x": {
+         "k": "ident",
+         "name": "n"
+        },
+        "y": {
+         "k": "int",
+         "value": "2"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "ShiftProbe",
+   "params": [
+    {
+     "name": "x",
+     "type": {
+      "k": "named",
+      "name": "uint64"
+     }
+    },
+    {
+     "name": "n",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "uint64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "uint64"
+        },
+        "x": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "uint8"
+         },
+         "x": {
+          "k": "ident",
+          "name": "x"
+         }
+        }
+       },
+       "y": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "uint64"
+         },
+         "x": {
+          "k": "conv",
+          "type": {
+           "k": "named",
+           "name": "uint32"
+          },
+          "x": {
+           "k": "conv",
+           "type": {
+            "k": "named",
+            "name": "int32"
+           },
+           "x": {
+            "k": "ident",
+            "name": "x"
+           }
+          }
+         }
+        },
+        "y": {
+         "k": "int",
+         "value": "1000"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "ConvProbe",
+   "params": [
+    {
+     "name": "x",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "uint64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "s"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "n"
+       }
+      ],
+      "fn": "make",
+      "k": "builtin",
+      "spread": false,
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "int64"
+       },
+       "k": "slice"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "index": {
+        "k": "int",
+        "value": "0"
+       },
+       "k": "index",
+       "x": {
+        "hi": null,
+        "k": "slice_expr",
+        "lo": {
+         "k": "int",
+         "value": "1"
+        },
+        "x": {
+         "k": "ident",
+         "name": "s"
+        }
+       }
+      }
+     ],
+     "value": {
+      "k": "int",
+      "value": "7"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "index": {
+        "k": "int",
+        "value": "0"
+       },
+       "k": "index",
+       "x": {
+        "hi": null,
+        "k": "slice_expr",
+        "lo": {
+         "k": "int",
+         "value": "1"
+        },
+        "x": {
+         "hi": null,
+         "k": "slice_expr",
+         "lo": {
+          "k": "int",
+          "value": "1"
+         },
+         "x": {
+          "k": "ident",
+          "name": "s"
+         }
+        }
+       }
+      }
+     ],
+     "value": {
+      "k": "int",
+      "value": "9"
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "t"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "t"
+        }
+       ],
+       "value": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "ident",
+          "name": "t"
+         },
+         "y": {
+          "k": "int",
+          "value": "10"
+         }
+        },
+        "y": {
+         "index": {
+          "k": "ident",
+          "name": "i"
+         },
+         "k": "index",
+         "x": {
+          "k": "ident",
+          "name": "s"
+         }
+        }
+       }
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "s"
+        }
+       ],
+       "fn": "len",
+       "k": "builtin",
+       "spread": false,
+       "type": null
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "t"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "SubWrite",
+   "params": [
+    {
+     "name": "n",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "s"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "int",
+        "value": "8"
+       }
+      ],
+      "fn": "make",
+      "k": "builtin",
+      "spread": false,
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "uint64"
+       },
+       "k": "slice"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "index": {
+        "k": "int",
+        "value": "3"
+       },
+       "k": "index",
+       "x": {
+        "k": "ident",
+        "name": "s"
+       }
+      }
+     ],
+     "value": {
+      "k": "int",
+      "value": "255"
+     }
+    },
+    {
+     "k": "op_assign",
+     "lhs": {
+      "index": {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "c"
+         },
+         {
+          "k": "int",
+          "value": "1"
+         }
+        ],
+        "fn": "bump",
+        "k": "call"
+       },
+       "y": {
+        "k": "int",
+        "value": "2"
+       }
+      },
+      "k": "index",
+      "x": {
+       "k": "ident",
+       "name": "s"
+      }
+     },
+     "op": "\u0026^=",
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "k": "conv",
+       "type": {
+        "k": "named",
+        "name": "uint64"
+       },
+       "x": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "c"
+         },
+         {
+          "k": "int",
+          "value": "2"
+         }
+        ],
+        "fn": "bump",
+        "k": "call"
+       }
+      },
+      "y": {
+       "k": "int",
+       "value": "15"
+      }
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "index": {
+           "k": "int",
+           "value": "3"
+          },
+          "k": "index",
+          "x": {
+           "k": "ident",
+           "name": "s"
+          }
+         }
+        },
+        "y": {
+         "k": "int",
+         "value": "100000"
+        }
+       },
+       "y": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "c"
+         }
+        ],
+        "fn": "logCode",
+        "k": "call"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "AndNotOrder",
+   "params": [
+    {
+     "name": "c",
+     "type": {
+      "k": "ptr",
+      "name": "Counter"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "var_decl",
+     "name": "a",
+     "type": {
+      "elem": {
+       "k": "named",
+       "name": "int32"
+      },
+      "k": "array",
+      "len": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "value": null
+    },
+    {
+     "k": "define",
+     "names": [
+      "t"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "!=",
+      "x": {
+       "hi": null,
+       "k": "slice_expr",
+       "lo": null,
+       "x": {
+        "k": "ident",
+        "name": "a"
+       }
+      },
+      "y": {
+       "k": "ident",
+       "name": "nil"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "incdec",
+       "lhs": {
+        "k": "ident",
+        "name": "t"
+       },
+       "op": "++"
+      }
+     ]
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "t"
+      }
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "k": "binary",
+       "op": "*",
+       "x": {
+        "k": "ident",
+        "name": "t"
+       },
+       "y": {
+        "k": "int",
+        "value": "10"
+       }
+      },
+      "y": {
+       "k": "conv",
+       "type": {
+        "k": "named",
+        "name": "int64"
+       },
+       "x": {
+        "args": [
+         {
+          "hi": null,
+          "k": "slice_expr",
+          "lo": null,
+          "x": {
+           "k": "ident",
+           "name": "a"
+          }
+         }
+        ],
+        "fn": "len",
+        "k": "builtin",
+        "spread": false,
+        "type": null
+       }
+      }
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "t"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "ZeroArray",
+   "params": [],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "s"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "n"
+       }
+      ],
+      "fn": "make",
+      "k": "builtin",
+      "spread": false,
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "int32"
+       },
+       "k": "slice"
+      }
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "conv",
+       "type": {
+        "k": "named",
+        "name": "int64"
+       },
+       "x": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "s"
+         }
+        ],
+        "fn": "len",
+        "k": "builtin",
+        "spread": false,
+        "type": null
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "MakeU64",
+   "params": [
+    {
+     "name": "n",
+     "type": {
+      "k": "named",
+      "name": "uint64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "var_decl",
+     "name": "a",
+     "type": {
+      "elem": {
+       "k": "named",
+       "name": "int64"
+      },
+      "k": "array",
+      "len": {
+       "k": "int",
+       "value": "3"
+      }
+     },
+     "value": null
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "index": {
+        "k": "int",
+        "value": "0"
+       },
+       "k": "index",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       }
+      }
+     ],
+     "value": {
+      "k": "ident",
+      "name": "x"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "index": {
+        "k": "int",
+        "value": "1"
+       },
+       "k": "index",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       }
+      }
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "k": "ident",
+       "name": "x"
+      },
+      "y": {
+       "k": "int",
+       "value": "1"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "index": {
+        "k": "int",
+        "value": "2"
+       },
+       "k": "index",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       }
+      }
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "k": "ident",
+       "name": "x"
+      },
+      "y": {
+       "k": "int",
+       "value": "2"
+      }
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "a"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "mkTriple",
+   "params": [
+    {
+     "name": "x",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "elem": {
+      "k": "named",
+      "name": "int64"
+     },
+     "k": "array",
+     "len": {
+      "k": "int",
+      "value": "3"
+     }
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "v"
+     ],
+     "value": {
+      "index": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "c"
+        },
+        {
+         "k": "int",
+         "value": "2"
+        }
+       ],
+       "fn": "bump",
+       "k": "call"
+      },
+      "k": "index",
+      "x": {
+       "args": [
+        {
+         "k": "int",
+         "value": "40"
+        }
+       ],
+       "fn": "mkTriple",
+       "k": "call"
+      }
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "ident",
+         "name": "v"
+        },
+        "y": {
+         "k": "int",
+         "value": "10000"
+        }
+       },
+       "y": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "c"
+         }
+        ],
+        "fn": "logCode",
+        "k": "call"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "PickArray",
+   "params": [
+    {
+     "name": "c",
+     "type": {
+      "k": "ptr",
+      "name": "Counter"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  }
+ ],
+ "package": "probe",
+ "types": [
+  {
+   "fields": [
+    {
+     "name": "n",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    },
+    {
+     "name": "log",
+     "type": {
+      "elem": {
+       "k": "named",
+       "name": "int32"
+      },
+      "k": "slice"
+     }
+    }
+   ],
+   "k": "type",
+   "name": "Counter"
+  },
+  {
+   "fields": [
+    {
+     "name": "Tags",
+     "type": {
+      "elem": {
+       "k": "named",
+       "name": "string"
+      },
+      "k": "array",
+      "len": {
+       "k": "int",
+       "value": "2"
+      }
+     }
+    },
+    {
+     "name": "N",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    }
+   ],
+   "k": "type",
+   "name": "Tagged"
+  }
+ ],
+ "vars": [],
+ "vego": 1
+}

@@ -319,8 +319,8 @@ func (c *checker) varDecls(decl *ast.GenDecl) []any {
 		for i, name := range vs.Names {
 			c.checkConstInitializer(vs.Values[i])
 			if obj := c.info.Defs[name]; obj != nil {
-				if _, isSlice := obj.Type().Underlying().(*types.Slice); isSlice {
-					c.errorf(name.Pos(), "slice-typed package variables are not in the subset")
+				if typeContainsSlice(obj.Type()) {
+					c.errorf(name.Pos(), "package variable types must not contain slices")
 				}
 			}
 			entry := map[string]any{"k": "var", "name": name.Name,
@@ -334,6 +334,26 @@ func (c *checker) varDecls(decl *ast.GenDecl) []any {
 		}
 	}
 	return out
+}
+
+// typeContainsSlice walks a type for a slice at any depth. A
+// package variable is static constant data in every target, which
+// a slice buffer cannot be. The vegoc checker enforces the same
+// rule over the JSON, for producers that bypass this tool.
+func typeContainsSlice(t types.Type) bool {
+	switch u := t.Underlying().(type) {
+	case *types.Slice:
+		return true
+	case *types.Array:
+		return typeContainsSlice(u.Elem())
+	case *types.Struct:
+		for i := 0; i < u.NumFields(); i++ {
+			if typeContainsSlice(u.Field(i).Type()) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // checkConstInitializer accepts constant expressions and composite

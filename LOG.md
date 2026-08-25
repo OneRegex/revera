@@ -385,3 +385,95 @@ and removing the Regexp.multi field (inherited go0 shape, read once
 at compile time). The JSON was regenerated; the full differential
 suite and the regenerated-from-JSON engine both pass, with vet and
 gofmt clean.
+
+## Target printers and instantiations (Zig, C++, Rust)
+
+The user asked, based on the work in go1, for a printer and
+implementations in Zig, C++ and Rust, verified correct. I built a
+shared front end, go1/vegoc, that loads revera.vego.json, infers
+the type of every expression, folds constants, and computes local
+usage and mutation; three printers (cmd/json2zig, cmd/json2cpp,
+cmd/json2rust) consume it. Each target directory (zig1/, cpp1/,
+rust1/) pairs the generated engine with a hand-written minimal
+runtime: Slice and Str value types with Go slice-header semantics
+lowered to pointer plus length (the spec's sanctioned route, since
+Vego views can alias), Go-exact integer conversion and comparison
+helpers, the embedded locale blob, and three arenas (persistent
+locale data, per-pattern, per-operation scratch) replacing the
+garbage collector. Verification is a cross-language differential
+harness: revera/driver_host.go defines a line protocol, each
+target ships a driver speaking it, and cmd/crosscheck feeds all
+drivers the corpora of the go1 differential tests (random patterns
+across every flag set, the fixed corpus, the cs multi-element
+locale, replacement, iteration, contracts, and locale case-map
+sweeps), comparing against the Go engine line by line. The final
+joint run covers 191059 commands, including 25000 extra random
+patterns; the Zig, C++ and Rust drivers agree with Go on every
+line. Language lessons landed in api-faq.md, design notes in
+go1/PROGRESS-TARGETS.md, and missteps in MISTAKES.md.
+
+## Review round on the target printers
+
+A swival review of the finished targets surfaced translator gaps
+and two latent engine-relevant bugs, all fixed and re-verified.
+The deep one: Go zeroes allocations and the engine extends slices
+inside capacity, so the C++ and Zig runtimes had to zero the spare
+region of grown buffers; malloc had been handing out zero pages by
+luck, and poisoning the region proved the dependence. The C++
+printer now pins side-effecting operands and arguments into
+ordered temporaries, since C++ leaves evaluation order unspecified
+where Go fixes it left to right; pointer-typed arguments stay
+inline because they lower to references and a temporary would copy
+the referent. Signed division goes through MinInt-safe helpers in
+all three targets. Smaller lowerings landed for []uint8(s), &^= in
+C++, MinInt literals, partial array literals, struct equality over
+string and array fields, and range statements. The driver protocol
+gained error positions on replacement, both O endpoints truncate
+like the reference, and the corpus now sweeps execution flags over
+replacement and iteration and runs case-insensitive matching per
+locale. A new go1/probe package exercises every previously
+uncovered construct; cmd/probecheck verifies the three probe
+binaries against the Go package, and all match. Final state:
+191689 corpus commands and 24 probe lines agree across Go, Zig,
+C++ and Rust.
+
+## Second review round on the target printers
+
+A re-run of the swival review returned four findings, all fixed:
+package variables may not contain slices at any depth (vego2json
+and vegoc both reject them now, since globals are static constant
+data no target can allocate); the Rust printer accepts subslice
+views as assignment bases (a slice base is a value, not a place);
+Rust &^= routes through the same pinned-place lowering as other
+compound assignments, keeping Go's place-before-value order; and
+the C++ zero-length array view uses a static sentinel instead of
+arithmetic on a fabricated pointer. The probe suite grew to 29
+lines covering each fix, plus unsigned make lengths and indexing
+an array-typed call result, which earlier rounds fixed. All
+corpora and probes pass in the three languages.
+
+## Simplify pass on the target-printer change set
+
+Four parallel review agents (reuse, simplification, efficiency,
+altitude) went over the hand-written files. Applied: the corpus
+generators and fixed tables moved into revera/corpus_host.go, so
+the differential tests and crosscheck share one source (their
+copies had already drifted); vegoc gained WalkExpr/WalkStmt and
+the six hand-rolled AST walkers now use them, with the printers'
+diverged containsCall copies replaced by vegoc.Impure; LoadFile
+and TupName joined vegoc; the two-value-assign side-effect rule
+moved from three printers into the checker; array lengths resolve
+once during Check, replacing the foldProgram package global whose
+answers depended on whether a check was in flight; crosscheck runs
+its drivers concurrently and imports the engine's flag constants;
+the runtimes zero only the spare region of grown buffers and bulk-
+copy slice literals; the C++ driver decodes hex without sscanf;
+and a dozen small cleanups (dead assignments, one-caller helpers,
+duplicate constants, redundant length checks, std.mem.zeroes and
+the {x} formatter in Zig). Skipped by choice: bump-allocator
+arenas for C++/Rust (a verified-memory rework for milliseconds),
+moving the probe call matrix into the subset (a redesign, and the
+per-language mains are deliberate differential surface), and
+deriving HasElse from nil (the flags document loader intent).
+Everything reverified: full test suite, the 191689-command
+extended crosscheck, and all 29 probe lines in three languages.

@@ -124,3 +124,54 @@
   statements, and zero-argument append all slipped through. I fixed
   the code, tightened the checker, aligned the spec, and added tests
   for every case.
+
+## 2026-08-25, target printers (Zig/C++/Rust)
+
+- The first Zig driver used one arena per compiled pattern and
+  reset it only at the next compile. Exec workspaces for the
+  solver-heavy corpus patterns piled up gigabytes across the 88
+  Exec commands sharing one pattern, and the process thrashed. Go
+  hid this cost behind the garbage collector. Lesson: when removing
+  a GC, map every allocation to an explicit lifetime first; the
+  workspace lifetime (one Exec) was shorter than the arena I gave
+  it (one pattern).
+- I diagnosed the hang at the wrong corpus line because the driver
+  buffered its output; the stall point I computed from output line
+  count was off by the buffered tail. Per-line flushes made the
+  next diagnosis exact. Lesson: make the failure observable before
+  locating it.
+- I first wrote the checker to type constants strictly in
+  declaration order; the engine references constants ahead of
+  their declaration, which Go allows. On-demand resolution fixed
+  it. Lesson: Go declaration-order freedom applies to constants
+  too, not only functions.
+- I piped the first swival review through `tail -80`, which threw
+  away the top-priority findings; only items 8 through 13
+  survived. Lesson: capture full review output to a file, then
+  read it.
+- The C++ evaluation-order pinning copied pointer-typed arguments
+  into temporaries. A Vego `*S` parameter lowers to a C++
+  reference, so `auto _t = b;` copied the referent struct, and the
+  callee mutated the copy. Symptom: one alternation pattern lost
+  its program fragments. Lesson: a lowering that changes an
+  argument's binding class (reference to value) is not a pure
+  reordering.
+- The C++ and Zig runtimes left the spare capacity of grown
+  buffers uninitialized. Go zeroes allocations, and the engine
+  extends slices inside capacity (`s[:off+n]`), reading memory it
+  never wrote. The corpora passed for days on zero pages fresh
+  from the OS; recycled arena memory and allocator perturbations
+  flipped results. Poisoning the spare region made the dependence
+  deterministic and provable. Lesson: match the source language's
+  allocation contract, not the behavior observed on a lucky
+  allocator, and poison what must not be read to prove it is not.
+- Two debug bisects chased phantoms because the test loop ignored
+  build failures and reused stale binaries, and because the
+  underlying nondeterminism made "pass" unrepeatable. Lesson:
+  before bisecting, pin down that the failure is deterministic and
+  that every probe actually rebuilt.
+- My first fix for zero-length array views replaced a null pointer
+  with `reinterpret_cast<T*>(alignof(T))` and then did arithmetic
+  on it, which is itself undefined behavior. The review caught it;
+  a static sentinel object now provides real storage. Lesson: do
+  not patch undefined behavior with a smaller undefined behavior.

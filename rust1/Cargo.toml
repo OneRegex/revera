@@ -1,0 +1,23 @@
+[package]
+name = "revera-rust"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "driver"
+path = "src/main.rs"
+
+[[bin]]
+name = "probe"
+path = "src/probe_main.rs"
+
+# The Vego specification gives integers Go's wrapping semantics, so
+# overflow checks stay off in every profile. The runtime's bounds
+# asserts use assert!, which debug-assertions does not control, but
+# keeping it on also guards the few debug_assert! sites in std.
+[profile.dev]
+overflow-checks = false
+
+[profile.release]
+overflow-checks = false
+debug-assertions = true

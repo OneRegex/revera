@@ -17,6 +17,21 @@ and its JSON representation in full.
   into a compilable Go file. The same recipe with a different
   printer produces the C++, Rust, or Zig instantiation.
 - `revera.vego.json` is the generated JSON form of the engine.
+- `vegoc` is the shared front end of the target printers: it loads
+  the JSON, types every expression, folds constants, and computes
+  local usage and mutation.
+- `cmd/json2zig`, `cmd/json2cpp` and `cmd/json2rust` print the
+  engine in the target languages; the results and their runtimes
+  live in `../zig1`, `../cpp1` and `../rust1`.
+- `cmd/crosscheck` verifies the target drivers against the Go
+  engine over the differential corpora; `cmd/godriver` runs the
+  same driver protocol with the Go engine, for debugging.
+- `probe/` is a second Vego package (JSON form: `probe.vego.json`)
+  covering the subset constructs the engine never uses: range
+  statements, division overflow, byte-slice conversion, comparable
+  structs, evaluation order, spare-capacity zeroing. `cmd/proberef`
+  prints its results with the Go original, and `cmd/probecheck`
+  diffs each target's probe binary against them.
 
 ## API differences against go0
 
@@ -66,5 +81,16 @@ go run ./cmd/json2go -o /tmp/engine_gen.go revera.vego.json
 
 Regenerating the engine from the JSON and running the same test
 suite against the regenerated file passes. The JSON therefore
-carries the whole program, which is what the planned Rust, C++, and
-Zig converters and the LEAN4 proof consume.
+carries the whole program, which is what the Rust, C++, and Zig
+converters and the planned LEAN4 proof consume.
+
+The target instantiations close a second loop. Each target builds
+a driver speaking a small line protocol (see
+`revera/driver_host.go`), and `cmd/crosscheck` feeds every driver
+the corpora of the differential tests, comparing against the Go
+engine line by line:
+
+```sh
+go run ./cmd/crosscheck ../zig1/zig-out/bin/driver \
+    ../cpp1/driver ../rust1/target/release/driver
+```

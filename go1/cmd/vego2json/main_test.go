@@ -129,7 +129,7 @@ func TestRejections(t *testing.T) {
 		{"pointer local", "package p\n\ntype S struct{ X int }\n\nfunc g(p *S) {}\n\nfunc f() {\n\tvar s S\n\tp := &s\n\tg(p)\n}\n",
 			"call argument"},
 		{"global slice", "package p\n\nvar g = []int{1}\n\nfunc f() int { return g[0] }\n",
-			"slice-typed package variables"},
+			"must not contain slices"},
 		{"global passed as slice", "package p\n\nvar g = [1]int{1}\n\nfunc mutate(v []int) { v[0] = 2 }\n\nfunc f() { mutate(g[:]) }\n",
 			"package-level data"},
 		{"rune-slice conversion", "package p\n\nfunc f(a []int32) string { return string(a) }\n",

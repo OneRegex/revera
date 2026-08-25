@@ -7,7 +7,6 @@ package revera
 
 import (
 	"math/rand"
-	"strings"
 	"testing"
 
 	g0 "revera"
@@ -71,93 +70,17 @@ func compareExec(t *testing.T, pattern string, re0 *g0.Regexp, re1 *Regexp, subj
 	}
 }
 
-// genPattern builds a random valid ERE over a small alphabet, the
-// same shape the go0 differential uses.
-func genPattern(rng *rand.Rand, depth int) string {
-	if depth <= 0 {
-		return genAtom(rng)
-	}
-	switch rng.Intn(10) {
-	case 0:
-		return genPattern(rng, depth-1) + "|" + genPattern(rng, depth-1)
-	case 1:
-		return "(" + genPattern(rng, depth-1) + ")" + genDup(rng)
-	case 2:
-		return genPattern(rng, depth-1) + genPattern(rng, depth-1)
-	case 3:
-		return genAtom(rng) + genDup(rng)
-	case 4:
-		return "^" + genPattern(rng, depth-1)
-	case 5:
-		return genPattern(rng, depth-1) + "$"
-	default:
-		return genAtom(rng) + genPattern(rng, depth-1)
-	}
-}
-
-func genAtom(rng *rand.Rand) string {
-	switch rng.Intn(8) {
-	case 0:
-		return "."
-	case 1:
-		return "[ab]"
-	case 2:
-		return "[^a]"
-	case 3:
-		return "[a-c]"
-	case 4:
-		return "[[:alpha:]]"
-	case 5:
-		return "[[=a=]]"
-	default:
-		return string(rune('a' + rng.Intn(3)))
-	}
-}
-
-func genDup(rng *rand.Rand) string {
-	var dup string
-	switch rng.Intn(7) {
-	case 0:
-		dup = "*"
-	case 1:
-		dup = "+"
-	case 2:
-		dup = "?"
-	case 3:
-		dup = "{2}"
-	case 4:
-		dup = "{0,2}"
-	case 5:
-		dup = "{1,}"
-	default:
-		return ""
-	}
-	if rng.Intn(3) == 0 {
-		dup += "?"
-	}
-	return dup
-}
-
-func genSubject(rng *rand.Rand, alphabet string, maxLen int) string {
-	length := rng.Intn(maxLen + 1)
-	var out strings.Builder
-	for range length {
-		out.WriteByte(alphabet[rng.Intn(len(alphabet))])
-	}
-	return out.String()
-}
-
 func runDifferential(t *testing.T, seed int64, rounds int, cflags uint32, alphabet string) {
 	t.Helper()
 	rng := rand.New(rand.NewSource(seed))
 	for range rounds {
-		pattern := genPattern(rng, 3)
+		pattern := GenPattern(rng, 3)
 		re0, re1, ok := compileBoth(t, pattern, cflags)
 		if !ok {
 			continue
 		}
 		for range 6 {
-			subject := genSubject(rng, alphabet, 7)
+			subject := GenSubject(rng, alphabet, 7)
 			eflags := uint32(rng.Intn(4))
 			compareExec(t, pattern, re0, &re1, subject, eflags)
 		}
@@ -192,60 +115,13 @@ func TestDifferentialICaseMinimal(t *testing.T) {
 // including the spec section 16 shapes and the capacity fallbacks,
 // through both engines.
 func TestDifferentialFixed(t *testing.T) {
-	patterns := []string{
-		"(a|ab)(c|bcd)(d*)",
-		"(a*)(a*?)c",
-		"((a)|b)*",
-		"(a?)*b",
-		"(a{0,2}){2,3}",
-		"x{2,3}",
-		"(wee|week)(knights|night)",
-		"a[bc]d",
-		"[[:alpha:]]+$",
-		"^[^a]*$",
-		"(a+)(b+)?",
-		"(a|b)*abb",
-		"\\.\\[\\(",
-		"a{0}b",
-		"(|a)b",
-		"a{251}{250}{250}",
-		"(a{200}){200}{200}",
-		// The full ((a*){250}){250} over a long subject needs tens
-		// of gigabytes in both engines before ESpace, so the corpus
-		// keeps the nesting but blocks the match with a final b.
-		"((a*){250}){250}b",
-		"((a*){4}){4}",
-		"[]a]b",
-		"[^]a]b",
-		"[a-]b",
-		"ab$c",
-		"^*a",
-		"a**",
-		"a{2,1}",
-		"a{",
-		"a\\",
-		"(ab",
-		"ab)",
-		"[ab",
-		"a{1000}",
-		"é(è|e)*",
-		".€.",
-	}
-	subjects := []string{
-		"", "a", "b", "ab", "abc", "abcd", "aabb", "abab", "aaac",
-		"xxx", "weeknights", "a\nb", "\n", "aaaaab", "abb", "aabbab",
-		"éèe", "x€y", "\xff", "a\xffb", "a\x00b",
-		strings.Repeat("a", 120),
-	}
-	flagSets := []uint32{0, FlagICase, FlagNewline, FlagMinimal,
-		FlagICase | FlagNewline, FlagNoSub}
-	for _, cflags := range flagSets {
-		for _, pattern := range patterns {
+	for _, cflags := range FixedFlagSets {
+		for _, pattern := range FixedPatterns {
 			re0, re1, ok := compileBoth(t, pattern, cflags)
 			if !ok {
 				continue
 			}
-			for _, subject := range subjects {
+			for _, subject := range FixedSubjects {
 				for _, eflags := range []uint32{0, 1, 2, 3} {
 					compareExec(t, pattern, re0, &re1, subject, eflags)
 				}
@@ -264,12 +140,8 @@ func TestDifferentialMultiElement(t *testing.T) {
 		t.Fatal("go1 cs locale missing")
 	}
 	rng := rand.New(rand.NewSource(5))
-	patterns := []string{
-		"[[.ch.]]", "([[.ch.]]|c)h?", "[[.ch.]]*x?", "a?[[.ch.]]+",
-		"([[.ch.]]?)(h*)", "[[=ch=]]", "([[.ch.]]|[ch])*",
-	}
 	for _, cflags := range []uint32{0, FlagICase, FlagMinimal} {
-		for _, pattern := range patterns {
+		for _, pattern := range MultiElementPatterns {
 			re0, err0 := g0.Compile(pattern, cs0, g0.CompileFlags(cflags))
 			if err0 != nil {
 				t.Fatalf("go0 Compile(%q) failed: %v", pattern, err0)
@@ -279,7 +151,7 @@ func TestDifferentialMultiElement(t *testing.T) {
 				t.Fatalf("go1 Compile(%q) failed: code %d", pattern, err1.Code)
 			}
 			for range 40 {
-				subject := genSubject(rng, "chxCH", 6)
+				subject := GenSubject(rng, "chxCH", 6)
 				compareExec(t, pattern, re0, &re1, subject, 0)
 			}
 		}
@@ -287,49 +159,31 @@ func TestDifferentialMultiElement(t *testing.T) {
 }
 
 func TestDifferentialReplace(t *testing.T) {
-	type callCase struct {
-		pattern     string
-		subject     string
-		replacement string
-		limit       int
-	}
-	cases := []callCase{
-		{"(a+)(b+)", "aabb xab", `\2\1`, -1},
-		{"a*", "bab", "-", -1},
-		{"a*", "bab", "&&", 2},
-		{"b", "abc", `[\&]`, -1},
-		{"x", "abc", "y", -1},
-		{"(a)(b)?", "ab a", `<\1\2>`, -1},
-		{"a", "aaaa", "z", 2},
-		{"a", "aaaa", "z", 0},
-	}
-	for _, c := range cases {
-		re0, re1, ok := compileBoth(t, c.pattern, 0)
+	for _, c := range ReplaceCases {
+		re0, re1, ok := compileBoth(t, c.Pattern, 0)
 		if !ok {
-			t.Fatalf("corpus pattern %q failed to compile", c.pattern)
+			t.Fatalf("corpus pattern %q failed to compile", c.Pattern)
 		}
-		out0, err0 := re0.ReplaceAll(c.subject, c.replacement, c.limit, 0)
-		out1, err1 := ReplaceAll(&re1, c.subject, c.replacement, c.limit, 0)
+		out0, err0 := re0.ReplaceAll(c.Subject, c.Replacement, c.Limit, 0)
+		out1, err1 := ReplaceAll(&re1, c.Subject, c.Replacement, c.Limit, 0)
 		code0 := g0Code(err0)
 		if code0 != err1.Code {
 			t.Fatalf("ReplaceAll(%q, %q): go0 code=%d, go1 code=%d",
-				c.pattern, c.replacement, code0, err1.Code)
+				c.Pattern, c.Replacement, code0, err1.Code)
 		}
 		if err0 == nil && out0 != out1 {
 			t.Fatalf("ReplaceAll(%q, %q, %q): go0 %q, go1 %q",
-				c.pattern, c.subject, c.replacement, out0, out1)
+				c.Pattern, c.Subject, c.Replacement, out0, out1)
 		}
 	}
 }
 
 func TestDifferentialMatchIter(t *testing.T) {
-	patterns := []string{"a*", "(a|b)+", "b", "", "a?"}
-	subjects := []string{"", "abba", "b\nab", "aaa", "xyz"}
-	for _, pattern := range patterns {
+	for _, pattern := range IterPatterns {
 		if pattern == "" {
 			continue
 		}
-		for _, subject := range subjects {
+		for _, subject := range IterSubjects {
 			for _, limit := range []int{-1, 0, 1, 2} {
 				re0, re1, ok := compileBoth(t, pattern, 0)
 				if !ok {
