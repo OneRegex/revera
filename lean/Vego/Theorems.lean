@@ -32,21 +32,28 @@ What the theorems say:
    out-of-range index or slice, no division by zero, no
    impossible shift, no ill-typed step.
 
-   Every Exec call also stays within the resource contract that
-   the engine's own contract code computes for its pattern and
-   subject length. The buffer bytes it allocates never pass
-   ContractHeapBytes. Its deepest call chain, priced at the
-   contract's per-frame estimate, never passes ContractStackBytes.
-   Its loop iterations and calls never pass ContractSteps. A
-   violation of any bound is a hard session fault, so this theorem
-   would be false.
+   Every Exec that an X command performs also stays within the
+   resource contract that the engine's own contract code computes
+   for its pattern and subject length. The buffer bytes it
+   allocates never pass ContractHeapBytes. Its deepest call chain,
+   priced at the contract's per-frame estimate, never passes
+   ContractStackBytes. Its loop iterations and calls never pass
+   ContractSteps. A violation of any bound is a hard session
+   fault, so this theorem would be false.
+
+   The R and I commands are outside that claim. ReplaceAll and
+   MatchIterNext call Exec themselves, and the session measures
+   only the calls it makes directly, so the 360 R and I commands
+   of the corpus are checked for output agreement but not against
+   a contract. Metering them needs a delta around the inner call
+   rather than a reset around the outer one.
 
    The corpus holds two patterns that cannot be executed under the
    interpreter in any reasonable time, and the theorem leaves
    their 1056 executions out of the 86691 commands. It keeps their
    compiles and their contract queries, so no pattern escapes the
-   check and the contract figures of the extreme cases are still
-   compared against the Go reference. `Vego.Corpus` documents the
+   check and the figures of the extreme cases are still compared
+   against the Go reference. `Vego.Corpus` documents the
    measurements behind that choice, and the proposition re-checks
    its own coverage.
 -/

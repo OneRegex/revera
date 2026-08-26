@@ -32,17 +32,14 @@ produced it. -/
 structure Worst where
   ratio : Nat := 0
   over : Nat := 0
-  seen : Bool := false
-  cmd : String := ""
-  st : MeterStat := default
+  win : Option (String × MeterStat) := none
 
 def Worst.add (w : Worst) (cmd : String) (st : MeterStat)
     (r : Nat) : Worst :=
-  { ratio := if r > w.ratio then r else w.ratio,
-    over := if r > 1000 then w.over + 1 else w.over,
-    seen := true,
-    cmd := if r > w.ratio || !w.seen then cmd else w.cmd,
-    st := if r > w.ratio || !w.seen then st else w.st }
+  let over := if r > 1000 then w.over + 1 else w.over
+  if w.win.isNone || r > w.ratio then
+    { ratio := r, over, win := some (cmd, st) }
+  else { w with over }
 
 def statLine (cmd : String) (st : MeterStat) : String :=
   s!"heap {st.heapUsed}/{st.heapBound} " ++
@@ -50,21 +47,28 @@ def statLine (cmd : String) (st : MeterStat) : String :=
   s!"steps {st.stepsUsed}/{st.stepsBound} " ++
   s!"loops {st.loopsUsed}/{st.stepsBound} : {cmd.take 60}"
 
-/-- The four meters, each with the ratio it reports. -/
-def meterRatio : List (String × (MeterStat → Nat)) :=
-  [("heap", fun st => permille st.heapUsed st.heapBound),
-   ("stack", fun st => permille (st.depthUsed * frameBytes) st.stackBound),
-   ("steps", fun st => permille st.stepsUsed st.stepsBound),
-   ("loops", fun st => permille st.loopsUsed st.stepsBound)]
+/-- The meters, each with the ratio it reports and whether the
+session enforces it. The step counter is reported but not
+enforced: it counts one unit per executed statement, which is
+finer than the contract's abstract operations, so Exec's fixed
+setup takes it over the figure on tiny subjects. The loop counter
+is the enforced one. -/
+def meterRatio : List (String × Bool × (MeterStat → Nat)) :=
+  [("heap", true, fun st => permille st.heapUsed st.heapBound),
+   ("stack", true,
+    fun st => permille (st.depthUsed * frameBytes) st.stackBound),
+   ("steps", false, fun st => permille st.stepsUsed st.stepsBound),
+   ("loops", true, fun st => permille st.loopsUsed st.stepsBound)]
 
-def reportWorsts (measured : Nat) (ws : Array Worst) : IO Unit := do
+def reportWorsts (measured : Nat) (ws : List Worst) : IO Unit := do
   IO.println s!"measured Exec calls: {measured}"
-  for (name, _) in meterRatio, w in ws do
-    if w.seen then
-      IO.println s!"{name}: worst {w.ratio} permille, {w.over} over"
-      IO.println s!"  {statLine w.cmd w.st}"
-    else
-      IO.println s!"{name}: no data"
+  for (name, enforced, _) in meterRatio, w in ws do
+    let tag := if enforced then "" else " (reported only)"
+    match w.win with
+    | some (cmd, st) =>
+      IO.println s!"{name}{tag}: worst {w.ratio} permille, {w.over} over"
+      IO.println s!"  {statLine cmd st}"
+    | none => IO.println s!"{name}{tag}: no data"
 
 def main (args : List String) : IO UInt32 := do
   let contracts := args.contains "--contracts"
@@ -87,16 +91,13 @@ def main (args : List String) : IO UInt32 := do
     | .ok s0 => do
       let stdout ← IO.getStdout
       let t0 ← IO.monoMsNow
-      let mut s := { s0 with fuel,
-                             enforce := !contracts,
-                             collect := contracts }
+      let mut s := { s0 with fuel, calibrate := contracts }
       let mut checked := 0
       let mut skipped := 0
       let mut reStale := false
       let mut idx := 0
       let mut measured := 0
-      let mut worsts : Array Worst :=
-        Array.replicate meterRatio.length {}
+      let mut worsts : List Worst := meterRatio.map (fun _ => {})
       for (cmd, want) in pairs do
         let tc ← IO.monoMsNow
         match corpusStep s reStale cmd want with
@@ -116,10 +117,8 @@ def main (args : List String) : IO UInt32 := do
         -- accumulate one record per Exec.
         for st in s.stats do
           measured := measured + 1
-          let mut i := 0
-          for (_, ratio) in meterRatio do
-            worsts := worsts.modify i (fun w => w.add cmd st (ratio st))
-            i := i + 1
+          worsts := (meterRatio.zip worsts).map
+            (fun ((_, _, ratio), w) => w.add cmd st (ratio st))
         if !s.stats.isEmpty then
           s := { s with stats := #[] }
         let dtc := (← IO.monoMsNow) - tc

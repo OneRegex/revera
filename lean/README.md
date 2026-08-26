@@ -41,17 +41,24 @@ all inputs and are proved by induction, with no native evaluation.
    commands execute.
 
    The same theorem also proves the resource contracts sound over
-   the corpus. The interpreter meters every Exec call: the bytes
-   of every buffer allocation (make, append growth, slice
-   literals, and the string conversions, at the fixed 64-bit
-   layout the targets share), the deepest call chain, and one
-   abstract step per loop iteration and per call. Before each Exec
-   the session computes the pattern's contract for the subject
-   length with the engine's own interpreted ContractFor, and a
-   measurement above ContractHeapBytes, ContractStackBytes (at the
-   contract's 256-byte frame estimate), or ContractSteps is a hard
-   fault. The theorem therefore states that no real evaluation in
-   the corpus ever exceeds its contract.
+   the executions it measures. The interpreter meters each Exec
+   the session calls: the bytes of every buffer allocation (make,
+   append growth, slice literals, and the string conversions, at
+   the fixed 64-bit layout the targets share), the deepest call
+   chain, and one abstract step per loop iteration and per call.
+   Before each one the session computes the pattern's contract for
+   the subject length with the engine's own interpreted
+   ContractFor, and a measurement above ContractHeapBytes,
+   ContractStackBytes (at the contract's 256-byte frame estimate),
+   or ContractSteps is a hard fault.
+
+   That covers the X commands, which are 76112 of the corpus. It
+   does not cover R and I: ReplaceAll and MatchIterNext call Exec
+   themselves, and the session measures only its own calls, so
+   those 360 commands are checked for output agreement alone.
+   Metering them needs a delta around the inner call rather than a
+   reset around the outer one, which the monotonicity lemmas of
+   `MeterSound.lean` would justify.
 
    The heap meter counts the total bytes of every buffer the call
    allocates, never subtracting: that matches the arena-backed
@@ -83,8 +90,8 @@ all inputs and are proved by induction, with no native evaluation.
    of them, so no pattern goes uncompiled and unchecked. The T
    commands of those blocks are kept too, so the contract figures
    of the two extreme patterns are still compared against the Go
-   reference; those are the figures that reach the saturation cap,
-   so they are the ones worth keeping. Only the executions go.
+   reference; those are the largest figures in the corpus, which
+   makes them the ones worth keeping. Only the executions go.
    Dropping them is sound for the session state, because an X
    command allocates its own match buffer and writes no session
    root. `Vego/Corpus.lean` records the measurements, and the

@@ -22,8 +22,8 @@ What the theorem drops is exactly the X commands of those blocks,
 in the corpus is still compiled and checked, and it keeps their T
 commands, so the contract figures of those patterns are still
 compared against the Go reference. That matters most for these
-patterns, because their figures are the ones that reach the
-saturation cap. Only the executions go.
+patterns, because their figures are the largest the corpus
+produces. Only the executions go.
 
 Dropping X commands is sound for the session state. An X command
 allocates its own match buffer and calls Exec; it writes no
@@ -51,41 +51,53 @@ def intractablePatterns : List String :=
   ["2828612a297b3235307d297b3235307d62",
    "2828612a297b347d297b347d"]
 
-/-- The tokens of a command, without the empty ones. -/
-def cmdTokens (cmd : String) : List String :=
-  (cmd.splitOn " ").filter (· ≠ "")
+/-- What one command is, for the filter: a compile carrying its
+pattern, an execution, or anything else. One tokenization answers
+all three questions. -/
+inductive CmdKind where
+  | compile (pat : Option String)
+  | exec
+  | other
 
-/-- The pattern token of a compile command, if the command is one. -/
-def compilePattern (cmd : String) : Option String :=
-  match cmdTokens cmd with
-  | ["C", _, pat] => some pat
-  | _ => none
+def cmdKind (cmd : String) : CmdKind :=
+  match (cmd.splitOn " ").filter (· ≠ "") with
+  | ["C", _, pat] => .compile (some pat)
+  | "C" :: _ => .compile none
+  | "X" :: _ => .exec
+  | _ => .other
 
-def isCompile (cmd : String) : Bool := (cmdTokens cmd).head? == some "C"
-
-def isExec (cmd : String) : Bool := (cmdTokens cmd).head? == some "X"
+def isCompile (cmd : String) : Bool :=
+  match cmdKind cmd with
+  | .compile _ => true
+  | _ => false
 
 /-- Drop the executions of the intractable blocks. `inSlow` says
 whether the block being scanned is one of them; a compile command
-always starts a new block and is always kept. -/
-def dropSlowExecs (pats : List String) (inSlow : Bool) :
+always starts a new block and is always kept. The accumulator
+keeps the recursion flat: the corpus is long enough that a
+non-tail recursion here overflows the Lean interpreter. -/
+def dropSlowExecs (pats : List String) (inSlow : Bool)
+    (acc : List (String × String)) :
     List (String × String) → List (String × String)
-  | [] => []
+  | [] => acc.reverse
   | (cmd, want) :: rest =>
-    if isCompile cmd then
-      let slow := match compilePattern cmd with
-        | some pat => pats.contains pat
+    match cmdKind cmd with
+    | .compile pat =>
+      let slow := match pat with
+        | some p => pats.contains p
         | none => false
-      (cmd, want) :: dropSlowExecs pats slow rest
-    else if inSlow && isExec cmd then dropSlowExecs pats inSlow rest
-    else (cmd, want) :: dropSlowExecs pats inSlow rest
+      dropSlowExecs pats slow ((cmd, want) :: acc) rest
+    | .exec =>
+      if inSlow then dropSlowExecs pats inSlow acc rest
+      else dropSlowExecs pats inSlow ((cmd, want) :: acc) rest
+    | .other => dropSlowExecs pats inSlow ((cmd, want) :: acc) rest
 
 /-- The corpus without those executions. -/
 def sensiblePairs : List (String × String) :=
-  dropSlowExecs intractablePatterns false corpusPairs
+  dropSlowExecs intractablePatterns false [] corpusPairs
 
 def countCompiles (pairs : List (String × String)) : Nat :=
-  (pairs.filter (fun p => isCompile p.1)).length
+  pairs.countP (fun p => isCompile p.1)
 
 /-- Replay `pairs` and report whether every command was checked
 and answered exactly as the Go engine. The session enforces the

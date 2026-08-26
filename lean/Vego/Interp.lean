@@ -525,9 +525,14 @@ def M.rebindSlot (fr : Frame) (slot : Nat) (v : Val) :
     else M.bindSlot fr slot v
   | none => M.bindSlot fr slot v
 
+/-- The growth rule of the portable append contract, which the
+Zig, C++ and Rust runtimes implement. The cost lemmas reason about
+this definition, so the rule has one home. -/
+def growCap (cap need : Nat) : Nat :=
+  Nat.max (Nat.max (2 * cap) 8) need
+
 /-- The append primitive: in place inside capacity, else a grown
-buffer under the portable contract max(2*cap, 8, need) with a
-zeroed spare region. -/
+buffer under the portable contract, with a zeroed spare region. -/
 def doAppend (c : Ctx) (sv : Val) (adds : Array Val)
     (elemTy : VTy) : M Val := do
   let (base, off, len, cap) ← M.expectSlice sv
@@ -537,7 +542,7 @@ def doAppend (c : Ctx) (sv : Val) (adds : Array Val)
     M.writeElems base off len adds
     pure (.slice base off need cap)
   else do
-    let newcap := Nat.max (Nat.max (2 * cap) 8) need
+    let newcap := growCap cap need
     M.charge (newcap * elemBytes c.structs elemTy)
     let live ← M.readElems base off len
     let buf := live ++ adds ++

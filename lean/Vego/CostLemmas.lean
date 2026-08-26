@@ -24,12 +24,11 @@ import Vego.Interp
 
 namespace Vego
 
-/-! ## The growth rule -/
+/-! ## The growth rule
 
-/-- One growth step of the portable append contract, as the
-runtimes and `doAppend` implement it. -/
-def growCap (cap need : Nat) : Nat :=
-  Nat.max (Nat.max (2 * cap) 8) need
+`growCap` is the interpreter's own definition, from `Interp.lean`,
+so these lemmas cannot drift away from the rule `doAppend`
+applies. -/
 
 theorem growCap_ge_need (cap need : Nat) : need ≤ growCap cap need :=
   Nat.le_max_right _ _
@@ -52,25 +51,17 @@ def GrowthChain : List Nat → Prop
   | [_] => True
   | a :: b :: rest => 2 * a ≤ b ∧ GrowthChain (b :: rest)
 
-def total : List Nat → Nat
-  | [] => 0
-  | x :: xs => x + total xs
-
-def lastD : List Nat → Nat → Nat
-  | [], d => d
-  | x :: xs, _ => lastD xs x
-
 /-- The geometric series bound: a doubling chain allocates less
 than twice its final capacity, over its whole history. -/
 theorem growthChain_total (a : Nat) (l : List Nat)
     (h : GrowthChain (a :: l)) :
-    total (a :: l) + a ≤ 2 * lastD (a :: l) 0 := by
+    (a :: l).sum + a ≤ 2 * (a :: l).getLastD 0 := by
   induction l generalizing a with
-  | nil => simp [total, lastD]; omega
+  | nil => simp; omega
   | cons b rest ih =>
     obtain ⟨hab, hrest⟩ := h
     have hb := ih b hrest
-    simp only [total, lastD] at *
+    simp only [List.sum_cons, List.getLastD_cons] at *
     omega
 
 /-- Every run of growing appends whose needs stay within n
@@ -79,8 +70,8 @@ buffers it ever abandons to the arena. This is the universal form
 of the doubling constants the resource contract folds into its
 per-record sizes. -/
 theorem growthChain_total_le (a : Nat) (l : List Nat) (n : Nat)
-    (h : GrowthChain (a :: l)) (hlast : lastD (a :: l) 0 ≤ 2 * n + 8) :
-    total (a :: l) ≤ 2 * (2 * n + 8) := by
+    (h : GrowthChain (a :: l)) (hlast : (a :: l).getLastD 0 ≤ 2 * n + 8) :
+    (a :: l).sum ≤ 2 * (2 * n + 8) := by
   have := growthChain_total a l h
   omega
 
@@ -387,21 +378,9 @@ theorem doAppend_allocBytes (c : Ctx) (base : Option Loc)
               have hc := charge_allocBytes _ _ _ _ hch
               have ha := alloc_allocBytes _ _ _ _ hal
               rw [ha, hc]
-              rfl
             next => cases e
           next => cases e
         next => cases e
-
-/-- Writing elements into place never changes the buffer size. -/
-theorem blitInto_size (es : Array Val) (base : Nat) (vs : Array Val) :
-    (blitInto es base vs).size = es.size := by
-  unfold blitInto
-  generalize vs.size = m
-  induction m with
-  | zero => rfl
-  | succ m ih =>
-    simp only [Array.set!] at ih ⊢
-    simp [Nat.fold_succ, Array.size_setIfInBounds, ih]
 
 /-! ## The saturating contract arithmetic
 

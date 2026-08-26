@@ -152,9 +152,10 @@ structure MeterStat where
 
 /-- One live driver session. `fuel` bounds the recursion depth of
 every engine call, not its aggregate work; the default never binds
-in practice. `enforce` makes every Exec fail hard when it exceeds
-its contract; `collect` records the measurements instead, for the
-calibration reports of vegocheck. -/
+in practice. `calibrate` swaps enforcement for measurement: an
+Exec over its contract normally fails the session, but a
+calibrating session records the figures instead, which is what the
+vegocheck margin reports read. -/
 structure Session where
   m : Machine
   ids : SessionIds
@@ -163,14 +164,14 @@ structure Session where
   reCell : Nat
   valid : Bool
   fuel : Nat := Machine.defaultFuel
-  enforce : Bool := true
-  collect : Bool := false
+  calibrate : Bool := false
   stats : Array MeterStat := #[]
-  /- Contract figures per subject length, for the current pattern.
-  The figures depend only on the compiled pattern and the length,
-  and evaluating ContractFor on a large pattern costs several AST
-  walks, so each compile starts a fresh cache. -/
-  conCache : List (Nat × (Int × Int × Int)) := []
+  /- Contract figures per argument, for the current pattern. Only
+  Compile writes the pattern, so between two C commands the
+  contract is a function of the argument alone; evaluating
+  ContractFor costs several AST walks, so each compile starts a
+  fresh cache. -/
+  conCache : List (Int × (Bool × Int × Int × Int)) := []
 
 namespace Session
 
@@ -255,7 +256,11 @@ def compact (s : Session) : Session :=
     let (base', memo, nh) := migrateCell old memo dummy s.baseCell
     let (cur', memo, nh) := migrateCell old memo nh s.curCell
     let (re', _, nh) := migrateCell old memo nh s.reCell
-    { s with m := { s.m with heap := { cells := nh, free := #[] } },
+    -- Keep the meter: a fresh Heap literal would reset the
+    -- counters to their defaults, and compaction must not erase a
+    -- measurement.
+    { s with m := { s.m with
+                    heap := { s.m.heap with cells := nh, free := #[] } },
              baseCell := base', curCell := cur', reCell := re' }
 
 private def asI (v : Val) : SR Int :=
@@ -313,16 +318,26 @@ private def strTok (t : String) : SR ByteArray :=
   | some b => pure b
   | none => die s!"bad hex token {t}"
 
-/-- The contract figures of the compiled pattern for subjects of at
-most maxInput bytes, computed by the engine's own contract code
-under the formal semantics. -/
-private def contractBounds (s : Session) (maxInput : Nat) :
-    SR ((Int × Int × Int) × Session) := do
+/-- The contract of the compiled pattern for subjects of at most
+maxInput bytes: whether a solver backend can run, then the heap,
+stack and step figures. Everything comes from the engine's own
+contract code under the formal semantics, through the same
+accessors the cross-language drivers call.
+
+The result is cached per argument. Only Compile writes the
+pattern, so between two C commands the contract is a function of
+the argument alone, and both the T command and the per-Exec check
+read the same cached figures. -/
+private def contractOf (s : Session) (maxInput : Int) :
+    SR ((Bool × Int × Int × Int) × Session) := do
   match s.conCache.lookup maxInput with
-  | some b => pure (b, s)
+  | some c => pure (c, s)
   | none => do
     let (con, s) ← s.call1 s.ids.contractFor "ContractFor"
       [.ptr s.reCell 0 [], .i maxInput]
+    let hs ← match con with
+      | .strukt fs => asB (fs.getD s.ids.contractHasSolver (.b false))
+      | _ => die "expected a Contract value"
     let (m, conCell) := s.m.alloc con
     let s := { s with m }
     let get1 (st : Session) (idx : Nat) (what : String) :
@@ -332,8 +347,8 @@ private def contractBounds (s : Session) (maxInput : Nat) :
     let (heapB, s) ← get1 s s.ids.contractHeapBytes "ContractHeapBytes"
     let (stackB, s) ← get1 s s.ids.contractStackBytes "ContractStackBytes"
     let (stepsB, s) ← get1 s s.ids.contractSteps "ContractSteps"
-    let b := (heapB, stackB, stepsB)
-    pure (b, { s with conCache := (maxInput, b) :: s.conCache })
+    let c := (hs, heapB, stackB, stepsB)
+    pure (c, { s with conCache := (maxInput, c) :: s.conCache })
 
 /-- Compare one metered Exec against its contract. The heap meter
 counts every buffer byte the call allocated, which is what the
@@ -354,8 +369,7 @@ private def meterCheck (s : Session) (heapB stackB stepsB : Int) :
       depthUsed := h.maxDepth, stackBound := stackB,
       stepsUsed := h.steps, loopsUsed := h.loops,
       stepsBound := stepsB }
-  let s := if s.collect then { s with stats := s.stats.push st } else s
-  if !s.enforce then pure s
+  if s.calibrate then pure { s with stats := s.stats.push st }
   else do
     if Int.ofNat h.allocBytes > heapB then
       die s!"contract heap exceeded: {h.allocBytes} > {heapB}"
@@ -419,7 +433,7 @@ def eval (s : Session) (line : String) : SR (String × Session) := do
       let subj ← strTok subjT
       let (n, s) ← numSub s
       let (pm, s) ← mkPmatch s (n.toNat + 1)
-      let ((heapB, stackB, stepsB), s) ← contractBounds s subj.size
+      let ((_, heapB, stackB, stepsB), s) ← contractOf s subj.size
       let s := { s with m := s.m.resetMeter }
       let (ok, err, s) ← s.call2 s.ids.exec "Exec"
         [.ptr s.reCell 0 [], .s subj, pm, .i eflags]
@@ -488,20 +502,7 @@ def eval (s : Session) (line : String) : SR (String × Session) := do
     if !s.valid then pure ("T ERR", s)
     else do
       let maxInput ← intTok maxT
-      let (con, s) ← s.call1 s.ids.contractFor "ContractFor"
-        [.ptr s.reCell 0 [], .i maxInput]
-      let (m, conCell) := s.m.alloc con
-      let s := { s with m }
-      let hs ← match con with
-        | .strukt fs => asB (fs.getD s.ids.contractHasSolver (.b false))
-        | _ => die "expected a Contract value"
-      let get1 (st : Session) (idx : Nat) (what : String) :
-          SR (Int × Session) := do
-        let (v, st) ← st.call1 idx what [.ptr conCell 0 []]
-        pure (← asI v, st)
-      let (heapB, s) ← get1 s s.ids.contractHeapBytes "ContractHeapBytes"
-      let (stackB, s) ← get1 s s.ids.contractStackBytes "ContractStackBytes"
-      let (steps, s) ← get1 s s.ids.contractSteps "ContractSteps"
+      let ((hs, heapB, stackB, steps), s) ← contractOf s maxInput
       pure (s!"T {if hs then 1 else 0} {heapB} {stackB} {steps}", s)
   | ["O", loT, hiT] => do
     let lo := IW.i32.wrap (← intTok loT)

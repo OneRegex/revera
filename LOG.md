@@ -749,3 +749,42 @@ keeping every compile, or matches everything, or matches nothing.
 `TheoremsFull.lean` and the `FullProof` target are gone, and one
 `lake build` now checks all four theorems in four minutes and
 forty-six seconds.
+
+## Simplify pass on the contract proofs
+
+The user ran /simplify over the contract commit. Four review
+angles ran as parallel agents, and two of them found errors in the
+prose rather than the code. The claim that "every Exec call stays
+within its contract" was too strong: ReplaceAll and MatchIterNext
+call Exec inside the engine, so the 360 R and I commands run Exec
+calls the session never meters. The claim that the intractable
+patterns' figures "reach the saturation cap" was simply false;
+they report about 6.6e12 steps against a cap of 4.6e18. Both are
+corrected, and the theorem now says what it checks.
+
+Applied to the code: the append growth rule moved into
+`Interp.lean` as `growCap`, so the cost lemmas reason about the
+definition the interpreter runs instead of a copy that could
+drift; `Session.compact` keeps the meter instead of rebuilding a
+Heap literal that silently reset it; the T command and the
+per-Exec check now share one `contractOf`, which also gives T the
+cache; `dropSlowExecs` became tail recursive, which the Lean
+interpreter had refused to evaluate at 86691 frames; the corpus
+filter tokenizes each command once through a `CmdKind` rather than
+three times; `enforce` and `collect` collapsed into one
+`calibrate` field, since they were always complementary; the
+margin report labels the step counter "reported only", because the
+session enforces the loop counter; and two dead lemmas went, along
+with local re-implementations of `List.sum` and `List.getLastD`.
+
+Skipped: about 430 lines of duplicated tactic script in
+MeterSound.lean, where the four `assignCall2` branches, the three
+slice-bound blocks and the loop-body tails repeat. The
+duplication is real, and factoring it is worthwhile, but these are
+brittle scripts against do-notation join points and each attempt
+costs a five minute rebuild to verify. Also skipped: reading
+`frameBytes` from the artifact's own constants instead of
+hardcoding 256, which needs the elaborator to carry its folded
+const environment onto TProgram, and grouping the meter fields
+into a nested record, which touches every one of the fifty MOK
+lemmas. Both are worth doing and neither is cleanup.

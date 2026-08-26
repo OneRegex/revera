@@ -201,13 +201,6 @@ theorem MOK_readElem (base : Option Loc) (off k : Nat) :
       · exact MOK_trap _
     · exact MOK_trap _
 
-theorem MOK_writeElem (base : Option Loc) (off k : Nat) (nv : Val) :
-    MOK (M.writeElem base off k nv) := by
-  unfold M.writeElem
-  split
-  · exact MOK_trap _
-  · exact MOK_writeLoc _ _ _ _
-
 theorem MOK_writeElems (base : Option Loc) (off k : Nat)
     (vs : Array Val) : MOK (M.writeElems base off k vs) := by
   unfold M.writeElems

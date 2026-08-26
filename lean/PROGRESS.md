@@ -85,6 +85,22 @@
   passes it. It leaves nothing spare though, so any extra frame on
   the phase A path breaks the contract, and the equivFrames slack
   should grow before that happens.
+- The contract check covers the X commands only. ReplaceAll and
+  MatchIterNext call Exec inside the engine, so the 360 R and I
+  commands of the corpus run Exec calls the session never meters;
+  they are checked for output agreement alone. Covering them needs
+  a delta around the inner call, snapshot before and subtract
+  after, rather than the reset the X handler uses. The
+  monotonicity lemmas of MeterSound.lean already justify that
+  form. The theorem and the READMEs now say X rather than "every
+  Exec".
+- The contract figures of the two intractable patterns are the
+  largest the corpus produces, but they do not saturate:
+  `((a*){4}){4}` reports 6.56e12 steps at maxinput 4096 against a
+  cap of 4.6e18. An earlier note claiming they reach the cap was
+  wrong, and no threshold on ContractSteps separates the
+  intractable blocks from tractable ones, which is why the
+  exclusion list names patterns instead.
 - The corpus is not uniformly cheap to replay, and the old
   promise of "tens of minutes" for the corpus theorem was wrong by
   orders of magnitude. Twelve compile blocks, six of
