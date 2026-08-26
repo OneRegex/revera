@@ -50,6 +50,20 @@ mappings, collating elements, and equivalence classes. The Go module in
   conformance testing. [`go0/NOTES.md`](go0/NOTES.md) records the chosen
   outcomes for undefined and unspecified constructs.
 
+### Vego pipeline and LEAN4 model
+
+- [`go1/`](go1/) rewrites the engine in Vego, a mechanically
+  translatable Go subset, and exports it to JSON
+  (`go1/revera.vego.json`). The `cmd/json2go`, `cmd/json2rust`,
+  `cmd/json2zig` and `cmd/json2cpp` printers generate the engines in
+  [`rust1/`](rust1/), [`zig1/`](zig1/) and [`cpp1/`](cpp1/);
+  `cmd/crosscheck` and `cmd/probecheck` verify them differentially.
+- [`lean/`](lean/) holds the LEAN4 model of Vego: a formal semantics
+  for the subset and machine-checked theorems that the exact JSON
+  artifacts are well formed and reproduce the Go reference outputs,
+  trap-free. [`lean/README.md`](lean/README.md) states precisely
+  what is proved.
+
 ### Reference engines
 
 The `ref/` directory contains independent upstream trees used as evidence and

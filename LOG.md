@@ -477,3 +477,68 @@ per-language mains are deliberate differential surface), and
 deriving HasElse from nil (the flags document loader intent).
 Everything reverified: full test suite, the 191689-command
 extended crosscheck, and all 29 probe lines in three languages.
+
+## LEAN4 proof of the Vego pipeline
+
+The user asked for the correctness of the vego code, through its
+JSON representation, to be proven with LEAN4, fixing any real vego
+defect the proof might surface at the root. A new lean/ directory
+holds the model: a total JSON decoder into a raw AST, an
+elaborator into a fully typed core (resolved names, wrapping
+widths, exact untyped-constant folding, explicit zero fills), a
+total heap-based operational semantics with traps for the
+specification's abnormal terminations, and host harnesses that
+mirror probe_host.go and driver_host.go. crosscheck gained a
+-dumpexpected flag so the exact corpus with the Go engine's
+outputs feeds both the Lean theorems and the vegocheck replay
+binary. Machine-checked results: both shipped artifacts are well
+formed; the probe program reproduces all 29 reference lines; the
+revera engine answers the crosscheck corpus exactly like the Go
+engine through the same driver protocol, trap-free, under an
+explicit per-command fuel budget. No defect in the vego artifacts
+surfaced; the two bugs the differential runs caught were in the
+Lean elaborator itself and were fixed there.
+
+## Review round on the LEAN4 model
+
+Profiling with sample(1) exposed that Lean's borrow inference made
+every nested buffer write copy its containing array (the top stack
+entry was lean_copy_expand_array); inlining the short write paths
+into M.writeLoc with a detached slot took the worst corpus command
+from 104 seconds to 0.4 and the heavy fixed-pattern block from 412
+seconds to 1.65. A swival review of the whole change set returned
+five findings. The important one was a real gap in the pipeline
+itself: cap() after a growing append is observable in the subset,
+Go grows with its runtime policy while the Zig, C++, Rust runtimes
+and the Lean model allocate max(2*cap, 8, need), so the value
+differs between targets. The specification now declares post-growth
+capacity target defined and requires that it never reach observable
+output; the engine's single post-growth cap read only selects
+between equivalent paths, which the cross-target corpus verifies.
+The review also caught a missing int32 narrowing of the O command
+bounds in the Lean driver session; the narrowing is fixed and the
+corpus now carries two out-of-range O commands so every driver
+proves it. The remaining findings were documentation wording about
+the fuel bound, which is a per-call recursion-depth bound, not a
+work budget; the texts now say so.
+
+## The theorems check
+
+Two memory rounds stood between the model and the finished proof.
+The theorem evaluation first ran in Lean's IR interpreter, because
+lake does not precompile user modules by default; sample(1) showed
+lean::ir::interpreter on top and precompileModules = true fixed it
+(the finding is in api-faq.md). The monster automaton executions
+then ran out of memory, because the interpreter never freed the
+frame cells of the millions of calls inside one command. The heap
+now recycles cells through a free list, every call frees its frame
+on return, and each cell carries a generation, so a view or borrow
+that illegally outlives its call traps as stale instead of reading
+recycled memory; the buffer model's lifetime discipline is now
+enforced dynamically. With that, lake build completes: both JSON
+artifacts are well formed, the probe program reproduces all 29
+reference lines, and the revera engine answers all 86691 corpus
+commands exactly like the Go engine, trap free. Each theorem
+depends only on propext, Classical.choice, Quot.sound and its
+native_decide axiom. The proofs live in their own lake target, so
+building the vegocheck tool no longer replays them.

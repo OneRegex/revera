@@ -175,3 +175,20 @@
   on it, which is itself undefined behavior. The review caught it;
   a static sentinel object now provides real storage. Lesson: do
   not patch undefined behavior with a smaller undefined behavior.
+- The first LEAN4 elaborator dropped the slot counter when leaving a
+  nested block, so functions under-reported their frame size and the
+  interpreter wrote past the frame. The probe run caught it at the
+  first call with block-local variables. Lesson: when a tree walk
+  threads a monotone counter, every branch must return it, including
+  the branches whose bindings go out of scope.
+- Two shell one-liners died on `zsh` because a bare `=====` separator
+  token triggers `=word` expansion. Lesson: quote decorative
+  separators in zsh commands.
+- The LEAN4 driver session forgot the int32 narrowing that the Go,
+  Zig, C++ and Rust drivers apply to the O command bounds. The
+  crosscheck corpus never used out-of-range bounds, so 86689
+  agreeing commands hid the gap; the swival review found it with a
+  reproducer. Fixed in the session, and the corpus now carries two
+  out-of-range O commands so every driver proves the narrowing.
+  Lesson: a protocol harness needs corpus lines at the numeric
+  edges of every parsed field, not only realistic values.

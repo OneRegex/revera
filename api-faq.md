@@ -127,3 +127,57 @@ Notes on standard-library behavior that differed from first expectations.
 - Reality: race instrumentation adds allocations, so the assertion is
   only valid without `-race`. The test skips itself via a build-tagged
   `raceEnabled` flag.
+
+### Lean 4 core: Int division, bitwise operators, and literals
+
+- Context: implementing Go's wrapping arithmetic in the LEAN4 model.
+- Expectation: `Int.div`/`Int.mod` exist and `&&&`, `|||`, `^^^` work
+  on `Int` like they do on `Nat` and the fixed-width types.
+- Reality: the truncated pair is `Int.tdiv`/`Int.tmod` (`Int.div` is
+  gone; `/` on `Int` is not what Go needs), and core ships no bitwise
+  instances for `Int` at all. The model defines `intAnd`/`intOr`/
+  `intXor` over `Int.ofNat`/`Int.negSucc` with the two's-complement
+  identities.
+- Also: `ByteArray` has `BEq` but no `Repr`; a `deriving instance
+  Repr for ByteArray` line fixes AST derivation. `include_str
+  "path"` embeds a file relative to the source file and needs valid
+  UTF-8, so binary blobs travel hex-encoded.
+
+### Lean 4: structure-update syntax and docstrings are indentation-picky
+
+- Context: elaborator and interpreter modules.
+- Reality: in `{ c with a := x, b := y }` split over lines, the second
+  field must not be left of the first; a `/-- -/` docstring cannot
+  precede `mutual`; a pattern binder named like a constructor of the
+  matched type (`i` vs `Val.i`) is parsed as that constructor.
+
+### Lean 4: recursive updates through a matched argument copy arrays
+
+- Context: the interpreter's heap writes went through a recursive
+  `Val.store : Val → Path → Val → Except Trap Val`.
+- Expectation: destructuring an uniquely referenced value and calling
+  `Array.set!` updates in place.
+- Reality: the compiler's borrow inference can pass such an argument
+  borrowed, so the arrays inside it keep an extra reference and every
+  `set!` copies the whole array. One `copy` builtin then cost O(buffer)
+  per element and a 28-byte match ran for 104 seconds.
+- Resolution: the hot one- and two-step write paths are inlined in
+  `M.writeLoc`, where the cell value is a locally owned binding; the
+  slot is detached (`set!` to a dummy) before the nested update. The
+  same command now runs in milliseconds. When an interpreter loop is
+  slow, `sample <pid>` naming `lean_copy_expand_array` is the tell.
+
+### Lean 4: native_decide interprets user modules without precompileModules
+
+- Context: the corpus theorem evaluates an 86691-command replay
+  inside `native_decide`.
+- Expectation: `native_decide` runs compiled native code, so the
+  proof check costs about what the compiled executable costs.
+- Reality: without `precompileModules = true` on the library, the
+  evaluator falls back to Lean's IR interpreter for user modules
+  (sample(1) shows `lean::ir::interpreter::eval_body`), which is
+  well over an order of magnitude slower. Only the toolchain's own
+  stdlib is precompiled.
+- Resolution: set `precompileModules = true` in lakefile.toml; the
+  modules then build as dynamic libraries and the evaluator calls
+  the native symbols.

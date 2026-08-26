@@ -290,6 +290,15 @@ transient, which is what lets them use plain pointers.
    copied while both copies stay live. Structs without slice fields
    copy freely.
 
+Capacity after growth is target defined. A growing `append` gives
+the buffer at least the needed capacity and a zeroed spare region.
+The translated runtimes and the LEAN4 model allocate exactly
+`max(2*cap, 8, need)` elements. The Go original runs on Go's own
+`append`, whose capacities differ. A conforming program may read
+`cap` after a growing append, but must not let the value reach
+observable output. Capacities from `make` and from slicing are
+exact and identical in every target.
+
 The `vego2json` tool checks what is decidable locally: writes into
 slice-typed fields and elements must be fresh buffers, moves, or
 self-truncations; package-level data is never written; `&` stays on

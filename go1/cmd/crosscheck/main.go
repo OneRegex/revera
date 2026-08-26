@@ -153,6 +153,10 @@ func (c *corpus) locales() {
 	}
 	c.add("P")
 	c.add("O 0 65536")
+	// The drivers convert the O bounds to int32 before iterating;
+	// these bounds sit outside that range on purpose.
+	c.add("O -2147483649 -2147483648")
+	c.add("O 2147483646 2147483650")
 }
 
 func build(extra int64) *corpus {
@@ -183,6 +187,8 @@ func build(extra int64) *corpus {
 
 func main() {
 	dump := flag.String("dump", "", "write the corpus commands to a file")
+	dumpExpected := flag.String("dumpexpected", "",
+		"write command and expected output pairs, tab separated")
 	extra := flag.Int64("extra", 0, "additional random rounds, 500 patterns each")
 	flag.Parse()
 	c := build(*extra)
@@ -201,6 +207,20 @@ func main() {
 		expected[i] = session.Eval(line)
 	}
 	fmt.Printf("corpus: %d commands\n", len(c.lines))
+
+	if *dumpExpected != "" {
+		var b strings.Builder
+		for i, line := range c.lines {
+			b.WriteString(line)
+			b.WriteByte('\t')
+			b.WriteString(expected[i])
+			b.WriteByte('\n')
+		}
+		if err := os.WriteFile(*dumpExpected, []byte(b.String()), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
 
 	// The drivers are independent processes; run them together and
 	// report in argument order once all finish.
