@@ -76,6 +76,12 @@ def sliceElems (m : Machine) (v : Val) : Option (Array Val) :=
     | _ => none
   | _ => none
 
+/-- Clear the resource meter, so the next call is measured on its
+own. -/
+def resetMeter (m : Machine) : Machine :=
+  { m with heap := { m.heap with allocBytes := 0, steps := 0, loops := 0,
+                                 depth := 0, maxDepth := 0 } }
+
 def defaultFuel : Nat := 1000000000000
 
 /-- Call a function by its resolved index: the same entry as

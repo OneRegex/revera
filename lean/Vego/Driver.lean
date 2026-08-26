@@ -133,9 +133,28 @@ structure SessionIds where
   contractHasSolver : Nat
   zeroMatch : Val
 
+/-- One interpreted call frame, in bytes, as the resource contract
+estimates it. Mirrors frameBytes in contract.go. -/
+def frameBytes : Nat := 256
+
+/-- One Exec call measured against the pattern's contract: what the
+meter saw, next to the figures the engine's own contract code
+reported for this subject length. -/
+structure MeterStat where
+  heapUsed : Nat
+  heapBound : Int
+  depthUsed : Nat
+  stackBound : Int
+  stepsUsed : Nat
+  loopsUsed : Nat
+  stepsBound : Int
+  deriving Repr, Inhabited
+
 /-- One live driver session. `fuel` bounds the recursion depth of
 every engine call, not its aggregate work; the default never binds
-in practice. -/
+in practice. `enforce` makes every Exec fail hard when it exceeds
+its contract; `collect` records the measurements instead, for the
+calibration reports of vegocheck. -/
 structure Session where
   m : Machine
   ids : SessionIds
@@ -144,6 +163,14 @@ structure Session where
   reCell : Nat
   valid : Bool
   fuel : Nat := Machine.defaultFuel
+  enforce : Bool := true
+  collect : Bool := false
+  stats : Array MeterStat := #[]
+  /- Contract figures per subject length, for the current pattern.
+  The figures depend only on the compiled pattern and the length,
+  and evaluating ContractFor on a large pattern costs several AST
+  walks, so each compile starts a fresh cache. -/
+  conCache : List (Nat × (Int × Int × Int)) := []
 
 namespace Session
 
@@ -286,6 +313,58 @@ private def strTok (t : String) : SR ByteArray :=
   | some b => pure b
   | none => die s!"bad hex token {t}"
 
+/-- The contract figures of the compiled pattern for subjects of at
+most maxInput bytes, computed by the engine's own contract code
+under the formal semantics. -/
+private def contractBounds (s : Session) (maxInput : Nat) :
+    SR ((Int × Int × Int) × Session) := do
+  match s.conCache.lookup maxInput with
+  | some b => pure (b, s)
+  | none => do
+    let (con, s) ← s.call1 s.ids.contractFor "ContractFor"
+      [.ptr s.reCell 0 [], .i maxInput]
+    let (m, conCell) := s.m.alloc con
+    let s := { s with m }
+    let get1 (st : Session) (idx : Nat) (what : String) :
+        SR (Int × Session) := do
+      let (v, st) ← st.call1 idx what [.ptr conCell 0 []]
+      pure (← asI v, st)
+    let (heapB, s) ← get1 s s.ids.contractHeapBytes "ContractHeapBytes"
+    let (stackB, s) ← get1 s s.ids.contractStackBytes "ContractStackBytes"
+    let (stepsB, s) ← get1 s s.ids.contractSteps "ContractSteps"
+    let b := (heapB, stackB, stepsB)
+    pure (b, { s with conCache := (maxInput, b) :: s.conCache })
+
+/-- Compare one metered Exec against its contract. The heap meter
+counts every buffer byte the call allocated, which is what the
+arena-backed targets consume. The stack meter is the deepest call
+chain, priced at the contract's per-frame estimate. The step
+comparison uses the loop counter: one unit per loop iteration and
+per call, which is the granularity the contract's abstract
+operations describe. The straight-line code between two of those
+units is bounded by the program text, so the loop counter bounds
+the whole work up to a constant of the artifact. Exceeding any
+bound is a hard fault, so the corpus theorem fails if one real
+execution ever passes its contract. -/
+private def meterCheck (s : Session) (heapB stackB stepsB : Int) :
+    SR Session := do
+  let h := s.m.heap
+  let st : MeterStat :=
+    { heapUsed := h.allocBytes, heapBound := heapB,
+      depthUsed := h.maxDepth, stackBound := stackB,
+      stepsUsed := h.steps, loopsUsed := h.loops,
+      stepsBound := stepsB }
+  let s := if s.collect then { s with stats := s.stats.push st } else s
+  if !s.enforce then pure s
+  else do
+    if Int.ofNat h.allocBytes > heapB then
+      die s!"contract heap exceeded: {h.allocBytes} > {heapB}"
+    else if Int.ofNat (h.maxDepth * frameBytes) > stackB then
+      die s!"contract stack exceeded: {h.maxDepth * frameBytes} > {stackB}"
+    else if Int.ofNat h.loops > stepsB then
+      die s!"contract steps exceeded: {h.loops} > {stepsB}"
+    else pure s
+
 /-- The FNV-1a style digest of the O command. -/
 private def caseDigest (s : Session) (lo hi : Int) : SR (Nat × Session) := do
   let mask : Nat := 18446744073709551615
@@ -327,9 +406,10 @@ def eval (s : Session) (line : String) : SR (String × Session) := do
     let (re, err, s) ← s.call2 s.ids.compile "Compile" [.s pat, cur, .i flags]
     let (code, pos) ← errParts s err
     if code != 0 then
-      pure (s!"C {code} {pos} 0", { s with valid := false })
+      pure (s!"C {code} {pos} 0", { s with valid := false, conCache := [] })
     else do
-      let s := { s with m := s.m.writeRoot s.reCell re, valid := true }
+      let s := { s with m := s.m.writeRoot s.reCell re, valid := true,
+                        conCache := [] }
       let (n, s) ← numSub s
       pure (s!"C 0 0 {n}", s)
   | ["X", eflagsT, subjT] => do
@@ -339,8 +419,11 @@ def eval (s : Session) (line : String) : SR (String × Session) := do
       let subj ← strTok subjT
       let (n, s) ← numSub s
       let (pm, s) ← mkPmatch s (n.toNat + 1)
+      let ((heapB, stackB, stepsB), s) ← contractBounds s subj.size
+      let s := { s with m := s.m.resetMeter }
       let (ok, err, s) ← s.call2 s.ids.exec "Exec"
         [.ptr s.reCell 0 [], .s subj, pm, .i eflags]
+      let s ← meterCheck s heapB stackB stepsB
       let (code, _) ← errParts s err
       if code != 0 then pure (s!"X {code} 0", s)
       else if !(← asB ok) then pure ("X 0 0", s)

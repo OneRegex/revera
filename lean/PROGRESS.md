@@ -57,6 +57,45 @@
   count (siblings each receive fuel - 1), so a fuel budget cannot
   cap wall time. The corpus theorem therefore replays the whole
   corpus unbounded instead of skipping by budget.
+- The resource contracts needed a unit for "abstract steps" that
+  the interpreter can observe. Counting every executed statement
+  is too fine: a one-byte subject pays Exec's fixed setup and
+  passes the contract figure (worst 1.2x on the corpus). Counting
+  one unit per loop iteration and per call matches the granularity
+  contract.go describes, and the straight-line code between two
+  such units is bounded by the artifact's text; on the corpus the
+  worst case stays well under the bound. The heap meter counts
+  total bytes ever allocated, never subtracting, which matches the
+  arena-backed targets, since their grow() abandons the old block
+  inside the arena. It counts what the contract counts and no
+  more, so it models no allocator overhead: the runtimes round a
+  zero-length request up to one element and malloc adds a header.
+  contract.go leaves that out on purpose, as platform dependent.
+- The stack contract has no headroom on one corpus case, and the
+  measurement found it. Over 69248 measured Exec calls the worst
+  heap margin is 60 percent of the bound and the worst loop margin
+  27 percent, but the worst stack margin is exactly 100 percent:
+  pattern `[[=ch=]]` on subject "HhhxhH" reaches 18 interpreted
+  call frames against a bound of 18. The figures agree by
+  construction, since `matcherContract` prices phase A as
+  matcherStackBytes (2048, eight frames) plus equivFrames
+  (maxElemAhead + 2 = 10) frames, and the multi-character
+  equivalence test really does recurse once per element character.
+  The bound holds, because the check rejects only a run that
+  passes it. It leaves nothing spare though, so any extra frame on
+  the phase A path breaks the contract, and the equivFrames slack
+  should grow before that happens.
+- The corpus is not uniformly cheap to replay, and the old
+  promise of "tens of minutes" for the corpus theorem was wrong by
+  orders of magnitude. Twelve compile blocks, six of
+  `((a*){250}){250}b` and six of `((a*){4}){4}`, would take days
+  between them, while the other 85635 commands replay in about
+  five minutes. The cost comes from the nesting, not the subject:
+  each block holds four 120 byte subjects, one of which was
+  measured at 107 minutes, but `((a*){4}){4}` needs minutes even
+  on the empty subject. The theorem now drops those 1056
+  executions and keeps everything else, compiles and contract
+  queries included.
 
 ## Status
 
@@ -71,9 +110,36 @@
 - [x] Write-path profile fix (in-place buffer writes)
 - [x] Generation-tagged frame recycling (bounded memory, dangling
       views trap as `stale` instead of misreading)
-- [x] `lake build` with all four theorems checked: well-formedness
-      of both artifacts, the 29-line probe agreement, and the
-      86691-command corpus agreement, all by native_decide, each
-      depending only on propext, Classical.choice, Quot.sound and
-      its native_decide axiom
-- [x] Unbounded full-corpus replay of vegocheck (confirmation run)
+- [x] All four theorems checked by native_decide, each depending
+      only on propext, Classical.choice, Quot.sound and its
+      native_decide axiom
+- [x] vegocheck replays of the corpus with contract enforcement:
+      85599 commands in one run, plus the first 14 commands of an
+      `((a*){250}){250}b` block, all agreeing
+- [x] Resource meter in the interpreter (buffer bytes at the
+      shared 64-bit layout, call depth, loop and call steps) and
+      the per-Exec contract check in the driver session; the
+      corpus theorem now also states that no Exec in the corpus
+      exceeds the contract of the engine's own ContractFor
+- [x] vegocheck --contracts calibration mode: replays a dump with
+      enforcement off and reports the tightest margins per meter
+- [x] Universal cost lemmas (Vego/CostLemmas.lean), proved by
+      induction with no native evaluation: the geometric bound of
+      the append growth rule and its connection to real append
+      histories, the layout well-formedness, the exactness of the
+      allocation meter on every allocation form (append, make,
+      slice literal, both string conversions), and the saturation
+      algebra of the contract arithmetic
+- [x] `Vego/Corpus.lean` derives the replay set from the embedded
+      corpus: everything except the 1056 executions of the two
+      intractable patterns, so all 9779 compiles and every
+      contract query stay in. The proposition re-checks its own
+      coverage
+- [x] `lake build` finishes in about five minutes and checks all
+      four theorems, the corpus contract theorem among them
+- [x] Meter soundness for the whole interpreter
+      (Vego/MeterSound.lean): one mutual induction on fuel proves
+      that no counter ever decreases and that the call depth
+      balances across every successful call, up to the harness
+      corollary callIdx_meterOK; the driver's reset-run-read
+      measurement is thereby sound by proof

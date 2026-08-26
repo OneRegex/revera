@@ -4,6 +4,8 @@ import Vego.Data
 import Vego.Core
 import Vego.Elab
 import Vego.Interp
+import Vego.CostLemmas
 import Vego.Machine
+import Vego.MeterSound
 import Vego.Probe
 import Vego.Driver

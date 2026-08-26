@@ -421,7 +421,7 @@ private partial def elabExpr (g : Genv) (c : Lctx) (want : Option VTy)
     | .slice e => do
       let tes ← elems.mapM (fun x => do
         pure (← coerce (← elabExpr g c (some e) x) (some e)).1)
-      pure (.typed (.mkSliceLit tes) (.slice e))
+      pure (.typed (.mkSliceLit e tes) (.slice e))
     | .arr n e => do
       if elems.length > n then throw "too many array literal elements"
       let tes ← elems.mapM (fun x => do

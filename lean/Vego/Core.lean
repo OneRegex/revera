@@ -93,7 +93,7 @@ inductive TExpr where
   | maxE (x : TExpr) (y : TExpr)
   | mkStruct (fields : List TExpr)
   | mkArr (elems : List TExpr) (pad : Nat) (elemTy : VTy)
-  | mkSliceLit (elems : List TExpr)
+  | mkSliceLit (elemTy : VTy) (elems : List TExpr)
   deriving Repr
 
 end

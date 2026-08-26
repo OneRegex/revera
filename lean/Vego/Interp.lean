@@ -66,6 +66,19 @@ abbrev Cell := Nat × Val
 structure Heap where
   cells : Array Cell
   free : Array Nat
+  /- The resource meter. It measures what a run of the interpreted
+  program costs in the units of the resource contract: bytes of
+  buffer allocations, the depth of the call stack, and abstract
+  steps. Harnesses reset it before a call and read it after.
+  `steps` counts statements, loop iterations, and calls. `loops`
+  counts only loop iterations and calls; the straight-line code
+  between two of those ticks is bounded by the program text, so
+  either counter bounds the total work up to a program constant. -/
+  allocBytes : Nat := 0
+  steps : Nat := 0
+  loops : Nat := 0
+  depth : Nat := 0
+  maxDepth : Nat := 0
 
 def Heap.empty : Heap := { cells := #[(0, .b false)], free := #[] }
 
@@ -93,7 +106,8 @@ def M.alloc (v : Val) : M (Nat × Nat) := fun h =>
   | some id =>
     match h.cells[id]? with
     | some (g, _) =>
-      .ok (id, g) { cells := h.cells.set! id (g, v), free := h.free.pop }
+      .ok (id, g) { h with cells := h.cells.set! id (g, v),
+                           free := h.free.pop }
     | none => .trap (.stuck "bad free list")
   | none =>
     .ok (h.cells.size, 0) { h with cells := h.cells.push (0, v) }
@@ -102,9 +116,86 @@ def M.alloc (v : Val) : M (Nat × Nat) := fun h =>
 def M.freeCell (id : Nat) : M Unit := fun h =>
   match h.cells[id]? with
   | some (g, _) =>
-    .ok () { cells := h.cells.set! id (g + 1, .b false),
-             free := h.free.push id }
+    .ok () { h with cells := h.cells.set! id (g + 1, .b false),
+                    free := h.free.push id }
   | none => .trap (.stuck "bad cell free")
+
+/-- Meter ticks. `tickStmt` counts one statement; `tickLoop`
+counts one loop iteration or one call, which also counts as a
+statement-level step. -/
+@[always_inline]
+def M.tickStmt : M Unit := fun h =>
+  .ok () { h with steps := h.steps + 1 }
+
+@[always_inline]
+def M.tickLoop : M Unit := fun h =>
+  .ok () { h with steps := h.steps + 1, loops := h.loops + 1 }
+
+/-- Count one buffer allocation of the given size, in bytes. -/
+@[always_inline]
+def M.charge (bytes : Nat) : M Unit := fun h =>
+  .ok () { h with allocBytes := h.allocBytes + bytes }
+
+/-- Enter and leave one function call, tracking the deepest chain.
+A trap abandons the whole run, so a missed `exitFn` on a trap path
+cannot skew a completed measurement. -/
+@[always_inline]
+def M.enterFn : M Unit := fun h =>
+  let d := h.depth + 1
+  .ok () { h with steps := h.steps + 1, loops := h.loops + 1,
+                  depth := d, maxDepth := Nat.max h.maxDepth d }
+
+@[always_inline]
+def M.exitFn : M Unit := fun h =>
+  .ok () { h with depth := h.depth - 1 }
+
+/- Byte sizes of the values a buffer allocation holds. The layout
+is the natural 64-bit layout every target shares: one byte for
+bool and u8, the declared width for the other integers, an 8-byte
+pointer, a 16-byte string header, and a 24-byte slice header.
+Struct fields are aligned to their natural alignment and the
+struct size is rounded up to the struct alignment, as Go and the
+generated targets lay them out. The depth argument only bounds the
+recursion through the struct table, like in `zeroValD`. -/
+def IW.byteSize : IW → Nat
+  | .u8 => 1
+  | .u16 => 2
+  | .u32 => 4
+  | .u64 => 8
+  | .i32 => 4
+  | .i64 => 8
+
+def sizeAlignD (depth : Nat) (structs : Array (Array VTy)) :
+    VTy → Nat × Nat
+  | .bool => (1, 1)
+  | .int w => (w.byteSize, w.byteSize)
+  | .str => (16, 8)
+  | .slice _ => (24, 8)
+  | .ptr _ => (8, 8)
+  | .arr n e =>
+    match depth with
+    | 0 => (0, 1)
+    | d + 1 =>
+      let (s, a) := sizeAlignD d structs e
+      (n * s, a)
+  | .strukt si =>
+    match depth with
+    | 0 => (0, 1)
+    | d + 1 =>
+      match structs[si]? with
+      | none => (0, 1)
+      | some ftys =>
+        let oa := ftys.toList.foldl
+          (fun acc fty =>
+            let sa := sizeAlignD d structs fty
+            (((acc.1 + sa.2 - 1) / sa.2) * sa.2 + sa.1,
+             Nat.max acc.2 sa.2))
+          (0, 1)
+        (((oa.1 + oa.2 - 1) / oa.2) * oa.2, oa.2)
+
+/-- The allocation size of one buffer element of the given type. -/
+def elemBytes (structs : Array (Array VTy)) (ty : VTy) : Nat :=
+  (sizeAlignD 10000 structs ty).1
 
 /-- Unchecked cell read, for cells the caller owns: frame slots,
 loop cells, and harness roots, which are never freed while held. -/
@@ -315,9 +406,17 @@ abbrev Frame := Array Nat
 
 /-- Free every cell a frame owns. Locals and parameters cannot
 legally outlive their call, so this runs at every return. -/
-def M.freeFrame (fr : Frame) : M Unit := do
-  for cell in fr do
-    if cell != 0 then M.freeCell cell
+def M.freeFrameFrom (fr : Frame) (i : Nat) : M Unit := do
+  if h : i < fr.size then
+    if fr[i] != 0 then do
+      M.freeCell fr[i]
+      M.freeFrameFrom fr (i + 1)
+    else M.freeFrameFrom fr (i + 1)
+  else pure ()
+termination_by fr.size - i
+
+def M.freeFrame (fr : Frame) : M Unit :=
+  M.freeFrameFrom fr 0
 
 def M.expectInt (v : Val) : M Int :=
   match v with
@@ -358,6 +457,11 @@ def M.writeElem (base : Option Loc) (off : Nat) (k : Nat)
   | none => M.trap (.stuck "write into an empty buffer")
   | some (obj, gen, path) => M.writeLoc obj gen (path ++ [off + k]) nv
 
+/-- Copy vs into es starting at base, purely. -/
+def blitInto (es : Array Val) (base : Nat) (vs : Array Val) :
+    Array Val :=
+  vs.size.fold (fun j _ acc => acc.set! (base + j) vs[j]!) es
+
 /-- Bulk-write values into a buffer starting at element k: one cell
 read-modify-write instead of one per element. -/
 def M.writeElems (base : Option Loc) (off : Nat) (k : Nat)
@@ -371,11 +475,8 @@ def M.writeElems (base : Option Loc) (off : Nat) (k : Nat)
       | .arr es => do
         if off + k + vs.size > es.size then
           M.trap (.stuck "buffer write out of range")
-        else do
-          let mut es := es
-          for j in [0:vs.size] do
-            es := es.set! (off + k + j) vs[j]!
-          M.writeLoc obj gen path (.arr es)
+        else
+          M.writeLoc obj gen path (.arr (blitInto es (off + k) vs))
       | _ => M.trap (.stuck "buffer base is not an array")
 
 /-- Bulk-read the live elements of a slice header. -/
@@ -406,15 +507,23 @@ def M.gatherSrc (sv : Val) (srcIsStr : Bool) : M (Array Val) := do
     let (base, off, len, _) ← M.expectSlice sv
     M.readElems base off len
 
+/-- Bind a fresh cell holding v into a frame slot. -/
+def M.bindSlot (fr : Frame) (slot : Nat) (v : Val) :
+    M (Frame × Nat) := do
+  let (cell, _) ← M.alloc v
+  pure (fr.set! slot cell, cell)
+
 /-- Free the old cell in a frame slot, if any, and bind a fresh one
 holding v. -/
 def M.rebindSlot (fr : Frame) (slot : Nat) (v : Val) :
     M (Frame × Nat) := do
   match fr[slot]? with
-  | some old => if old != 0 then M.freeCell old else pure ()
-  | none => pure ()
-  let (cell, _) ← M.alloc v
-  pure (fr.set! slot cell, cell)
+  | some old =>
+    if old != 0 then do
+      M.freeCell old
+      M.bindSlot fr slot v
+    else M.bindSlot fr slot v
+  | none => M.bindSlot fr slot v
 
 /-- The append primitive: in place inside capacity, else a grown
 buffer under the portable contract max(2*cap, 8, need) with a
@@ -429,11 +538,55 @@ def doAppend (c : Ctx) (sv : Val) (adds : Array Val)
     pure (.slice base off need cap)
   else do
     let newcap := Nat.max (Nat.max (2 * cap) 8) need
+    M.charge (newcap * elemBytes c.structs elemTy)
     let live ← M.readElems base off len
     let buf := live ++ adds ++
       Array.replicate (newcap - need) (zeroVal c.structs elemTy)
     let (cell, g) ← M.alloc (.arr buf)
     pure (.slice (some (cell, g, [])) 0 need newcap)
+
+/-- The make primitive: a zeroed buffer of the requested length
+and capacity. -/
+def doMake (c : Ctx) (elemTy : VTy) (n cp : Int) : M Val := do
+  if n < 0 || cp < n then M.trap .makeBad
+  else do
+    M.charge (cp.toNat * elemBytes c.structs elemTy)
+    let buf : Array Val :=
+      Array.replicate cp.toNat (zeroVal c.structs elemTy)
+    let (cell, g) ← M.alloc (.arr buf)
+    pure (.slice (some (cell, g, [])) 0 n.toNat cp.toNat)
+
+/-- The slice-literal primitive: a fresh exact-size buffer holding
+the evaluated elements. -/
+def doSliceLit (c : Ctx) (elemTy : VTy) (vs : Array Val) : M Val := do
+  M.charge (vs.size * elemBytes c.structs elemTy)
+  let (cell, g) ← M.alloc (.arr vs)
+  pure (.slice (some (cell, g, [])) 0 vs.size vs.size)
+
+/-- The string-to-bytes conversion: a fresh buffer with one cell
+per byte. -/
+def doStrToBytes (s : ByteArray) : M Val := do
+  M.charge s.size
+  let (cell, g) ← M.alloc (.arr (bytesToVals s))
+  pure (.slice (some (cell, g, [])) 0 s.size s.size)
+
+/-- The byte image of buffer elements, purely; none on a stray
+non-integer, which the typed core rules out. -/
+def valsToBytes (vs : Array Val) : Option ByteArray :=
+  vs.foldl
+    (fun acc v =>
+      match acc, v with
+      | some out, .i b => some (out.push (UInt8.ofNat b.toNat))
+      | _, _ => none)
+    (some (ByteArray.emptyWithCapacity vs.size))
+
+/-- The bytes-to-string conversion: the string storage counts as
+one allocation of its length. -/
+def doBytesToStr (vs : Array Val) : M Val := do
+  M.charge vs.size
+  match valsToBytes vs with
+  | some out => pure (.s out)
+  | none => M.trap (.stuck "byte buffer holds a non-integer")
 
 /-- One loop-variable cell, rebound per loop statement. -/
 def allocLoopCell (fr : Frame) (slot : Option Nat) :
@@ -731,20 +884,14 @@ def evalExpr (fuel : Nat) (c : Ctx) (fr : Frame) : TExpr → M Val
     | 0 => M.trap .fuel
     | fuel + 1 => do
       let s ← M.expectStr (← evalExpr fuel c fr x)
-      let (cell, g) ← M.alloc (.arr (bytesToVals s))
-      pure (.slice (some (cell, g, [])) 0 s.size s.size)
+      doStrToBytes s
   | .bytesToStr x => do
     match fuel with
     | 0 => M.trap .fuel
     | fuel + 1 => do
       let (base, off, len, _) ← M.expectSlice (← evalExpr fuel c fr x)
       let vs ← M.readElems base off len
-      let mut out := ByteArray.emptyWithCapacity len
-      for v in vs do
-        match v with
-        | .i b => out := out.push (UInt8.ofNat b.toNat)
-        | _ => M.trap (.stuck "byte buffer holds a non-integer")
-      pure (.s out)
+      doBytesToStr vs
   | .lenSlice x => do
     match fuel with
     | 0 => M.trap .fuel
@@ -791,12 +938,7 @@ def evalExpr (fuel : Nat) (c : Ctx) (fr : Frame) : TExpr → M Val
       let cp ← match capE with
         | some e => M.expectInt (← evalExpr fuel c fr e)
         | none => pure n
-      if n < 0 || cp < n then M.trap .makeBad
-      else do
-        let buf : Array Val :=
-          Array.replicate cp.toNat (zeroVal c.structs elemTy)
-        let (cell, g) ← M.alloc (.arr buf)
-        pure (.slice (some (cell, g, [])) 0 n.toNat cp.toNat)
+      doMake c elemTy n cp
   | .copyE dst src srcIsStr => do
     match fuel with
     | 0 => M.trap .fuel
@@ -832,13 +974,12 @@ def evalExpr (fuel : Nat) (c : Ctx) (fr : Frame) : TExpr → M Val
     | fuel + 1 => do
       let vs ← evalExprs fuel c fr elems
       pure (.arr (vs.toArray ++ Array.replicate pad (zeroVal c.structs elemTy)))
-  | .mkSliceLit elems => do
+  | .mkSliceLit elemTy elems => do
     match fuel with
     | 0 => M.trap .fuel
     | fuel + 1 => do
       let vs ← evalExprs fuel c fr elems
-      let (cell, g) ← M.alloc (.arr vs.toArray)
-      pure (.slice (some (cell, g, [])) 0 vs.length vs.length)
+      doSliceLit c elemTy vs.toArray
 
 /-- Run one function on already-evaluated arguments: build the
 frame, execute, free the frame, map the flow to results. The
@@ -848,6 +989,7 @@ def runFn (fuel : Nat) (c : Ctx) (fn : TFunc) (avs : List Val) :
   match fuel with
   | 0 => M.trap .fuel
   | fuel + 1 => do
+    M.enterFn
     let mut frame : Frame := Array.replicate fn.nslots 0
     let mut i := 0
     for v in avs do
@@ -856,6 +998,7 @@ def runFn (fuel : Nat) (c : Ctx) (fn : TFunc) (avs : List Val) :
       i := i + 1
     let (flow, fr') ← execStmts fuel c frame fn.body
     M.freeFrame fr'
+    M.exitFn
     match flow with
     | .retv vs => pure vs
     | .normal =>
@@ -880,6 +1023,7 @@ def execStmts (fuel : Nat) (c : Ctx) (fr : Frame) :
     match fuel with
     | 0 => M.trap .fuel
     | fuel + 1 => do
+      M.tickStmt
       let (f, fr') ← execStmt fuel c fr s
       match f with
       | .normal => execStmts fuel c fr' rest
@@ -892,6 +1036,7 @@ def execForLoop (fuel : Nat) (c : Ctx) (fr : Frame)
   match fuel with
   | 0 => M.trap .fuel
   | fuel + 1 => do
+    M.tickLoop
     let go ← match cond with
       | some e => M.expectBool (← evalExpr fuel c fr e)
       | none => pure true
@@ -916,6 +1061,7 @@ def execRangeLoop (fuel : Nat) (c : Ctx) (fr : Frame) (k n : Nat)
   match fuel with
   | 0 => M.trap .fuel
   | fuel + 1 => do
+    M.tickLoop
     if k ≥ n then pure .normal
     else do
       match iCell with

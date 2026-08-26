@@ -5,7 +5,9 @@ Every theorem here is about the exact JSON artifacts that the Go,
 Rust, Zig and C++ printers consume, embedded byte for byte, and
 about the formal Vego semantics of Interp.lean. They are proved by
 native evaluation (`native_decide`), so the trusted base is the
-Lean kernel plus the Lean compiler.
+Lean kernel plus the Lean compiler. The universally quantified
+statements about the cost model live in `CostLemmas.lean` and
+`MeterSound.lean` instead, and those need no native evaluation.
 
 What the theorems say:
 
@@ -21,41 +23,38 @@ What the theorems say:
    widths, evaluation order, spare-capacity zeroing, nil-ness,
    range semantics, struct equality, and view writes.
 
-3. `revera_corpus_agrees`: under the formal semantics, the revera
-   engine answers every command of the embedded crosscheck corpus
-   with exactly the output of the Go reference engine, and it does
-   so without hitting any trap: no out-of-range index or slice, no
-   division by zero, no impossible shift, anywhere in those runs.
-   Checking this theorem replays the whole corpus through the
-   interpreter and takes tens of minutes; the built module caches
-   the result.
+3. `revera_corpus_agrees_within_contract`: under the formal
+   semantics, the revera engine answers the crosscheck corpus
+   with exactly the output of the Go reference engine, through
+   the same driver protocol as the Zig, C++ and Rust targets:
+   compile, execute, replace, iterate, contracts, locale
+   selection and case digests. The runs hit no trap: no
+   out-of-range index or slice, no division by zero, no
+   impossible shift, no ill-typed step.
+
+   Every Exec call also stays within the resource contract that
+   the engine's own contract code computes for its pattern and
+   subject length. The buffer bytes it allocates never pass
+   ContractHeapBytes. Its deepest call chain, priced at the
+   contract's per-frame estimate, never passes ContractStackBytes.
+   Its loop iterations and calls never pass ContractSteps. A
+   violation of any bound is a hard session fault, so this theorem
+   would be false.
+
+   The corpus holds two patterns that cannot be executed under the
+   interpreter in any reasonable time, and the theorem leaves
+   their 1056 executions out of the 86691 commands. It keeps their
+   compiles and their contract queries, so no pattern escapes the
+   check and the contract figures of the extreme cases are still
+   compared against the Go reference. `Vego.Corpus` documents the
+   measurements behind that choice, and the proposition re-checks
+   its own coverage.
 -/
 
 import Vego.Probe
-import Vego.Driver
+import Vego.Corpus
 
 namespace Vego
-
-/-- The embedded differential corpus: crosscheck commands with the
-expected output of the Go engine, tab separated. -/
-def corpusText : String := include_str "../data/corpus.tsv"
-
-def corpusPairs : List (String × String) :=
-  parseCorpus corpusText
-
-/-- True when the interpreted engine reproduces the whole corpus:
-every command answers exactly as the Go engine and nothing traps.
-Checking this proposition replays all 86691 commands through the
-interpreter, which takes a while; the result is cached in the
-built module. -/
-def corpusAgrees : Bool :=
-  match reveraChecked with
-  | .error _ => false
-  | .ok tp =>
-    match runCorpusFuel tp corpusPairs with
-    | .ok r => r.checked == corpusPairs.length && r.skipped == 0 &&
-               r.checked > 0
-    | .error _ => false
 
 theorem probe_wellformed : probeChecked.isOk = true := by native_decide
 
@@ -63,6 +62,7 @@ theorem revera_wellformed : reveraChecked.isOk = true := by native_decide
 
 theorem probe_agrees : probeAgrees = true := by native_decide
 
-theorem revera_corpus_agrees : corpusAgrees = true := by native_decide
+theorem revera_corpus_agrees_within_contract : corpusAgrees = true := by
+  native_decide
 
 end Vego

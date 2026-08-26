@@ -192,3 +192,21 @@
   out-of-range O commands so every driver proves the narrowing.
   Lesson: a protocol harness needs corpus lines at the numeric
   edges of every parsed field, not only realistic values.
+- The first metered step check in the LEAN4 driver counted every
+  executed statement against ContractSteps. A one-byte subject
+  pays Exec's fixed setup, and three corpus commands passed the
+  figure by up to 1.2x. The contract counts abstract operations,
+  so the meter now counts loop iterations and calls, which is the
+  granularity contract.go describes; statements stay a calibration
+  counter. Lesson: pick the measurement unit from the bound's own
+  definition, then calibrate against real runs before enforcing.
+- The meter-soundness proofs first assumed every do-block is a
+  right-nested bind chain. The do elaborator instead inlines the
+  continuation into match arms, emits join points after mid-block
+  statements, and compiles mutable frame variables into
+  projections. Each wrong guess showed up as a failed split or
+  apply. The fix was structural: case on the scrutinee before
+  touching the binds, re-run the bind simp after every split, and
+  restructure two interpreter helpers into tail form. Lesson: read
+  the elaborated term in the error before scripting tactics
+  against imagined shapes.

@@ -621,3 +621,131 @@ the drift) and reverting the C++ line buffer to a function-local
 static (that is global storage again). Regenerated engines are
 byte-identical; probecheck and a quick crosscheck re-verify the
 rebuilt Zig and Rust drivers.
+
+## Resource contracts, proved in LEAN4
+
+The user asked for a LEAN4 proof that the contract computation is
+universally correct, or at least that a real evaluation never
+exceeds the contract. The work has two layers, because the second
+is what a deep embedding can reach and the first is what it
+cannot.
+
+The first layer is a resource meter inside the formal semantics.
+The heap of Interp.lean now carries five counters: the bytes of
+every buffer allocation, the abstract steps, the loop and call
+count, the live call depth and its running maximum. Allocations
+are charged at the fixed 64-bit layout that the Zig, C++ and Rust
+targets share, computed by a layout function that aligns struct
+fields the way Go does. Charges sit at exactly the allocation
+forms that vegoc marks: make, a growing append, a slice literal,
+and the two string conversions. To make each one provable, the
+allocation cores moved out of evalExpr into named functions
+(doMake, doSliceLit, doStrToBytes, doBytesToStr), and freeFrame
+and rebindSlot became tail recursive.
+
+The driver session then measures each Exec the way an application
+would: it asks the engine's own interpreted ContractFor for the
+figures at that subject length, resets the meter, runs the call,
+and compares. Passing ContractHeapBytes, ContractStackBytes at the
+contract's 256-byte frame estimate, or ContractSteps is a hard
+session fault. The corpus theorem, renamed
+revera_corpus_agrees_within_contract, therefore states agreement
+with the Go reference and contract compliance together. A first
+draft counted every executed statement against ContractSteps and
+three tiny-subject commands passed the figure by 1.2x; the check
+now counts loop iterations and calls, which is the granularity
+contract.go describes, and the statement counter stays for
+calibration. vegocheck grew a --contracts mode that reports the
+tightest margins per meter instead of failing, and reports them
+during the replay because a few corpus patterns run for hours.
+
+The second layer answers the universality question honestly. Two
+new modules prove statements that quantify over all inputs, by
+induction, with no native evaluation. CostLemmas.lean covers the
+cost model: the geometric bound of the portable growth rule
+max(2*cap, 8, need), its connection to real append histories, the
+well-formedness of the layout function, the exactness of the meter
+on every allocation form, and the saturation algebra of cAdd and
+cMul. MeterSound.lean covers the interpreter itself: one mutual
+induction on fuel over all sixty evaluation cases proves that no
+counter ever decreases and that the call depth returns to its
+entry value whenever a call completes, up to callIdx_meterOK for
+harness calls. That makes the driver's reset, run, read protocol
+sound by proof rather than by inspection.
+
+What stays corpus bound is the engine's own control flow. A fully
+universal contract theorem would need verified invariants for the
+matcher, the one-pass walk and the parse solver, which is a
+separate project; the READMEs now say so instead of implying more.
+
+Measuring the replay changed the plan for the corpus theorem. The
+corpus is not uniformly cheap: twelve compile blocks, six of
+`((a*){250}){250}b` and six of `((a*){4}){4}`, cost hours between
+them, while the other 85599 commands replay in about a minute. The
+old README promise of "tens of minutes" for the whole theorem was
+wrong by an order of magnitude. So `Vego/Corpus.lean` now derives
+the corpus without those twelve blocks from the same embedded
+data, and a second theorem states the same contract claim over
+that 98 percent in minutes. The proposition re-checks its own
+coverage, so a filter that matched everything or nothing would
+fail the theorem instead of quietly weakening it. The full theorem
+stays as the complete claim.
+
+Verified in this session: the three cheap theorems still pass
+against the refactored interpreter, including the 29-line probe
+matrix that pins spare-capacity zeroing and evaluation order; and
+`vegocheck` replayed 85599 corpus commands with contract
+enforcement on, all agreeing, none exceeding its contract. The
+tightest margins over the first 3000 commands were 50 percent of
+the heap bound, 78 percent of the stack bound and 22 percent of
+the step bound, so the contracts hold but the stack figure has the
+least room.
+
+Calibrating over the whole quick corpus (69248 measured Exec
+calls) found one case with no headroom at all. The worst heap
+margin is 60 percent of the bound and the worst loop margin 27
+percent, but the worst stack margin is exactly 100 percent:
+pattern `[[=ch=]]` on subject "HhhxhH" reaches 18 interpreted call
+frames against a bound of 18 frames. That is not an accident of
+the model. `matcherContract` prices phase A as matcherStackBytes,
+2048 bytes or eight frames, plus equivFrames, which is
+maxElemAhead + 2 = 10 frames, and the multi-character equivalence
+test really does recurse once per character of the collating
+element. The contract holds, since only a run that passes the
+bound is rejected, but nothing is spare: one more frame anywhere
+on the phase A path would break it. Whoever touches that path
+should raise the equivFrames slack first.
+
+The two corpus theorems then moved apart, into `Vego/Theorems.lean`
+and `Vego/TheoremsFull.lean`, with a `FullProof` Lake target for
+the second. One module cannot cache half a proof, so keeping both
+statements together meant nobody could check either without paying
+for the slow one. Now `lake build` finishes in about two minutes
+and checks four theorems: both well-formedness claims, the probe
+agreement, and the quick corpus contract theorem over 85599
+commands. `lake build FullProof` states the complete claim and
+runs for hours.
+
+The user then asked to stop the full replay and reduce the corpus
+theorem to sensible cases, so that it runs quickly. Measuring the
+two intractable patterns settled how. The cost comes from the
+nesting, not the subject: `((a*){250}){250}b` needs about a minute
+on the empty subject and 107 minutes on a 120 byte one, and
+`((a*){4}){4}` needs minutes even on the empty subject, so no
+subject length is cheap for either. Each of the twelve blocks
+holds four 120 byte subjects. A full replay would take days.
+
+So the theorem now drops exactly the executions of those two
+patterns, 1056 X commands, and keeps everything else. All 9779
+compile commands stay, so no pattern goes unchecked, and the T
+commands of the intractable blocks stay too, so the contract
+figures of the extreme patterns are still compared against the Go
+reference. Those are the figures that reach the saturation cap, so
+they are the ones worth keeping; only the executions go. Dropping
+an X command cannot disturb the session, because it allocates its
+own match buffer and writes no session root. The proposition
+re-checks its own coverage: it fails if the filter ever stops
+keeping every compile, or matches everything, or matches nothing.
+`TheoremsFull.lean` and the `FullProof` target are gone, and one
+`lake build` now checks all four theorems in four minutes and
+forty-six seconds.

@@ -61,8 +61,9 @@ mappings, collating elements, and equivalence classes. The Go module in
 - [`lean/`](lean/) holds the LEAN4 model of Vego: a formal semantics
   for the subset and machine-checked theorems that the exact JSON
   artifacts are well formed and reproduce the Go reference outputs,
-  trap-free. [`lean/README.md`](lean/README.md) states precisely
-  what is proved.
+  trap-free, and that no execution it replays from the differential
+  corpus ever exceeds its resource contract. [`lean/README.md`](lean/README.md)
+  states precisely what is proved.
 
 ### Reference engines
 
