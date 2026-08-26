@@ -2,6 +2,12 @@
 // engine. It reads protocol commands on stdin, one per line, and
 // prints one output line per command. The protocol is defined by
 // go1/revera/driver_host.go, the Go reference implementation.
+//
+// The host owns three arenas. Locale data lives in the persistent
+// arena. A compiled pattern lives in the pattern arena until the
+// next compile. Everything one operation allocates comes from the
+// scratch arena, reset before each operation. Each engine call
+// receives the arena that must back its allocations.
 
 #![allow(non_snake_case)]
 
@@ -12,13 +18,13 @@ use std::io::{BufRead, Write};
 
 static DATA: &[u8] = include_bytes!("data.bin");
 
-fn unhex(tok: &str) -> vg::Str {
+fn unhex(mem: &vg::Arena, tok: &str) -> vg::Str {
     if tok == "-" {
         return vg::zero();
     }
     let t = tok.as_bytes();
     assert!(t.len() % 2 == 0, "bad hex token");
-    let s = vg::make::<u8>((t.len() / 2) as i64);
+    let s = vg::make::<u8>(mem, (t.len() / 2) as i64);
     for i in 0..t.len() / 2 {
         let hi = hexval(t[2 * i]);
         let lo = hexval(t[2 * i + 1]);
@@ -52,13 +58,15 @@ fn main() {
     let stdout = std::io::stdout();
     let mut w = std::io::BufWriter::new(stdout.lock());
 
-    vg::use_persistent_arena();
+    let persistent = vg::Arena::new();
+    let pattern = vg::Arena::new();
+    let scratch = vg::Arena::new();
+
     let (mut base, ok) = engine::LocaleLoad(vg::lit(DATA));
     assert!(ok, "embedded locale data failed to load");
     let mut cur = engine::LocalePOSIX();
     let mut re: engine::Regexp = vg::zero();
     let mut valid = false;
-    vg::use_scratch_arena();
 
     for line in stdin.lock().lines() {
         let line = line.expect("read error");
@@ -72,11 +80,9 @@ fn main() {
                 writeln!(w, "P 1").unwrap();
             }
             "L" => {
-                vg::use_persistent_arena();
-                let name = unhex(f[1]);
-                let coll = unhex(f[2]);
-                let (loc, ok) = engine::LocaleSelect(&mut base, name, coll);
-                vg::use_scratch_arena();
+                let name = unhex(&persistent, f[1]);
+                let coll = unhex(&persistent, f[2]);
+                let (loc, ok) = engine::LocaleSelect(&persistent, &mut base, name, coll);
                 if ok {
                     cur = loc;
                 }
@@ -86,11 +92,10 @@ fn main() {
                 let flags: u32 = f[1].parse().unwrap();
                 valid = false;
                 re = vg::zero();
-                vg::reset_pattern_arena();
-                vg::use_pattern_arena();
-                let pat = unhex(f[2]);
-                let (compiled, err) = engine::Compile(pat, cur, flags);
-                vg::use_scratch_arena();
+                pattern.reset();
+                scratch.reset();
+                let pat = unhex(&pattern, f[2]);
+                let (compiled, err) = engine::Compile(&pattern, pat, cur, flags);
                 if err.Code != 0 {
                     writeln!(w, "C {} {} 0", err.Code, err.Pos).unwrap();
                 } else {
@@ -103,12 +108,12 @@ fn main() {
                 if !valid {
                     writeln!(w, "X ERR").unwrap();
                 } else {
-                    vg::reset_scratch_arena();
+                    scratch.reset();
                     let eflags: u32 = f[1].parse().unwrap();
-                    let subject = unhex(f[2]);
+                    let subject = unhex(&scratch, f[2]);
                     let n = engine::NumSub(&mut re);
-                    let pmatch = vg::make::<engine::Match>(n + 1);
-                    let (matched, err) = engine::Exec(&mut re, subject, pmatch, eflags);
+                    let pmatch = vg::make::<engine::Match>(&scratch, n + 1);
+                    let (matched, err) = engine::Exec(&scratch, &mut re, subject, pmatch, eflags);
                     if err.Code != 0 {
                         writeln!(w, "X {} 0", err.Code).unwrap();
                     } else if !matched {
@@ -127,12 +132,12 @@ fn main() {
                 if !valid {
                     writeln!(w, "R ERR").unwrap();
                 } else {
-                    vg::reset_scratch_arena();
+                    scratch.reset();
                     let limit: i64 = f[1].parse().unwrap();
                     let eflags: u32 = f[2].parse().unwrap();
-                    let repl = unhex(f[3]);
-                    let subject = unhex(f[4]);
-                    let (out, err) = engine::ReplaceAll(&mut re, subject, repl, limit, eflags);
+                    let repl = unhex(&scratch, f[3]);
+                    let subject = unhex(&scratch, f[4]);
+                    let (out, err) = engine::ReplaceAll(&scratch, &mut re, subject, repl, limit, eflags);
                     if err.Code != 0 {
                         writeln!(w, "R {} {} -", err.Code, err.Pos).unwrap();
                     } else {
@@ -144,22 +149,22 @@ fn main() {
                 if !valid {
                     writeln!(w, "I ERR").unwrap();
                 } else {
-                    vg::reset_scratch_arena();
+                    scratch.reset();
                     let limit: i64 = f[1].parse().unwrap();
                     let eflags: u32 = f[2].parse().unwrap();
-                    let subject = unhex(f[3]);
+                    let subject = unhex(&scratch, f[3]);
                     let (mut iter, ierr) = engine::MatchIterInit(&mut re, limit);
                     if ierr.Code != 0 {
                         writeln!(w, "I {} 0", ierr.Code).unwrap();
                     } else {
                         let n = engine::NumSub(&mut re);
-                        let pmatch = vg::make::<engine::Match>(n + 1);
+                        let pmatch = vg::make::<engine::Match>(&scratch, n + 1);
                         let mut rows = String::new();
                         let mut count: i64 = 0;
                         let mut failed = 0i32;
                         loop {
                             let (got, err) =
-                                engine::MatchIterNext(&mut re, &mut iter, subject, eflags, pmatch);
+                                engine::MatchIterNext(&scratch, &mut re, &mut iter, subject, eflags, pmatch);
                             if err.Code != 0 {
                                 failed = err.Code;
                                 break;
@@ -193,7 +198,7 @@ fn main() {
                 if !valid {
                     writeln!(w, "T ERR").unwrap();
                 } else {
-                    vg::reset_scratch_arena();
+                    scratch.reset();
                     let max_input: i64 = f[1].parse().unwrap();
                     let mut c = engine::ContractFor(&mut re, max_input);
                     writeln!(

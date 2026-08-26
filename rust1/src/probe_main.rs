@@ -28,6 +28,8 @@ fn eq(x: p::Tagged, y: p::Tagged) -> i32 {
 }
 
 fn main() {
+    let mem = vg::Arena::new();
+
     for ab in [
         (MIN_I64, -1i64),
         (7, -2),
@@ -44,14 +46,14 @@ fn main() {
     println!("divmod32b = {} {}", q32b, r32b);
     println!(
         "bytes = {} {}",
-        p::BytesProbe(vg::lit(b"hello")),
-        p::BytesProbe(vg::zero::<vg::Str>())
+        p::BytesProbe(&mem, vg::lit(b"hello")),
+        p::BytesProbe(&mem, vg::zero::<vg::Str>())
     );
     let mut c1 = vg::zero::<p::Counter>();
-    println!("range = {}", p::RangeProbe(&mut c1));
+    println!("range = {}", p::RangeProbe(&mem, &mut c1));
     println!(
         "rangeval = {}",
-        p::RangeValProbe(vg::slice_of::<i32>(&[3, 5, 7]))
+        p::RangeValProbe(vg::slice_of::<i32>(&mem, &[3, 5, 7]))
     );
     println!("rangeint = {}", p::RangeIntProbe(5));
     println!("partial = {}", p::PartialArray());
@@ -62,13 +64,13 @@ fn main() {
         eq(mk(b"a", b"b", 1), mk(b"a", b"b", 2))
     );
     let mut c2 = vg::zero::<p::Counter>();
-    println!("orderargs = {}", p::OrderArgs(&mut c2));
+    println!("orderargs = {}", p::OrderArgs(&mem, &mut c2));
     let mut c3 = vg::zero::<p::Counter>();
-    println!("orderbinary = {}", p::OrderBinary(&mut c3));
+    println!("orderbinary = {}", p::OrderBinary(&mem, &mut c3));
     let mut c4 = vg::zero::<p::Counter>();
-    println!("orderindex = {}", p::OrderIndex(&mut c4));
-    println!("spare = {}", p::SpareProbe());
-    println!("nil = {}", p::NilProbe());
+    println!("orderindex = {}", p::OrderIndex(&mem, &mut c4));
+    println!("spare = {}", p::SpareProbe(&mem));
+    println!("nil = {}", p::NilProbe(&mem));
     println!(
         "wrap = {} {}",
         p::WrapProbe(MIN_I64, 3),
@@ -83,11 +85,11 @@ fn main() {
     println!("andnot = {}", p::AndNotProbe(0xF0F0F0F0, 0xFF00FF00));
     println!("shift = {}", p::ShiftProbe(0x8000000000000001, 7));
     println!("conv = {} {}", p::ConvProbe(-99), p::ConvProbe(300));
-    println!("subwrite = {}", p::SubWrite(4));
+    println!("subwrite = {}", p::SubWrite(&mem, 4));
     let mut c5 = vg::zero::<p::Counter>();
-    println!("andnotorder = {}", p::AndNotOrder(&mut c5));
+    println!("andnotorder = {}", p::AndNotOrder(&mem, &mut c5));
     println!("zeroarray = {}", p::ZeroArray());
-    println!("makeu64 = {}", p::MakeU64(6));
+    println!("makeu64 = {}", p::MakeU64(&mem, 6));
     let mut c6 = vg::zero::<p::Counter>();
-    println!("pickarray = {}", p::PickArray(&mut c6));
+    println!("pickarray = {}", p::PickArray(&mem, &mut c6));
 }

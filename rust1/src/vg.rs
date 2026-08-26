@@ -2,76 +2,58 @@
 // the Go runtime supplied implicitly: growable buffers, immutable
 // string views, and memory.
 //
-// Memory comes from three arenas. Locale data loads into the
-// persistent arena once. The pattern arena holds one compiled
-// Regexp and resets at every compile. The scratch arena holds one
-// operation's workspace and resets at every operation. This
-// mirrors the Vego ownership model: nothing outlives the compiled
-// pattern except locale data.
+// Memory is explicit. Every generated function that allocates
+// takes an Arena reference as its first parameter, so the runtime
+// holds no state at all. The host owns the arenas and decides
+// which one backs each engine call.
 //
-// The whole program is single threaded, as the Vego specification
-// requires, so the raw statics below are safe in practice.
+// Generated code passes the arena through nested calls, so the
+// reference is shared and the mutable block list sits behind an
+// UnsafeCell. That cell also keeps Arena !Sync: the compiler
+// rejects sharing one arena between threads, and each thread with
+// its own arenas is thread safe by construction.
 
 #![allow(dead_code)]
 
 use std::alloc::Layout;
+use std::cell::UnsafeCell;
 
-struct Arena {
-    blocks: Vec<(*mut u8, Layout)>,
+pub struct Arena {
+    blocks: UnsafeCell<Vec<(*mut u8, Layout)>>,
 }
 
-static mut PERSISTENT: Arena = Arena { blocks: Vec::new() };
-static mut PATTERN: Arena = Arena { blocks: Vec::new() };
-static mut SCRATCH: Arena = Arena { blocks: Vec::new() };
-static mut MODE: u8 = 0;
-
-pub fn use_persistent_arena() {
-    unsafe { MODE = 0 };
-}
-
-pub fn use_pattern_arena() {
-    unsafe { MODE = 1 };
-}
-
-pub fn use_scratch_arena() {
-    unsafe { MODE = 2 };
-}
-
-fn arena_reset(a: *mut Arena) {
-    unsafe {
-        for (p, l) in (*a).blocks.drain(..) {
-            std::alloc::dealloc(p, l);
+impl Arena {
+    pub fn new() -> Arena {
+        Arena {
+            blocks: UnsafeCell::new(Vec::new()),
         }
     }
-}
 
-pub fn reset_pattern_arena() {
-    arena_reset(&raw mut PATTERN);
-    arena_reset(&raw mut SCRATCH);
-}
+    pub fn reset(&self) {
+        let blocks = unsafe { &mut *self.blocks.get() };
+        for (p, l) in blocks.drain(..) {
+            unsafe { std::alloc::dealloc(p, l) };
+        }
+    }
 
-pub fn reset_scratch_arena() {
-    arena_reset(&raw mut SCRATCH);
-}
-
-fn arena_alloc(layout: Layout) -> *mut u8 {
-    unsafe {
-        let a: *mut Arena = match MODE {
-            0 => &raw mut PERSISTENT,
-            1 => &raw mut PATTERN,
-            _ => &raw mut SCRATCH,
-        };
-        let p = std::alloc::alloc_zeroed(layout);
+    fn alloc(&self, layout: Layout) -> *mut u8 {
+        let p = unsafe { std::alloc::alloc_zeroed(layout) };
         assert!(!p.is_null(), "out of memory");
-        (*a).blocks.push((p, layout));
+        unsafe { (*self.blocks.get()).push((p, layout)) };
         p
     }
 }
 
-fn alloc_elems<T>(n: i64) -> *mut T {
+impl Drop for Arena {
+    fn drop(&mut self) {
+        self.reset();
+    }
+}
+
+fn alloc_elems<T>(mem: &Arena, n: i64) -> *mut T {
     let count = if n < 1 { 1 } else { n as usize };
     let layout = Layout::array::<T>(count).unwrap();
-    arena_alloc(layout) as *mut T
+    mem.alloc(layout) as *mut T
 }
 
 // Str is an immutable byte view, the translation of a Go string.
@@ -89,7 +71,8 @@ impl Clone for Str {
 
 impl Copy for Str {}
 
-unsafe impl Send for Str {}
+// The generated engine holds static Str tables, so Str must be
+// Sync. That is sound: a Str never changes after construction.
 unsafe impl Sync for Str {}
 
 impl Str {
@@ -162,9 +145,6 @@ impl<T> Clone for Slice<T> {
 
 impl<T> Copy for Slice<T> {}
 
-unsafe impl<T> Send for Slice<T> {}
-unsafe impl<T> Sync for Slice<T> {}
-
 impl<T> Slice<T> {
     // ptr addresses one element for writing. Bounds are checked
     // here, so generated writes stay as safe as Go's.
@@ -201,41 +181,41 @@ impl<T: Copy> Slice<T> {
     }
 }
 
-pub fn make<T>(n: i64) -> Slice<T> {
-    make_cap(n, n)
+pub fn make<T>(mem: &Arena, n: i64) -> Slice<T> {
+    make_cap(mem, n, n)
 }
 
-pub fn make_cap<T>(n: i64, c: i64) -> Slice<T> {
+pub fn make_cap<T>(mem: &Arena, n: i64, c: i64) -> Slice<T> {
     assert!(0 <= n && n <= c);
-    Slice { p: alloc_elems(c), len: n, cap: c }
+    Slice { p: alloc_elems(mem, c), len: n, cap: c }
 }
 
-fn grow<T>(s: Slice<T>, need: i64) -> Slice<T> {
+fn grow<T>(mem: &Arena, s: Slice<T>, need: i64) -> Slice<T> {
     let mut newcap = if s.cap * 2 > 8 { s.cap * 2 } else { 8 };
     if newcap < need {
         newcap = need;
     }
-    let p = alloc_elems::<T>(newcap);
+    let p = alloc_elems::<T>(mem, newcap);
     if !s.p.is_null() && s.len > 0 {
         unsafe { std::ptr::copy_nonoverlapping(s.p, p, s.len as usize) };
     }
     Slice { p, len: s.len, cap: newcap }
 }
 
-pub fn append<T>(s: Slice<T>, v: T) -> Slice<T> {
+pub fn append<T>(mem: &Arena, s: Slice<T>, v: T) -> Slice<T> {
     let mut out = s;
     if out.len == out.cap {
-        out = grow(out, out.len + 1);
+        out = grow(mem, out, out.len + 1);
     }
     unsafe { std::ptr::write(out.p.add(out.len as usize), v) };
     out.len += 1;
     out
 }
 
-pub fn append_slice<T>(s: Slice<T>, more: Slice<T>) -> Slice<T> {
+pub fn append_slice<T>(mem: &Arena, s: Slice<T>, more: Slice<T>) -> Slice<T> {
     let mut out = s;
     if out.len + more.len > out.cap {
-        out = grow(out, out.len + more.len);
+        out = grow(mem, out, out.len + more.len);
     }
     if more.len > 0 {
         // The source may alias the old buffer; the old buffer is
@@ -246,10 +226,10 @@ pub fn append_slice<T>(s: Slice<T>, more: Slice<T>) -> Slice<T> {
     out
 }
 
-pub fn append_str(s: Slice<u8>, more: Str) -> Slice<u8> {
+pub fn append_str(mem: &Arena, s: Slice<u8>, more: Str) -> Slice<u8> {
     let mut out = s;
     if out.len + more.len > out.cap {
-        out = grow(out, out.len + more.len);
+        out = grow(mem, out, out.len + more.len);
     }
     if more.len > 0 {
         unsafe { std::ptr::copy(more.p, out.p.add(out.len as usize), more.len as usize) };
@@ -276,8 +256,8 @@ pub fn vcopy_str(dst: Slice<u8>, src: Str) -> i64 {
 
 // bytes_from_str copies a string into a fresh mutable byte
 // buffer, the []uint8(s) conversion.
-pub fn bytes_from_str(s: Str) -> Slice<u8> {
-    let out = make::<u8>(s.len);
+pub fn bytes_from_str(mem: &Arena, s: Str) -> Slice<u8> {
+    let out = make::<u8>(mem, s.len);
     if s.len > 0 {
         unsafe {
             std::ptr::copy_nonoverlapping(s.p, out.p, s.len as usize);
@@ -286,8 +266,8 @@ pub fn bytes_from_str(s: Str) -> Slice<u8> {
     out
 }
 
-pub fn str_from_bytes(b: Slice<u8>) -> Str {
-    let p = alloc_elems::<u8>(b.len);
+pub fn str_from_bytes(mem: &Arena, b: Slice<u8>) -> Str {
+    let p = alloc_elems::<u8>(mem, b.len);
     if b.len > 0 {
         unsafe { std::ptr::copy_nonoverlapping(b.p, p, b.len as usize) };
     }
@@ -306,8 +286,8 @@ pub fn arr_slice<T, const N: usize>(p: *mut [T; N], lo: i64, hi: i64) -> Slice<T
     }
 }
 
-pub fn slice_of<T: Copy>(src: &[T]) -> Slice<T> {
-    let out = make::<T>(src.len() as i64);
+pub fn slice_of<T: Copy>(mem: &Arena, src: &[T]) -> Slice<T> {
+    let out = make::<T>(mem, src.len() as i64);
     if !src.is_empty() {
         unsafe { std::ptr::copy_nonoverlapping(src.as_ptr(), out.p, src.len()) };
     }

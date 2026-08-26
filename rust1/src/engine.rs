@@ -472,7 +472,7 @@ pub fn vg_eq_memoKey(a: memoKey, b: memoKey) -> bool {
     a.a == b.a && a.b == b.b && a.c == b.c && a.d == b.d
 }
 
-pub fn parseBracket(p: &mut parser, loc: &mut Locale) -> i32 {
+pub fn parseBracket(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
     let start: i64 = p.pos;
     p.pos += 1i64;
     let mut b: bracketSet = vg::zero();
@@ -489,13 +489,13 @@ pub fn parseBracket(p: &mut parser, loc: &mut Locale) -> i32 {
         }
         if ((peekByte(p) == 93u8) && (!empty)) {
             p.pos += 1i64;
-            finalizeBracket(&mut b, loc);
-            p.brackets = vg::append(p.brackets, b);
-            let n: i32 = { let _t3 = opBracket; addNode(p, _t3) };
+            finalizeBracket(mem, &mut b, loc);
+            p.brackets = vg::append(mem, p.brackets, b);
+            let n: i32 = { let _t3 = opBracket; addNode(mem, p, _t3) };
             unsafe { (*p.nodes.ptr(((n) as i64))).br = (((p.brackets.len - 1i64)) as i32); }
             return n;
         }
-        let _t4 = { let _t5 = start; parseBracketItem(p, loc, _t5) };
+        let _t4 = { let _t5 = start; parseBracketItem(mem, p, loc, _t5) };
         let item: bracketItem = _t4.0;
         let ok: bool = _t4.1;
         if (!ok) {
@@ -505,7 +505,7 @@ pub fn parseBracket(p: &mut parser, loc: &mut Locale) -> i32 {
         if ((((item.kind == itemChar) && (peekByte(p) == 45u8)) && ({ let _t6 = 1i64; peekByteAt(p, _t6) } != 93u8)) && ((p.pos + 1i64) < p.src.len)) {
             let rangeStart: i64 = p.pos;
             p.pos += 1i64;
-            let _t7 = { let _t8 = start; parseBracketItem(p, loc, _t8) };
+            let _t7 = { let _t8 = start; parseBracketItem(mem, p, loc, _t8) };
             let end: bracketItem = _t7.0;
             let ok2: bool = _t7.1;
             if (!ok2) {
@@ -523,7 +523,7 @@ pub fn parseBracket(p: &mut parser, loc: &mut Locale) -> i32 {
             let mut rr: runeRange = vg::zero();
             rr.lo = item.r;
             rr.hi = end.r;
-            b.ranges = vg::append(b.ranges, rr);
+            b.ranges = vg::append(mem, b.ranges, rr);
             if ((peekByte(p) == 45u8) && ({ let _t15 = 1i64; peekByteAt(p, _t15) } != 93u8)) {
                 return { let _t16 = ErrERange; let _t17 = p.pos; fail(p, _t16, _t17) };
             }
@@ -538,11 +538,11 @@ pub fn parseBracket(p: &mut parser, loc: &mut Locale) -> i32 {
                 let mut rr_2: runeRange = vg::zero();
                 rr_2.lo = item.r;
                 rr_2.hi = item.r;
-                b.ranges = vg::append(b.ranges, rr_2);
+                b.ranges = vg::append(mem, b.ranges, rr_2);
             } else if _t21 == itemElem {
-                b.elems = vg::append(b.elems, item.seq);
+                b.elems = vg::append(mem, b.elems, item.seq);
             } else if _t21 == itemEquiv {
-                b.equivs = vg::append(b.equivs, item.seq);
+                b.equivs = vg::append(mem, b.equivs, item.seq);
             } else if _t21 == itemClass {
                 b.classMask |= (1u16 << item.class);
             }
@@ -551,13 +551,13 @@ pub fn parseBracket(p: &mut parser, loc: &mut Locale) -> i32 {
     unreachable!()
 }
 
-pub fn parseBracketItem(p: &mut parser, loc: &mut Locale, bracketStart: i64) -> (bracketItem, bool) {
+pub fn parseBracketItem(mem: &vg::Arena, p: &mut parser, loc: &mut Locale, bracketStart: i64) -> (bracketItem, bool) {
     let mut item: bracketItem = vg::zero();
     let c: u8 = peekByte(p);
     if (c == 91u8) {
         let inner: u8 = { let _t1 = 1i64; peekByteAt(p, _t1) };
         if (inner == 46u8) {
-            let _t2 = { let _t3 = vg::lit(b".]"); let _t4 = ErrECollate; scanInner(p, _t3, _t4) };
+            let _t2 = { let _t3 = vg::lit(b".]"); let _t4 = ErrECollate; scanInner(mem, p, _t3, _t4) };
             let seq: vg::Slice<i32> = _t2.0;
             let ok: bool = _t2.1;
             if (!ok) {
@@ -577,7 +577,7 @@ pub fn parseBracketItem(p: &mut parser, loc: &mut Locale, bracketStart: i64) -> 
             return (item, true);
         }
         if (inner == 61u8) {
-            let _t8 = { let _t9 = vg::lit(b"=]"); let _t10 = ErrECollate; scanInner(p, _t9, _t10) };
+            let _t8 = { let _t9 = vg::lit(b"=]"); let _t10 = ErrECollate; scanInner(mem, p, _t9, _t10) };
             let seq_2: vg::Slice<i32> = _t8.0;
             let ok_2: bool = _t8.1;
             if (!ok_2) {
@@ -592,13 +592,13 @@ pub fn parseBracketItem(p: &mut parser, loc: &mut Locale, bracketStart: i64) -> 
             return (item, true);
         }
         if (inner == 58u8) {
-            let _t14 = { let _t15 = vg::lit(b":]"); let _t16 = ErrECType; scanInner(p, _t15, _t16) };
+            let _t14 = { let _t15 = vg::lit(b":]"); let _t16 = ErrECType; scanInner(mem, p, _t15, _t16) };
             let seq_3: vg::Slice<i32> = _t14.0;
             let ok_3: bool = _t14.1;
             if (!ok_3) {
                 return (item, false);
             }
-            let _t17 = classByName(runesToString(seq_3));
+            let _t17 = classByName(runesToString(mem, seq_3));
             let class: u8 = _t17.0;
             let ok2: bool = _t17.1;
             if (!ok2) {
@@ -619,23 +619,23 @@ pub fn parseBracketItem(p: &mut parser, loc: &mut Locale, bracketStart: i64) -> 
     return (item, true);
 }
 
-pub fn runesToString(seq: vg::Slice<i32>) -> vg::Str {
-    let mut out: vg::Slice<u8> = vg::make_cap::<u8>(0i64, seq.len);
+pub fn runesToString(mem: &vg::Arena, seq: vg::Slice<i32>) -> vg::Str {
+    let mut out: vg::Slice<u8> = vg::make_cap::<u8>(mem, 0i64, seq.len);
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < seq.len) {
             '_c1: {
                 let r: i32 = seq.get(i);
                 if (r < 128i32) {
-                    out = vg::append(out, ((r) as u8));
+                    out = vg::append(mem, out, ((r) as u8));
                 } else {
                     if (r < 2048i32) {
-                        out = vg::append(vg::append(out, (((192i32 | (r >> 6i64))) as u8)), (((128i32 | (r & 63i32))) as u8));
+                        out = vg::append(mem, vg::append(mem, out, (((192i32 | (r >> 6i64))) as u8)), (((128i32 | (r & 63i32))) as u8));
                     } else {
                         if (r < 65536i32) {
-                            out = vg::append(vg::append(vg::append(out, (((224i32 | (r >> 12i64))) as u8)), (((128i32 | ((r >> 6i64) & 63i32))) as u8)), (((128i32 | (r & 63i32))) as u8));
+                            out = vg::append(mem, vg::append(mem, vg::append(mem, out, (((224i32 | (r >> 12i64))) as u8)), (((128i32 | ((r >> 6i64) & 63i32))) as u8)), (((128i32 | (r & 63i32))) as u8));
                         } else {
-                            out = vg::append(vg::append(vg::append(vg::append(out, (((240i32 | (r >> 18i64))) as u8)), (((128i32 | ((r >> 12i64) & 63i32))) as u8)), (((128i32 | ((r >> 6i64) & 63i32))) as u8)), (((128i32 | (r & 63i32))) as u8));
+                            out = vg::append(mem, vg::append(mem, vg::append(mem, vg::append(mem, out, (((240i32 | (r >> 18i64))) as u8)), (((128i32 | ((r >> 12i64) & 63i32))) as u8)), (((128i32 | ((r >> 6i64) & 63i32))) as u8)), (((128i32 | (r & 63i32))) as u8));
                         }
                     }
                 }
@@ -643,10 +643,10 @@ pub fn runesToString(seq: vg::Slice<i32>) -> vg::Str {
             i += 1i64;
         }
     }
-    return vg::str_from_bytes(out);
+    return vg::str_from_bytes(mem, out);
 }
 
-pub fn scanInner(p: &mut parser, closer: vg::Str, emptyCode: i32) -> (vg::Slice<i32>, bool) {
+pub fn scanInner(mem: &vg::Arena, p: &mut parser, closer: vg::Str, emptyCode: i32) -> (vg::Slice<i32>, bool) {
     let start: i64 = p.pos;
     p.pos += 2i64;
     let mut end: i64 = (1i64).wrapping_neg();
@@ -670,7 +670,7 @@ pub fn scanInner(p: &mut parser, closer: vg::Str, emptyCode: i32) -> (vg::Slice<
         let _ = { let _t4 = emptyCode; let _t5 = start; fail(p, _t4, _t5) };
         return (vg::zero::<vg::Slice<i32>>(), false);
     }
-    let mut content: vg::Slice<i32> = vg::make_cap::<i32>(0i64, (end - p.pos));
+    let mut content: vg::Slice<i32> = vg::make_cap::<i32>(mem, 0i64, (end - p.pos));
     let mut at: i64 = p.pos;
     while (at < end) {
         let _t6 = decodeRuneAt(p.src, at);
@@ -680,19 +680,19 @@ pub fn scanInner(p: &mut parser, closer: vg::Str, emptyCode: i32) -> (vg::Slice<
             let _ = { let _t7 = ErrBadPat; let _t8 = start; fail(p, _t7, _t8) };
             return (vg::zero::<vg::Slice<i32>>(), false);
         }
-        content = vg::append(content, r);
+        content = vg::append(mem, content, r);
         at += size;
     }
     p.pos = (end + 2i64);
     return (content, true);
 }
 
-pub fn sortRanges(rr: vg::Slice<runeRange>) {
+pub fn sortRanges(mem: &vg::Arena, rr: vg::Slice<runeRange>) {
     let n: i64 = rr.len;
     if (n < 2i64) {
         return;
     }
-    let tmp: vg::Slice<runeRange> = vg::make::<runeRange>(n);
+    let tmp: vg::Slice<runeRange> = vg::make::<runeRange>(mem, n);
     {
         let mut width: i64 = 1i64;
         '_b1: while (width < n) {
@@ -738,7 +738,7 @@ pub fn sortRanges(rr: vg::Slice<runeRange>) {
     }
 }
 
-pub fn finalizeBracket(b: &mut bracketSet, loc: &mut Locale) {
+pub fn finalizeBracket(mem: &vg::Arena, b: &mut bracketSet, loc: &mut Locale) {
     if ((!b.negated) && ((b.elems.len > 0i64) || (b.equivs.len > 0i64))) {
         {
             let mut i: i64 = 0i64;
@@ -764,7 +764,7 @@ pub fn finalizeBracket(b: &mut bracketSet, loc: &mut Locale) {
     if (b.ranges.len < 2i64) {
         return;
     }
-    sortRanges(b.ranges);
+    sortRanges(mem, b.ranges);
     let mut w: i64 = 0i64;
     {
         let mut i_2: i64 = 1i64;
@@ -998,27 +998,27 @@ pub fn capStep(s: &mut capSolver) -> bool {
     return (!s.failed);
 }
 
-pub fn seedArenas(s: &mut capSolver) {
+pub fn seedArenas(mem: &vg::Arena, s: &mut capSolver) {
     let scratch: ptree = vg::zero();
-    s.trees = vg::append(s.trees, scratch);
-    s.kidStore = vg::append(s.kidStore, (1i32).wrapping_neg());
+    s.trees = vg::append(mem, s.trees, scratch);
+    s.kidStore = vg::append(mem, s.kidStore, (1i32).wrapping_neg());
 }
 
-pub fn newTree(s: &mut capSolver, t: ptree) -> i32 {
+pub fn newTree(mem: &vg::Arena, s: &mut capSolver, t: ptree) -> i32 {
     if (s.failed || (s.trees.len >= solverArenaLimit)) {
         s.failed = true;
         unsafe { (*s.trees.ptr(0i64)) = t; }
         return 0i32;
     }
-    s.trees = vg::append(s.trees, t);
+    s.trees = vg::append(mem, s.trees, t);
     return (((s.trees.len - 1i64)) as i32);
 }
 
-pub fn kidAlloc(s: &mut capSolver, length: i64) -> i64 {
+pub fn kidAlloc(mem: &vg::Arena, s: &mut capSolver, length: i64) -> i64 {
     if (s.failed || ((s.kidStore.len + length) > solverArenaLimit)) {
         s.failed = true;
         while (s.kidStore.len < length) {
-            s.kidStore = vg::append(s.kidStore, (1i32).wrapping_neg());
+            s.kidStore = vg::append(mem, s.kidStore, (1i32).wrapping_neg());
         }
         return 0i64;
     }
@@ -1031,7 +1031,7 @@ pub fn kidAlloc(s: &mut capSolver, length: i64) -> i64 {
         let mut i: i64 = 0i64;
         '_b1: while (i < length) {
             '_c1: {
-                s.kidStore = vg::append(s.kidStore, (1i32).wrapping_neg());
+                s.kidStore = vg::append(mem, s.kidStore, (1i32).wrapping_neg());
             }
             i += 1i64;
         }
@@ -1039,14 +1039,14 @@ pub fn kidAlloc(s: &mut capSolver, length: i64) -> i64 {
     return off;
 }
 
-pub fn kidAlloc1(s: &mut capSolver, t: i32) -> i64 {
-    let off: i64 = { let _t1 = 1i64; kidAlloc(s, _t1) };
+pub fn kidAlloc1(mem: &vg::Arena, s: &mut capSolver, t: i32) -> i64 {
+    let off: i64 = { let _t1 = 1i64; kidAlloc(mem, s, _t1) };
     unsafe { (*s.kidStore.ptr(off)) = t; }
     return off;
 }
 
-pub fn kidPrepend(s: &mut capSolver, head: i32, tailOff: i64, tailLen: i64) -> i64 {
-    let off: i64 = { let _t1 = (tailLen + 1i64); kidAlloc(s, _t1) };
+pub fn kidPrepend(mem: &vg::Arena, s: &mut capSolver, head: i32, tailOff: i64, tailLen: i64) -> i64 {
+    let off: i64 = { let _t1 = (tailLen + 1i64); kidAlloc(mem, s, _t1) };
     unsafe { (*s.kidStore.ptr(off)) = head; }
     let _ = vg::vcopy(s.kidStore.sub((off + 1i64), ((off + 1i64) + tailLen)), s.kidStore.sub(tailOff, (tailOff + tailLen)));
     return off;
@@ -1178,7 +1178,7 @@ pub fn cmpCand(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
     return { let _t7 = a; let _t8 = b; structCmp(s, re, _t7, _t8) };
 }
 
-pub fn bestParse(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64) -> i32 {
+pub fn bestParse(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64) -> i32 {
     let span: i64 = (j - i);
     if ((span < re.nodes.get(((ni) as i64)).minL) || ((re.nodes.get(((ni) as i64)).maxL < lenInf) && (span > re.nodes.get(((ni) as i64)).maxL))) {
         return (1i32).wrapping_neg();
@@ -1201,41 +1201,41 @@ pub fn bestParse(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i
         let _t3 = re.nodes.get(((ni) as i64)).op;
         if _t3 == opChar {
             if ((j == (i + 1i64)) && { let _t4 = ni; let _t5 = d.runes.get(i); charMatches(re, _t4, _t5) }) {
-                best = { let _t6 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(s, _t6) };
+                best = { let _t6 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(mem, s, _t6) };
             }
         } else if _t3 == opAny {
             if ((j == (i + 1i64)) && { let _t7 = d.runes.get(i); anyMatches(re, _t7) }) {
-                best = { let _t8 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(s, _t8) };
+                best = { let _t8 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(mem, s, _t8) };
             }
         } else if _t3 == opBracket {
             if { let _t9 = re.brackets; let _t10 = re.nodes.get(((ni) as i64)).br; let _t11 = d.runes; let _t12 = i; let _t13 = j; bracketMatchesSpan(_t9, _t10, &mut re.loc, _t11, _t12, _t13) } {
-                best = { let _t14 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(s, _t14) };
+                best = { let _t14 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(mem, s, _t14) };
             }
         } else if _t3 == opBOL {
             if ((j == i) && { let _t15 = i; let _t16 = s.eflags; atBOL(re, d, _t15, _t16) }) {
-                best = { let _t17 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(s, _t17) };
+                best = { let _t17 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(mem, s, _t17) };
             }
         } else if _t3 == opEOL {
             if ((j == i) && { let _t18 = i; let _t19 = s.eflags; atEOL(re, d, _t18, _t19) }) {
-                best = { let _t20 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(s, _t20) };
+                best = { let _t20 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(mem, s, _t20) };
             }
         } else if _t3 == opGroup {
-            let sub: i32 = { let _t21 = re.nodes.get(((ni) as i64)).ch.get(0i64); let _t22 = i; let _t23 = j; bestParse(s, re, d, _t21, _t22, _t23) };
+            let sub: i32 = { let _t21 = re.nodes.get(((ni) as i64)).ch.get(0i64); let _t22 = i; let _t23 = j; bestParse(mem, s, re, d, _t21, _t22, _t23) };
             if (sub >= 0i32) {
-                let off: i64 = { let _t24 = sub; kidAlloc1(s, _t24) };
-                best = { let _t25 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off) as i32), kidsLen: 1i32, ..vg::zero() }; newTree(s, _t25) };
+                let off: i64 = { let _t24 = sub; kidAlloc1(mem, s, _t24) };
+                best = { let _t25 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off) as i32), kidsLen: 1i32, ..vg::zero() }; newTree(mem, s, _t25) };
             }
         } else if _t3 == opAlt {
             {
                 let mut bi: i64 = 0i64;
                 '_b26: while (bi < re.nodes.get(((ni) as i64)).ch.len) {
                     '_c26: {
-                        let sub_2: i32 = { let _t27 = re.nodes.get(((ni) as i64)).ch.get(bi); let _t28 = i; let _t29 = j; bestParse(s, re, d, _t27, _t28, _t29) };
+                        let sub_2: i32 = { let _t27 = re.nodes.get(((ni) as i64)).ch.get(bi); let _t28 = i; let _t29 = j; bestParse(mem, s, re, d, _t27, _t28, _t29) };
                         if (sub_2 < 0i32) {
                             break '_c26;
                         }
-                        let off_2: i64 = { let _t30 = sub_2; kidAlloc1(s, _t30) };
-                        let candidate: i32 = { let _t31 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), branch: ((bi) as i32), kidsOff: ((off_2) as i32), kidsLen: 1i32 }; newTree(s, _t31) };
+                        let off_2: i64 = { let _t30 = sub_2; kidAlloc1(mem, s, _t30) };
+                        let candidate: i32 = { let _t31 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), branch: ((bi) as i32), kidsOff: ((off_2) as i32), kidsLen: 1i32 }; newTree(mem, s, _t31) };
                         if ((best < 0i32) || ({ let _t32 = candidate; let _t33 = best; cmpCand(s, re, _t32, _t33) } < 0i64)) {
                             best = candidate;
                         }
@@ -1244,45 +1244,45 @@ pub fn bestParse(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i
                 }
             }
         } else if _t3 == opConcat {
-            let _t34 = { let _t35 = ni; let _t36 = 0i64; let _t37 = i; let _t38 = j; bestConcat(s, re, d, _t35, _t36, _t37, _t38) };
+            let _t34 = { let _t35 = ni; let _t36 = 0i64; let _t37 = i; let _t38 = j; bestConcat(mem, s, re, d, _t35, _t36, _t37, _t38) };
             let off_3: i64 = _t34.0;
             let count: i64 = _t34.1;
             if (off_3 >= 0i64) {
-                best = { let _t39 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off_3) as i32), kidsLen: ((count) as i32), ..vg::zero() }; newTree(s, _t39) };
+                best = { let _t39 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off_3) as i32), kidsLen: ((count) as i32), ..vg::zero() }; newTree(mem, s, _t39) };
             }
         } else if _t3 == opRepeat {
             if ((i == j) && (re.nodes.get(((ni) as i64)).min == 0i64)) {
                 let mut sub_3: i32 = (((1i32).wrapping_neg()) as i32);
                 if (re.nodes.get(((ni) as i64)).max != 0i64) {
-                    sub_3 = { let _t40 = re.nodes.get(((ni) as i64)).ch.get(0i64); let _t41 = i; let _t42 = i; bestParse(s, re, d, _t40, _t41, _t42) };
+                    sub_3 = { let _t40 = re.nodes.get(((ni) as i64)).ch.get(0i64); let _t41 = i; let _t42 = i; bestParse(mem, s, re, d, _t40, _t41, _t42) };
                 }
                 if (sub_3 >= 0i32) {
-                    let off_4: i64 = { let _t43 = sub_3; kidAlloc1(s, _t43) };
-                    best = { let _t44 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off_4) as i32), kidsLen: 1i32, ..vg::zero() }; newTree(s, _t44) };
+                    let off_4: i64 = { let _t43 = sub_3; kidAlloc1(mem, s, _t43) };
+                    best = { let _t44 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off_4) as i32), kidsLen: 1i32, ..vg::zero() }; newTree(mem, s, _t44) };
                 } else {
-                    best = { let _t45 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(s, _t45) };
+                    best = { let _t45 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(mem, s, _t45) };
                 }
             } else {
-                let win: repWin = { let _t46 = ni; let _t47 = i; let _t48 = j; let _t49 = 0i64; let _t50 = false; bestRep(s, re, d, _t46, _t47, _t48, _t49, _t50) };
+                let win: repWin = { let _t46 = ni; let _t47 = i; let _t48 = j; let _t49 = 0i64; let _t50 = false; bestRep(mem, s, re, d, _t46, _t47, _t48, _t49, _t50) };
                 if win.ok {
-                    best = { let _t51 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((win.off) as i32), kidsLen: ((win.length) as i32), ..vg::zero() }; newTree(s, _t51) };
+                    best = { let _t51 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((win.off) as i32), kidsLen: ((win.length) as i32), ..vg::zero() }; newTree(mem, s, _t51) };
                 }
             }
         }
     }
     let mut val: memoVal = vg::zero();
     val.x = best;
-    { let _t52 = key; let _t53 = val; memoPut(&mut s.memo, _t52, _t53) };
+    { let _t52 = key; let _t53 = val; memoPut(mem, &mut s.memo, _t52, _t53) };
     return best;
 }
 
-pub fn bestConcat(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, idx: i64, i: i64, j: i64) -> (i64, i64) {
+pub fn bestConcat(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, idx: i64, i: i64, j: i64) -> (i64, i64) {
     if (idx == (re.nodes.get(((ni) as i64)).ch.len - 1i64)) {
-        let sub: i32 = { let _t1 = re.nodes.get(((ni) as i64)).ch.get(idx); let _t2 = i; let _t3 = j; bestParse(s, re, d, _t1, _t2, _t3) };
+        let sub: i32 = { let _t1 = re.nodes.get(((ni) as i64)).ch.get(idx); let _t2 = i; let _t3 = j; bestParse(mem, s, re, d, _t1, _t2, _t3) };
         if (sub < 0i32) {
             return ((1i64).wrapping_neg(), 0i64);
         }
-        return ({ let _t4 = sub; kidAlloc1(s, _t4) }, 1i64);
+        return ({ let _t4 = sub; kidAlloc1(mem, s, _t4) }, 1i64);
     }
     let mut key: memoKey = vg::zero();
     key.a = ni;
@@ -1317,18 +1317,18 @@ pub fn bestConcat(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, 
                 if (!capStep(s)) {
                     return ((1i64).wrapping_neg(), 0i64);
                 }
-                let head: i32 = { let _t8 = head0; let _t9 = i; let _t10 = m; bestParse(s, re, d, _t8, _t9, _t10) };
+                let head: i32 = { let _t8 = head0; let _t9 = i; let _t10 = m; bestParse(mem, s, re, d, _t8, _t9, _t10) };
                 if (head < 0i32) {
                     break '_c7;
                 }
-                let _t11 = { let _t12 = ni; let _t13 = (idx + 1i64); let _t14 = m; let _t15 = j; bestConcat(s, re, d, _t12, _t13, _t14, _t15) };
+                let _t11 = { let _t12 = ni; let _t13 = (idx + 1i64); let _t14 = m; let _t15 = j; bestConcat(mem, s, re, d, _t12, _t13, _t14, _t15) };
                 let tailOff: i64 = _t11.0;
                 let tailLen: i64 = _t11.1;
                 if (tailOff < 0i64) {
                     break '_c7;
                 }
-                let off: i64 = { let _t16 = head; let _t17 = tailOff; let _t18 = tailLen; kidPrepend(s, _t16, _t17, _t18) };
-                let candidate: i32 = { let _t19 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off) as i32), kidsLen: (((tailLen + 1i64)) as i32), ..vg::zero() }; newTree(s, _t19) };
+                let off: i64 = { let _t16 = head; let _t17 = tailOff; let _t18 = tailLen; kidPrepend(mem, s, _t16, _t17, _t18) };
+                let candidate: i32 = { let _t19 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off) as i32), kidsLen: (((tailLen + 1i64)) as i32), ..vg::zero() }; newTree(mem, s, _t19) };
                 if ((bestTree < 0i32) || ({ let _t20 = candidate; let _t21 = bestTree; cmpCand(s, re, _t20, _t21) } < 0i64)) {
                     bestTree = candidate;
                     bestOff = off;
@@ -1341,12 +1341,12 @@ pub fn bestConcat(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, 
     let mut val: memoVal = vg::zero();
     val.x = ((bestOff) as i32);
     val.y = ((bestLen) as i32);
-    { let _t22 = key; let _t23 = val; memoPut(&mut s.cmemo, _t22, _t23) };
+    { let _t22 = key; let _t23 = val; memoPut(mem, &mut s.cmemo, _t22, _t23) };
     return (bestOff, bestLen);
 }
 
-pub fn repTry(s: &mut capSolver, re: &mut Regexp, ni: i32, i: i64, j: i64, off: i64, length: i64, best: &mut repBest) {
-    let candidate: i32 = { let _t1 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off) as i32), kidsLen: ((length) as i32), ..vg::zero() }; newTree(s, _t1) };
+pub fn repTry(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, ni: i32, i: i64, j: i64, off: i64, length: i64, best: &mut repBest) {
+    let candidate: i32 = { let _t1 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off) as i32), kidsLen: ((length) as i32), ..vg::zero() }; newTree(mem, s, _t1) };
     if ((!best.found) || ({ let _t2 = candidate; let _t3 = best.tree; cmpCand(s, re, _t2, _t3) } < 0i64)) {
         best.off = off;
         best.length = length;
@@ -1355,7 +1355,7 @@ pub fn repTry(s: &mut capSolver, re: &mut Regexp, ni: i32, i: i64, j: i64, off: 
     }
 }
 
-pub fn bestRep(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, done: i64, hasEmpty: bool) -> repWin {
+pub fn bestRep(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, done: i64, hasEmpty: bool) -> repWin {
     let mut done_v: i64 = done;
     if ((re.nodes.get(((ni) as i64)).max == infinite) && (done_v > re.nodes.get(((ni) as i64)).min)) {
         done_v = re.nodes.get(((ni) as i64)).min;
@@ -1384,7 +1384,7 @@ pub fn bestRep(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i: 
     }
     let mut best: repBest = vg::zero();
     if (((i == j) && (done_v >= re.nodes.get(((ni) as i64)).min)) && ((!hasEmpty) || (done_v == re.nodes.get(((ni) as i64)).min))) {
-        { let _t3 = ni; let _t4 = i; let _t5 = j; let _t6 = 0i64; let _t7 = 0i64; repTry(s, re, _t3, _t4, _t5, _t6, _t7, &mut best) };
+        { let _t3 = ni; let _t4 = i; let _t5 = j; let _t6 = 0i64; let _t7 = 0i64; repTry(mem, s, re, _t3, _t4, _t5, _t6, _t7, &mut best) };
     }
     let canTake: bool = ((re.nodes.get(((ni) as i64)).max == infinite) || (done_v < re.nodes.get(((ni) as i64)).max));
     if (canTake && (!(hasEmpty && (done_v >= re.nodes.get(((ni) as i64)).min)))) {
@@ -1417,16 +1417,16 @@ pub fn bestRep(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i: 
                         win.off = (1i64).wrapping_neg();
                         return win;
                     }
-                    let head: i32 = { let _t9 = child; let _t10 = i; let _t11 = m; bestParse(s, re, d, _t9, _t10, _t11) };
+                    let head: i32 = { let _t9 = child; let _t10 = i; let _t11 = m; bestParse(mem, s, re, d, _t9, _t10, _t11) };
                     if (head < 0i32) {
                         break '_c8;
                     }
-                    let tail: repWin = { let _t12 = ni; let _t13 = m; let _t14 = j; let _t15 = (done_v + 1i64); let _t16 = (hasEmpty || (m == i)); bestRep(s, re, d, _t12, _t13, _t14, _t15, _t16) };
+                    let tail: repWin = { let _t12 = ni; let _t13 = m; let _t14 = j; let _t15 = (done_v + 1i64); let _t16 = (hasEmpty || (m == i)); bestRep(mem, s, re, d, _t12, _t13, _t14, _t15, _t16) };
                     if (!tail.ok) {
                         break '_c8;
                     }
-                    let off: i64 = { let _t17 = head; let _t18 = tail.off; let _t19 = tail.length; kidPrepend(s, _t17, _t18, _t19) };
-                    { let _t20 = ni; let _t21 = i; let _t22 = j; let _t23 = off; let _t24 = (tail.length + 1i64); repTry(s, re, _t20, _t21, _t22, _t23, _t24, &mut best) };
+                    let off: i64 = { let _t17 = head; let _t18 = tail.off; let _t19 = tail.length; kidPrepend(mem, s, _t17, _t18, _t19) };
+                    { let _t20 = ni; let _t21 = i; let _t22 = j; let _t23 = off; let _t24 = (tail.length + 1i64); repTry(mem, s, re, _t20, _t21, _t22, _t23, _t24, &mut best) };
                 }
                 m += 1i64;
             }
@@ -1440,14 +1440,14 @@ pub fn bestRep(s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i: 
     } else {
         val.x = (1i32).wrapping_neg();
     }
-    { let _t25 = key; let _t26 = val; memoPut(&mut s.rmemo, _t25, _t26) };
+    { let _t25 = key; let _t26 = val; memoPut(mem, &mut s.rmemo, _t25, _t26) };
     win.off = ((val.x) as i64);
     win.length = ((val.y) as i64);
     win.ok = best.found;
     return win;
 }
 
-pub fn solveCaptures(re: &mut Regexp, d: &mut decoded, so: i64, eo: i64, eflags: u32, caps: vg::Slice<Match>) -> Error {
+pub fn solveCaptures(mem: &vg::Arena, re: &mut Regexp, d: &mut decoded, so: i64, eo: i64, eflags: u32, caps: vg::Slice<Match>) -> Error {
     if re.onePass {
         {
             let mut idx: i64 = 0i64;
@@ -1465,10 +1465,10 @@ pub fn solveCaptures(re: &mut Regexp, d: &mut decoded, so: i64, eo: i64, eflags:
     }
     let mut s: capSolver = vg::zero();
     s.eflags = eflags;
-    s.ctrA = vg::make::<i64>(re.minSlots);
-    s.ctrB = vg::make::<i64>(re.minSlots);
-    seedArenas(&mut s);
-    let best: i32 = { let _t7 = re.root; let _t8 = so; let _t9 = eo; bestParse(&mut s, re, d, _t7, _t8, _t9) };
+    s.ctrA = vg::make::<i64>(mem, re.minSlots);
+    s.ctrB = vg::make::<i64>(mem, re.minSlots);
+    seedArenas(mem, &mut s);
+    let best: i32 = { let _t7 = re.root; let _t8 = so; let _t9 = eo; bestParse(mem, &mut s, re, d, _t7, _t8, _t9) };
     if s.failed {
         return compileError(ErrESpace, (1i64).wrapping_neg());
     }
@@ -1851,28 +1851,28 @@ pub fn solverFanout(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
     return widest;
 }
 
-pub fn prepare(ws: &mut engineWS, n: i64, k: i64, ring: i64) {
-    ws.slots = vg::make::<slotTable>(ring);
+pub fn prepare(mem: &vg::Arena, ws: &mut engineWS, n: i64, k: i64, ring: i64) {
+    ws.slots = vg::make::<slotTable>(mem, ring);
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < ring) {
             '_c1: {
-                unsafe { (*ws.slots.ptr(i)).stamp = vg::make::<u32>(n); }
-                unsafe { (*ws.slots.ptr(i)).starts = vg::make::<i32>(n); }
+                unsafe { (*ws.slots.ptr(i)).stamp = vg::make::<u32>(mem, n); }
+                unsafe { (*ws.slots.ptr(i)).starts = vg::make::<i32>(mem, n); }
                 if (k > 0i64) {
-                    unsafe { (*ws.slots.ptr(i)).ctr = vg::make::<u32>((n * k)); }
+                    unsafe { (*ws.slots.ptr(i)).ctr = vg::make::<u32>(mem, (n * k)); }
                 }
             }
             i += 1i64;
         }
     }
-    ws.onq = vg::make::<u8>(n);
+    ws.onq = vg::make::<u8>(mem, n);
     if (k > 0i64) {
-        ws.bestCtr = vg::make::<u32>(k);
-        ws.ctrBuf = vg::make::<u32>(k);
-        ws.zeros = vg::make::<u32>(k);
+        ws.bestCtr = vg::make::<u32>(mem, k);
+        ws.ctrBuf = vg::make::<u32>(mem, k);
+        ws.zeros = vg::make::<u32>(mem, k);
     }
-    ws.queue = vg::make_cap::<u32>(0i64, 16i64);
+    ws.queue = vg::make_cap::<u32>(mem, 0i64, 16i64);
 }
 
 pub fn workspaceHeapBound(n: i64, k: i64, ring: i64) -> i64 {
@@ -1926,7 +1926,7 @@ pub fn trailingZeros64(x: u64) -> i64 {
     return n;
 }
 
-pub fn runPhaseA(re: &mut Regexp, subject: vg::Str, eflags: u32) -> engineResult {
+pub fn runPhaseA(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, eflags: u32) -> engineResult {
     let mut ws: engineWS = vg::zero();
     let mut e: phaseAState = vg::zero();
     e.subject = subject;
@@ -1937,8 +1937,8 @@ pub fn runPhaseA(re: &mut Regexp, subject: vg::Str, eflags: u32) -> engineResult
     if re.prog.multi {
         e.ring = (maxElemAhead + 1i64);
     }
-    { let _t1 = re.prog.ins.len; let _t2 = e.k; let _t3 = e.ring; prepare(&mut ws, _t1, _t2, _t3) };
-    paRun(&mut e, &mut ws, re);
+    { let _t1 = re.prog.ins.len; let _t2 = e.k; let _t3 = e.ring; prepare(mem, &mut ws, _t1, _t2, _t3) };
+    paRun(mem, &mut e, &mut ws, re);
     let mut result: engineResult = vg::zero();
     result.matched = e.matched;
     result.so = e.so;
@@ -1989,7 +1989,7 @@ pub fn paPrune(e: &mut phaseAState, ws: &mut engineWS, start: i32, ctr: vg::Slic
     return ctrLess(ws.bestCtr.head(e.k), ctr);
 }
 
-pub fn paStore(e: &mut phaseAState, ws: &mut engineWS, si: i64, pc: u32, start: i32, ctr: vg::Slice<u32>) -> bool {
+pub fn paStore(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, si: i64, pc: u32, start: i32, ctr: vg::Slice<u32>) -> bool {
     if { let _t1 = start; let _t2 = ctr; paPrune(e, ws, _t1, _t2) } {
         return false;
     }
@@ -2009,7 +2009,7 @@ pub fn paStore(e: &mut phaseAState, ws: &mut engineWS, si: i64, pc: u32, start: 
         }
     } else {
         unsafe { (*ws.slots.get(si).stamp.ptr(((pc) as i64))) = ws.slots.get(si).r#gen; }
-        unsafe { (*ws.slots.ptr(si)).active = vg::append(ws.slots.get(si).active, pc); }
+        unsafe { (*ws.slots.ptr(si)).active = vg::append(mem, ws.slots.get(si).active, pc); }
     }
     unsafe { (*ws.slots.get(si).starts.ptr(((pc) as i64))) = start; }
     if (e.k > 0i64) {
@@ -2019,9 +2019,9 @@ pub fn paStore(e: &mut phaseAState, ws: &mut engineWS, si: i64, pc: u32, start: 
     return true;
 }
 
-pub fn paRelax(e: &mut phaseAState, ws: &mut engineWS, si: i64, pc: u32, start: i32, ctr: vg::Slice<u32>) {
-    if { let _t1 = si; let _t2 = pc; let _t3 = start; let _t4 = ctr; paStore(e, ws, _t1, _t2, _t3, _t4) } {
-        ws.queue = vg::append(ws.queue, pc);
+pub fn paRelax(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, si: i64, pc: u32, start: i32, ctr: vg::Slice<u32>) {
+    if { let _t1 = si; let _t2 = pc; let _t3 = start; let _t4 = ctr; paStore(mem, e, ws, _t1, _t2, _t3, _t4) } {
+        ws.queue = vg::append(mem, ws.queue, pc);
     }
 }
 
@@ -2053,7 +2053,7 @@ pub fn compactQueue(ws: &mut engineWS) {
     }
 }
 
-pub fn paClosure(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i64) {
+pub fn paClosure(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i64) {
     let limit: i64 = (queueCompactFactor * re.prog.ins.len);
     while (ws.queue.len > 0i64) {
         if (ws.queue.len > limit) {
@@ -2070,17 +2070,17 @@ pub fn paClosure(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i6
         {
             let _t1 = re.prog.ins.get(((pc) as i64)).op;
             if _t1 == iSplit {
-                { let _t2 = si; let _t3 = re.prog.ins.get(((pc) as i64)).next; let _t4 = start; let _t5 = ctr; paRelax(e, ws, _t2, _t3, _t4, _t5) };
-                { let _t6 = si; let _t7 = re.prog.ins.get(((pc) as i64)).alt; let _t8 = start; let _t9 = ctr; paRelax(e, ws, _t6, _t7, _t8, _t9) };
+                { let _t2 = si; let _t3 = re.prog.ins.get(((pc) as i64)).next; let _t4 = start; let _t5 = ctr; paRelax(mem, e, ws, _t2, _t3, _t4, _t5) };
+                { let _t6 = si; let _t7 = re.prog.ins.get(((pc) as i64)).alt; let _t8 = start; let _t9 = ctr; paRelax(mem, e, ws, _t6, _t7, _t8, _t9) };
             } else if _t1 == iJmp {
-                { let _t10 = si; let _t11 = re.prog.ins.get(((pc) as i64)).next; let _t12 = start; let _t13 = ctr; paRelax(e, ws, _t10, _t11, _t12, _t13) };
+                { let _t10 = si; let _t11 = re.prog.ins.get(((pc) as i64)).next; let _t12 = start; let _t13 = ctr; paRelax(mem, e, ws, _t10, _t11, _t12, _t13) };
             } else if _t1 == iBOL {
                 if e.bol {
-                    { let _t14 = si; let _t15 = re.prog.ins.get(((pc) as i64)).next; let _t16 = start; let _t17 = ctr; paRelax(e, ws, _t14, _t15, _t16, _t17) };
+                    { let _t14 = si; let _t15 = re.prog.ins.get(((pc) as i64)).next; let _t16 = start; let _t17 = ctr; paRelax(mem, e, ws, _t14, _t15, _t16, _t17) };
                 }
             } else if _t1 == iEOL {
                 if e.eol {
-                    { let _t18 = si; let _t19 = re.prog.ins.get(((pc) as i64)).next; let _t20 = start; let _t21 = ctr; paRelax(e, ws, _t18, _t19, _t20, _t21) };
+                    { let _t18 = si; let _t19 = re.prog.ins.get(((pc) as i64)).next; let _t20 = start; let _t21 = ctr; paRelax(mem, e, ws, _t18, _t19, _t20, _t21) };
                 }
             } else if _t1 == iMatch {
                 { let _t22 = start; let _t23 = ctr; let _t24 = e.pos; paConsider(e, ws, _t22, _t23, _t24) };
@@ -2089,7 +2089,7 @@ pub fn paClosure(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i6
     }
 }
 
-pub fn paArrive(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, pc: u32, delta: i64, start: i32, ctr: vg::Slice<u32>) {
+pub fn paArrive(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, pc: u32, delta: i64, start: i32, ctr: vg::Slice<u32>) {
     let fi: i64 = ((e.ci + delta)).wrapping_rem(e.ring);
     let g: u32 = paGen((e.ci + delta));
     if (ws.slots.get(fi).r#gen != g) {
@@ -2122,10 +2122,10 @@ pub fn paArrive(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, pc: u32
         }
         newCtr = buffer;
     }
-    let _ = { let _t3 = fi; let _t4 = re.prog.ins.get(((pc) as i64)).next; let _t5 = start; let _t6 = newCtr; paStore(e, ws, _t3, _t4, _t5, _t6) };
+    let _ = { let _t3 = fi; let _t4 = re.prog.ins.get(((pc) as i64)).next; let _t5 = start; let _t6 = newCtr; paStore(mem, e, ws, _t3, _t4, _t5, _t6) };
 }
 
-pub fn paConsume(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i64) {
+pub fn paConsume(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i64) {
     let mut aheadReady: bool = false;
     {
         let mut ai: i64 = 0i64;
@@ -2142,26 +2142,26 @@ pub fn paConsume(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i6
                     let _t2 = re.prog.ins.get(((pc) as i64)).op;
                     if _t2 == iRune {
                         if (e.cur == ((re.prog.ins.get(((pc) as i64)).arg) as i32)) {
-                            { let _t3 = pc; let _t4 = 1i64; let _t5 = start; let _t6 = ctr; paArrive(e, ws, re, _t3, _t4, _t5, _t6) };
+                            { let _t3 = pc; let _t4 = 1i64; let _t5 = start; let _t6 = ctr; paArrive(mem, e, ws, re, _t3, _t4, _t5, _t6) };
                         }
                     } else if _t2 == iRuneFold {
                         if runesContain(re.prog.foldSets.get(((re.prog.ins.get(((pc) as i64)).arg) as i64)), e.cur) {
-                            { let _t7 = pc; let _t8 = 1i64; let _t9 = start; let _t10 = ctr; paArrive(e, ws, re, _t7, _t8, _t9, _t10) };
+                            { let _t7 = pc; let _t8 = 1i64; let _t9 = start; let _t10 = ctr; paArrive(mem, e, ws, re, _t7, _t8, _t9, _t10) };
                         }
                     } else if _t2 == iAny {
                         if { let _t11 = e.cur; anyMatches(re, _t11) } {
-                            { let _t12 = pc; let _t13 = 1i64; let _t14 = start; let _t15 = ctr; paArrive(e, ws, re, _t12, _t13, _t14, _t15) };
+                            { let _t12 = pc; let _t13 = 1i64; let _t14 = start; let _t15 = ctr; paArrive(mem, e, ws, re, _t12, _t13, _t14, _t15) };
                         }
                     } else if _t2 == iBracket {
                         let bi: i32 = ((re.prog.ins.get(((pc) as i64)).arg) as i32);
                         if { let _t16 = re.brackets; let _t17 = bi; let _t18 = e.cur; bracketMatchesOne(_t16, _t17, &mut re.loc, _t18) } {
-                            { let _t19 = pc; let _t20 = 1i64; let _t21 = start; let _t22 = ctr; paArrive(e, ws, re, _t19, _t20, _t21, _t22) };
+                            { let _t19 = pc; let _t20 = 1i64; let _t21 = start; let _t22 = ctr; paArrive(mem, e, ws, re, _t19, _t20, _t21, _t22) };
                         }
                         if (re.brackets.get(((bi) as i64)).multiLens == 0u16) {
                             break '_c1;
                         }
                         if (!aheadReady) {
-                            decodeAhead(e, ws);
+                            decodeAhead(mem, e, ws);
                             aheadReady = true;
                         }
                         {
@@ -2172,7 +2172,7 @@ pub fn paConsume(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i6
                                         break '_c23;
                                     }
                                     if { let _t24 = re.brackets; let _t25 = bi; let _t26 = ws.ahead.head(length); bracketMatchesMulti(_t24, _t25, &mut re.loc, _t26) } {
-                                        { let _t27 = pc; let _t28 = length; let _t29 = start; let _t30 = ctr; paArrive(e, ws, re, _t27, _t28, _t29, _t30) };
+                                        { let _t27 = pc; let _t28 = length; let _t29 = start; let _t30 = ctr; paArrive(mem, e, ws, re, _t27, _t28, _t29, _t30) };
                                     }
                                 }
                                 length += 1i64;
@@ -2186,14 +2186,14 @@ pub fn paConsume(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i6
     }
 }
 
-pub fn decodeAhead(e: &mut phaseAState, ws: &mut engineWS) {
+pub fn decodeAhead(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS) {
     ws.ahead = ws.ahead.head(0i64);
     let mut at: i64 = e.pos;
     while ((ws.ahead.len < maxElemAhead) && (at < e.subject.len)) {
         let _t1 = decodeRuneAt(e.subject, at);
         let r: i32 = _t1.0;
         let size: i64 = _t1.1;
-        ws.ahead = vg::append(ws.ahead, r);
+        ws.ahead = vg::append(mem, ws.ahead, r);
         at += size;
     }
 }
@@ -2234,7 +2234,7 @@ pub fn continuationFlags(re: &mut Regexp, subject: vg::Str, pos: i64, eflags: u3
     return (eflags | ExecNotBOL);
 }
 
-pub fn paRun(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp) {
+pub fn paRun(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp) {
     let mut prev: i32 = (2i32).wrapping_neg();
     let zeros: vg::Slice<u32> = ws.zeros.head(e.k);
     loop {
@@ -2282,15 +2282,15 @@ pub fn paRun(e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp) {
         }
         e.bol = { let _t4 = prev; bolAt(e, _t4) };
         e.eol = ((atEnd && ((e.eflags & ExecNotEOL) == 0u32)) || (e.nlMode && (e.cur == 10i32)));
-        ws.queue = vg::append_slice(ws.queue.head(0i64), ws.slots.get(si).active);
+        ws.queue = vg::append_slice(mem, ws.queue.head(0i64), ws.slots.get(si).active);
         if (!e.matched) {
-            { let _t5 = si; let _t6 = re.prog.start; let _t7 = ((e.pos) as i32); let _t8 = zeros; paRelax(e, ws, _t5, _t6, _t7, _t8) };
+            { let _t5 = si; let _t6 = re.prog.start; let _t7 = ((e.pos) as i32); let _t8 = zeros; paRelax(mem, e, ws, _t5, _t6, _t7, _t8) };
         }
-        { let _t9 = si; paClosure(e, ws, re, _t9) };
+        { let _t9 = si; paClosure(mem, e, ws, re, _t9) };
         if atEnd {
             return;
         }
-        { let _t10 = si; paConsume(e, ws, re, _t10) };
+        { let _t10 = si; paConsume(mem, e, ws, re, _t10) };
         if e.matched {
             let mut pendingWork: bool = false;
             {
@@ -2411,7 +2411,7 @@ pub fn memoInsert(t: &mut memoTab, k: memoKey, v: memoVal) {
     t.count += 1i64;
 }
 
-pub fn memoGrow(t: &mut memoTab) {
+pub fn memoGrow(mem: &vg::Arena, t: &mut memoTab) {
     let oldKeys: vg::Slice<memoKey> = t.keys;
     let oldVals: vg::Slice<memoVal> = t.vals;
     let oldUsed: vg::Slice<u8> = t.used;
@@ -2419,9 +2419,9 @@ pub fn memoGrow(t: &mut memoTab) {
     if (oldKeys.len > 0i64) {
         size = (2i64 * oldKeys.len);
     }
-    t.keys = vg::make::<memoKey>(size);
-    t.vals = vg::make::<memoVal>(size);
-    t.used = vg::make::<u8>(size);
+    t.keys = vg::make::<memoKey>(mem, size);
+    t.vals = vg::make::<memoVal>(mem, size);
+    t.used = vg::make::<u8>(mem, size);
     t.count = 0i64;
     {
         let mut i: i64 = 0i64;
@@ -2436,9 +2436,9 @@ pub fn memoGrow(t: &mut memoTab) {
     }
 }
 
-pub fn memoPut(t: &mut memoTab, k: memoKey, v: memoVal) {
+pub fn memoPut(mem: &vg::Arena, t: &mut memoTab, k: memoKey, v: memoVal) {
     if ((4i64 * (t.count + 1i64)) >= (3i64 * t.keys.len)) {
-        memoGrow(t);
+        memoGrow(mem, t);
     }
     { let _t1 = k; let _t2 = v; memoInsert(t, _t1, _t2) };
 }
@@ -2687,11 +2687,11 @@ pub fn asciiLower(c: u8) -> u8 {
     return c;
 }
 
-pub fn normalizeName(input: vg::Str) -> (vg::Str, bool) {
+pub fn normalizeName(mem: &vg::Arena, input: vg::Str) -> (vg::Str, bool) {
     if (input.len == 0i64) {
         return (vg::lit(b""), false);
     }
-    let mut out: vg::Slice<u8> = vg::make_cap::<u8>(0i64, input.len);
+    let mut out: vg::Slice<u8> = vg::make_cap::<u8>(mem, 0i64, input.len);
     let mut i: i64 = 0i64;
     while (((i < input.len) && (input.byte(i) != 46u8)) && (input.byte(i) != 64u8)) {
         let mut c: u8 = input.byte(i);
@@ -2703,12 +2703,12 @@ pub fn normalizeName(input: vg::Str) -> (vg::Str, bool) {
         } else {
             c = asciiLower(c);
         }
-        out = vg::append(out, c);
+        out = vg::append(mem, out, c);
         i += 1i64;
     }
     if ((i < input.len) && (input.byte(i) == 46u8)) {
         i += 1i64;
-        let mut codeset: vg::Slice<u8> = vg::make_cap::<u8>(0i64, 5i64);
+        let mut codeset: vg::Slice<u8> = vg::make_cap::<u8>(mem, 0i64, 5i64);
         while ((i < input.len) && (input.byte(i) != 64u8)) {
             let c_2: u8 = asciiLower(input.byte(i));
             i += 1i64;
@@ -2718,13 +2718,13 @@ pub fn normalizeName(input: vg::Str) -> (vg::Str, bool) {
             if ((codeset.len == 5i64) || (c_2 >= 128u8)) {
                 return (vg::lit(b""), false);
             }
-            codeset = vg::append(codeset, c_2);
+            codeset = vg::append(mem, codeset, c_2);
         }
-        if (!vg::streq(vg::str_from_bytes(codeset), vg::lit(b"utf8"))) {
+        if (!vg::streq(vg::str_from_bytes(mem, codeset), vg::lit(b"utf8"))) {
             return (vg::lit(b""), false);
         }
     }
-    return (vg::str_from_bytes(out), true);
+    return (vg::str_from_bytes(mem, out), true);
 }
 
 pub fn embeddedModifier(name: vg::Str) -> (vg::Str, bool) {
@@ -2764,11 +2764,11 @@ pub fn longTypeAlias(name: vg::Str) -> vg::Str {
     return name;
 }
 
-pub fn normalizeType(input: vg::Str) -> (vg::Str, bool) {
+pub fn normalizeType(mem: &vg::Arena, input: vg::Str) -> (vg::Str, bool) {
     if (input.len == 0i64) {
         return (vg::lit(b""), true);
     }
-    let mut out: vg::Slice<u8> = vg::make_cap::<u8>(0i64, input.len);
+    let mut out: vg::Slice<u8> = vg::make_cap::<u8>(mem, 0i64, input.len);
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < input.len) {
@@ -2777,12 +2777,12 @@ pub fn normalizeType(input: vg::Str) -> (vg::Str, bool) {
                 if ((c >= 128u8) || (out.len == normalizedNameMax)) {
                     return (vg::lit(b""), false);
                 }
-                out = vg::append(out, asciiLower(c));
+                out = vg::append(mem, out, asciiLower(c));
             }
             i += 1i64;
         }
     }
-    return (longTypeAlias(vg::str_from_bytes(out)), true);
+    return (longTypeAlias(vg::str_from_bytes(mem, out)), true);
 }
 
 pub fn findName(l: &mut Locale, name: vg::Str, poolSec: i64, offsetsSec: i64, count: i64) -> i64 {
@@ -2817,10 +2817,10 @@ pub fn localeRowAt(l: &mut Locale, index: i64) -> LocaleRow {
     return row;
 }
 
-pub fn normalizeRequest(name: vg::Str, collationType: vg::Str) -> (localeRequest, bool) {
+pub fn normalizeRequest(mem: &vg::Arena, name: vg::Str, collationType: vg::Str) -> (localeRequest, bool) {
     let mut collationType_v: vg::Str = collationType;
     let mut req: localeRequest = vg::zero();
-    let _t1 = normalizeName(name);
+    let _t1 = normalizeName(mem, name);
     let normalized: vg::Str = _t1.0;
     let ok: bool = _t1.1;
     if (!ok) {
@@ -2838,7 +2838,7 @@ pub fn normalizeRequest(name: vg::Str, collationType: vg::Str) -> (localeRequest
     if hasModifier {
         collationType_v = modifier;
     }
-    let _t3 = normalizeType(collationType_v);
+    let _t3 = normalizeType(mem, collationType_v);
     let normalizedType: vg::Str = _t3.0;
     let ok2: bool = _t3.1;
     if (!ok2) {
@@ -2907,8 +2907,8 @@ pub fn resolveLocale(data: &mut Locale, req: localeRequest) -> (Locale, bool) {
     return (invalid, false);
 }
 
-pub fn LocaleSelect(data: &mut Locale, name: vg::Str, collationType: vg::Str) -> (Locale, bool) {
-    let _t1 = normalizeRequest(name, collationType);
+pub fn LocaleSelect(mem: &vg::Arena, data: &mut Locale, name: vg::Str, collationType: vg::Str) -> (Locale, bool) {
+    let _t1 = normalizeRequest(mem, name, collationType);
     let req: localeRequest = _t1.0;
     let ok: bool = _t1.1;
     if (!ok) {
@@ -2921,9 +2921,9 @@ pub fn LocaleSelect(data: &mut Locale, name: vg::Str, collationType: vg::Str) ->
     return { let _t2 = req; resolveLocale(data, _t2) };
 }
 
-pub fn LocaleOpen(blob: vg::Str, name: vg::Str, collationType: vg::Str) -> (Locale, bool) {
+pub fn LocaleOpen(mem: &vg::Arena, blob: vg::Str, name: vg::Str, collationType: vg::Str) -> (Locale, bool) {
     let invalid: Locale = vg::zero();
-    let _t1 = normalizeRequest(name, collationType);
+    let _t1 = normalizeRequest(mem, name, collationType);
     let req: localeRequest = _t1.0;
     let ok: bool = _t1.1;
     if (!ok) {
@@ -3462,24 +3462,24 @@ pub fn LocaleName(l: &mut Locale, index: i64) -> vg::Str {
     return { let _t1 = secLocaleNames; let _t2 = (({ let _t3 = secLocaleNameOffsets; let _t4 = index; u32At(l, _t3, _t4) }) as i64); byteString(l, _t1, _t2) };
 }
 
-pub fn decodeWindow(s: vg::Str, so: i64, eo: i64) -> decoded {
+pub fn decodeWindow(mem: &vg::Arena, s: vg::Str, so: i64, eo: i64) -> decoded {
     let mut d: decoded = vg::zero();
-    d.runes = vg::make_cap::<i32>(0i64, (eo - so));
-    d.byteAt = vg::make_cap::<i64>(0i64, ((eo - so) + 1i64));
+    d.runes = vg::make_cap::<i32>(mem, 0i64, (eo - so));
+    d.byteAt = vg::make_cap::<i64>(mem, 0i64, ((eo - so) + 1i64));
     d.atSubjectStart = (so == 0i64);
     d.atSubjectEnd = (eo == s.len);
     d.prevIsNewline = ((so > 0i64) && (s.byte((so - 1i64)) == 10u8));
     d.nextIsNewline = ((eo < s.len) && (s.byte(eo) == 10u8));
     let mut i: i64 = so;
     while (i < eo) {
-        d.byteAt = vg::append(d.byteAt, i);
+        d.byteAt = vg::append(mem, d.byteAt, i);
         let _t1 = decodeRuneAt(s, i);
         let r: i32 = _t1.0;
         let size: i64 = _t1.1;
-        d.runes = vg::append(d.runes, r);
+        d.runes = vg::append(mem, d.runes, r);
         i += size;
     }
-    d.byteAt = vg::append(d.byteAt, eo);
+    d.byteAt = vg::append(mem, d.byteAt, eo);
     return d;
 }
 
@@ -3574,7 +3574,7 @@ pub fn fillMatches(re: &mut Regexp, d: &mut decoded, caps: vg::Slice<Match>, pma
     }
 }
 
-pub fn onePassAnalyze(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i32) -> bool {
+pub fn onePassAnalyze(mem: &vg::Arena, nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i32) -> bool {
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opChar || _t1 == opAny || _t1 == opBOL || _t1 == opEOL {
@@ -3582,7 +3582,7 @@ pub fn onePassAnalyze(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i3
         } else if _t1 == opBracket {
             return (!bracketHasMultiMembers(brs, nodes.get(((ni) as i64)).br));
         } else if _t1 == opGroup {
-            return onePassAnalyze(nodes, brs, nodes.get(((ni) as i64)).ch.get(0i64));
+            return onePassAnalyze(mem, nodes, brs, nodes.get(((ni) as i64)).ch.get(0i64));
         } else if _t1 == opConcat {
             let mut variable: i64 = 0i64;
             {
@@ -3590,7 +3590,7 @@ pub fn onePassAnalyze(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i3
                 '_b2: while (i < nodes.get(((ni) as i64)).ch.len) {
                     '_c2: {
                         let child: i32 = nodes.get(((ni) as i64)).ch.get(i);
-                        if (!onePassAnalyze(nodes, brs, child)) {
+                        if (!onePassAnalyze(mem, nodes, brs, child)) {
                             return false;
                         }
                         if (!fixedLength(nodes, child)) {
@@ -3606,13 +3606,13 @@ pub fn onePassAnalyze(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i3
                 return true;
             }
             let child_2: i32 = nodes.get(((ni) as i64)).ch.get(0i64);
-            return ((fixedLength(nodes, child_2) && (nodes.get(((child_2) as i64)).minL > 0i64)) && onePassAnalyze(nodes, brs, child_2));
+            return ((fixedLength(nodes, child_2) && (nodes.get(((child_2) as i64)).minL > 0i64)) && onePassAnalyze(mem, nodes, brs, child_2));
         } else if _t1 == opAlt {
             {
                 let mut i_2: i64 = 0i64;
                 '_b3: while (i_2 < nodes.get(((ni) as i64)).ch.len) {
                     '_c3: {
-                        if (!onePassAnalyze(nodes, brs, nodes.get(((ni) as i64)).ch.get(i_2))) {
+                        if (!onePassAnalyze(mem, nodes, brs, nodes.get(((ni) as i64)).ch.get(i_2))) {
                             return false;
                         }
                     }
@@ -3622,7 +3622,7 @@ pub fn onePassAnalyze(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i3
             if disjointLengths(nodes, ni) {
                 return true;
             }
-            return disjointFirsts(nodes, ni);
+            return disjointFirsts(mem, nodes, ni);
         }
     }
     return false;
@@ -3658,33 +3658,33 @@ pub fn disjointLengths(nodes: vg::Slice<node>, ni: i32) -> bool {
     return true;
 }
 
-pub fn firstSet(nodes: vg::Slice<node>, ni: i32) -> (vg::Slice<i32>, bool) {
+pub fn firstSet(mem: &vg::Arena, nodes: vg::Slice<node>, ni: i32) -> (vg::Slice<i32>, bool) {
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opChar {
-            let mut out: vg::Slice<i32> = vg::make_cap::<i32>(0i64, (nodes.get(((ni) as i64)).fold.len + 1i64));
+            let mut out: vg::Slice<i32> = vg::make_cap::<i32>(mem, 0i64, (nodes.get(((ni) as i64)).fold.len + 1i64));
             if (nodes.get(((ni) as i64)).fold.len > 0i64) {
-                out = vg::append_slice(out, nodes.get(((ni) as i64)).fold);
+                out = vg::append_slice(mem, out, nodes.get(((ni) as i64)).fold);
                 return (out, true);
             }
-            out = vg::append(out, nodes.get(((ni) as i64)).r);
+            out = vg::append(mem, out, nodes.get(((ni) as i64)).r);
             return (out, true);
         } else if _t1 == opBOL || _t1 == opEOL {
             return (vg::zero::<vg::Slice<i32>>(), true);
         } else if _t1 == opGroup {
-            return firstSet(nodes, nodes.get(((ni) as i64)).ch.get(0i64));
+            return firstSet(mem, nodes, nodes.get(((ni) as i64)).ch.get(0i64));
         } else if _t1 == opRepeat {
             if (nodes.get(((ni) as i64)).max == 0i64) {
                 return (vg::zero::<vg::Slice<i32>>(), true);
             }
-            return firstSet(nodes, nodes.get(((ni) as i64)).ch.get(0i64));
+            return firstSet(mem, nodes, nodes.get(((ni) as i64)).ch.get(0i64));
         } else if _t1 == opAlt {
             let mut out_2: vg::Slice<i32> = vg::zero();
             {
                 let mut i: i64 = 0i64;
                 '_b2: while (i < nodes.get(((ni) as i64)).ch.len) {
                     '_c2: {
-                        let _t3 = firstSet(nodes, nodes.get(((ni) as i64)).ch.get(i));
+                        let _t3 = firstSet(mem, nodes, nodes.get(((ni) as i64)).ch.get(i));
                         let sub: vg::Slice<i32> = _t3.0;
                         let ok: bool = _t3.1;
                         if (!ok) {
@@ -3694,7 +3694,7 @@ pub fn firstSet(nodes: vg::Slice<node>, ni: i32) -> (vg::Slice<i32>, bool) {
                             let mut k: i64 = 0i64;
                             '_b4: while (k < sub.len) {
                                 '_c4: {
-                                    out_2 = appendUnique(out_2, sub.get(k));
+                                    out_2 = appendUnique(mem, out_2, sub.get(k));
                                 }
                                 k += 1i64;
                             }
@@ -3711,7 +3711,7 @@ pub fn firstSet(nodes: vg::Slice<node>, ni: i32) -> (vg::Slice<i32>, bool) {
                 '_b5: while (i_2 < nodes.get(((ni) as i64)).ch.len) {
                     '_c5: {
                         let child: i32 = nodes.get(((ni) as i64)).ch.get(i_2);
-                        let _t6 = firstSet(nodes, child);
+                        let _t6 = firstSet(mem, nodes, child);
                         let sub_2: vg::Slice<i32> = _t6.0;
                         let ok_2: bool = _t6.1;
                         if (!ok_2) {
@@ -3721,7 +3721,7 @@ pub fn firstSet(nodes: vg::Slice<node>, ni: i32) -> (vg::Slice<i32>, bool) {
                             let mut k_2: i64 = 0i64;
                             '_b7: while (k_2 < sub_2.len) {
                                 '_c7: {
-                                    out_3 = appendUnique(out_3, sub_2.get(k_2));
+                                    out_3 = appendUnique(mem, out_3, sub_2.get(k_2));
                                 }
                                 k_2 += 1i64;
                             }
@@ -3739,16 +3739,16 @@ pub fn firstSet(nodes: vg::Slice<node>, ni: i32) -> (vg::Slice<i32>, bool) {
     return (vg::zero::<vg::Slice<i32>>(), false);
 }
 
-pub fn disjointFirsts(nodes: vg::Slice<node>, ni: i32) -> bool {
+pub fn disjointFirsts(mem: &vg::Arena, nodes: vg::Slice<node>, ni: i32) -> bool {
     let count: i64 = nodes.get(((ni) as i64)).ch.len;
-    let firsts: vg::Slice<vg::Slice<i32>> = vg::make::<vg::Slice<i32>>(count);
+    let firsts: vg::Slice<vg::Slice<i32>> = vg::make::<vg::Slice<i32>>(mem, count);
     let mut nullable: i64 = 0i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < count) {
             '_c1: {
                 let branch: i32 = nodes.get(((ni) as i64)).ch.get(i);
-                let _t2 = firstSet(nodes, branch);
+                let _t2 = firstSet(mem, nodes, branch);
                 let set: vg::Slice<i32> = _t2.0;
                 let ok: bool = _t2.1;
                 if (!ok) {
@@ -3937,12 +3937,12 @@ pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, ef
     return false;
 }
 
-pub fn buildScanFilter(pr: &mut program, newlineMode: bool) {
+pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) {
     let mut ok: bool = true;
     let mut matchReachable: bool = false;
-    let seen: vg::Slice<bool> = vg::make::<bool>(pr.ins.len);
-    let mut stack: vg::Slice<u32> = vg::make_cap::<u32>(0i64, 16i64);
-    stack = vg::append(stack, pr.start);
+    let seen: vg::Slice<bool> = vg::make::<bool>(mem, pr.ins.len);
+    let mut stack: vg::Slice<u32> = vg::make_cap::<u32>(mem, 0i64, 16i64);
+    stack = vg::append(mem, stack, pr.start);
     while (stack.len > 0i64) {
         let pc: u32 = stack.get((stack.len - 1i64));
         stack = stack.head((stack.len - 1i64));
@@ -3953,9 +3953,9 @@ pub fn buildScanFilter(pr: &mut program, newlineMode: bool) {
         {
             let _t1 = pr.ins.get(((pc) as i64)).op;
             if _t1 == iSplit {
-                stack = vg::append(vg::append(stack, pr.ins.get(((pc) as i64)).next), pr.ins.get(((pc) as i64)).alt);
+                stack = vg::append(mem, vg::append(mem, stack, pr.ins.get(((pc) as i64)).next), pr.ins.get(((pc) as i64)).alt);
             } else if _t1 == iJmp {
-                stack = vg::append(stack, pr.ins.get(((pc) as i64)).next);
+                stack = vg::append(mem, stack, pr.ins.get(((pc) as i64)).next);
             } else if _t1 == iBOL {
             } else if _t1 == iEOL {
             } else if _t1 == iMatch {
@@ -4059,15 +4059,15 @@ pub fn instrEstimate(nodes: vg::Slice<node>, ni: i32) -> i64 {
     return 1i64;
 }
 
-pub fn compileProgram(b: &mut progBuilder, nodes: vg::Slice<node>, root: i32, multi: bool, newlineMode: bool) {
+pub fn compileProgram(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, root: i32, multi: bool, newlineMode: bool) {
     b.failMin = failMinNone;
-    let body: frag = { let _t1 = nodes; let _t2 = root; let _t3 = 0u64; let _t4 = vg::zero::<vg::Slice<u32>>(); emit(b, _t1, _t2, _t3, _t4) };
+    let body: frag = { let _t1 = nodes; let _t2 = root; let _t3 = 0u64; let _t4 = vg::zero::<vg::Slice<u32>>(); emit(mem, b, _t1, _t2, _t3, _t4) };
     if (b.errCode != ErrNone) {
         return;
     }
     let mut m: instr = vg::zero();
     m.op = iMatch;
-    let r#match: u32 = { let _t5 = m; addInstr(b, _t5) };
+    let r#match: u32 = { let _t5 = m; addInstr(mem, b, _t5) };
     if ((b.errCode != ErrNone) || b.tooBig) {
         return;
     }
@@ -4075,10 +4075,10 @@ pub fn compileProgram(b: &mut progBuilder, nodes: vg::Slice<node>, root: i32, mu
     b.prog.start = body.start;
     b.prog.multi = multi;
     b.prog.failMin = b.failMin;
-    { let _t8 = newlineMode; buildScanFilter(&mut b.prog, _t8) };
+    { let _t8 = newlineMode; buildScanFilter(mem, &mut b.prog, _t8) };
 }
 
-pub fn addInstr(b: &mut progBuilder, ins: instr) -> u32 {
+pub fn addInstr(mem: &vg::Arena, b: &mut progBuilder, ins: instr) -> u32 {
     if b.tooBig {
         return 0u32;
     }
@@ -4086,7 +4086,7 @@ pub fn addInstr(b: &mut progBuilder, ins: instr) -> u32 {
         b.tooBig = true;
         return 0u32;
     }
-    b.prog.ins = vg::append(b.prog.ins, ins);
+    b.prog.ins = vg::append(mem, b.prog.ins, ins);
     return (((b.prog.ins.len - 1i64)) as u32);
 }
 
@@ -4109,47 +4109,47 @@ pub fn patch(b: &mut progBuilder, slots: vg::Slice<patchSlot>, target: u32) {
     }
 }
 
-pub fn singleOut(idx: u32, alt: bool) -> vg::Slice<patchSlot> {
+pub fn singleOut(mem: &vg::Arena, idx: u32, alt: bool) -> vg::Slice<patchSlot> {
     let mut slot: patchSlot = vg::zero();
     slot.idx = idx;
     slot.alt = alt;
-    let out: vg::Slice<patchSlot> = vg::make_cap::<patchSlot>(0i64, 1i64);
-    return vg::append(out, slot);
+    let out: vg::Slice<patchSlot> = vg::make_cap::<patchSlot>(mem, 0i64, 1i64);
+    return vg::append(mem, out, slot);
 }
 
-pub fn epsilonFrag(b: &mut progBuilder) -> frag {
+pub fn epsilonFrag(mem: &vg::Arena, b: &mut progBuilder) -> frag {
     let mut j: instr = vg::zero();
     j.op = iJmp;
-    let idx: u32 = { let _t1 = j; addInstr(b, _t1) };
+    let idx: u32 = { let _t1 = j; addInstr(mem, b, _t1) };
     let mut f: frag = vg::zero();
     f.start = idx;
-    f.out = singleOut(idx, false);
+    f.out = singleOut(mem, idx, false);
     return f;
 }
 
-pub fn copyExtra(extra: vg::Slice<u32>) -> vg::Slice<u32> {
+pub fn copyExtra(mem: &vg::Arena, extra: vg::Slice<u32>) -> vg::Slice<u32> {
     if (extra.len == 0i64) {
         return vg::zero::<vg::Slice<u32>>();
     }
-    let dup: vg::Slice<u32> = vg::make::<u32>(extra.len);
+    let dup: vg::Slice<u32> = vg::make::<u32>(mem, extra.len);
     let _ = vg::vcopy(dup, extra);
     return dup;
 }
 
-pub fn consumeFrag(b: &mut progBuilder, op: u8, arg: u32, mask: u64, extra: vg::Slice<u32>) -> frag {
+pub fn consumeFrag(mem: &vg::Arena, b: &mut progBuilder, op: u8, arg: u32, mask: u64, extra: vg::Slice<u32>) -> frag {
     let mut ins: instr = vg::zero();
     ins.op = op;
     ins.arg = arg;
     ins.mask = mask;
-    ins.extra = copyExtra(extra);
-    let idx: u32 = { let _t1 = ins; addInstr(b, _t1) };
+    ins.extra = copyExtra(mem, extra);
+    let idx: u32 = { let _t1 = ins; addInstr(mem, b, _t1) };
     let mut f: frag = vg::zero();
     f.start = idx;
-    f.out = singleOut(idx, false);
+    f.out = singleOut(mem, idx, false);
     return f;
 }
 
-pub fn emit(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
+pub fn emit(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
     let none: frag = vg::zero();
     if ((b.errCode != ErrNone) || b.tooBig) {
         return none;
@@ -4159,29 +4159,29 @@ pub fn emit(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, ext
         if _t1 == opChar {
             if b.icase {
                 let arg: u32 = ((b.prog.foldSets.len) as u32);
-                let foldCopy: vg::Slice<i32> = vg::make::<i32>(nodes.get(((ni) as i64)).fold.len);
+                let foldCopy: vg::Slice<i32> = vg::make::<i32>(mem, nodes.get(((ni) as i64)).fold.len);
                 let _ = vg::vcopy(foldCopy, nodes.get(((ni) as i64)).fold);
-                b.prog.foldSets = vg::append(b.prog.foldSets, foldCopy);
-                return { let _t2 = iRuneFold; let _t3 = arg; let _t4 = mask; let _t5 = extra; consumeFrag(b, _t2, _t3, _t4, _t5) };
+                b.prog.foldSets = vg::append(mem, b.prog.foldSets, foldCopy);
+                return { let _t2 = iRuneFold; let _t3 = arg; let _t4 = mask; let _t5 = extra; consumeFrag(mem, b, _t2, _t3, _t4, _t5) };
             }
-            return { let _t6 = iRune; let _t7 = ((nodes.get(((ni) as i64)).r) as u32); let _t8 = mask; let _t9 = extra; consumeFrag(b, _t6, _t7, _t8, _t9) };
+            return { let _t6 = iRune; let _t7 = ((nodes.get(((ni) as i64)).r) as u32); let _t8 = mask; let _t9 = extra; consumeFrag(mem, b, _t6, _t7, _t8, _t9) };
         } else if _t1 == opAny {
-            return { let _t10 = iAny; let _t11 = 0u32; let _t12 = mask; let _t13 = extra; consumeFrag(b, _t10, _t11, _t12, _t13) };
+            return { let _t10 = iAny; let _t11 = 0u32; let _t12 = mask; let _t13 = extra; consumeFrag(mem, b, _t10, _t11, _t12, _t13) };
         } else if _t1 == opBracket {
-            return { let _t14 = iBracket; let _t15 = ((nodes.get(((ni) as i64)).br) as u32); let _t16 = mask; let _t17 = extra; consumeFrag(b, _t14, _t15, _t16, _t17) };
+            return { let _t14 = iBracket; let _t15 = ((nodes.get(((ni) as i64)).br) as u32); let _t16 = mask; let _t17 = extra; consumeFrag(mem, b, _t14, _t15, _t16, _t17) };
         } else if _t1 == opBOL {
-            return { let _t18 = iBOL; let _t19 = 0u32; let _t20 = 0u64; let _t21 = vg::zero::<vg::Slice<u32>>(); consumeFrag(b, _t18, _t19, _t20, _t21) };
+            return { let _t18 = iBOL; let _t19 = 0u32; let _t20 = 0u64; let _t21 = vg::zero::<vg::Slice<u32>>(); consumeFrag(mem, b, _t18, _t19, _t20, _t21) };
         } else if _t1 == opEOL {
-            return { let _t22 = iEOL; let _t23 = 0u32; let _t24 = 0u64; let _t25 = vg::zero::<vg::Slice<u32>>(); consumeFrag(b, _t22, _t23, _t24, _t25) };
+            return { let _t22 = iEOL; let _t23 = 0u32; let _t24 = 0u64; let _t25 = vg::zero::<vg::Slice<u32>>(); consumeFrag(mem, b, _t22, _t23, _t24, _t25) };
         } else if _t1 == opGroup {
-            return { let _t26 = nodes; let _t27 = nodes.get(((ni) as i64)).ch.get(0i64); let _t28 = mask; let _t29 = extra; emit(b, _t26, _t27, _t28, _t29) };
+            return { let _t26 = nodes; let _t27 = nodes.get(((ni) as i64)).ch.get(0i64); let _t28 = mask; let _t29 = extra; emit(mem, b, _t26, _t27, _t28, _t29) };
         } else if _t1 == opConcat {
-            let mut result: frag = { let _t30 = nodes; let _t31 = nodes.get(((ni) as i64)).ch.get(0i64); let _t32 = mask; let _t33 = extra; emit(b, _t30, _t31, _t32, _t33) };
+            let mut result: frag = { let _t30 = nodes; let _t31 = nodes.get(((ni) as i64)).ch.get(0i64); let _t32 = mask; let _t33 = extra; emit(mem, b, _t30, _t31, _t32, _t33) };
             {
                 let mut i: i64 = 1i64;
                 '_b34: while (i < nodes.get(((ni) as i64)).ch.len) {
                     '_c34: {
-                        let next: frag = { let _t35 = nodes; let _t36 = nodes.get(((ni) as i64)).ch.get(i); let _t37 = mask; let _t38 = extra; emit(b, _t35, _t36, _t37, _t38) };
+                        let next: frag = { let _t35 = nodes; let _t36 = nodes.get(((ni) as i64)).ch.get(i); let _t37 = mask; let _t38 = extra; emit(mem, b, _t35, _t36, _t37, _t38) };
                         if (b.errCode != ErrNone) {
                             return none;
                         }
@@ -4193,19 +4193,19 @@ pub fn emit(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, ext
             }
             return result;
         } else if _t1 == opAlt {
-            return { let _t41 = nodes; let _t42 = ni; let _t43 = mask; let _t44 = extra; emitAlt(b, _t41, _t42, _t43, _t44) };
+            return { let _t41 = nodes; let _t42 = ni; let _t43 = mask; let _t44 = extra; emitAlt(mem, b, _t41, _t42, _t43, _t44) };
         } else if _t1 == opRepeat {
-            return { let _t45 = nodes; let _t46 = ni; let _t47 = mask; let _t48 = extra; emitRepeat(b, _t45, _t46, _t47, _t48) };
+            return { let _t45 = nodes; let _t46 = ni; let _t47 = mask; let _t48 = extra; emitRepeat(mem, b, _t45, _t46, _t47, _t48) };
         }
     }
     b.errCode = ErrBadPat;
     return none;
 }
 
-pub fn emitAlt(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
+pub fn emitAlt(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
     let none: frag = vg::zero();
     let mut result: frag = vg::zero();
-    let mut splits: vg::Slice<u32> = vg::make_cap::<u32>(0i64, nodes.get(((ni) as i64)).ch.len);
+    let mut splits: vg::Slice<u32> = vg::make_cap::<u32>(mem, 0i64, nodes.get(((ni) as i64)).ch.len);
     let count: i64 = nodes.get(((ni) as i64)).ch.len;
     {
         let mut i: i64 = 0i64;
@@ -4214,9 +4214,9 @@ pub fn emitAlt(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, 
                 if (i < (count - 1i64)) {
                     let mut s: instr = vg::zero();
                     s.op = iSplit;
-                    splits = vg::append(splits, { let _t2 = s; addInstr(b, _t2) });
+                    splits = vg::append(mem, splits, { let _t2 = s; addInstr(mem, b, _t2) });
                 }
-                let sub: frag = { let _t3 = nodes; let _t4 = nodes.get(((ni) as i64)).ch.get(i); let _t5 = mask; let _t6 = extra; emit(b, _t3, _t4, _t5, _t6) };
+                let sub: frag = { let _t3 = nodes; let _t4 = nodes.get(((ni) as i64)).ch.get(i); let _t5 = mask; let _t6 = extra; emit(mem, b, _t3, _t4, _t5, _t6) };
                 if ((b.errCode != ErrNone) || b.tooBig) {
                     return none;
                 }
@@ -4228,7 +4228,7 @@ pub fn emitAlt(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, 
                 if ((i > 0i64) && (i < (count - 1i64))) {
                     unsafe { (*b.prog.ins.ptr(((splits.get((i - 1i64))) as i64))).alt = splits.get(i); }
                 }
-                result.out = vg::append_slice(result.out, sub.out);
+                result.out = vg::append_slice(mem, result.out, sub.out);
             }
             i += 1i64;
         }
@@ -4248,14 +4248,14 @@ pub fn fragAppend(b: &mut progBuilder, result: &mut frag, have: bool, f: frag) -
     return true;
 }
 
-pub fn emitRepeat(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
+pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
     let mut mask_v: u64 = mask;
     let mut extra_v: vg::Slice<u32> = extra;
     let none: frag = vg::zero();
     if (instrEstimate(nodes, ni) > (maxProgram - b.prog.ins.len)) {
         let mut fi: instr = vg::zero();
         fi.op = iFail;
-        let idx: u32 = { let _t1 = fi; addInstr(b, _t1) };
+        let idx: u32 = { let _t1 = fi; addInstr(mem, b, _t1) };
         b.failMin = std::cmp::min(b.failMin, nodes.get(((ni) as i64)).minL);
         let mut f: frag = vg::zero();
         f.start = idx;
@@ -4266,7 +4266,7 @@ pub fn emitRepeat(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u6
         if (slot < maskWidth) {
             mask_v |= (((1u64) as u64) << slot);
         } else {
-            let grown: vg::Slice<u32> = vg::make::<u32>((extra_v.len + 1i64));
+            let grown: vg::Slice<u32> = vg::make::<u32>(mem, (extra_v.len + 1i64));
             let _ = vg::vcopy(grown, extra_v);
             unsafe { (*grown.ptr(extra_v.len)) = ((slot) as u32); }
             extra_v = grown;
@@ -4276,7 +4276,7 @@ pub fn emitRepeat(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u6
     let lo: i64 = nodes.get(((ni) as i64)).min;
     let hi: i64 = nodes.get(((ni) as i64)).max;
     if ((lo == 0i64) && (hi == 0i64)) {
-        return epsilonFrag(b);
+        return epsilonFrag(mem, b);
     }
     let mut result: frag = vg::zero();
     let mut haveResult: bool = false;
@@ -4288,19 +4288,19 @@ pub fn emitRepeat(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u6
                     return none;
                 }
                 if ((i == (lo - 1i64)) && (hi == infinite)) {
-                    haveResult = { let _t3 = haveResult; let _t4 = { let _t5 = nodes; let _t6 = child; let _t7 = mask_v; let _t8 = extra_v; emitPlus(b, _t5, _t6, _t7, _t8) }; fragAppend(b, &mut result, _t3, _t4) };
+                    haveResult = { let _t3 = haveResult; let _t4 = { let _t5 = nodes; let _t6 = child; let _t7 = mask_v; let _t8 = extra_v; emitPlus(mem, b, _t5, _t6, _t7, _t8) }; fragAppend(b, &mut result, _t3, _t4) };
                     return result;
                 }
-                haveResult = { let _t9 = haveResult; let _t10 = { let _t11 = nodes; let _t12 = child; let _t13 = mask_v; let _t14 = extra_v; emit(b, _t11, _t12, _t13, _t14) }; fragAppend(b, &mut result, _t9, _t10) };
+                haveResult = { let _t9 = haveResult; let _t10 = { let _t11 = nodes; let _t12 = child; let _t13 = mask_v; let _t14 = extra_v; emit(mem, b, _t11, _t12, _t13, _t14) }; fragAppend(b, &mut result, _t9, _t10) };
             }
             i += 1i64;
         }
     }
     if (hi == infinite) {
-        haveResult = { let _t15 = haveResult; let _t16 = { let _t17 = nodes; let _t18 = child; let _t19 = mask_v; let _t20 = extra_v; emitStar(b, _t17, _t18, _t19, _t20) }; fragAppend(b, &mut result, _t15, _t16) };
+        haveResult = { let _t15 = haveResult; let _t16 = { let _t17 = nodes; let _t18 = child; let _t19 = mask_v; let _t20 = extra_v; emitStar(mem, b, _t17, _t18, _t19, _t20) }; fragAppend(b, &mut result, _t15, _t16) };
         return result;
     }
-    let mut skips: vg::Slice<patchSlot> = vg::make_cap::<patchSlot>(0i64, std::cmp::max((hi - lo), 1i64));
+    let mut skips: vg::Slice<patchSlot> = vg::make_cap::<patchSlot>(mem, 0i64, std::cmp::max((hi - lo), 1i64));
     {
         let mut i_2: i64 = lo;
         '_b21: while (i_2 < hi) {
@@ -4310,8 +4310,8 @@ pub fn emitRepeat(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u6
                 }
                 let mut s: instr = vg::zero();
                 s.op = iSplit;
-                let split: u32 = { let _t22 = s; addInstr(b, _t22) };
-                let sub: frag = { let _t23 = nodes; let _t24 = child; let _t25 = mask_v; let _t26 = extra_v; emit(b, _t23, _t24, _t25, _t26) };
+                let split: u32 = { let _t22 = s; addInstr(mem, b, _t22) };
+                let sub: frag = { let _t23 = nodes; let _t24 = child; let _t25 = mask_v; let _t26 = extra_v; emit(mem, b, _t23, _t24, _t25, _t26) };
                 if ((b.errCode != ErrNone) || b.tooBig) {
                     return none;
                 }
@@ -4319,7 +4319,7 @@ pub fn emitRepeat(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u6
                 let mut slot_2: patchSlot = vg::zero();
                 slot_2.idx = split;
                 slot_2.alt = true;
-                skips = vg::append(skips, slot_2);
+                skips = vg::append(mem, skips, slot_2);
                 let mut piece: frag = vg::zero();
                 piece.start = split;
                 piece.out = sub.out;
@@ -4328,19 +4328,19 @@ pub fn emitRepeat(b: &mut progBuilder, nodes: vg::Slice<node>, ni: i32, mask: u6
             i_2 += 1i64;
         }
     }
-    result.out = vg::append_slice(result.out, skips);
+    result.out = vg::append_slice(mem, result.out, skips);
     if (!haveResult) {
-        return epsilonFrag(b);
+        return epsilonFrag(mem, b);
     }
     return result;
 }
 
-pub fn emitStar(b: &mut progBuilder, nodes: vg::Slice<node>, child: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
+pub fn emitStar(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, child: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
     let none: frag = vg::zero();
     let mut s: instr = vg::zero();
     s.op = iSplit;
-    let split: u32 = { let _t1 = s; addInstr(b, _t1) };
-    let body: frag = { let _t2 = nodes; let _t3 = child; let _t4 = mask; let _t5 = extra; emit(b, _t2, _t3, _t4, _t5) };
+    let split: u32 = { let _t1 = s; addInstr(mem, b, _t1) };
+    let body: frag = { let _t2 = nodes; let _t3 = child; let _t4 = mask; let _t5 = extra; emit(mem, b, _t2, _t3, _t4, _t5) };
     if ((b.errCode != ErrNone) || b.tooBig) {
         return none;
     }
@@ -4348,24 +4348,24 @@ pub fn emitStar(b: &mut progBuilder, nodes: vg::Slice<node>, child: i32, mask: u
     { let _t6 = body.out; let _t7 = split; patch(b, _t6, _t7) };
     let mut f: frag = vg::zero();
     f.start = split;
-    f.out = singleOut(split, true);
+    f.out = singleOut(mem, split, true);
     return f;
 }
 
-pub fn emitPlus(b: &mut progBuilder, nodes: vg::Slice<node>, child: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
+pub fn emitPlus(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, child: i32, mask: u64, extra: vg::Slice<u32>) -> frag {
     let none: frag = vg::zero();
-    let body: frag = { let _t1 = nodes; let _t2 = child; let _t3 = mask; let _t4 = extra; emit(b, _t1, _t2, _t3, _t4) };
+    let body: frag = { let _t1 = nodes; let _t2 = child; let _t3 = mask; let _t4 = extra; emit(mem, b, _t1, _t2, _t3, _t4) };
     if ((b.errCode != ErrNone) || b.tooBig) {
         return none;
     }
     let mut s: instr = vg::zero();
     s.op = iSplit;
-    let split: u32 = { let _t5 = s; addInstr(b, _t5) };
+    let split: u32 = { let _t5 = s; addInstr(mem, b, _t5) };
     unsafe { (*b.prog.ins.ptr(((split) as i64))).next = body.start; }
     { let _t6 = body.out; let _t7 = split; patch(b, _t6, _t7) };
     let mut f: frag = vg::zero();
     f.start = body.start;
-    f.out = singleOut(split, true);
+    f.out = singleOut(mem, split, true);
     return f;
 }
 
@@ -4396,7 +4396,7 @@ pub fn compileScan(re: &mut Regexp, ni: i32) {
     }
 }
 
-pub fn collectNested(re: &mut Regexp, ni: i32, stack: &mut groupStack) {
+pub fn collectNested(mem: &vg::Arena, re: &mut Regexp, ni: i32, stack: &mut groupStack) {
     let isGroup: bool = (re.nodes.get(((ni) as i64)).op == opGroup);
     if isGroup {
         let gi: i32 = ((re.nodes.get(((ni) as i64)).index) as i32);
@@ -4405,18 +4405,18 @@ pub fn collectNested(re: &mut Regexp, ni: i32, stack: &mut groupStack) {
             '_b1: while (k < stack.g.len) {
                 '_c1: {
                     let outer: i32 = stack.g.get(k);
-                    unsafe { (*re.nested.ptr(((outer) as i64))) = vg::append(re.nested.get(((outer) as i64)), gi); }
+                    unsafe { (*re.nested.ptr(((outer) as i64))) = vg::append(mem, re.nested.get(((outer) as i64)), gi); }
                 }
                 k += 1i64;
             }
         }
-        stack.g = vg::append(stack.g, gi);
+        stack.g = vg::append(mem, stack.g, gi);
     }
     {
         let mut i: i64 = 0i64;
         '_b2: while (i < re.nodes.get(((ni) as i64)).ch.len) {
             '_c2: {
-                { let _t3 = re.nodes.get(((ni) as i64)).ch.get(i); collectNested(re, _t3, stack) };
+                { let _t3 = re.nodes.get(((ni) as i64)).ch.get(i); collectNested(mem, re, _t3, stack) };
             }
             i += 1i64;
         }
@@ -4475,14 +4475,14 @@ pub fn minMatchChars(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, loc: &m
     return 0i64;
 }
 
-pub fn Compile(pattern: vg::Str, loc: Locale, flags: u32) -> (Regexp, Error) {
+pub fn Compile(mem: &vg::Arena, pattern: vg::Str, loc: Locale, flags: u32) -> (Regexp, Error) {
     let mut loc_v: Locale = loc;
     let mut re: Regexp = vg::zero();
     if (!LocaleValid(&mut loc_v)) {
         return (re, compileError(ErrBadPat, (1i64).wrapping_neg()));
     }
     let mut p: parser = vg::zero();
-    let root: i32 = { let _t1 = pattern; let _t2 = flags; parse(&mut p, &mut loc_v, _t1, _t2) };
+    let root: i32 = { let _t1 = pattern; let _t2 = flags; parse(mem, &mut p, &mut loc_v, _t1, _t2) };
     if (root < 0i32) {
         return (re, p.err);
     }
@@ -4492,15 +4492,15 @@ pub fn Compile(pattern: vg::Str, loc: Locale, flags: u32) -> (Regexp, Error) {
     re.root = root;
     re.flags = flags;
     re.loc = loc_v;
-    re.nested = vg::make::<vg::Slice<i32>>((re.nsub + 1i64));
+    re.nested = vg::make::<vg::Slice<i32>>(mem, (re.nsub + 1i64));
     { let _t3 = root; compileScan(&mut re, _t3) };
     let mut stack: groupStack = vg::zero();
-    { let _t4 = root; collectNested(&mut re, _t4, &mut stack) };
-    { let _t5 = re.nodes; let _t6 = re.brackets; let _t7 = root; computeLengths(_t5, &mut re.loc, _t6, _t7) };
-    re.onePass = onePassAnalyze(re.nodes, re.brackets, root);
+    { let _t4 = root; collectNested(mem, &mut re, _t4, &mut stack) };
+    { let _t5 = re.nodes; let _t6 = re.brackets; let _t7 = root; computeLengths(mem, _t5, &mut re.loc, _t6, _t7) };
+    re.onePass = onePassAnalyze(mem, re.nodes, re.brackets, root);
     let mut b: progBuilder = vg::zero();
     b.icase = ((flags & FlagICase) != 0u32);
-    { let _t8 = re.nodes; let _t9 = root; let _t10 = re.multi; let _t11 = ((flags & FlagNewline) != 0u32); compileProgram(&mut b, _t8, _t9, _t10, _t11) };
+    { let _t8 = re.nodes; let _t9 = root; let _t10 = re.multi; let _t11 = ((flags & FlagNewline) != 0u32); compileProgram(mem, &mut b, _t8, _t9, _t10, _t11) };
     if (b.errCode != ErrNone) {
         return (re, compileError(b.errCode, (1i64).wrapping_neg()));
     }
@@ -4521,7 +4521,7 @@ pub fn trivialNullMatch(re: &mut Regexp, pmatch: vg::Slice<Match>) -> bool {
     return (((re.nodes.get(((re.root) as i64)).minL == 0i64) && (!re.anchors)) && (((re.flags & FlagNoSub) != 0u32) || (pmatch.len == 0i64)));
 }
 
-pub fn Exec(re: &mut Regexp, subject: vg::Str, pmatch: vg::Slice<Match>, eflags: u32) -> (bool, Error) {
+pub fn Exec(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, pmatch: vg::Slice<Match>, eflags: u32) -> (bool, Error) {
     if (subject.len > subjectLimit) {
         return (false, compileError(ErrESpace, (1i64).wrapping_neg()));
     }
@@ -4542,14 +4542,14 @@ pub fn Exec(re: &mut Regexp, subject: vg::Str, pmatch: vg::Slice<Match>, eflags:
             return (true, noError());
         }
         if (((re.flags & FlagNoSub) != 0u32) || (pmatch.len == 0i64)) {
-            let probe: engineResult = { let _t3 = subject; let _t4 = eflags; runPhaseA(re, _t3, _t4) };
+            let probe: engineResult = { let _t3 = subject; let _t4 = eflags; runPhaseA(mem, re, _t3, _t4) };
             if probe.matched {
                 return (true, noError());
             }
         }
         return (false, compileError(ErrESpace, (1i64).wrapping_neg()));
     }
-    let result: engineResult = { let _t5 = subject; let _t6 = eflags; runPhaseA(re, _t5, _t6) };
+    let result: engineResult = { let _t5 = subject; let _t6 = eflags; runPhaseA(mem, re, _t5, _t6) };
     if (!result.matched) {
         return (false, noError());
     }
@@ -4569,9 +4569,9 @@ pub fn Exec(re: &mut Regexp, subject: vg::Str, pmatch: vg::Slice<Match>, eflags:
     if ((pmatch.len == 1i64) || (re.nsub == 0i64)) {
         return (true, noError());
     }
-    let mut d: decoded = decodeWindow(subject, result.so, result.eo);
-    let caps: vg::Slice<Match> = vg::make::<Match>((re.nsub + 1i64));
-    let serr: Error = { let _t8 = 0i64; let _t9 = d.runes.len; let _t10 = eflags; let _t11 = caps; solveCaptures(re, &mut d, _t8, _t9, _t10, _t11) };
+    let mut d: decoded = decodeWindow(mem, subject, result.so, result.eo);
+    let caps: vg::Slice<Match> = vg::make::<Match>(mem, (re.nsub + 1i64));
+    let serr: Error = { let _t8 = 0i64; let _t9 = d.runes.len; let _t10 = eflags; let _t11 = caps; solveCaptures(mem, re, &mut d, _t8, _t9, _t10, _t11) };
     if (serr.Code != ErrNone) {
         return (false, serr);
     }
@@ -4593,7 +4593,7 @@ pub fn MatchIterInit(re: &mut Regexp, limit: i64) -> (MatchIter, Error) {
     return (it, noError());
 }
 
-pub fn MatchIterNext(re: &mut Regexp, it: &mut MatchIter, subject: vg::Str, eflags: u32, pmatch: vg::Slice<Match>) -> (bool, Error) {
+pub fn MatchIterNext(mem: &vg::Arena, re: &mut Regexp, it: &mut MatchIter, subject: vg::Str, eflags: u32, pmatch: vg::Slice<Match>) -> (bool, Error) {
     if it.done {
         return (false, noError());
     }
@@ -4603,7 +4603,7 @@ pub fn MatchIterNext(re: &mut Regexp, it: &mut MatchIter, subject: vg::Str, efla
     }
     while (it.pos <= subject.len) {
         let flags: u32 = { let _t1 = subject; let _t2 = it.pos; let _t3 = eflags; continuationFlags(re, _t1, _t2, _t3) };
-        let _t4 = { let _t5 = subject.tail(it.pos); let _t6 = pmatch; let _t7 = flags; Exec(re, _t5, _t6, _t7) };
+        let _t4 = { let _t5 = subject.tail(it.pos); let _t6 = pmatch; let _t7 = flags; Exec(mem, re, _t5, _t6, _t7) };
         let matched: bool = _t4.0;
         let err: Error = _t4.1;
         if (err.Code != ErrNone) {
@@ -4656,8 +4656,8 @@ pub fn MatchIterNext(re: &mut Regexp, it: &mut MatchIter, subject: vg::Str, efla
     return (false, noError());
 }
 
-pub fn parseReplacement(replacement: vg::Str, nsub: i64) -> (vg::Slice<replPart>, Error) {
-    let mut parts: vg::Slice<replPart> = vg::make_cap::<replPart>(0i64, 4i64);
+pub fn parseReplacement(mem: &vg::Arena, replacement: vg::Str, nsub: i64) -> (vg::Slice<replPart>, Error) {
+    let mut parts: vg::Slice<replPart> = vg::make_cap::<replPart>(mem, 0i64, 4i64);
     let mut start: i64 = 0i64;
     {
         let mut idx: i64 = 0i64;
@@ -4670,11 +4670,11 @@ pub fn parseReplacement(replacement: vg::Str, nsub: i64) -> (vg::Slice<replPart>
                 if (start < idx) {
                     let mut lit: replPart = vg::zero();
                     lit.lit = replacement.sub(start, idx);
-                    parts = vg::append(parts, lit);
+                    parts = vg::append(mem, parts, lit);
                 }
                 if (c == 38u8) {
                     let whole: replPart = vg::zero();
-                    parts = vg::append(parts, whole);
+                    parts = vg::append(mem, parts, whole);
                     start = (idx + 1i64);
                     break '_c1;
                 }
@@ -4689,11 +4689,11 @@ pub fn parseReplacement(replacement: vg::Str, nsub: i64) -> (vg::Slice<replPart>
                     }
                     let mut r#ref: replPart = vg::zero();
                     r#ref.group = group;
-                    parts = vg::append(parts, r#ref);
+                    parts = vg::append(mem, parts, r#ref);
                 } else {
                     let mut esc: replPart = vg::zero();
                     esc.lit = replacement.sub((idx + 1i64), (idx + 2i64));
-                    parts = vg::append(parts, esc);
+                    parts = vg::append(mem, parts, esc);
                 }
                 idx += 1i64;
                 start = (idx + 1i64);
@@ -4704,13 +4704,13 @@ pub fn parseReplacement(replacement: vg::Str, nsub: i64) -> (vg::Slice<replPart>
     if (start < replacement.len) {
         let mut tail: replPart = vg::zero();
         tail.lit = replacement.tail(start);
-        parts = vg::append(parts, tail);
+        parts = vg::append(mem, parts, tail);
     }
     return (parts, noError());
 }
 
-pub fn ReplaceAll(re: &mut Regexp, subject: vg::Str, replacement: vg::Str, limit: i64, eflags: u32) -> (vg::Str, Error) {
-    let _t1 = parseReplacement(replacement, re.nsub);
+pub fn ReplaceAll(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, replacement: vg::Str, limit: i64, eflags: u32) -> (vg::Str, Error) {
+    let _t1 = parseReplacement(mem, replacement, re.nsub);
     let parts: vg::Slice<replPart> = _t1.0;
     let perr: Error = _t1.1;
     if (perr.Code != ErrNone) {
@@ -4722,12 +4722,12 @@ pub fn ReplaceAll(re: &mut Regexp, subject: vg::Str, replacement: vg::Str, limit
     if (ierr.Code != ErrNone) {
         return (vg::lit(b""), ierr);
     }
-    let pmatch: vg::Slice<Match> = vg::make::<Match>((re.nsub + 1i64));
+    let pmatch: vg::Slice<Match> = vg::make::<Match>(mem, (re.nsub + 1i64));
     let mut out: vg::Slice<u8> = vg::zero();
     let mut last: i64 = 0i64;
     let mut any: bool = false;
     loop {
-        let _t4 = { let _t5 = subject; let _t6 = eflags; let _t7 = pmatch; MatchIterNext(re, &mut it, _t5, _t6, _t7) };
+        let _t4 = { let _t5 = subject; let _t6 = eflags; let _t7 = pmatch; MatchIterNext(mem, re, &mut it, _t5, _t6, _t7) };
         let ok: bool = _t4.0;
         let err: Error = _t4.1;
         if (err.Code != ErrNone) {
@@ -4737,21 +4737,21 @@ pub fn ReplaceAll(re: &mut Regexp, subject: vg::Str, replacement: vg::Str, limit
             break;
         }
         if (!any) {
-            out = vg::make_cap::<u8>(0i64, (subject.len + (subject.len).wrapping_div(8i64)));
+            out = vg::make_cap::<u8>(mem, 0i64, (subject.len + (subject.len).wrapping_div(8i64)));
             any = true;
         }
-        out = vg::append_str(out, subject.sub(last, pmatch.get(0i64).So));
+        out = vg::append_str(mem, out, subject.sub(last, pmatch.get(0i64).So));
         {
             let mut i: i64 = 0i64;
             '_b8: while (i < parts.len) {
                 '_c8: {
                     if (parts.get(i).lit.len != 0i64) {
-                        out = vg::append_str(out, parts.get(i).lit);
+                        out = vg::append_str(mem, out, parts.get(i).lit);
                         break '_c8;
                     }
                     let r#ref: Match = pmatch.get(parts.get(i).group);
                     if (r#ref.So >= 0i64) {
-                        out = vg::append_str(out, subject.sub(r#ref.So, r#ref.Eo));
+                        out = vg::append_str(mem, out, subject.sub(r#ref.So, r#ref.Eo));
                     }
                 }
                 i += 1i64;
@@ -4762,8 +4762,8 @@ pub fn ReplaceAll(re: &mut Regexp, subject: vg::Str, replacement: vg::Str, limit
     if (!any) {
         return (subject, noError());
     }
-    out = vg::append_str(out, subject.tail(last));
-    return (vg::str_from_bytes(out), noError());
+    out = vg::append_str(mem, out, subject.tail(last));
+    return (vg::str_from_bytes(mem, out), noError());
 }
 
 pub fn fail(p: &mut parser, code: i32, pos: i64) -> i32 {
@@ -4773,10 +4773,10 @@ pub fn fail(p: &mut parser, code: i32, pos: i64) -> i32 {
     return (1i32).wrapping_neg();
 }
 
-pub fn addNode(p: &mut parser, op: u8) -> i32 {
+pub fn addNode(mem: &vg::Arena, p: &mut parser, op: u8) -> i32 {
     let mut n: node = vg::zero();
     n.op = op;
-    p.nodes = vg::append(p.nodes, n);
+    p.nodes = vg::append(mem, p.nodes, n);
     return (((p.nodes.len - 1i64)) as i32);
 }
 
@@ -4810,10 +4810,10 @@ pub fn nextRune(p: &mut parser) -> i32 {
     return r;
 }
 
-pub fn parse(p: &mut parser, loc: &mut Locale, pattern: vg::Str, flags: u32) -> i32 {
+pub fn parse(mem: &vg::Arena, p: &mut parser, loc: &mut Locale, pattern: vg::Str, flags: u32) -> i32 {
     p.src = pattern;
     p.flags = flags;
-    let root: i32 = { let _t1 = false; parseAlt(p, loc, _t1) };
+    let root: i32 = { let _t1 = false; parseAlt(mem, p, loc, _t1) };
     if (root < 0i32) {
         return (1i32).wrapping_neg();
     }
@@ -4823,29 +4823,29 @@ pub fn parse(p: &mut parser, loc: &mut Locale, pattern: vg::Str, flags: u32) -> 
     return root;
 }
 
-pub fn parseAlt(p: &mut parser, loc: &mut Locale, inGroup: bool) -> i32 {
-    let first: i32 = { let _t1 = inGroup; parseBranch(p, loc, _t1) };
+pub fn parseAlt(mem: &vg::Arena, p: &mut parser, loc: &mut Locale, inGroup: bool) -> i32 {
+    let first: i32 = { let _t1 = inGroup; parseBranch(mem, p, loc, _t1) };
     if (first < 0i32) {
         return (1i32).wrapping_neg();
     }
     if (peekByte(p) != 124u8) {
         return first;
     }
-    let alt: i32 = { let _t2 = opAlt; addNode(p, _t2) };
-    unsafe { (*p.nodes.ptr(((alt) as i64))).ch = vg::append(p.nodes.get(((alt) as i64)).ch, first); }
+    let alt: i32 = { let _t2 = opAlt; addNode(mem, p, _t2) };
+    unsafe { (*p.nodes.ptr(((alt) as i64))).ch = vg::append(mem, p.nodes.get(((alt) as i64)).ch, first); }
     while (peekByte(p) == 124u8) {
         p.pos += 1i64;
-        let branch: i32 = { let _t3 = inGroup; parseBranch(p, loc, _t3) };
+        let branch: i32 = { let _t3 = inGroup; parseBranch(mem, p, loc, _t3) };
         if (branch < 0i32) {
             return (1i32).wrapping_neg();
         }
-        unsafe { (*p.nodes.ptr(((alt) as i64))).ch = vg::append(p.nodes.get(((alt) as i64)).ch, branch); }
+        unsafe { (*p.nodes.ptr(((alt) as i64))).ch = vg::append(mem, p.nodes.get(((alt) as i64)).ch, branch); }
     }
     return alt;
 }
 
-pub fn parseBranch(p: &mut parser, loc: &mut Locale, inGroup: bool) -> i32 {
-    let mut exprs: vg::Slice<i32> = vg::make_cap::<i32>(0i64, 4i64);
+pub fn parseBranch(mem: &vg::Arena, p: &mut parser, loc: &mut Locale, inGroup: bool) -> i32 {
+    let mut exprs: vg::Slice<i32> = vg::make_cap::<i32>(mem, 0i64, 4i64);
     loop {
         if eof(p) {
             break;
@@ -4857,11 +4857,11 @@ pub fn parseBranch(p: &mut parser, loc: &mut Locale, inGroup: bool) -> i32 {
         if ((c == 41u8) && inGroup) {
             break;
         }
-        let expr: i32 = parseExpr(p, loc);
+        let expr: i32 = parseExpr(mem, p, loc);
         if (expr < 0i32) {
             return (1i32).wrapping_neg();
         }
-        exprs = vg::append(exprs, expr);
+        exprs = vg::append(mem, exprs, expr);
     }
     if (exprs.len == 0i64) {
         return { let _t1 = ErrBadPat; let _t2 = p.pos; fail(p, _t1, _t2) };
@@ -4869,7 +4869,7 @@ pub fn parseBranch(p: &mut parser, loc: &mut Locale, inGroup: bool) -> i32 {
     if (exprs.len == 1i64) {
         return exprs.get(0i64);
     }
-    let cat: i32 = { let _t3 = opConcat; addNode(p, _t3) };
+    let cat: i32 = { let _t3 = opConcat; addNode(mem, p, _t3) };
     unsafe { (*p.nodes.ptr(((cat) as i64))).ch = exprs; }
     return cat;
 }
@@ -4878,7 +4878,7 @@ pub fn isDupByte(c: u8) -> bool {
     return ((((c == 42u8) || (c == 43u8)) || (c == 63u8)) || (c == 123u8));
 }
 
-pub fn parseExpr(p: &mut parser, loc: &mut Locale) -> i32 {
+pub fn parseExpr(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
     let start: i64 = p.pos;
     let c: u8 = peekByte(p);
     if ((c == 94u8) || (c == 36u8)) {
@@ -4887,9 +4887,9 @@ pub fn parseExpr(p: &mut parser, loc: &mut Locale) -> i32 {
             return { let _t1 = ErrBadRpt; let _t2 = p.pos; fail(p, _t1, _t2) };
         }
         if (c == 94u8) {
-            return { let _t3 = opBOL; addNode(p, _t3) };
+            return { let _t3 = opBOL; addNode(mem, p, _t3) };
         }
-        return { let _t4 = opEOL; addNode(p, _t4) };
+        return { let _t4 = opEOL; addNode(mem, p, _t4) };
     }
     if isDupByte(c) {
         return { let _t5 = ErrBadRpt; let _t6 = start; fail(p, _t5, _t6) };
@@ -4901,7 +4901,7 @@ pub fn parseExpr(p: &mut parser, loc: &mut Locale) -> i32 {
             p.pos += 1i64;
             p.groups += 1i64;
             let index: i64 = p.groups;
-            let sub: i32 = { let _t8 = true; parseAlt(p, loc, _t8) };
+            let sub: i32 = { let _t8 = true; parseAlt(mem, p, loc, _t8) };
             if (sub < 0i32) {
                 return (1i32).wrapping_neg();
             }
@@ -4909,11 +4909,11 @@ pub fn parseExpr(p: &mut parser, loc: &mut Locale) -> i32 {
                 return { let _t9 = ErrEParen; let _t10 = start; fail(p, _t9, _t10) };
             }
             p.pos += 1i64;
-            primary = { let _t11 = opGroup; addNode(p, _t11) };
-            unsafe { (*p.nodes.ptr(((primary) as i64))).ch = vg::append(p.nodes.get(((primary) as i64)).ch, sub); }
+            primary = { let _t11 = opGroup; addNode(mem, p, _t11) };
+            unsafe { (*p.nodes.ptr(((primary) as i64))).ch = vg::append(mem, p.nodes.get(((primary) as i64)).ch, sub); }
             unsafe { (*p.nodes.ptr(((primary) as i64))).index = index; }
         } else if _t7 == 91u8 {
-            primary = parseBracket(p, loc);
+            primary = parseBracket(mem, p, loc);
             if (primary < 0i32) {
                 return (1i32).wrapping_neg();
             }
@@ -4927,38 +4927,38 @@ pub fn parseExpr(p: &mut parser, loc: &mut Locale) -> i32 {
                 return (1i32).wrapping_neg();
             }
             if ((((((((((((((r == 94i32) || (r == 46i32)) || (r == 91i32)) || (r == 93i32)) || (r == 36i32)) || (r == 40i32)) || (r == 41i32)) || (r == 124i32)) || (r == 42i32)) || (r == 43i32)) || (r == 63i32)) || (r == 123i32)) || (r == 125i32)) || (r == 92i32)) {
-                primary = { let _t14 = r; charNode(p, loc, _t14) };
+                primary = { let _t14 = r; charNode(mem, p, loc, _t14) };
             } else {
                 return { let _t15 = ErrBadPat; let _t16 = start; fail(p, _t15, _t16) };
             }
         } else if _t7 == 46u8 {
             p.pos += 1i64;
-            primary = { let _t17 = opAny; addNode(p, _t17) };
+            primary = { let _t17 = opAny; addNode(mem, p, _t17) };
         } else {
             let r_2: i32 = nextRune(p);
             if (r_2 < 0i32) {
                 return (1i32).wrapping_neg();
             }
-            primary = { let _t18 = r_2; charNode(p, loc, _t18) };
+            primary = { let _t18 = r_2; charNode(mem, p, loc, _t18) };
         }
     }
-    return { let _t19 = primary; parseDup(p, _t19) };
+    return { let _t19 = primary; parseDup(mem, p, _t19) };
 }
 
-pub fn charNode(p: &mut parser, loc: &mut Locale, r: i32) -> i32 {
-    let n: i32 = { let _t1 = opChar; addNode(p, _t1) };
+pub fn charNode(mem: &vg::Arena, p: &mut parser, loc: &mut Locale, r: i32) -> i32 {
+    let n: i32 = { let _t1 = opChar; addNode(mem, p, _t1) };
     unsafe { (*p.nodes.ptr(((n) as i64))).r = r; }
     if ((p.flags & FlagICase) != 0u32) {
-        let mut fold: vg::Slice<i32> = vg::make_cap::<i32>(0i64, 3i64);
-        fold = appendUnique(fold, r);
-        fold = appendUnique(fold, { let _t2 = r; localeToUpper(loc, _t2) });
-        fold = appendUnique(fold, { let _t3 = r; localeToLower(loc, _t3) });
+        let mut fold: vg::Slice<i32> = vg::make_cap::<i32>(mem, 0i64, 3i64);
+        fold = appendUnique(mem, fold, r);
+        fold = appendUnique(mem, fold, { let _t2 = r; localeToUpper(loc, _t2) });
+        fold = appendUnique(mem, fold, { let _t3 = r; localeToLower(loc, _t3) });
         unsafe { (*p.nodes.ptr(((n) as i64))).fold = fold; }
     }
     return n;
 }
 
-pub fn appendUnique(runes: vg::Slice<i32>, r: i32) -> vg::Slice<i32> {
+pub fn appendUnique(mem: &vg::Arena, runes: vg::Slice<i32>, r: i32) -> vg::Slice<i32> {
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < runes.len) {
@@ -4970,10 +4970,10 @@ pub fn appendUnique(runes: vg::Slice<i32>, r: i32) -> vg::Slice<i32> {
             i += 1i64;
         }
     }
-    return vg::append(runes, r);
+    return vg::append(mem, runes, r);
 }
 
-pub fn parseDup(p: &mut parser, operand: i32) -> i32 {
+pub fn parseDup(mem: &vg::Arena, p: &mut parser, operand: i32) -> i32 {
     let c: u8 = peekByte(p);
     let mut lo: i64 = vg::zero();
     let mut hi: i64 = vg::zero();
@@ -5012,8 +5012,8 @@ pub fn parseDup(p: &mut parser, operand: i32) -> i32 {
     if isDupByte(peekByte(p)) {
         return { let _t3 = ErrBadRpt; let _t4 = p.pos; fail(p, _t3, _t4) };
     }
-    let rep: i32 = { let _t5 = opRepeat; addNode(p, _t5) };
-    unsafe { (*p.nodes.ptr(((rep) as i64))).ch = vg::append(p.nodes.get(((rep) as i64)).ch, operand); }
+    let rep: i32 = { let _t5 = opRepeat; addNode(mem, p, _t5) };
+    unsafe { (*p.nodes.ptr(((rep) as i64))).ch = vg::append(mem, p.nodes.get(((rep) as i64)).ch, operand); }
     unsafe { (*p.nodes.ptr(((rep) as i64))).min = lo; }
     unsafe { (*p.nodes.ptr(((rep) as i64))).max = hi; }
     unsafe { (*p.nodes.ptr(((rep) as i64))).minimal = minimal; }
@@ -5101,12 +5101,12 @@ pub fn satMul(a: i64, b: i64) -> i64 {
     return product;
 }
 
-pub fn computeLengths(nodes: vg::Slice<node>, loc: &mut Locale, brackets: vg::Slice<bracketSet>, ni: i32) {
+pub fn computeLengths(mem: &vg::Arena, nodes: vg::Slice<node>, loc: &mut Locale, brackets: vg::Slice<bracketSet>, ni: i32) {
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < nodes.get(((ni) as i64)).ch.len) {
             '_c1: {
-                { let _t2 = nodes; let _t3 = brackets; let _t4 = nodes.get(((ni) as i64)).ch.get(i); computeLengths(_t2, loc, _t3, _t4) };
+                { let _t2 = nodes; let _t3 = brackets; let _t4 = nodes.get(((ni) as i64)).ch.get(i); computeLengths(mem, _t2, loc, _t3, _t4) };
             }
             i += 1i64;
         }
@@ -5131,8 +5131,8 @@ pub fn computeLengths(nodes: vg::Slice<node>, loc: &mut Locale, brackets: vg::Sl
             unsafe { (*nodes.ptr(((ni) as i64))).maxL = nodes.get(((child) as i64)).maxL; }
         } else if _t5 == opConcat {
             let count: i64 = nodes.get(((ni) as i64)).ch.len;
-            unsafe { (*nodes.ptr(((ni) as i64))).sufMin = vg::make::<i64>((count + 1i64)); }
-            unsafe { (*nodes.ptr(((ni) as i64))).sufMax = vg::make::<i64>((count + 1i64)); }
+            unsafe { (*nodes.ptr(((ni) as i64))).sufMin = vg::make::<i64>(mem, (count + 1i64)); }
+            unsafe { (*nodes.ptr(((ni) as i64))).sufMax = vg::make::<i64>(mem, (count + 1i64)); }
             {
                 let mut k: i64 = (count - 1i64);
                 '_b8: while (k >= 0i64) {

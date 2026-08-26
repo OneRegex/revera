@@ -1,7 +1,9 @@
 // Command json2rust converts the Vego JSON form into one Rust
 // source file. The output imports the hand-written runtime vg.rs,
-// which supplies the Slice and Str value types, the arena
-// allocator, and the Go comparison helpers.
+// which supplies the Slice and Str value types, the Arena
+// allocator, and the Go comparison helpers. Every function that
+// allocates receives an Arena reference as its first parameter,
+// "mem"; the output holds no global state.
 //
 // Usage:
 //
@@ -284,6 +286,9 @@ func (g *gen) emitFunc(f *vegoc.FuncDecl) {
 	g.tmp = 0
 	g.loops = nil
 	var params []string
+	if f.Allocates {
+		params = append(params, "mem: &vg::Arena")
+	}
 	for _, pa := range f.Params {
 		params = append(params, ident(pa.Name)+": "+g.typ(pa.Type))
 	}
@@ -721,10 +726,10 @@ func (g *gen) expr(e *vegoc.Expr) string {
 		return g.builtin(e)
 	case "conv":
 		if e.TypeRef.K == vegoc.KStr {
-			return "vg::str_from_bytes(" + g.expr(e.X) + ")"
+			return "vg::str_from_bytes(mem, " + g.expr(e.X) + ")"
 		}
 		if e.TypeRef.K == vegoc.KSlice {
-			return "vg::bytes_from_str(" + g.expr(e.X) + ")"
+			return "vg::bytes_from_str(mem, " + g.expr(e.X) + ")"
 		}
 		return "((" + g.expr(e.X) + ") as " + g.typ(e.TypeRef) + ")"
 	case "unary":
@@ -753,6 +758,10 @@ func (g *gen) expr(e *vegoc.Expr) string {
 // the other arguments hoist into temps first, in Go's evaluation
 // order, so the borrow never overlaps their reads.
 func (g *gen) call(e *vegoc.Expr) string {
+	var memArg []string
+	if g.p.CalleeAllocates(e.Name) {
+		memArg = []string{"mem"}
+	}
 	hasBorrow := false
 	for _, a := range e.Args {
 		if isBorrowArg(a) {
@@ -760,14 +769,14 @@ func (g *gen) call(e *vegoc.Expr) string {
 		}
 	}
 	if !hasBorrow {
-		var args []string
+		args := memArg
 		for _, a := range e.Args {
 			args = append(args, g.expr(a))
 		}
 		return ident(e.Name) + "(" + strings.Join(args, ", ") + ")"
 	}
 	var pre []string
-	var args []string
+	args := memArg
 	for _, a := range e.Args {
 		if isBorrowArg(a) {
 			args = append(args, g.expr(a))
@@ -799,19 +808,19 @@ func (g *gen) builtin(e *vegoc.Expr) string {
 	case "make":
 		elem := g.typ(e.TypeRef.Elem)
 		if len(e.Args) == 2 {
-			return fmt.Sprintf("vg::make_cap::<%s>(%s, %s)", elem, g.idx(e.Args[0]), g.idx(e.Args[1]))
+			return fmt.Sprintf("vg::make_cap::<%s>(mem, %s, %s)", elem, g.idx(e.Args[0]), g.idx(e.Args[1]))
 		}
-		return fmt.Sprintf("vg::make::<%s>(%s)", elem, g.idx(e.Args[0]))
+		return fmt.Sprintf("vg::make::<%s>(mem, %s)", elem, g.idx(e.Args[0]))
 	case "append":
 		if e.Spread {
 			if e.Args[1].Typ.K == vegoc.KStr {
-				return fmt.Sprintf("vg::append_str(%s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
+				return fmt.Sprintf("vg::append_str(mem, %s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
 			}
-			return fmt.Sprintf("vg::append_slice(%s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
+			return fmt.Sprintf("vg::append_slice(mem, %s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
 		}
 		out := g.expr(e.Args[0])
 		for _, a := range e.Args[1:] {
-			out = fmt.Sprintf("vg::append(%s, %s)", out, g.expr(a))
+			out = fmt.Sprintf("vg::append(mem, %s, %s)", out, g.expr(a))
 		}
 		return out
 	case "copy":
@@ -906,7 +915,7 @@ func (g *gen) composite(e *vegoc.Expr) string {
 		for _, el := range e.Elems {
 			parts = append(parts, g.expr(el))
 		}
-		return fmt.Sprintf("vg::slice_of::<%s>(&[%s])", g.typ(t.Elem), strings.Join(parts, ", "))
+		return fmt.Sprintf("vg::slice_of::<%s>(mem, &[%s])", g.typ(t.Elem), strings.Join(parts, ", "))
 	case vegoc.KArray:
 		var parts []string
 		for _, el := range e.Elems {

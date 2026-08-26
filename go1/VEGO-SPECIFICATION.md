@@ -314,7 +314,9 @@ Vego semantics are Go semantics, restricted:
   order.
 - All values are zero-initialized: integers to 0, bools to false,
   strings to "", slices to empty, structs field by field.
-- There is one thread. Nothing in the subset synchronizes.
+- There is one thread. Nothing in the subset synchronizes. A
+  translated engine still holds no global state, so a host may run
+  one engine per thread; section 9.1 gives the rule.
 - Abnormal termination (index out of range, division by zero,
   impossible shift) aborts the program. It is not recoverable and
   carries no defined value.
@@ -455,6 +457,32 @@ Views can alias, so a borrow-checked target either copies at the few
 aliasing call sites or lowers slices to pointer-and-length pairs in
 generated (unsafe) code. The correctness argument for generated code
 is the LEAN4 proof over the JSON, not the target language's checker.
+
+### 9.1 The memory context
+
+Translated code holds no global state, mutable or hidden. The Go
+original leans on the garbage collector; the targets lean on
+memory the host owns. Every function that can allocate, directly
+or through a callee, receives an explicit memory context as a
+synthetic first parameter. Translators name it `mem`. The name is
+reserved: a package-level declaration must not use it, and the
+checker renames any local of that name, like any other clash.
+
+The allocation sites are `make`, `append`, the two string and
+buffer conversions, and slice composite literals. The shared front
+end computes the transitive "allocates" flag per function. Each
+printer adds the parameter and threads it through call sites
+mechanically; a function that never allocates keeps its plain
+signature.
+
+The context is an allocator or arena of the target runtime. The
+host owns these arenas, and picks the one that backs each engine
+call: locale data outlives patterns, a pattern outlives the
+operations on it, and one operation's scratch dies at the next.
+Two threads with separate contexts share only immutable data, so
+each thread runs its own engine safely. One context must never be
+shared between threads; the Rust runtime rejects that at compile
+time.
 
 ## 10. Conformance
 

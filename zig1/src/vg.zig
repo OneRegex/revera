@@ -2,53 +2,15 @@
 // the Go runtime supplied implicitly: growable buffers, immutable
 // string views, conversions with Go semantics, and memory.
 //
-// Memory comes from three arenas. Locale data loads into the
-// persistent arena once. A compiled pattern lives in the pattern
-// arena until the next compile. Everything one operation allocates
-// (an Exec workspace, a ReplaceAll output) comes from the scratch
-// arena, which the host resets before each operation.
+// Memory is explicit. Every generated function that allocates
+// takes an allocator as its first parameter, so the runtime holds
+// no state at all. The host owns the arenas and decides which one
+// backs each engine call; two threads with separate arenas never
+// share anything mutable.
 
 const std = @import("std");
 
-var arena_persistent = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-var arena_pattern = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-var arena_scratch = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-
-const Mode = enum { persistent, pattern, scratch };
-var mode: Mode = .persistent;
-
-pub fn usePersistentArena() void {
-    mode = .persistent;
-}
-
-// usePatternArena directs allocations to the pattern arena, which
-// holds a compiled Regexp until the next resetPatternArena.
-pub fn usePatternArena() void {
-    mode = .pattern;
-}
-
-// useScratchArena directs allocations to the scratch arena, which
-// holds one operation's workspace (an Exec, a ReplaceAll).
-pub fn useScratchArena() void {
-    mode = .scratch;
-}
-
-pub fn resetPatternArena() void {
-    _ = arena_pattern.reset(.retain_capacity);
-    _ = arena_scratch.reset(.retain_capacity);
-}
-
-pub fn resetScratchArena() void {
-    _ = arena_scratch.reset(.retain_capacity);
-}
-
-fn cur() std.mem.Allocator {
-    return switch (mode) {
-        .persistent => arena_persistent.allocator(),
-        .pattern => arena_pattern.allocator(),
-        .scratch => arena_scratch.allocator(),
-    };
-}
+pub const Allocator = std.mem.Allocator;
 
 const zeroOf = std.mem.zeroes;
 
@@ -155,24 +117,24 @@ pub fn Slice(comptime T: type) type {
     };
 }
 
-fn allocElems(comptime T: type, n: i64) [*]T {
+fn allocElems(gpa: Allocator, comptime T: type, n: i64) [*]T {
     const count: usize = @intCast(@max(n, 1));
-    const mem = cur().alloc(T, count) catch @panic("out of memory");
-    return mem.ptr;
+    const buf = gpa.alloc(T, count) catch @panic("out of memory");
+    return buf.ptr;
 }
 
-pub fn make(comptime T: type, n: i64) Slice(T) {
-    return makeCap(T, n, n);
+pub fn make(gpa: Allocator, comptime T: type, n: i64) Slice(T) {
+    return makeCap(gpa, T, n, n);
 }
 
-pub fn makeCap(comptime T: type, n: i64, c: i64) Slice(T) {
+pub fn makeCap(gpa: Allocator, comptime T: type, n: i64, c: i64) Slice(T) {
     std.debug.assert(0 <= n and n <= c);
-    const p = allocElems(T, c);
+    const p = allocElems(gpa, T, c);
     @memset(p[0..@intCast(c)], zeroOf(T));
     return .{ .p = p, .len = n, .cap = c };
 }
 
-fn grow(comptime T: type, s: Slice(T), need: i64) Slice(T) {
+fn grow(gpa: Allocator, comptime T: type, s: Slice(T), need: i64) Slice(T) {
     var newcap: i64 = @max(s.cap * 2, 8);
     if (newcap < need) {
         newcap = need;
@@ -180,7 +142,7 @@ fn grow(comptime T: type, s: Slice(T), need: i64) Slice(T) {
     // The spare region must read as zero: Go allocates zeroed
     // memory, and extending a slice inside its capacity exposes
     // that memory. The prefix gets the live elements instead.
-    const p = allocElems(T, newcap);
+    const p = allocElems(gpa, T, newcap);
     const n: usize = @intCast(s.len);
     @memset(p[n..@intCast(newcap)], zeroOf(T));
     if (s.p) |old| {
@@ -189,20 +151,20 @@ fn grow(comptime T: type, s: Slice(T), need: i64) Slice(T) {
     return .{ .p = p, .len = s.len, .cap = newcap };
 }
 
-pub fn append(comptime T: type, s: Slice(T), v: T) Slice(T) {
+pub fn append(gpa: Allocator, comptime T: type, s: Slice(T), v: T) Slice(T) {
     var out = s;
     if (out.len == out.cap) {
-        out = grow(T, out, out.len + 1);
+        out = grow(gpa, T, out, out.len + 1);
     }
     out.p.?[@intCast(out.len)] = v;
     out.len += 1;
     return out;
 }
 
-pub fn appendSlice(comptime T: type, s: Slice(T), more: Slice(T)) Slice(T) {
+pub fn appendSlice(gpa: Allocator, comptime T: type, s: Slice(T), more: Slice(T)) Slice(T) {
     var out = s;
     if (out.len + more.len > out.cap) {
-        out = grow(T, out, out.len + more.len);
+        out = grow(gpa, T, out, out.len + more.len);
     }
     const n: usize = @intCast(more.len);
     if (n > 0) {
@@ -214,10 +176,10 @@ pub fn appendSlice(comptime T: type, s: Slice(T), more: Slice(T)) Slice(T) {
     return out;
 }
 
-pub fn appendStr(s: Slice(u8), more: Str) Slice(u8) {
+pub fn appendStr(gpa: Allocator, s: Slice(u8), more: Str) Slice(u8) {
     var out = s;
     if (out.len + more.len > out.cap) {
-        out = grow(u8, out, out.len + more.len);
+        out = grow(gpa, u8, out, out.len + more.len);
     }
     const n: usize = @intCast(more.len);
     if (n > 0) {
@@ -245,9 +207,9 @@ pub fn copyStr(dst: Slice(u8), src: Str) i64 {
     return n;
 }
 
-pub fn strFromBytes(b: Slice(u8)) Str {
+pub fn strFromBytes(gpa: Allocator, b: Slice(u8)) Str {
     const n: usize = @intCast(b.len);
-    const p = allocElems(u8, b.len);
+    const p = allocElems(gpa, u8, b.len);
     if (n > 0) {
         @memcpy(p[0..n], b.p.?[0..n]);
     }
@@ -264,8 +226,8 @@ pub fn arrSlice(comptime T: type, arr: anytype, lo: i64, hi: i64) Slice(T) {
     };
 }
 
-pub fn sliceOf(comptime T: type, src: anytype) Slice(T) {
-    const out = make(T, @intCast(src.len));
+pub fn sliceOf(gpa: Allocator, comptime T: type, src: anytype) Slice(T) {
+    const out = make(gpa, T, @intCast(src.len));
     @memcpy(out.p.?[0..src.len], src);
     return out;
 }
@@ -324,8 +286,8 @@ pub fn remT(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
 
 // bytesFromStr copies a string into a fresh mutable byte buffer,
 // the []uint8(s) conversion.
-pub fn bytesFromStr(s: Str) Slice(u8) {
-    const out = make(u8, s.len);
+pub fn bytesFromStr(gpa: Allocator, s: Str) Slice(u8) {
+    const out = make(gpa, u8, s.len);
     _ = copyStr(out, s);
     return out;
 }

@@ -2,11 +2,11 @@
 // the Go runtime supplied implicitly: growable buffers, immutable
 // string views, comparison helpers, and memory.
 //
-// Memory comes from three arenas. Locale data loads into the
-// persistent arena once. A compiled pattern lives in the pattern
-// arena until the next compile. Everything one operation allocates
-// (an Exec workspace, a ReplaceAll output) comes from the scratch
-// arena, which the host resets before each operation.
+// Memory is explicit. Every generated function that allocates
+// takes an Arena reference as its first parameter, so the runtime
+// holds no state at all. The host owns the arenas and decides
+// which one backs each engine call; two threads with separate
+// arenas never share anything mutable.
 
 #pragma once
 
@@ -25,6 +25,11 @@ namespace vg {
 
 class Arena {
   public:
+    Arena() = default;
+    Arena(const Arena&) = delete;
+    Arena& operator=(const Arena&) = delete;
+    ~Arena() { reset(); }
+
     void* alloc(size_t n) {
         void* p = std::malloc(n ? n : 1);
         if (p == nullptr) {
@@ -45,28 +50,12 @@ class Arena {
     std::vector<void*> blocks_;
 };
 
-inline Arena arena_persistent;
-inline Arena arena_pattern;
-inline Arena arena_scratch;
-inline Arena* arena_cur = &arena_persistent;
-
-inline void use_persistent_arena() { arena_cur = &arena_persistent; }
-inline void use_pattern_arena() { arena_cur = &arena_pattern; }
-inline void use_scratch_arena() { arena_cur = &arena_scratch; }
-
-inline void reset_pattern_arena() {
-    arena_pattern.reset();
-    arena_scratch.reset();
-}
-
-inline void reset_scratch_arena() { arena_scratch.reset(); }
-
 template <typename T>
-T* alloc_elems(int64_t n) {
+T* alloc_elems(Arena& mem, int64_t n) {
     if (n < 1) {
         n = 1;
     }
-    return static_cast<T*>(arena_cur->alloc(size_t(n) * sizeof(T)));
+    return static_cast<T*>(mem.alloc(size_t(n) * sizeof(T)));
 }
 
 // Str is an immutable byte view, the translation of a Go string.
@@ -163,23 +152,23 @@ int64_t len(const std::array<T, N>&) {
 }
 
 template <typename T>
-Slice<T> make_cap(int64_t n, int64_t c) {
+Slice<T> make_cap(Arena& mem, int64_t n, int64_t c) {
     // Value initialization of every generated type is all zero
     // bytes, so one memset replaces per-element construction.
     static_assert(std::is_trivially_copyable_v<T>);
     assert(0 <= n && n <= c);
-    T* p = alloc_elems<T>(c);
+    T* p = alloc_elems<T>(mem, c);
     std::memset(p, 0, size_t(c) * sizeof(T));
     return Slice<T>{p, n, c};
 }
 
 template <typename T>
-Slice<T> make(int64_t n) {
-    return make_cap<T>(n, n);
+Slice<T> make(Arena& mem, int64_t n) {
+    return make_cap<T>(mem, n, n);
 }
 
 template <typename T>
-Slice<T> grow(Slice<T> s, int64_t need) {
+Slice<T> grow(Arena& mem, Slice<T> s, int64_t need) {
     int64_t newcap = std::max<int64_t>(s.cap * 2, 8);
     if (newcap < need) {
         newcap = need;
@@ -187,7 +176,7 @@ Slice<T> grow(Slice<T> s, int64_t need) {
     // The spare region must read as zero: Go allocates zeroed
     // memory, and extending a slice inside its capacity exposes
     // that memory. The prefix gets the live elements instead.
-    T* p = alloc_elems<T>(newcap);
+    T* p = alloc_elems<T>(mem, newcap);
     std::memset(p + s.len, 0, size_t(newcap - s.len) * sizeof(T));
     if (s.p != nullptr && s.len > 0) {
         std::memcpy(p, s.p, size_t(s.len) * sizeof(T));
@@ -196,9 +185,9 @@ Slice<T> grow(Slice<T> s, int64_t need) {
 }
 
 template <typename T>
-Slice<T> append(Slice<T> s, T v) {
+Slice<T> append(Arena& mem, Slice<T> s, T v) {
     if (s.len == s.cap) {
-        s = grow(s, s.len + 1);
+        s = grow(mem, s, s.len + 1);
     }
     s.p[s.len] = v;
     s.len++;
@@ -208,9 +197,9 @@ Slice<T> append(Slice<T> s, T v) {
 // The source of a spread append may alias the old buffer; the old
 // buffer stays intact after a grow, so a plain copy is right.
 template <typename T>
-Slice<T> append_slice(Slice<T> s, Slice<T> more) {
+Slice<T> append_slice(Arena& mem, Slice<T> s, Slice<T> more) {
     if (s.len + more.len > s.cap) {
-        s = grow(s, s.len + more.len);
+        s = grow(mem, s, s.len + more.len);
     }
     if (more.len > 0) {
         std::memmove(s.p + s.len, more.p, size_t(more.len) * sizeof(T));
@@ -219,9 +208,9 @@ Slice<T> append_slice(Slice<T> s, Slice<T> more) {
     return s;
 }
 
-inline Slice<uint8_t> append_str(Slice<uint8_t> s, Str more) {
+inline Slice<uint8_t> append_str(Arena& mem, Slice<uint8_t> s, Str more) {
     if (s.len + more.len > s.cap) {
-        s = grow(s, s.len + more.len);
+        s = grow(mem, s, s.len + more.len);
     }
     if (more.len > 0) {
         std::memmove(s.p + s.len, more.p, size_t(more.len));
@@ -268,16 +257,16 @@ T srem(T a, T b) {
 
 // bytes_from_str copies a string into a fresh mutable byte buffer,
 // the []uint8(s) conversion.
-inline Slice<uint8_t> bytes_from_str(Str s) {
-    Slice<uint8_t> out = make<uint8_t>(s.len);
+inline Slice<uint8_t> bytes_from_str(Arena& mem, Str s) {
+    Slice<uint8_t> out = make<uint8_t>(mem, s.len);
     if (s.len > 0) {
         std::memcpy(out.p, s.p, size_t(s.len));
     }
     return out;
 }
 
-inline Str str_from_bytes(Slice<uint8_t> b) {
-    char* p = alloc_elems<char>(b.len);
+inline Str str_from_bytes(Arena& mem, Slice<uint8_t> b) {
+    char* p = alloc_elems<char>(mem, b.len);
     if (b.len > 0) {
         std::memcpy(p, b.p, size_t(b.len));
     }
@@ -288,19 +277,18 @@ template <typename T, size_t N>
 Slice<T> arr_slice(std::array<T, N>& a, int64_t lo, int64_t hi) {
     assert(0 <= lo && lo <= hi && hi <= int64_t(N));
     if (N == 0) {
-        // A zero-length array may have no storage. Give the view
-        // real static storage so it stays non-nil, like a Go slice
-        // of a zero-length array, with no pointer arithmetic on an
-        // invented address.
-        static T sentinel{};
-        return Slice<T>{&sentinel, 0, 0};
+        // std::array<T, 0>::data() may be null, but a Go slice of
+        // a zero-length array is non-nil. Point at the array object
+        // itself: it has real storage, and with cap 0 the pointer
+        // is never dereferenced.
+        return Slice<T>{reinterpret_cast<T*>(&a), 0, 0};
     }
     return Slice<T>{a.data() + lo, hi - lo, int64_t(N) - lo};
 }
 
 template <typename T>
-Slice<T> slice_of(std::initializer_list<T> elems) {
-    Slice<T> out = make<T>(int64_t(elems.size()));
+Slice<T> slice_of(Arena& mem, std::initializer_list<T> elems) {
+    Slice<T> out = make<T>(mem, int64_t(elems.size()));
     if (elems.size() > 0) {
         std::memcpy(out.p, elems.begin(), elems.size() * sizeof(T));
     }

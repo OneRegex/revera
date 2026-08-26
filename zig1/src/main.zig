@@ -2,6 +2,12 @@
 // engine. It reads protocol commands on stdin, one per line, and
 // prints one output line per command. The protocol is defined by
 // go1/revera/driver_host.go, the Go reference implementation.
+//
+// The host owns three arenas. Locale data lives in the persistent
+// arena. A compiled pattern lives in the pattern arena until the
+// next compile. Everything one operation allocates comes from the
+// scratch arena, reset before each operation. Each engine call
+// receives the arena that must back its allocations.
 
 const std = @import("std");
 const Io = std.Io;
@@ -10,20 +16,23 @@ const vg = @import("vg.zig");
 
 const data = @embedFile("data.bin");
 
-var inbuf: [1 << 20]u8 = undefined;
-var outbuf: [1 << 16]u8 = undefined;
-var rowsbuf: [1 << 22]u8 = undefined;
+// The persistent arena never resets, so its plain allocator is
+// enough; pattern and scratch keep the arena for reset().
+const Host = struct {
+    persistent: vg.Allocator,
+    pattern: *std.heap.ArenaAllocator,
+    scratch: *std.heap.ArenaAllocator,
+    base: engine.Locale = .{},
+    cur: engine.Locale = .{},
+    re: engine.Regexp = .{},
+    valid: bool = false,
+};
 
-var base: engine.Locale = .{};
-var cur: engine.Locale = .{};
-var re: engine.Regexp = .{};
-var valid = false;
-
-fn decode(tok: []const u8) vg.Str {
+fn decode(gpa: vg.Allocator, tok: []const u8) vg.Str {
     if (tok.len == 1 and tok[0] == '-') {
         return .{};
     }
-    const s = vg.make(u8, @intCast(tok.len / 2));
+    const s = vg.make(gpa, u8, @intCast(tok.len / 2));
     _ = std.fmt.hexToBytes(s.items(), tok) catch @panic("bad hex");
     return vg.str(s.items());
 }
@@ -48,53 +57,52 @@ fn next(it: *std.mem.TokenIterator(u8, .scalar)) []const u8 {
     return it.next() orelse @panic("missing token");
 }
 
-fn handle(w: *Io.Writer, line: []const u8) !void {
+fn handle(h: *Host, w: *Io.Writer, line: []const u8) !void {
     var it = std.mem.tokenizeScalar(u8, line, ' ');
     const cmd = next(&it);
     switch (cmd[0]) {
         'P' => {
-            cur = engine.LocalePOSIX();
+            h.cur = engine.LocalePOSIX();
             try w.writeAll("P 1\n");
         },
         'L' => {
-            vg.usePersistentArena();
-            const name = decode(next(&it));
-            const coll = decode(next(&it));
-            const res = engine.LocaleSelect(&base, name, coll);
-            vg.useScratchArena();
+            const name = decode(h.persistent, next(&it));
+            const coll = decode(h.persistent, next(&it));
+            const res = engine.LocaleSelect(h.persistent, &h.base, name, coll);
             if (res[1]) {
-                cur = res[0];
+                h.cur = res[0];
             }
             try w.print("L {d}\n", .{@intFromBool(res[1])});
         },
         'C' => {
             const flags = parseU32(next(&it));
             const patTok = next(&it);
-            valid = false;
-            re = .{};
-            vg.resetPatternArena();
-            vg.usePatternArena();
-            const pat = decode(patTok);
-            const res = engine.Compile(pat, cur, flags);
-            vg.useScratchArena();
+            h.valid = false;
+            h.re = .{};
+            _ = h.pattern.reset(.retain_capacity);
+            _ = h.scratch.reset(.retain_capacity);
+            const gpa = h.pattern.allocator();
+            const pat = decode(gpa, patTok);
+            const res = engine.Compile(gpa, pat, h.cur, flags);
             if (res[1].Code != 0) {
                 try w.print("C {d} {d} 0\n", .{ res[1].Code, res[1].Pos });
                 return;
             }
-            re = res[0];
-            valid = true;
-            try w.print("C 0 0 {d}\n", .{engine.NumSub(&re)});
+            h.re = res[0];
+            h.valid = true;
+            try w.print("C 0 0 {d}\n", .{engine.NumSub(&h.re)});
         },
         'X' => {
-            if (!valid) {
+            if (!h.valid) {
                 try w.writeAll("X ERR\n");
                 return;
             }
-            vg.resetScratchArena();
+            _ = h.scratch.reset(.retain_capacity);
+            const gpa = h.scratch.allocator();
             const eflags = parseU32(next(&it));
-            const subject = decode(next(&it));
-            const pmatch = vg.make(engine.Match, engine.NumSub(&re) + 1);
-            const res = engine.Exec(&re, subject, pmatch, eflags);
+            const subject = decode(gpa, next(&it));
+            const pmatch = vg.make(gpa, engine.Match, engine.NumSub(&h.re) + 1);
+            const res = engine.Exec(gpa, &h.re, subject, pmatch, eflags);
             if (res[1].Code != 0) {
                 try w.print("X {d} 0\n", .{res[1].Code});
                 return;
@@ -110,16 +118,17 @@ fn handle(w: *Io.Writer, line: []const u8) !void {
             try w.writeAll("\n");
         },
         'R' => {
-            if (!valid) {
+            if (!h.valid) {
                 try w.writeAll("R ERR\n");
                 return;
             }
-            vg.resetScratchArena();
+            _ = h.scratch.reset(.retain_capacity);
+            const gpa = h.scratch.allocator();
             const limit = parseI64(next(&it));
             const eflags = parseU32(next(&it));
-            const repl = decode(next(&it));
-            const subject = decode(next(&it));
-            const res = engine.ReplaceAll(&re, subject, repl, limit, eflags);
+            const repl = decode(gpa, next(&it));
+            const subject = decode(gpa, next(&it));
+            const res = engine.ReplaceAll(gpa, &h.re, subject, repl, limit, eflags);
             if (res[1].Code != 0) {
                 try w.print("R {d} {d} -\n", .{ res[1].Code, res[1].Pos });
                 return;
@@ -129,25 +138,27 @@ fn handle(w: *Io.Writer, line: []const u8) !void {
             try w.writeAll("\n");
         },
         'I' => {
-            if (!valid) {
+            if (!h.valid) {
                 try w.writeAll("I ERR\n");
                 return;
             }
-            vg.resetScratchArena();
+            _ = h.scratch.reset(.retain_capacity);
+            const gpa = h.scratch.allocator();
             const limit = parseI64(next(&it));
             const eflags = parseU32(next(&it));
-            const subject = decode(next(&it));
-            const ires = engine.MatchIterInit(&re, limit);
+            const subject = decode(gpa, next(&it));
+            const ires = engine.MatchIterInit(&h.re, limit);
             if (ires[1].Code != 0) {
                 try w.print("I {d} 0\n", .{ires[1].Code});
                 return;
             }
             var iter = ires[0];
-            const pmatch = vg.make(engine.Match, engine.NumSub(&re) + 1);
-            var rw = Io.Writer.fixed(&rowsbuf);
+            const pmatch = vg.make(gpa, engine.Match, engine.NumSub(&h.re) + 1);
+            const rows = try gpa.alloc(u8, 1 << 22);
+            var rw = Io.Writer.fixed(rows);
             var count: i64 = 0;
             while (true) {
-                const res = engine.MatchIterNext(&re, &iter, subject, eflags, pmatch);
+                const res = engine.MatchIterNext(gpa, &h.re, &iter, subject, eflags, pmatch);
                 if (res[1].Code != 0) {
                     try w.print("I {d} 0\n", .{res[1].Code});
                     return;
@@ -174,13 +185,13 @@ fn handle(w: *Io.Writer, line: []const u8) !void {
             try w.writeAll("\n");
         },
         'T' => {
-            if (!valid) {
+            if (!h.valid) {
                 try w.writeAll("T ERR\n");
                 return;
             }
-            vg.resetScratchArena();
+            _ = h.scratch.reset(.retain_capacity);
             const maxInput = parseI64(next(&it));
-            var c = engine.ContractFor(&re, maxInput);
+            var c = engine.ContractFor(&h.re, maxInput);
             try w.print("T {d} {d} {d} {d}\n", .{
                 @intFromBool(c.HasSolver),
                 engine.ContractHeapBytes(&c),
@@ -191,15 +202,15 @@ fn handle(w: *Io.Writer, line: []const u8) !void {
         'O' => {
             const lo = vg.cv(i32, parseI64(next(&it)));
             const hi = vg.cv(i32, parseI64(next(&it)));
-            var h: u64 = 0xcbf29ce484222325;
+            var hash: u64 = 0xcbf29ce484222325;
             var r: i32 = lo;
             while (r < hi) : (r +%= 1) {
-                h ^= @as(u32, @bitCast(engine.localeToUpper(&cur, r)));
-                h *%= 0x100000001b3;
-                h ^= @as(u32, @bitCast(engine.localeToLower(&cur, r)));
-                h *%= 0x100000001b3;
+                hash ^= @as(u32, @bitCast(engine.localeToUpper(&h.cur, r)));
+                hash *%= 0x100000001b3;
+                hash ^= @as(u32, @bitCast(engine.localeToLower(&h.cur, r)));
+                hash *%= 0x100000001b3;
             }
-            try w.print("O {d}\n", .{h});
+            try w.print("O {d}\n", .{hash});
         },
         else => @panic("unknown driver command"),
     }
@@ -207,25 +218,43 @@ fn handle(w: *Io.Writer, line: []const u8) !void {
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
-    var out_w: Io.File.Writer = .init(.stdout(), io, &outbuf);
+    const gpa = std.heap.page_allocator;
+
+    var arena_persistent = std.heap.ArenaAllocator.init(gpa);
+    defer arena_persistent.deinit();
+    var arena_pattern = std.heap.ArenaAllocator.init(gpa);
+    defer arena_pattern.deinit();
+    var arena_scratch = std.heap.ArenaAllocator.init(gpa);
+    defer arena_scratch.deinit();
+
+    const inbuf = try gpa.alloc(u8, 1 << 20);
+    defer gpa.free(inbuf);
+    const outbuf = try gpa.alloc(u8, 1 << 16);
+    defer gpa.free(outbuf);
+
+    var out_w: Io.File.Writer = .init(.stdout(), io, outbuf);
     const w = &out_w.interface;
-    var in_r: Io.File.Reader = .init(.stdin(), io, &inbuf);
+    var in_r: Io.File.Reader = .init(.stdin(), io, inbuf);
     const r = &in_r.interface;
 
-    vg.usePersistentArena();
+    var h: Host = .{
+        .persistent = arena_persistent.allocator(),
+        .pattern = &arena_pattern,
+        .scratch = &arena_scratch,
+    };
+
     const ld = engine.LocaleLoad(vg.str(data));
     if (!ld[1]) {
         @panic("embedded locale data failed to load");
     }
-    base = ld[0];
-    cur = engine.LocalePOSIX();
-    vg.useScratchArena();
+    h.base = ld[0];
+    h.cur = engine.LocalePOSIX();
 
     while (try r.takeDelimiter('\n')) |line| {
         if (line.len == 0) {
             continue;
         }
-        try handle(w, line);
+        try handle(&h, w, line);
         try w.flush();
     }
     try w.flush();

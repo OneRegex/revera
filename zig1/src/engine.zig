@@ -443,7 +443,7 @@ pub const interval = struct {
     hi: i64 = 0,
 };
 
-pub fn parseBracket(p: *parser, loc: *Locale) i32 {
+pub fn parseBracket(mem: vg.Allocator, p: *parser, loc: *Locale) i32 {
     const start: i64 = p.pos;
     p.pos +%= 1;
     var b: bracketSet = .{};
@@ -460,13 +460,13 @@ pub fn parseBracket(p: *parser, loc: *Locale) i32 {
         }
         if (((peekByte(p) == 93) and (!empty))) {
             p.pos +%= 1;
-            finalizeBracket(&b, loc);
-            p.brackets = vg.append(bracketSet, p.brackets, b);
-            const n: i32 = addNode(p, opBracket);
+            finalizeBracket(mem, &b, loc);
+            p.brackets = vg.append(mem, bracketSet, p.brackets, b);
+            const n: i32 = addNode(mem, p, opBracket);
             p.nodes.at(n).*.br = vg.cv(i32, (p.brackets.len -% 1));
             return n;
         }
-        const _t1 = parseBracketItem(p, loc, start);
+        const _t1 = parseBracketItem(mem, p, loc, start);
         const item: bracketItem = _t1[0];
         const ok: bool = _t1[1];
         if ((!ok)) {
@@ -476,7 +476,7 @@ pub fn parseBracket(p: *parser, loc: *Locale) i32 {
         if (((((item.kind == itemChar) and (peekByte(p) == 45)) and (peekByteAt(p, 1) != 93)) and ((p.pos +% 1) < p.src.len))) {
             const rangeStart: i64 = p.pos;
             p.pos +%= 1;
-            const _t2 = parseBracketItem(p, loc, start);
+            const _t2 = parseBracketItem(mem, p, loc, start);
             const end: bracketItem = _t2[0];
             const ok2: bool = _t2[1];
             if ((!ok2)) {
@@ -494,7 +494,7 @@ pub fn parseBracket(p: *parser, loc: *Locale) i32 {
             var rr: runeRange = .{};
             rr.lo = item.r;
             rr.hi = end.r;
-            b.ranges = vg.append(runeRange, b.ranges, rr);
+            b.ranges = vg.append(mem, runeRange, b.ranges, rr);
             if (((peekByte(p) == 45) and (peekByteAt(p, 1) != 93))) {
                 return fail(p, ErrERange, p.pos);
             }
@@ -508,13 +508,13 @@ pub fn parseBracket(p: *parser, loc: *Locale) i32 {
                 var rr_2: runeRange = .{};
                 rr_2.lo = item.r;
                 rr_2.hi = item.r;
-                b.ranges = vg.append(runeRange, b.ranges, rr_2);
+                b.ranges = vg.append(mem, runeRange, b.ranges, rr_2);
             },
             itemElem => {
-                b.elems = vg.append(vg.Slice(i32), b.elems, item.seq);
+                b.elems = vg.append(mem, vg.Slice(i32), b.elems, item.seq);
             },
             itemEquiv => {
-                b.equivs = vg.append(vg.Slice(i32), b.equivs, item.seq);
+                b.equivs = vg.append(mem, vg.Slice(i32), b.equivs, item.seq);
             },
             itemClass => {
                 b.classMask |= (@as(u16, 1) << @intCast(item.class));
@@ -524,13 +524,13 @@ pub fn parseBracket(p: *parser, loc: *Locale) i32 {
     }
 }
 
-pub fn parseBracketItem(p: *parser, loc: *Locale, bracketStart: i64) Tup_bracketItem_bool {
+pub fn parseBracketItem(mem: vg.Allocator, p: *parser, loc: *Locale, bracketStart: i64) Tup_bracketItem_bool {
     var item: bracketItem = .{};
     const c: u8 = peekByte(p);
     if ((c == 91)) {
         const inner: u8 = peekByteAt(p, 1);
         if ((inner == 46)) {
-            const _t1 = scanInner(p, vg.lit(".]"), ErrECollate);
+            const _t1 = scanInner(mem, p, vg.lit(".]"), ErrECollate);
             const seq: vg.Slice(i32) = _t1[0];
             const ok: bool = _t1[1];
             if ((!ok)) {
@@ -550,7 +550,7 @@ pub fn parseBracketItem(p: *parser, loc: *Locale, bracketStart: i64) Tup_bracket
             return .{ item, true };
         }
         if ((inner == 61)) {
-            const _t2 = scanInner(p, vg.lit("=]"), ErrECollate);
+            const _t2 = scanInner(mem, p, vg.lit("=]"), ErrECollate);
             const seq_2: vg.Slice(i32) = _t2[0];
             const ok_2: bool = _t2[1];
             if ((!ok_2)) {
@@ -565,13 +565,13 @@ pub fn parseBracketItem(p: *parser, loc: *Locale, bracketStart: i64) Tup_bracket
             return .{ item, true };
         }
         if ((inner == 58)) {
-            const _t3 = scanInner(p, vg.lit(":]"), ErrECType);
+            const _t3 = scanInner(mem, p, vg.lit(":]"), ErrECType);
             const seq_3: vg.Slice(i32) = _t3[0];
             const ok_3: bool = _t3[1];
             if ((!ok_3)) {
                 return .{ item, false };
             }
-            const _t4 = classByName(runesToString(seq_3));
+            const _t4 = classByName(runesToString(mem, seq_3));
             const class: u8 = _t4[0];
             const ok2: bool = _t4[1];
             if ((!ok2)) {
@@ -592,31 +592,31 @@ pub fn parseBracketItem(p: *parser, loc: *Locale, bracketStart: i64) Tup_bracket
     return .{ item, true };
 }
 
-pub fn runesToString(seq: vg.Slice(i32)) vg.Str {
-    var out: vg.Slice(u8) = vg.makeCap(u8, 0, seq.len);
+pub fn runesToString(mem: vg.Allocator, seq: vg.Slice(i32)) vg.Str {
+    var out: vg.Slice(u8) = vg.makeCap(mem, u8, 0, seq.len);
     {
         var i: i64 = 0;
         while ((i < seq.len)) : (i +%= 1) {
             const r: i32 = seq.at(i).*;
             if ((r < 128)) {
-                out = vg.append(u8, out, vg.cv(u8, r));
+                out = vg.append(mem, u8, out, vg.cv(u8, r));
             } else {
                 if ((r < 2048)) {
-                    out = vg.append(u8, vg.append(u8, out, vg.cv(u8, (192 | (r >> 6)))), vg.cv(u8, (128 | (r & 63))));
+                    out = vg.append(mem, u8, vg.append(mem, u8, out, vg.cv(u8, (192 | (r >> 6)))), vg.cv(u8, (128 | (r & 63))));
                 } else {
                     if ((r < 65536)) {
-                        out = vg.append(u8, vg.append(u8, vg.append(u8, out, vg.cv(u8, (224 | (r >> 12)))), vg.cv(u8, (128 | ((r >> 6) & 63)))), vg.cv(u8, (128 | (r & 63))));
+                        out = vg.append(mem, u8, vg.append(mem, u8, vg.append(mem, u8, out, vg.cv(u8, (224 | (r >> 12)))), vg.cv(u8, (128 | ((r >> 6) & 63)))), vg.cv(u8, (128 | (r & 63))));
                     } else {
-                        out = vg.append(u8, vg.append(u8, vg.append(u8, vg.append(u8, out, vg.cv(u8, (240 | (r >> 18)))), vg.cv(u8, (128 | ((r >> 12) & 63)))), vg.cv(u8, (128 | ((r >> 6) & 63)))), vg.cv(u8, (128 | (r & 63))));
+                        out = vg.append(mem, u8, vg.append(mem, u8, vg.append(mem, u8, vg.append(mem, u8, out, vg.cv(u8, (240 | (r >> 18)))), vg.cv(u8, (128 | ((r >> 12) & 63)))), vg.cv(u8, (128 | ((r >> 6) & 63)))), vg.cv(u8, (128 | (r & 63))));
                     }
                 }
             }
         }
     }
-    return vg.strFromBytes(out);
+    return vg.strFromBytes(mem, out);
 }
 
-pub fn scanInner(p: *parser, closer: vg.Str, emptyCode: i32) Tup_si32_bool {
+pub fn scanInner(mem: vg.Allocator, p: *parser, closer: vg.Str, emptyCode: i32) Tup_si32_bool {
     const start: i64 = p.pos;
     p.pos +%= 2;
     var end: i64 = (-%1);
@@ -637,7 +637,7 @@ pub fn scanInner(p: *parser, closer: vg.Str, emptyCode: i32) Tup_si32_bool {
         _ = fail(p, emptyCode, start);
         return .{ @as(vg.Slice(i32), .{}), false };
     }
-    var content: vg.Slice(i32) = vg.makeCap(i32, 0, (end -% p.pos));
+    var content: vg.Slice(i32) = vg.makeCap(mem, i32, 0, (end -% p.pos));
     var at: i64 = p.pos;
     while ((at < end)) {
         const _t1 = decodeRuneAt(p.src, at);
@@ -647,19 +647,19 @@ pub fn scanInner(p: *parser, closer: vg.Str, emptyCode: i32) Tup_si32_bool {
             _ = fail(p, ErrBadPat, start);
             return .{ @as(vg.Slice(i32), .{}), false };
         }
-        content = vg.append(i32, content, r);
+        content = vg.append(mem, i32, content, r);
         at +%= size;
     }
     p.pos = (end +% 2);
     return .{ content, true };
 }
 
-pub fn sortRanges(rr: vg.Slice(runeRange)) void {
+pub fn sortRanges(mem: vg.Allocator, rr: vg.Slice(runeRange)) void {
     const n: i64 = rr.len;
     if ((n < 2)) {
         return;
     }
-    const tmp: vg.Slice(runeRange) = vg.make(runeRange, n);
+    const tmp: vg.Slice(runeRange) = vg.make(mem, runeRange, n);
     {
         var width: i64 = 1;
         while ((width < n)) : (width *%= 2) {
@@ -699,7 +699,7 @@ pub fn sortRanges(rr: vg.Slice(runeRange)) void {
     }
 }
 
-pub fn finalizeBracket(b: *bracketSet, loc: *Locale) void {
+pub fn finalizeBracket(mem: vg.Allocator, b: *bracketSet, loc: *Locale) void {
     if (((!b.negated) and ((b.elems.len > 0) or (b.equivs.len > 0)))) {
         {
             var i: i64 = 0;
@@ -719,7 +719,7 @@ pub fn finalizeBracket(b: *bracketSet, loc: *Locale) void {
     if ((b.ranges.len < 2)) {
         return;
     }
-    sortRanges(b.ranges);
+    sortRanges(mem, b.ranges);
     var w: i64 = 0;
     {
         var i_2: i64 = 1;
@@ -926,27 +926,27 @@ pub fn capStep(s: *capSolver) bool {
     return (!s.failed);
 }
 
-pub fn seedArenas(s: *capSolver) void {
+pub fn seedArenas(mem: vg.Allocator, s: *capSolver) void {
     const scratch: ptree = .{};
-    s.trees = vg.append(ptree, s.trees, scratch);
-    s.kidStore = vg.append(i32, s.kidStore, (-%1));
+    s.trees = vg.append(mem, ptree, s.trees, scratch);
+    s.kidStore = vg.append(mem, i32, s.kidStore, (-%1));
 }
 
-pub fn newTree(s: *capSolver, t: ptree) i32 {
+pub fn newTree(mem: vg.Allocator, s: *capSolver, t: ptree) i32 {
     if ((s.failed or (s.trees.len >= solverArenaLimit))) {
         s.failed = true;
         s.trees.at(0).* = t;
         return 0;
     }
-    s.trees = vg.append(ptree, s.trees, t);
+    s.trees = vg.append(mem, ptree, s.trees, t);
     return vg.cv(i32, (s.trees.len -% 1));
 }
 
-pub fn kidAlloc(s: *capSolver, length: i64) i64 {
+pub fn kidAlloc(mem: vg.Allocator, s: *capSolver, length: i64) i64 {
     if ((s.failed or ((s.kidStore.len +% length) > solverArenaLimit))) {
         s.failed = true;
         while ((s.kidStore.len < length)) {
-            s.kidStore = vg.append(i32, s.kidStore, (-%1));
+            s.kidStore = vg.append(mem, i32, s.kidStore, (-%1));
         }
         return 0;
     }
@@ -958,20 +958,20 @@ pub fn kidAlloc(s: *capSolver, length: i64) i64 {
     {
         var i: i64 = 0;
         while ((i < length)) : (i +%= 1) {
-            s.kidStore = vg.append(i32, s.kidStore, (-%1));
+            s.kidStore = vg.append(mem, i32, s.kidStore, (-%1));
         }
     }
     return off;
 }
 
-pub fn kidAlloc1(s: *capSolver, t: i32) i64 {
-    const off: i64 = kidAlloc(s, 1);
+pub fn kidAlloc1(mem: vg.Allocator, s: *capSolver, t: i32) i64 {
+    const off: i64 = kidAlloc(mem, s, 1);
     s.kidStore.at(off).* = t;
     return off;
 }
 
-pub fn kidPrepend(s: *capSolver, head: i32, tailOff: i64, tailLen: i64) i64 {
-    const off: i64 = kidAlloc(s, (tailLen +% 1));
+pub fn kidPrepend(mem: vg.Allocator, s: *capSolver, head: i32, tailOff: i64, tailLen: i64) i64 {
+    const off: i64 = kidAlloc(mem, s, (tailLen +% 1));
     s.kidStore.at(off).* = head;
     _ = vg.copy(i32, s.kidStore.sub((off +% 1), ((off +% 1) +% tailLen)), s.kidStore.sub(tailOff, (tailOff +% tailLen)));
     return off;
@@ -1087,7 +1087,7 @@ pub fn cmpCand(s: *capSolver, re: *Regexp, a: i32, b: i32) i64 {
     return structCmp(s, re, a, b);
 }
 
-pub fn bestParse(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64) i32 {
+pub fn bestParse(mem: vg.Allocator, s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64) i32 {
     const span: i64 = (j -% i);
     if (((span < re.nodes.at(ni).*.minL) or ((re.nodes.at(ni).*.maxL < lenInf) and (span > re.nodes.at(ni).*.maxL)))) {
         return (-%1);
@@ -1109,46 +1109,46 @@ pub fn bestParse(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i6
     switch (re.nodes.at(ni).*.op) {
         opChar => {
             if (((j == (i +% 1)) and charMatches(re, ni, d.runes.at(i).*))) {
-                best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
+                best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
             }
         },
         opAny => {
             if (((j == (i +% 1)) and anyMatches(re, d.runes.at(i).*))) {
-                best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
+                best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
             }
         },
         opBracket => {
             if (bracketMatchesSpan(re.brackets, re.nodes.at(ni).*.br, &re.loc, d.runes, i, j)) {
-                best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
+                best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
             }
         },
         opBOL => {
             if (((j == i) and atBOL(re, d, i, s.eflags))) {
-                best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
+                best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
             }
         },
         opEOL => {
             if (((j == i) and atEOL(re, d, i, s.eflags))) {
-                best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
+                best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
             }
         },
         opGroup => {
-            const sub: i32 = bestParse(s, re, d, re.nodes.at(ni).*.ch.at(0).*, i, j);
+            const sub: i32 = bestParse(mem, s, re, d, re.nodes.at(ni).*.ch.at(0).*, i, j);
             if ((sub >= 0)) {
-                const off: i64 = kidAlloc1(s, sub);
-                best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off), .kidsLen = 1 });
+                const off: i64 = kidAlloc1(mem, s, sub);
+                best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off), .kidsLen = 1 });
             }
         },
         opAlt => {
             {
                 var bi: i64 = 0;
                 while ((bi < re.nodes.at(ni).*.ch.len)) : (bi +%= 1) {
-                    const sub_2: i32 = bestParse(s, re, d, re.nodes.at(ni).*.ch.at(bi).*, i, j);
+                    const sub_2: i32 = bestParse(mem, s, re, d, re.nodes.at(ni).*.ch.at(bi).*, i, j);
                     if ((sub_2 < 0)) {
                         continue;
                     }
-                    const off_2: i64 = kidAlloc1(s, sub_2);
-                    const candidate: i32 = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .branch = vg.cv(i32, bi), .kidsOff = vg.cv(i32, off_2), .kidsLen = 1 });
+                    const off_2: i64 = kidAlloc1(mem, s, sub_2);
+                    const candidate: i32 = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .branch = vg.cv(i32, bi), .kidsOff = vg.cv(i32, off_2), .kidsLen = 1 });
                     if (((best < 0) or (cmpCand(s, re, candidate, best) < 0))) {
                         best = candidate;
                     }
@@ -1156,29 +1156,29 @@ pub fn bestParse(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i6
             }
         },
         opConcat => {
-            const _t2 = bestConcat(s, re, d, ni, 0, i, j);
+            const _t2 = bestConcat(mem, s, re, d, ni, 0, i, j);
             const off_3: i64 = _t2[0];
             const count: i64 = _t2[1];
             if ((off_3 >= 0)) {
-                best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off_3), .kidsLen = vg.cv(i32, count) });
+                best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off_3), .kidsLen = vg.cv(i32, count) });
             }
         },
         opRepeat => {
             if (((i == j) and (re.nodes.at(ni).*.min == 0))) {
                 var sub_3: i32 = vg.cv(i32, (-%1));
                 if ((re.nodes.at(ni).*.max != 0)) {
-                    sub_3 = bestParse(s, re, d, re.nodes.at(ni).*.ch.at(0).*, i, i);
+                    sub_3 = bestParse(mem, s, re, d, re.nodes.at(ni).*.ch.at(0).*, i, i);
                 }
                 if ((sub_3 >= 0)) {
-                    const off_4: i64 = kidAlloc1(s, sub_3);
-                    best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off_4), .kidsLen = 1 });
+                    const off_4: i64 = kidAlloc1(mem, s, sub_3);
+                    best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off_4), .kidsLen = 1 });
                 } else {
-                    best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
+                    best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j) });
                 }
             } else {
-                const win: repWin = bestRep(s, re, d, ni, i, j, 0, false);
+                const win: repWin = bestRep(mem, s, re, d, ni, i, j, 0, false);
                 if (win.ok) {
-                    best = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, win.off), .kidsLen = vg.cv(i32, win.length) });
+                    best = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, win.off), .kidsLen = vg.cv(i32, win.length) });
                 }
             }
         },
@@ -1186,17 +1186,17 @@ pub fn bestParse(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i6
     }
     var val: memoVal = .{};
     val.x = best;
-    memoPut(&s.memo, key, val);
+    memoPut(mem, &s.memo, key, val);
     return best;
 }
 
-pub fn bestConcat(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, idx: i64, i: i64, j: i64) Tup_i64_i64 {
+pub fn bestConcat(mem: vg.Allocator, s: *capSolver, re: *Regexp, d: *decoded, ni: i32, idx: i64, i: i64, j: i64) Tup_i64_i64 {
     if ((idx == (re.nodes.at(ni).*.ch.len -% 1))) {
-        const sub: i32 = bestParse(s, re, d, re.nodes.at(ni).*.ch.at(idx).*, i, j);
+        const sub: i32 = bestParse(mem, s, re, d, re.nodes.at(ni).*.ch.at(idx).*, i, j);
         if ((sub < 0)) {
             return .{ (-%1), 0 };
         }
-        return .{ kidAlloc1(s, sub), 1 };
+        return .{ kidAlloc1(mem, s, sub), 1 };
     }
     var key: memoKey = .{};
     key.a = ni;
@@ -1230,18 +1230,18 @@ pub fn bestConcat(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, idx: i64, i:
             if ((!capStep(s))) {
                 return .{ (-%1), 0 };
             }
-            const head: i32 = bestParse(s, re, d, head0, i, m);
+            const head: i32 = bestParse(mem, s, re, d, head0, i, m);
             if ((head < 0)) {
                 continue;
             }
-            const _t2 = bestConcat(s, re, d, ni, (idx +% 1), m, j);
+            const _t2 = bestConcat(mem, s, re, d, ni, (idx +% 1), m, j);
             const tailOff: i64 = _t2[0];
             const tailLen: i64 = _t2[1];
             if ((tailOff < 0)) {
                 continue;
             }
-            const off: i64 = kidPrepend(s, head, tailOff, tailLen);
-            const candidate: i32 = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off), .kidsLen = vg.cv(i32, (tailLen +% 1)) });
+            const off: i64 = kidPrepend(mem, s, head, tailOff, tailLen);
+            const candidate: i32 = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off), .kidsLen = vg.cv(i32, (tailLen +% 1)) });
             if (((bestTree < 0) or (cmpCand(s, re, candidate, bestTree) < 0))) {
                 bestTree = candidate;
                 bestOff = off;
@@ -1252,12 +1252,12 @@ pub fn bestConcat(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, idx: i64, i:
     var val: memoVal = .{};
     val.x = vg.cv(i32, bestOff);
     val.y = vg.cv(i32, bestLen);
-    memoPut(&s.cmemo, key, val);
+    memoPut(mem, &s.cmemo, key, val);
     return .{ bestOff, bestLen };
 }
 
-pub fn repTry(s: *capSolver, re: *Regexp, ni: i32, i: i64, j: i64, off: i64, length: i64, best: *repBest) void {
-    const candidate: i32 = newTree(s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off), .kidsLen = vg.cv(i32, length) });
+pub fn repTry(mem: vg.Allocator, s: *capSolver, re: *Regexp, ni: i32, i: i64, j: i64, off: i64, length: i64, best: *repBest) void {
+    const candidate: i32 = newTree(mem, s, ptree{ .n = ni, .i = vg.cv(i32, i), .j = vg.cv(i32, j), .kidsOff = vg.cv(i32, off), .kidsLen = vg.cv(i32, length) });
     if (((!best.found) or (cmpCand(s, re, candidate, best.tree) < 0))) {
         best.off = off;
         best.length = length;
@@ -1266,7 +1266,7 @@ pub fn repTry(s: *capSolver, re: *Regexp, ni: i32, i: i64, j: i64, off: i64, len
     }
 }
 
-pub fn bestRep(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64, done: i64, hasEmpty: bool) repWin {
+pub fn bestRep(mem: vg.Allocator, s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64, done: i64, hasEmpty: bool) repWin {
     var done_v: i64 = done;
     if (((re.nodes.at(ni).*.max == infinite) and (done_v > re.nodes.at(ni).*.min))) {
         done_v = re.nodes.at(ni).*.min;
@@ -1295,7 +1295,7 @@ pub fn bestRep(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64,
     }
     var best: repBest = .{};
     if ((((i == j) and (done_v >= re.nodes.at(ni).*.min)) and ((!hasEmpty) or (done_v == re.nodes.at(ni).*.min)))) {
-        repTry(s, re, ni, i, j, 0, 0, &best);
+        repTry(mem, s, re, ni, i, j, 0, 0, &best);
     }
     const canTake: bool = ((re.nodes.at(ni).*.max == infinite) or (done_v < re.nodes.at(ni).*.max));
     if ((canTake and (!(hasEmpty and (done_v >= re.nodes.at(ni).*.min))))) {
@@ -1327,16 +1327,16 @@ pub fn bestRep(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64,
                     win.off = (-%1);
                     return win;
                 }
-                const head: i32 = bestParse(s, re, d, child, i, m);
+                const head: i32 = bestParse(mem, s, re, d, child, i, m);
                 if ((head < 0)) {
                     continue;
                 }
-                const tail: repWin = bestRep(s, re, d, ni, m, j, (done_v +% 1), (hasEmpty or (m == i)));
+                const tail: repWin = bestRep(mem, s, re, d, ni, m, j, (done_v +% 1), (hasEmpty or (m == i)));
                 if ((!tail.ok)) {
                     continue;
                 }
-                const off: i64 = kidPrepend(s, head, tail.off, tail.length);
-                repTry(s, re, ni, i, j, off, (tail.length +% 1), &best);
+                const off: i64 = kidPrepend(mem, s, head, tail.off, tail.length);
+                repTry(mem, s, re, ni, i, j, off, (tail.length +% 1), &best);
             }
         }
     }
@@ -1348,14 +1348,14 @@ pub fn bestRep(s: *capSolver, re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64,
     } else {
         val.x = (-%1);
     }
-    memoPut(&s.rmemo, key, val);
+    memoPut(mem, &s.rmemo, key, val);
     win.off = vg.cv(i64, val.x);
     win.length = vg.cv(i64, val.y);
     win.ok = best.found;
     return win;
 }
 
-pub fn solveCaptures(re: *Regexp, d: *decoded, so: i64, eo: i64, eflags: u32, caps: vg.Slice(Match)) Error {
+pub fn solveCaptures(mem: vg.Allocator, re: *Regexp, d: *decoded, so: i64, eo: i64, eflags: u32, caps: vg.Slice(Match)) Error {
     if (re.onePass) {
         {
             var idx: i64 = 0;
@@ -1370,10 +1370,10 @@ pub fn solveCaptures(re: *Regexp, d: *decoded, so: i64, eo: i64, eflags: u32, ca
     }
     var s: capSolver = .{};
     s.eflags = eflags;
-    s.ctrA = vg.make(i64, re.minSlots);
-    s.ctrB = vg.make(i64, re.minSlots);
-    seedArenas(&s);
-    const best: i32 = bestParse(&s, re, d, re.root, so, eo);
+    s.ctrA = vg.make(mem, i64, re.minSlots);
+    s.ctrB = vg.make(mem, i64, re.minSlots);
+    seedArenas(mem, &s);
+    const best: i32 = bestParse(mem, &s, re, d, re.root, so, eo);
     if (s.failed) {
         return compileError(ErrESpace, (-%1));
     }
@@ -1724,25 +1724,25 @@ pub fn solverFanout(nodes: vg.Slice(node), ni: i32, length: i64) i64 {
     return widest;
 }
 
-pub fn prepare(ws: *engineWS, n: i64, k: i64, ring: i64) void {
-    ws.slots = vg.make(slotTable, ring);
+pub fn prepare(mem: vg.Allocator, ws: *engineWS, n: i64, k: i64, ring: i64) void {
+    ws.slots = vg.make(mem, slotTable, ring);
     {
         var i: i64 = 0;
         while ((i < ring)) : (i +%= 1) {
-            ws.slots.at(i).*.stamp = vg.make(u32, n);
-            ws.slots.at(i).*.starts = vg.make(i32, n);
+            ws.slots.at(i).*.stamp = vg.make(mem, u32, n);
+            ws.slots.at(i).*.starts = vg.make(mem, i32, n);
             if ((k > 0)) {
-                ws.slots.at(i).*.ctr = vg.make(u32, (n *% k));
+                ws.slots.at(i).*.ctr = vg.make(mem, u32, (n *% k));
             }
         }
     }
-    ws.onq = vg.make(u8, n);
+    ws.onq = vg.make(mem, u8, n);
     if ((k > 0)) {
-        ws.bestCtr = vg.make(u32, k);
-        ws.ctrBuf = vg.make(u32, k);
-        ws.zeros = vg.make(u32, k);
+        ws.bestCtr = vg.make(mem, u32, k);
+        ws.ctrBuf = vg.make(mem, u32, k);
+        ws.zeros = vg.make(mem, u32, k);
     }
-    ws.queue = vg.makeCap(u32, 0, 16);
+    ws.queue = vg.makeCap(mem, u32, 0, 16);
 }
 
 pub fn workspaceHeapBound(n: i64, k: i64, ring: i64) i64 {
@@ -1793,7 +1793,7 @@ pub fn trailingZeros64(x: u64) i64 {
     return n;
 }
 
-pub fn runPhaseA(re: *Regexp, subject: vg.Str, eflags: u32) engineResult {
+pub fn runPhaseA(mem: vg.Allocator, re: *Regexp, subject: vg.Str, eflags: u32) engineResult {
     var ws: engineWS = .{};
     var e: phaseAState = .{};
     e.subject = subject;
@@ -1804,8 +1804,8 @@ pub fn runPhaseA(re: *Regexp, subject: vg.Str, eflags: u32) engineResult {
     if (re.prog.multi) {
         e.ring = (maxElemAhead +% 1);
     }
-    prepare(&ws, re.prog.ins.len, e.k, e.ring);
-    paRun(&e, &ws, re);
+    prepare(mem, &ws, re.prog.ins.len, e.k, e.ring);
+    paRun(mem, &e, &ws, re);
     var result: engineResult = .{};
     result.matched = e.matched;
     result.so = e.so;
@@ -1856,7 +1856,7 @@ pub fn paPrune(e: *phaseAState, ws: *engineWS, start: i32, ctr: vg.Slice(u32)) b
     return ctrLess(ws.bestCtr.head(e.k), ctr);
 }
 
-pub fn paStore(e: *phaseAState, ws: *engineWS, si: i64, pc: u32, start: i32, ctr: vg.Slice(u32)) bool {
+pub fn paStore(mem: vg.Allocator, e: *phaseAState, ws: *engineWS, si: i64, pc: u32, start: i32, ctr: vg.Slice(u32)) bool {
     if (paPrune(e, ws, start, ctr)) {
         return false;
     }
@@ -1876,7 +1876,7 @@ pub fn paStore(e: *phaseAState, ws: *engineWS, si: i64, pc: u32, start: i32, ctr
         }
     } else {
         ws.slots.at(si).*.stamp.at(pc).* = ws.slots.at(si).*.gen;
-        ws.slots.at(si).*.active = vg.append(u32, ws.slots.at(si).*.active, pc);
+        ws.slots.at(si).*.active = vg.append(mem, u32, ws.slots.at(si).*.active, pc);
     }
     ws.slots.at(si).*.starts.at(pc).* = start;
     if ((e.k > 0)) {
@@ -1886,9 +1886,9 @@ pub fn paStore(e: *phaseAState, ws: *engineWS, si: i64, pc: u32, start: i32, ctr
     return true;
 }
 
-pub fn paRelax(e: *phaseAState, ws: *engineWS, si: i64, pc: u32, start: i32, ctr: vg.Slice(u32)) void {
-    if (paStore(e, ws, si, pc, start, ctr)) {
-        ws.queue = vg.append(u32, ws.queue, pc);
+pub fn paRelax(mem: vg.Allocator, e: *phaseAState, ws: *engineWS, si: i64, pc: u32, start: i32, ctr: vg.Slice(u32)) void {
+    if (paStore(mem, e, ws, si, pc, start, ctr)) {
+        ws.queue = vg.append(mem, u32, ws.queue, pc);
     }
 }
 
@@ -1914,7 +1914,7 @@ pub fn compactQueue(ws: *engineWS) void {
     }
 }
 
-pub fn paClosure(e: *phaseAState, ws: *engineWS, re: *Regexp, si: i64) void {
+pub fn paClosure(mem: vg.Allocator, e: *phaseAState, ws: *engineWS, re: *Regexp, si: i64) void {
     const limit: i64 = (queueCompactFactor *% re.prog.ins.len);
     while ((ws.queue.len > 0)) {
         if ((ws.queue.len > limit)) {
@@ -1930,20 +1930,20 @@ pub fn paClosure(e: *phaseAState, ws: *engineWS, re: *Regexp, si: i64) void {
         const ctr: vg.Slice(u32) = ws.slots.at(si).*.ctr.sub(base, (base +% e.k));
         switch (re.prog.ins.at(pc).*.op) {
             iSplit => {
-                paRelax(e, ws, si, re.prog.ins.at(pc).*.next, start, ctr);
-                paRelax(e, ws, si, re.prog.ins.at(pc).*.alt, start, ctr);
+                paRelax(mem, e, ws, si, re.prog.ins.at(pc).*.next, start, ctr);
+                paRelax(mem, e, ws, si, re.prog.ins.at(pc).*.alt, start, ctr);
             },
             iJmp => {
-                paRelax(e, ws, si, re.prog.ins.at(pc).*.next, start, ctr);
+                paRelax(mem, e, ws, si, re.prog.ins.at(pc).*.next, start, ctr);
             },
             iBOL => {
                 if (e.bol) {
-                    paRelax(e, ws, si, re.prog.ins.at(pc).*.next, start, ctr);
+                    paRelax(mem, e, ws, si, re.prog.ins.at(pc).*.next, start, ctr);
                 }
             },
             iEOL => {
                 if (e.eol) {
-                    paRelax(e, ws, si, re.prog.ins.at(pc).*.next, start, ctr);
+                    paRelax(mem, e, ws, si, re.prog.ins.at(pc).*.next, start, ctr);
                 }
             },
             iMatch => {
@@ -1954,7 +1954,7 @@ pub fn paClosure(e: *phaseAState, ws: *engineWS, re: *Regexp, si: i64) void {
     }
 }
 
-pub fn paArrive(e: *phaseAState, ws: *engineWS, re: *Regexp, pc: u32, delta: i64, start: i32, ctr: vg.Slice(u32)) void {
+pub fn paArrive(mem: vg.Allocator, e: *phaseAState, ws: *engineWS, re: *Regexp, pc: u32, delta: i64, start: i32, ctr: vg.Slice(u32)) void {
     const fi: i64 = vg.remT((e.ci +% delta), e.ring);
     const g: u32 = paGen((e.ci +% delta));
     if ((ws.slots.at(fi).*.gen != g)) {
@@ -1981,10 +1981,10 @@ pub fn paArrive(e: *phaseAState, ws: *engineWS, re: *Regexp, pc: u32, delta: i64
         }
         newCtr = buffer;
     }
-    _ = paStore(e, ws, fi, re.prog.ins.at(pc).*.next, start, newCtr);
+    _ = paStore(mem, e, ws, fi, re.prog.ins.at(pc).*.next, start, newCtr);
 }
 
-pub fn paConsume(e: *phaseAState, ws: *engineWS, re: *Regexp, si: i64) void {
+pub fn paConsume(mem: vg.Allocator, e: *phaseAState, ws: *engineWS, re: *Regexp, si: i64) void {
     var aheadReady: bool = false;
     {
         var ai: i64 = 0;
@@ -1999,29 +1999,29 @@ pub fn paConsume(e: *phaseAState, ws: *engineWS, re: *Regexp, si: i64) void {
             switch (re.prog.ins.at(pc).*.op) {
                 iRune => {
                     if ((e.cur == vg.cv(i32, re.prog.ins.at(pc).*.arg))) {
-                        paArrive(e, ws, re, pc, 1, start, ctr);
+                        paArrive(mem, e, ws, re, pc, 1, start, ctr);
                     }
                 },
                 iRuneFold => {
                     if (runesContain(re.prog.foldSets.at(re.prog.ins.at(pc).*.arg).*, e.cur)) {
-                        paArrive(e, ws, re, pc, 1, start, ctr);
+                        paArrive(mem, e, ws, re, pc, 1, start, ctr);
                     }
                 },
                 iAny => {
                     if (anyMatches(re, e.cur)) {
-                        paArrive(e, ws, re, pc, 1, start, ctr);
+                        paArrive(mem, e, ws, re, pc, 1, start, ctr);
                     }
                 },
                 iBracket => {
                     const bi: i32 = vg.cv(i32, re.prog.ins.at(pc).*.arg);
                     if (bracketMatchesOne(re.brackets, bi, &re.loc, e.cur)) {
-                        paArrive(e, ws, re, pc, 1, start, ctr);
+                        paArrive(mem, e, ws, re, pc, 1, start, ctr);
                     }
                     if ((re.brackets.at(bi).*.multiLens == 0)) {
                         continue;
                     }
                     if ((!aheadReady)) {
-                        decodeAhead(e, ws);
+                        decodeAhead(mem, e, ws);
                         aheadReady = true;
                     }
                     {
@@ -2031,7 +2031,7 @@ pub fn paConsume(e: *phaseAState, ws: *engineWS, re: *Regexp, si: i64) void {
                                 continue;
                             }
                             if (bracketMatchesMulti(re.brackets, bi, &re.loc, ws.ahead.head(length))) {
-                                paArrive(e, ws, re, pc, length, start, ctr);
+                                paArrive(mem, e, ws, re, pc, length, start, ctr);
                             }
                         }
                     }
@@ -2042,14 +2042,14 @@ pub fn paConsume(e: *phaseAState, ws: *engineWS, re: *Regexp, si: i64) void {
     }
 }
 
-pub fn decodeAhead(e: *phaseAState, ws: *engineWS) void {
+pub fn decodeAhead(mem: vg.Allocator, e: *phaseAState, ws: *engineWS) void {
     ws.ahead = ws.ahead.head(0);
     var at: i64 = e.pos;
     while (((ws.ahead.len < maxElemAhead) and (at < e.subject.len))) {
         const _t1 = decodeRuneAt(e.subject, at);
         const r: i32 = _t1[0];
         const size: i64 = _t1[1];
-        ws.ahead = vg.append(i32, ws.ahead, r);
+        ws.ahead = vg.append(mem, i32, ws.ahead, r);
         at +%= size;
     }
 }
@@ -2087,7 +2087,7 @@ pub fn continuationFlags(re: *Regexp, subject: vg.Str, pos: i64, eflags: u32) u3
     return (eflags | ExecNotBOL);
 }
 
-pub fn paRun(e: *phaseAState, ws: *engineWS, re: *Regexp) void {
+pub fn paRun(mem: vg.Allocator, e: *phaseAState, ws: *engineWS, re: *Regexp) void {
     var prev: i32 = (-%2);
     const zeros: vg.Slice(u32) = ws.zeros.head(e.k);
     while (true) {
@@ -2132,15 +2132,15 @@ pub fn paRun(e: *phaseAState, ws: *engineWS, re: *Regexp) void {
         }
         e.bol = bolAt(e, prev);
         e.eol = ((atEnd and ((e.eflags & ExecNotEOL) == 0)) or (e.nlMode and (e.cur == 10)));
-        ws.queue = vg.appendSlice(u32, ws.queue.head(0), ws.slots.at(si).*.active);
+        ws.queue = vg.appendSlice(mem, u32, ws.queue.head(0), ws.slots.at(si).*.active);
         if ((!e.matched)) {
-            paRelax(e, ws, si, re.prog.start, vg.cv(i32, e.pos), zeros);
+            paRelax(mem, e, ws, si, re.prog.start, vg.cv(i32, e.pos), zeros);
         }
-        paClosure(e, ws, re, si);
+        paClosure(mem, e, ws, re, si);
         if (atEnd) {
             return;
         }
-        paConsume(e, ws, re, si);
+        paConsume(mem, e, ws, re, si);
         if (e.matched) {
             var pendingWork: bool = false;
             {
@@ -2271,7 +2271,7 @@ pub fn memoInsert(t: *memoTab, k: memoKey, v: memoVal) void {
     t.count +%= 1;
 }
 
-pub fn memoGrow(t: *memoTab) void {
+pub fn memoGrow(mem: vg.Allocator, t: *memoTab) void {
     const oldKeys: vg.Slice(memoKey) = t.keys;
     const oldVals: vg.Slice(memoVal) = t.vals;
     const oldUsed: vg.Slice(u8) = t.used;
@@ -2279,9 +2279,9 @@ pub fn memoGrow(t: *memoTab) void {
     if ((oldKeys.len > 0)) {
         size = (2 *% oldKeys.len);
     }
-    t.keys = vg.make(memoKey, size);
-    t.vals = vg.make(memoVal, size);
-    t.used = vg.make(u8, size);
+    t.keys = vg.make(mem, memoKey, size);
+    t.vals = vg.make(mem, memoVal, size);
+    t.used = vg.make(mem, u8, size);
     t.count = 0;
     {
         var i: i64 = 0;
@@ -2293,9 +2293,9 @@ pub fn memoGrow(t: *memoTab) void {
     }
 }
 
-pub fn memoPut(t: *memoTab, k: memoKey, v: memoVal) void {
+pub fn memoPut(mem: vg.Allocator, t: *memoTab, k: memoKey, v: memoVal) void {
     if (((4 *% (t.count +% 1)) >= (3 *% t.keys.len))) {
-        memoGrow(t);
+        memoGrow(mem, t);
     }
     memoInsert(t, k, v);
 }
@@ -2517,11 +2517,11 @@ pub fn asciiLower(c: u8) u8 {
     return c;
 }
 
-pub fn normalizeName(input: vg.Str) Tup_Str_bool {
+pub fn normalizeName(mem: vg.Allocator, input: vg.Str) Tup_Str_bool {
     if ((input.len == 0)) {
         return .{ vg.lit(""), false };
     }
-    var out: vg.Slice(u8) = vg.makeCap(u8, 0, input.len);
+    var out: vg.Slice(u8) = vg.makeCap(mem, u8, 0, input.len);
     var i: i64 = 0;
     while ((((i < input.len) and (input.byte(i) != 46)) and (input.byte(i) != 64))) {
         var c: u8 = input.byte(i);
@@ -2533,12 +2533,12 @@ pub fn normalizeName(input: vg.Str) Tup_Str_bool {
         } else {
             c = asciiLower(c);
         }
-        out = vg.append(u8, out, c);
+        out = vg.append(mem, u8, out, c);
         i +%= 1;
     }
     if (((i < input.len) and (input.byte(i) == 46))) {
         i +%= 1;
-        var codeset: vg.Slice(u8) = vg.makeCap(u8, 0, 5);
+        var codeset: vg.Slice(u8) = vg.makeCap(mem, u8, 0, 5);
         while (((i < input.len) and (input.byte(i) != 64))) {
             const c_2: u8 = asciiLower(input.byte(i));
             i +%= 1;
@@ -2548,13 +2548,13 @@ pub fn normalizeName(input: vg.Str) Tup_Str_bool {
             if (((codeset.len == 5) or (c_2 >= 128))) {
                 return .{ vg.lit(""), false };
             }
-            codeset = vg.append(u8, codeset, c_2);
+            codeset = vg.append(mem, u8, codeset, c_2);
         }
-        if ((!vg.streq(vg.strFromBytes(codeset), vg.lit("utf8")))) {
+        if ((!vg.streq(vg.strFromBytes(mem, codeset), vg.lit("utf8")))) {
             return .{ vg.lit(""), false };
         }
     }
-    return .{ vg.strFromBytes(out), true };
+    return .{ vg.strFromBytes(mem, out), true };
 }
 
 pub fn embeddedModifier(name: vg.Str) Tup_Str_bool {
@@ -2591,11 +2591,11 @@ pub fn longTypeAlias(name: vg.Str) vg.Str {
     return name;
 }
 
-pub fn normalizeType(input: vg.Str) Tup_Str_bool {
+pub fn normalizeType(mem: vg.Allocator, input: vg.Str) Tup_Str_bool {
     if ((input.len == 0)) {
         return .{ vg.lit(""), true };
     }
-    var out: vg.Slice(u8) = vg.makeCap(u8, 0, input.len);
+    var out: vg.Slice(u8) = vg.makeCap(mem, u8, 0, input.len);
     {
         var i: i64 = 0;
         while ((i < input.len)) : (i +%= 1) {
@@ -2603,10 +2603,10 @@ pub fn normalizeType(input: vg.Str) Tup_Str_bool {
             if (((c >= 128) or (out.len == normalizedNameMax))) {
                 return .{ vg.lit(""), false };
             }
-            out = vg.append(u8, out, asciiLower(c));
+            out = vg.append(mem, u8, out, asciiLower(c));
         }
     }
-    return .{ longTypeAlias(vg.strFromBytes(out)), true };
+    return .{ longTypeAlias(vg.strFromBytes(mem, out)), true };
 }
 
 pub fn findName(l: *Locale, name: vg.Str, poolSec: i64, offsetsSec: i64, count: i64) i64 {
@@ -2641,10 +2641,10 @@ pub fn localeRowAt(l: *Locale, index: i64) LocaleRow {
     return row;
 }
 
-pub fn normalizeRequest(name: vg.Str, collationType: vg.Str) Tup_localeRequest_bool {
+pub fn normalizeRequest(mem: vg.Allocator, name: vg.Str, collationType: vg.Str) Tup_localeRequest_bool {
     var collationType_v: vg.Str = collationType;
     var req: localeRequest = .{};
-    const _t1 = normalizeName(name);
+    const _t1 = normalizeName(mem, name);
     const normalized: vg.Str = _t1[0];
     const ok: bool = _t1[1];
     if ((!ok)) {
@@ -2662,7 +2662,7 @@ pub fn normalizeRequest(name: vg.Str, collationType: vg.Str) Tup_localeRequest_b
     if (hasModifier) {
         collationType_v = modifier;
     }
-    const _t3 = normalizeType(collationType_v);
+    const _t3 = normalizeType(mem, collationType_v);
     const normalizedType: vg.Str = _t3[0];
     const ok2: bool = _t3[1];
     if ((!ok2)) {
@@ -2731,8 +2731,8 @@ pub fn resolveLocale(data: *Locale, req: localeRequest) Tup_Locale_bool {
     return .{ invalid, false };
 }
 
-pub fn LocaleSelect(data: *Locale, name: vg.Str, collationType: vg.Str) Tup_Locale_bool {
-    const _t1 = normalizeRequest(name, collationType);
+pub fn LocaleSelect(mem: vg.Allocator, data: *Locale, name: vg.Str, collationType: vg.Str) Tup_Locale_bool {
+    const _t1 = normalizeRequest(mem, name, collationType);
     const req: localeRequest = _t1[0];
     const ok: bool = _t1[1];
     if ((!ok)) {
@@ -2745,9 +2745,9 @@ pub fn LocaleSelect(data: *Locale, name: vg.Str, collationType: vg.Str) Tup_Loca
     return resolveLocale(data, req);
 }
 
-pub fn LocaleOpen(blob: vg.Str, name: vg.Str, collationType: vg.Str) Tup_Locale_bool {
+pub fn LocaleOpen(mem: vg.Allocator, blob: vg.Str, name: vg.Str, collationType: vg.Str) Tup_Locale_bool {
     const invalid: Locale = .{};
-    const _t1 = normalizeRequest(name, collationType);
+    const _t1 = normalizeRequest(mem, name, collationType);
     const req: localeRequest = _t1[0];
     const ok: bool = _t1[1];
     if ((!ok)) {
@@ -3265,24 +3265,24 @@ pub fn LocaleName(l: *Locale, index: i64) vg.Str {
     return byteString(l, secLocaleNames, vg.cv(i64, u32At(l, secLocaleNameOffsets, index)));
 }
 
-pub fn decodeWindow(s: vg.Str, so: i64, eo: i64) decoded {
+pub fn decodeWindow(mem: vg.Allocator, s: vg.Str, so: i64, eo: i64) decoded {
     var d: decoded = .{};
-    d.runes = vg.makeCap(i32, 0, (eo -% so));
-    d.byteAt = vg.makeCap(i64, 0, ((eo -% so) +% 1));
+    d.runes = vg.makeCap(mem, i32, 0, (eo -% so));
+    d.byteAt = vg.makeCap(mem, i64, 0, ((eo -% so) +% 1));
     d.atSubjectStart = (so == 0);
     d.atSubjectEnd = (eo == s.len);
     d.prevIsNewline = ((so > 0) and (s.byte((so -% 1)) == 10));
     d.nextIsNewline = ((eo < s.len) and (s.byte(eo) == 10));
     var i: i64 = so;
     while ((i < eo)) {
-        d.byteAt = vg.append(i64, d.byteAt, i);
+        d.byteAt = vg.append(mem, i64, d.byteAt, i);
         const _t1 = decodeRuneAt(s, i);
         const r: i32 = _t1[0];
         const size: i64 = _t1[1];
-        d.runes = vg.append(i32, d.runes, r);
+        d.runes = vg.append(mem, i32, d.runes, r);
         i +%= size;
     }
-    d.byteAt = vg.append(i64, d.byteAt, eo);
+    d.byteAt = vg.append(mem, i64, d.byteAt, eo);
     return d;
 }
 
@@ -3368,7 +3368,7 @@ pub fn fillMatches(re: *Regexp, d: *decoded, caps: vg.Slice(Match), pmatch: vg.S
     }
 }
 
-pub fn onePassAnalyze(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), ni: i32) bool {
+pub fn onePassAnalyze(mem: vg.Allocator, nodes: vg.Slice(node), brs: vg.Slice(bracketSet), ni: i32) bool {
     switch (nodes.at(ni).*.op) {
         opChar, opAny, opBOL, opEOL => {
             return true;
@@ -3377,7 +3377,7 @@ pub fn onePassAnalyze(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), ni: i32)
             return (!bracketHasMultiMembers(brs, nodes.at(ni).*.br));
         },
         opGroup => {
-            return onePassAnalyze(nodes, brs, nodes.at(ni).*.ch.at(0).*);
+            return onePassAnalyze(mem, nodes, brs, nodes.at(ni).*.ch.at(0).*);
         },
         opConcat => {
             var variable: i64 = 0;
@@ -3385,7 +3385,7 @@ pub fn onePassAnalyze(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), ni: i32)
                 var i: i64 = 0;
                 while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
                     const child: i32 = nodes.at(ni).*.ch.at(i).*;
-                    if ((!onePassAnalyze(nodes, brs, child))) {
+                    if ((!onePassAnalyze(mem, nodes, brs, child))) {
                         return false;
                     }
                     if ((!fixedLength(nodes, child))) {
@@ -3400,13 +3400,13 @@ pub fn onePassAnalyze(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), ni: i32)
                 return true;
             }
             const child_2: i32 = nodes.at(ni).*.ch.at(0).*;
-            return ((fixedLength(nodes, child_2) and (nodes.at(child_2).*.minL > 0)) and onePassAnalyze(nodes, brs, child_2));
+            return ((fixedLength(nodes, child_2) and (nodes.at(child_2).*.minL > 0)) and onePassAnalyze(mem, nodes, brs, child_2));
         },
         opAlt => {
             {
                 var i_2: i64 = 0;
                 while ((i_2 < nodes.at(ni).*.ch.len)) : (i_2 +%= 1) {
-                    if ((!onePassAnalyze(nodes, brs, nodes.at(ni).*.ch.at(i_2).*))) {
+                    if ((!onePassAnalyze(mem, nodes, brs, nodes.at(ni).*.ch.at(i_2).*))) {
                         return false;
                     }
                 }
@@ -3414,7 +3414,7 @@ pub fn onePassAnalyze(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), ni: i32)
             if (disjointLengths(nodes, ni)) {
                 return true;
             }
-            return disjointFirsts(nodes, ni);
+            return disjointFirsts(mem, nodes, ni);
         },
         else => {},
     }
@@ -3445,35 +3445,35 @@ pub fn disjointLengths(nodes: vg.Slice(node), ni: i32) bool {
     return true;
 }
 
-pub fn firstSet(nodes: vg.Slice(node), ni: i32) Tup_si32_bool {
+pub fn firstSet(mem: vg.Allocator, nodes: vg.Slice(node), ni: i32) Tup_si32_bool {
     switch (nodes.at(ni).*.op) {
         opChar => {
-            var out: vg.Slice(i32) = vg.makeCap(i32, 0, (nodes.at(ni).*.fold.len +% 1));
+            var out: vg.Slice(i32) = vg.makeCap(mem, i32, 0, (nodes.at(ni).*.fold.len +% 1));
             if ((nodes.at(ni).*.fold.len > 0)) {
-                out = vg.appendSlice(i32, out, nodes.at(ni).*.fold);
+                out = vg.appendSlice(mem, i32, out, nodes.at(ni).*.fold);
                 return .{ out, true };
             }
-            out = vg.append(i32, out, nodes.at(ni).*.r);
+            out = vg.append(mem, i32, out, nodes.at(ni).*.r);
             return .{ out, true };
         },
         opBOL, opEOL => {
             return .{ @as(vg.Slice(i32), .{}), true };
         },
         opGroup => {
-            return firstSet(nodes, nodes.at(ni).*.ch.at(0).*);
+            return firstSet(mem, nodes, nodes.at(ni).*.ch.at(0).*);
         },
         opRepeat => {
             if ((nodes.at(ni).*.max == 0)) {
                 return .{ @as(vg.Slice(i32), .{}), true };
             }
-            return firstSet(nodes, nodes.at(ni).*.ch.at(0).*);
+            return firstSet(mem, nodes, nodes.at(ni).*.ch.at(0).*);
         },
         opAlt => {
             var out_2: vg.Slice(i32) = .{};
             {
                 var i: i64 = 0;
                 while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-                    const _t1 = firstSet(nodes, nodes.at(ni).*.ch.at(i).*);
+                    const _t1 = firstSet(mem, nodes, nodes.at(ni).*.ch.at(i).*);
                     const sub: vg.Slice(i32) = _t1[0];
                     const ok: bool = _t1[1];
                     if ((!ok)) {
@@ -3482,7 +3482,7 @@ pub fn firstSet(nodes: vg.Slice(node), ni: i32) Tup_si32_bool {
                     {
                         var k: i64 = 0;
                         while ((k < sub.len)) : (k +%= 1) {
-                            out_2 = appendUnique(out_2, sub.at(k).*);
+                            out_2 = appendUnique(mem, out_2, sub.at(k).*);
                         }
                     }
                 }
@@ -3495,7 +3495,7 @@ pub fn firstSet(nodes: vg.Slice(node), ni: i32) Tup_si32_bool {
                 var i_2: i64 = 0;
                 while ((i_2 < nodes.at(ni).*.ch.len)) : (i_2 +%= 1) {
                     const child: i32 = nodes.at(ni).*.ch.at(i_2).*;
-                    const _t2 = firstSet(nodes, child);
+                    const _t2 = firstSet(mem, nodes, child);
                     const sub_2: vg.Slice(i32) = _t2[0];
                     const ok_2: bool = _t2[1];
                     if ((!ok_2)) {
@@ -3504,7 +3504,7 @@ pub fn firstSet(nodes: vg.Slice(node), ni: i32) Tup_si32_bool {
                     {
                         var k_2: i64 = 0;
                         while ((k_2 < sub_2.len)) : (k_2 +%= 1) {
-                            out_3 = appendUnique(out_3, sub_2.at(k_2).*);
+                            out_3 = appendUnique(mem, out_3, sub_2.at(k_2).*);
                         }
                     }
                     if ((nodes.at(child).*.minL > 0)) {
@@ -3519,15 +3519,15 @@ pub fn firstSet(nodes: vg.Slice(node), ni: i32) Tup_si32_bool {
     return .{ @as(vg.Slice(i32), .{}), false };
 }
 
-pub fn disjointFirsts(nodes: vg.Slice(node), ni: i32) bool {
+pub fn disjointFirsts(mem: vg.Allocator, nodes: vg.Slice(node), ni: i32) bool {
     const count: i64 = nodes.at(ni).*.ch.len;
-    const firsts: vg.Slice(vg.Slice(i32)) = vg.make(vg.Slice(i32), count);
+    const firsts: vg.Slice(vg.Slice(i32)) = vg.make(mem, vg.Slice(i32), count);
     var nullable: i64 = 0;
     {
         var i: i64 = 0;
         while ((i < count)) : (i +%= 1) {
             const branch: i32 = nodes.at(ni).*.ch.at(i).*;
-            const _t1 = firstSet(nodes, branch);
+            const _t1 = firstSet(mem, nodes, branch);
             const set: vg.Slice(i32) = _t1[0];
             const ok: bool = _t1[1];
             if ((!ok)) {
@@ -3692,12 +3692,12 @@ pub fn onePassCaps(re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64, eflags: u3
     return false;
 }
 
-pub fn buildScanFilter(pr: *program, newlineMode: bool) void {
+pub fn buildScanFilter(mem: vg.Allocator, pr: *program, newlineMode: bool) void {
     var ok: bool = true;
     var matchReachable: bool = false;
-    const seen: vg.Slice(bool) = vg.make(bool, pr.ins.len);
-    var stack: vg.Slice(u32) = vg.makeCap(u32, 0, 16);
-    stack = vg.append(u32, stack, pr.start);
+    const seen: vg.Slice(bool) = vg.make(mem, bool, pr.ins.len);
+    var stack: vg.Slice(u32) = vg.makeCap(mem, u32, 0, 16);
+    stack = vg.append(mem, u32, stack, pr.start);
     while ((stack.len > 0)) {
         const pc: u32 = stack.at((stack.len -% 1)).*;
         stack = stack.head((stack.len -% 1));
@@ -3707,10 +3707,10 @@ pub fn buildScanFilter(pr: *program, newlineMode: bool) void {
         seen.at(pc).* = true;
         switch (pr.ins.at(pc).*.op) {
             iSplit => {
-                stack = vg.append(u32, vg.append(u32, stack, pr.ins.at(pc).*.next), pr.ins.at(pc).*.alt);
+                stack = vg.append(mem, u32, vg.append(mem, u32, stack, pr.ins.at(pc).*.next), pr.ins.at(pc).*.alt);
             },
             iJmp => {
-                stack = vg.append(u32, stack, pr.ins.at(pc).*.next);
+                stack = vg.append(mem, u32, stack, pr.ins.at(pc).*.next);
             },
             iBOL => {
             },
@@ -3812,15 +3812,15 @@ pub fn instrEstimate(nodes: vg.Slice(node), ni: i32) i64 {
     return 1;
 }
 
-pub fn compileProgram(b: *progBuilder, nodes: vg.Slice(node), root: i32, multi: bool, newlineMode: bool) void {
+pub fn compileProgram(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), root: i32, multi: bool, newlineMode: bool) void {
     b.failMin = failMinNone;
-    const body: frag = emit(b, nodes, root, 0, @as(vg.Slice(u32), .{}));
+    const body: frag = emit(mem, b, nodes, root, 0, @as(vg.Slice(u32), .{}));
     if ((b.errCode != ErrNone)) {
         return;
     }
     var m: instr = .{};
     m.op = iMatch;
-    const match: u32 = addInstr(b, m);
+    const match: u32 = addInstr(mem, b, m);
     if (((b.errCode != ErrNone) or b.tooBig)) {
         return;
     }
@@ -3828,10 +3828,10 @@ pub fn compileProgram(b: *progBuilder, nodes: vg.Slice(node), root: i32, multi: 
     b.prog.start = body.start;
     b.prog.multi = multi;
     b.prog.failMin = b.failMin;
-    buildScanFilter(&b.prog, newlineMode);
+    buildScanFilter(mem, &b.prog, newlineMode);
 }
 
-pub fn addInstr(b: *progBuilder, ins: instr) u32 {
+pub fn addInstr(mem: vg.Allocator, b: *progBuilder, ins: instr) u32 {
     if (b.tooBig) {
         return 0;
     }
@@ -3839,7 +3839,7 @@ pub fn addInstr(b: *progBuilder, ins: instr) u32 {
         b.tooBig = true;
         return 0;
     }
-    b.prog.ins = vg.append(instr, b.prog.ins, ins);
+    b.prog.ins = vg.append(mem, instr, b.prog.ins, ins);
     return vg.cv(u32, (b.prog.ins.len -% 1));
 }
 
@@ -3859,47 +3859,47 @@ pub fn patch(b: *progBuilder, slots: vg.Slice(patchSlot), target: u32) void {
     }
 }
 
-pub fn singleOut(idx: u32, alt: bool) vg.Slice(patchSlot) {
+pub fn singleOut(mem: vg.Allocator, idx: u32, alt: bool) vg.Slice(patchSlot) {
     var slot: patchSlot = .{};
     slot.idx = idx;
     slot.alt = alt;
-    const out: vg.Slice(patchSlot) = vg.makeCap(patchSlot, 0, 1);
-    return vg.append(patchSlot, out, slot);
+    const out: vg.Slice(patchSlot) = vg.makeCap(mem, patchSlot, 0, 1);
+    return vg.append(mem, patchSlot, out, slot);
 }
 
-pub fn epsilonFrag(b: *progBuilder) frag {
+pub fn epsilonFrag(mem: vg.Allocator, b: *progBuilder) frag {
     var j: instr = .{};
     j.op = iJmp;
-    const idx: u32 = addInstr(b, j);
+    const idx: u32 = addInstr(mem, b, j);
     var f: frag = .{};
     f.start = idx;
-    f.out = singleOut(idx, false);
+    f.out = singleOut(mem, idx, false);
     return f;
 }
 
-pub fn copyExtra(extra: vg.Slice(u32)) vg.Slice(u32) {
+pub fn copyExtra(mem: vg.Allocator, extra: vg.Slice(u32)) vg.Slice(u32) {
     if ((extra.len == 0)) {
         return @as(vg.Slice(u32), .{});
     }
-    const dup: vg.Slice(u32) = vg.make(u32, extra.len);
+    const dup: vg.Slice(u32) = vg.make(mem, u32, extra.len);
     _ = vg.copy(u32, dup, extra);
     return dup;
 }
 
-pub fn consumeFrag(b: *progBuilder, op: u8, arg: u32, mask: u64, extra: vg.Slice(u32)) frag {
+pub fn consumeFrag(mem: vg.Allocator, b: *progBuilder, op: u8, arg: u32, mask: u64, extra: vg.Slice(u32)) frag {
     var ins: instr = .{};
     ins.op = op;
     ins.arg = arg;
     ins.mask = mask;
-    ins.extra = copyExtra(extra);
-    const idx: u32 = addInstr(b, ins);
+    ins.extra = copyExtra(mem, extra);
+    const idx: u32 = addInstr(mem, b, ins);
     var f: frag = .{};
     f.start = idx;
-    f.out = singleOut(idx, false);
+    f.out = singleOut(mem, idx, false);
     return f;
 }
 
-pub fn emit(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra: vg.Slice(u32)) frag {
+pub fn emit(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra: vg.Slice(u32)) frag {
     const none: frag = .{};
     if (((b.errCode != ErrNone) or b.tooBig)) {
         return none;
@@ -3908,34 +3908,34 @@ pub fn emit(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra: v
         opChar => {
             if (b.icase) {
                 const arg: u32 = vg.cv(u32, b.prog.foldSets.len);
-                const foldCopy: vg.Slice(i32) = vg.make(i32, nodes.at(ni).*.fold.len);
+                const foldCopy: vg.Slice(i32) = vg.make(mem, i32, nodes.at(ni).*.fold.len);
                 _ = vg.copy(i32, foldCopy, nodes.at(ni).*.fold);
-                b.prog.foldSets = vg.append(vg.Slice(i32), b.prog.foldSets, foldCopy);
-                return consumeFrag(b, iRuneFold, arg, mask, extra);
+                b.prog.foldSets = vg.append(mem, vg.Slice(i32), b.prog.foldSets, foldCopy);
+                return consumeFrag(mem, b, iRuneFold, arg, mask, extra);
             }
-            return consumeFrag(b, iRune, vg.cv(u32, nodes.at(ni).*.r), mask, extra);
+            return consumeFrag(mem, b, iRune, vg.cv(u32, nodes.at(ni).*.r), mask, extra);
         },
         opAny => {
-            return consumeFrag(b, iAny, 0, mask, extra);
+            return consumeFrag(mem, b, iAny, 0, mask, extra);
         },
         opBracket => {
-            return consumeFrag(b, iBracket, vg.cv(u32, nodes.at(ni).*.br), mask, extra);
+            return consumeFrag(mem, b, iBracket, vg.cv(u32, nodes.at(ni).*.br), mask, extra);
         },
         opBOL => {
-            return consumeFrag(b, iBOL, 0, 0, @as(vg.Slice(u32), .{}));
+            return consumeFrag(mem, b, iBOL, 0, 0, @as(vg.Slice(u32), .{}));
         },
         opEOL => {
-            return consumeFrag(b, iEOL, 0, 0, @as(vg.Slice(u32), .{}));
+            return consumeFrag(mem, b, iEOL, 0, 0, @as(vg.Slice(u32), .{}));
         },
         opGroup => {
-            return emit(b, nodes, nodes.at(ni).*.ch.at(0).*, mask, extra);
+            return emit(mem, b, nodes, nodes.at(ni).*.ch.at(0).*, mask, extra);
         },
         opConcat => {
-            var result: frag = emit(b, nodes, nodes.at(ni).*.ch.at(0).*, mask, extra);
+            var result: frag = emit(mem, b, nodes, nodes.at(ni).*.ch.at(0).*, mask, extra);
             {
                 var i: i64 = 1;
                 while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-                    const next: frag = emit(b, nodes, nodes.at(ni).*.ch.at(i).*, mask, extra);
+                    const next: frag = emit(mem, b, nodes, nodes.at(ni).*.ch.at(i).*, mask, extra);
                     if ((b.errCode != ErrNone)) {
                         return none;
                     }
@@ -3946,10 +3946,10 @@ pub fn emit(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra: v
             return result;
         },
         opAlt => {
-            return emitAlt(b, nodes, ni, mask, extra);
+            return emitAlt(mem, b, nodes, ni, mask, extra);
         },
         opRepeat => {
-            return emitRepeat(b, nodes, ni, mask, extra);
+            return emitRepeat(mem, b, nodes, ni, mask, extra);
         },
         else => {},
     }
@@ -3957,10 +3957,10 @@ pub fn emit(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra: v
     return none;
 }
 
-pub fn emitAlt(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra: vg.Slice(u32)) frag {
+pub fn emitAlt(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra: vg.Slice(u32)) frag {
     const none: frag = .{};
     var result: frag = .{};
-    var splits: vg.Slice(u32) = vg.makeCap(u32, 0, nodes.at(ni).*.ch.len);
+    var splits: vg.Slice(u32) = vg.makeCap(mem, u32, 0, nodes.at(ni).*.ch.len);
     const count: i64 = nodes.at(ni).*.ch.len;
     {
         var i: i64 = 0;
@@ -3968,9 +3968,9 @@ pub fn emitAlt(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra
             if ((i < (count -% 1))) {
                 var s: instr = .{};
                 s.op = iSplit;
-                splits = vg.append(u32, splits, addInstr(b, s));
+                splits = vg.append(mem, u32, splits, addInstr(mem, b, s));
             }
-            const sub: frag = emit(b, nodes, nodes.at(ni).*.ch.at(i).*, mask, extra);
+            const sub: frag = emit(mem, b, nodes, nodes.at(ni).*.ch.at(i).*, mask, extra);
             if (((b.errCode != ErrNone) or b.tooBig)) {
                 return none;
             }
@@ -3982,7 +3982,7 @@ pub fn emitAlt(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra
             if (((i > 0) and (i < (count -% 1)))) {
                 b.prog.ins.at(splits.at((i -% 1)).*).*.alt = splits.at(i).*;
             }
-            result.out = vg.appendSlice(patchSlot, result.out, sub.out);
+            result.out = vg.appendSlice(mem, patchSlot, result.out, sub.out);
         }
     }
     result.start = splits.at(0).*;
@@ -4000,14 +4000,14 @@ pub fn fragAppend(b: *progBuilder, result: *frag, have: bool, f: frag) bool {
     return true;
 }
 
-pub fn emitRepeat(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra: vg.Slice(u32)) frag {
+pub fn emitRepeat(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, extra: vg.Slice(u32)) frag {
     var mask_v: u64 = mask;
     var extra_v: vg.Slice(u32) = extra;
     const none: frag = .{};
     if ((instrEstimate(nodes, ni) > (maxProgram -% b.prog.ins.len))) {
         var fi: instr = .{};
         fi.op = iFail;
-        const idx: u32 = addInstr(b, fi);
+        const idx: u32 = addInstr(mem, b, fi);
         b.failMin = @min(b.failMin, nodes.at(ni).*.minL);
         var f: frag = .{};
         f.start = idx;
@@ -4018,7 +4018,7 @@ pub fn emitRepeat(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, ex
         if ((slot < maskWidth)) {
             mask_v |= (@as(u64, vg.cv(u64, 1)) << @intCast(slot));
         } else {
-            const grown: vg.Slice(u32) = vg.make(u32, (extra_v.len +% 1));
+            const grown: vg.Slice(u32) = vg.make(mem, u32, (extra_v.len +% 1));
             _ = vg.copy(u32, grown, extra_v);
             grown.at(extra_v.len).* = vg.cv(u32, slot);
             extra_v = grown;
@@ -4028,7 +4028,7 @@ pub fn emitRepeat(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, ex
     const lo: i64 = nodes.at(ni).*.min;
     const hi: i64 = nodes.at(ni).*.max;
     if (((lo == 0) and (hi == 0))) {
-        return epsilonFrag(b);
+        return epsilonFrag(mem, b);
     }
     var result: frag = .{};
     var haveResult: bool = false;
@@ -4039,17 +4039,17 @@ pub fn emitRepeat(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, ex
                 return none;
             }
             if (((i == (lo -% 1)) and (hi == infinite))) {
-                haveResult = fragAppend(b, &result, haveResult, emitPlus(b, nodes, child, mask_v, extra_v));
+                haveResult = fragAppend(b, &result, haveResult, emitPlus(mem, b, nodes, child, mask_v, extra_v));
                 return result;
             }
-            haveResult = fragAppend(b, &result, haveResult, emit(b, nodes, child, mask_v, extra_v));
+            haveResult = fragAppend(b, &result, haveResult, emit(mem, b, nodes, child, mask_v, extra_v));
         }
     }
     if ((hi == infinite)) {
-        haveResult = fragAppend(b, &result, haveResult, emitStar(b, nodes, child, mask_v, extra_v));
+        haveResult = fragAppend(b, &result, haveResult, emitStar(mem, b, nodes, child, mask_v, extra_v));
         return result;
     }
-    var skips: vg.Slice(patchSlot) = vg.makeCap(patchSlot, 0, @max((hi -% lo), 1));
+    var skips: vg.Slice(patchSlot) = vg.makeCap(mem, patchSlot, 0, @max((hi -% lo), 1));
     {
         var i_2: i64 = lo;
         while ((i_2 < hi)) : (i_2 +%= 1) {
@@ -4058,8 +4058,8 @@ pub fn emitRepeat(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, ex
             }
             var s: instr = .{};
             s.op = iSplit;
-            const split: u32 = addInstr(b, s);
-            const sub: frag = emit(b, nodes, child, mask_v, extra_v);
+            const split: u32 = addInstr(mem, b, s);
+            const sub: frag = emit(mem, b, nodes, child, mask_v, extra_v);
             if (((b.errCode != ErrNone) or b.tooBig)) {
                 return none;
             }
@@ -4067,26 +4067,26 @@ pub fn emitRepeat(b: *progBuilder, nodes: vg.Slice(node), ni: i32, mask: u64, ex
             var slot_2: patchSlot = .{};
             slot_2.idx = split;
             slot_2.alt = true;
-            skips = vg.append(patchSlot, skips, slot_2);
+            skips = vg.append(mem, patchSlot, skips, slot_2);
             var piece: frag = .{};
             piece.start = split;
             piece.out = sub.out;
             haveResult = fragAppend(b, &result, haveResult, piece);
         }
     }
-    result.out = vg.appendSlice(patchSlot, result.out, skips);
+    result.out = vg.appendSlice(mem, patchSlot, result.out, skips);
     if ((!haveResult)) {
-        return epsilonFrag(b);
+        return epsilonFrag(mem, b);
     }
     return result;
 }
 
-pub fn emitStar(b: *progBuilder, nodes: vg.Slice(node), child: i32, mask: u64, extra: vg.Slice(u32)) frag {
+pub fn emitStar(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), child: i32, mask: u64, extra: vg.Slice(u32)) frag {
     const none: frag = .{};
     var s: instr = .{};
     s.op = iSplit;
-    const split: u32 = addInstr(b, s);
-    const body: frag = emit(b, nodes, child, mask, extra);
+    const split: u32 = addInstr(mem, b, s);
+    const body: frag = emit(mem, b, nodes, child, mask, extra);
     if (((b.errCode != ErrNone) or b.tooBig)) {
         return none;
     }
@@ -4094,24 +4094,24 @@ pub fn emitStar(b: *progBuilder, nodes: vg.Slice(node), child: i32, mask: u64, e
     patch(b, body.out, split);
     var f: frag = .{};
     f.start = split;
-    f.out = singleOut(split, true);
+    f.out = singleOut(mem, split, true);
     return f;
 }
 
-pub fn emitPlus(b: *progBuilder, nodes: vg.Slice(node), child: i32, mask: u64, extra: vg.Slice(u32)) frag {
+pub fn emitPlus(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), child: i32, mask: u64, extra: vg.Slice(u32)) frag {
     const none: frag = .{};
-    const body: frag = emit(b, nodes, child, mask, extra);
+    const body: frag = emit(mem, b, nodes, child, mask, extra);
     if (((b.errCode != ErrNone) or b.tooBig)) {
         return none;
     }
     var s: instr = .{};
     s.op = iSplit;
-    const split: u32 = addInstr(b, s);
+    const split: u32 = addInstr(mem, b, s);
     b.prog.ins.at(split).*.next = body.start;
     patch(b, body.out, split);
     var f: frag = .{};
     f.start = body.start;
-    f.out = singleOut(split, true);
+    f.out = singleOut(mem, split, true);
     return f;
 }
 
@@ -4141,7 +4141,7 @@ pub fn compileScan(re: *Regexp, ni: i32) void {
     }
 }
 
-pub fn collectNested(re: *Regexp, ni: i32, stack: *groupStack) void {
+pub fn collectNested(mem: vg.Allocator, re: *Regexp, ni: i32, stack: *groupStack) void {
     const isGroup: bool = (re.nodes.at(ni).*.op == opGroup);
     if (isGroup) {
         const gi: i32 = vg.cv(i32, re.nodes.at(ni).*.index);
@@ -4149,15 +4149,15 @@ pub fn collectNested(re: *Regexp, ni: i32, stack: *groupStack) void {
             var k: i64 = 0;
             while ((k < stack.g.len)) : (k +%= 1) {
                 const outer: i32 = stack.g.at(k).*;
-                re.nested.at(outer).* = vg.append(i32, re.nested.at(outer).*, gi);
+                re.nested.at(outer).* = vg.append(mem, i32, re.nested.at(outer).*, gi);
             }
         }
-        stack.g = vg.append(i32, stack.g, gi);
+        stack.g = vg.append(mem, i32, stack.g, gi);
     }
     {
         var i: i64 = 0;
         while ((i < re.nodes.at(ni).*.ch.len)) : (i +%= 1) {
-            collectNested(re, re.nodes.at(ni).*.ch.at(i).*, stack);
+            collectNested(mem, re, re.nodes.at(ni).*.ch.at(i).*, stack);
         }
     }
     if (isGroup) {
@@ -4214,14 +4214,14 @@ pub fn minMatchChars(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), loc: *Loc
     return 0;
 }
 
-pub fn Compile(pattern: vg.Str, loc: Locale, flags: u32) Tup_Regexp_Error {
+pub fn Compile(mem: vg.Allocator, pattern: vg.Str, loc: Locale, flags: u32) Tup_Regexp_Error {
     var loc_v: Locale = loc;
     var re: Regexp = .{};
     if ((!LocaleValid(&loc_v))) {
         return .{ re, compileError(ErrBadPat, (-%1)) };
     }
     var p: parser = .{};
-    const root: i32 = parse(&p, &loc_v, pattern, flags);
+    const root: i32 = parse(mem, &p, &loc_v, pattern, flags);
     if ((root < 0)) {
         return .{ re, p.err };
     }
@@ -4231,15 +4231,15 @@ pub fn Compile(pattern: vg.Str, loc: Locale, flags: u32) Tup_Regexp_Error {
     re.root = root;
     re.flags = flags;
     re.loc = loc_v;
-    re.nested = vg.make(vg.Slice(i32), (re.nsub +% 1));
+    re.nested = vg.make(mem, vg.Slice(i32), (re.nsub +% 1));
     compileScan(&re, root);
     var stack: groupStack = .{};
-    collectNested(&re, root, &stack);
-    computeLengths(re.nodes, &re.loc, re.brackets, root);
-    re.onePass = onePassAnalyze(re.nodes, re.brackets, root);
+    collectNested(mem, &re, root, &stack);
+    computeLengths(mem, re.nodes, &re.loc, re.brackets, root);
+    re.onePass = onePassAnalyze(mem, re.nodes, re.brackets, root);
     var b: progBuilder = .{};
     b.icase = ((flags & FlagICase) != 0);
-    compileProgram(&b, re.nodes, root, re.multi, ((flags & FlagNewline) != 0));
+    compileProgram(mem, &b, re.nodes, root, re.multi, ((flags & FlagNewline) != 0));
     if ((b.errCode != ErrNone)) {
         return .{ re, compileError(b.errCode, (-%1)) };
     }
@@ -4260,7 +4260,7 @@ pub fn trivialNullMatch(re: *Regexp, pmatch: vg.Slice(Match)) bool {
     return (((re.nodes.at(re.root).*.minL == 0) and (!re.anchors)) and (((re.flags & FlagNoSub) != 0) or (pmatch.len == 0)));
 }
 
-pub fn Exec(re: *Regexp, subject: vg.Str, pmatch: vg.Slice(Match), eflags: u32) Tup_bool_Error {
+pub fn Exec(mem: vg.Allocator, re: *Regexp, subject: vg.Str, pmatch: vg.Slice(Match), eflags: u32) Tup_bool_Error {
     if ((subject.len > subjectLimit)) {
         return .{ false, compileError(ErrESpace, (-%1)) };
     }
@@ -4281,14 +4281,14 @@ pub fn Exec(re: *Regexp, subject: vg.Str, pmatch: vg.Slice(Match), eflags: u32) 
             return .{ true, noError() };
         }
         if ((((re.flags & FlagNoSub) != 0) or (pmatch.len == 0))) {
-            const probe: engineResult = runPhaseA(re, subject, eflags);
+            const probe: engineResult = runPhaseA(mem, re, subject, eflags);
             if (probe.matched) {
                 return .{ true, noError() };
             }
         }
         return .{ false, compileError(ErrESpace, (-%1)) };
     }
-    const result: engineResult = runPhaseA(re, subject, eflags);
+    const result: engineResult = runPhaseA(mem, re, subject, eflags);
     if ((!result.matched)) {
         return .{ false, noError() };
     }
@@ -4305,9 +4305,9 @@ pub fn Exec(re: *Regexp, subject: vg.Str, pmatch: vg.Slice(Match), eflags: u32) 
     if (((pmatch.len == 1) or (re.nsub == 0))) {
         return .{ true, noError() };
     }
-    var d: decoded = decodeWindow(subject, result.so, result.eo);
-    const caps: vg.Slice(Match) = vg.make(Match, (re.nsub +% 1));
-    const serr: Error = solveCaptures(re, &d, 0, d.runes.len, eflags, caps);
+    var d: decoded = decodeWindow(mem, subject, result.so, result.eo);
+    const caps: vg.Slice(Match) = vg.make(mem, Match, (re.nsub +% 1));
+    const serr: Error = solveCaptures(mem, re, &d, 0, d.runes.len, eflags, caps);
     if ((serr.Code != ErrNone)) {
         return .{ false, serr };
     }
@@ -4329,7 +4329,7 @@ pub fn MatchIterInit(re: *Regexp, limit: i64) Tup_MatchIter_Error {
     return .{ it, noError() };
 }
 
-pub fn MatchIterNext(re: *Regexp, it: *MatchIter, subject: vg.Str, eflags: u32, pmatch: vg.Slice(Match)) Tup_bool_Error {
+pub fn MatchIterNext(mem: vg.Allocator, re: *Regexp, it: *MatchIter, subject: vg.Str, eflags: u32, pmatch: vg.Slice(Match)) Tup_bool_Error {
     if (it.done) {
         return .{ false, noError() };
     }
@@ -4339,7 +4339,7 @@ pub fn MatchIterNext(re: *Regexp, it: *MatchIter, subject: vg.Str, eflags: u32, 
     }
     while ((it.pos <= subject.len)) {
         const flags: u32 = continuationFlags(re, subject, it.pos, eflags);
-        const _t1 = Exec(re, subject.tail(it.pos), pmatch, flags);
+        const _t1 = Exec(mem, re, subject.tail(it.pos), pmatch, flags);
         const matched: bool = _t1[0];
         const err: Error = _t1[1];
         if ((err.Code != ErrNone)) {
@@ -4389,8 +4389,8 @@ pub fn MatchIterNext(re: *Regexp, it: *MatchIter, subject: vg.Str, eflags: u32, 
     return .{ false, noError() };
 }
 
-pub fn parseReplacement(replacement: vg.Str, nsub: i64) Tup_sreplPart_Error {
-    var parts: vg.Slice(replPart) = vg.makeCap(replPart, 0, 4);
+pub fn parseReplacement(mem: vg.Allocator, replacement: vg.Str, nsub: i64) Tup_sreplPart_Error {
+    var parts: vg.Slice(replPart) = vg.makeCap(mem, replPart, 0, 4);
     var start: i64 = 0;
     {
         var idx: i64 = 0;
@@ -4402,11 +4402,11 @@ pub fn parseReplacement(replacement: vg.Str, nsub: i64) Tup_sreplPart_Error {
             if ((start < idx)) {
                 var lit: replPart = .{};
                 lit.lit = replacement.sub(start, idx);
-                parts = vg.append(replPart, parts, lit);
+                parts = vg.append(mem, replPart, parts, lit);
             }
             if ((c == 38)) {
                 const whole: replPart = .{};
-                parts = vg.append(replPart, parts, whole);
+                parts = vg.append(mem, replPart, parts, whole);
                 start = (idx +% 1);
                 continue;
             }
@@ -4421,11 +4421,11 @@ pub fn parseReplacement(replacement: vg.Str, nsub: i64) Tup_sreplPart_Error {
                 }
                 var ref: replPart = .{};
                 ref.group = group;
-                parts = vg.append(replPart, parts, ref);
+                parts = vg.append(mem, replPart, parts, ref);
             } else {
                 var esc: replPart = .{};
                 esc.lit = replacement.sub((idx +% 1), (idx +% 2));
-                parts = vg.append(replPart, parts, esc);
+                parts = vg.append(mem, replPart, parts, esc);
             }
             idx +%= 1;
             start = (idx +% 1);
@@ -4434,13 +4434,13 @@ pub fn parseReplacement(replacement: vg.Str, nsub: i64) Tup_sreplPart_Error {
     if ((start < replacement.len)) {
         var tail: replPart = .{};
         tail.lit = replacement.tail(start);
-        parts = vg.append(replPart, parts, tail);
+        parts = vg.append(mem, replPart, parts, tail);
     }
     return .{ parts, noError() };
 }
 
-pub fn ReplaceAll(re: *Regexp, subject: vg.Str, replacement: vg.Str, limit: i64, eflags: u32) Tup_Str_Error {
-    const _t1 = parseReplacement(replacement, re.nsub);
+pub fn ReplaceAll(mem: vg.Allocator, re: *Regexp, subject: vg.Str, replacement: vg.Str, limit: i64, eflags: u32) Tup_Str_Error {
+    const _t1 = parseReplacement(mem, replacement, re.nsub);
     const parts: vg.Slice(replPart) = _t1[0];
     const perr: Error = _t1[1];
     if ((perr.Code != ErrNone)) {
@@ -4452,12 +4452,12 @@ pub fn ReplaceAll(re: *Regexp, subject: vg.Str, replacement: vg.Str, limit: i64,
     if ((ierr.Code != ErrNone)) {
         return .{ vg.lit(""), ierr };
     }
-    const pmatch: vg.Slice(Match) = vg.make(Match, (re.nsub +% 1));
+    const pmatch: vg.Slice(Match) = vg.make(mem, Match, (re.nsub +% 1));
     var out: vg.Slice(u8) = .{};
     var last: i64 = 0;
     var any: bool = false;
     while (true) {
-        const _t3 = MatchIterNext(re, &it, subject, eflags, pmatch);
+        const _t3 = MatchIterNext(mem, re, &it, subject, eflags, pmatch);
         const ok: bool = _t3[0];
         const err: Error = _t3[1];
         if ((err.Code != ErrNone)) {
@@ -4467,20 +4467,20 @@ pub fn ReplaceAll(re: *Regexp, subject: vg.Str, replacement: vg.Str, limit: i64,
             break;
         }
         if ((!any)) {
-            out = vg.makeCap(u8, 0, (subject.len +% vg.divT(subject.len, 8)));
+            out = vg.makeCap(mem, u8, 0, (subject.len +% vg.divT(subject.len, 8)));
             any = true;
         }
-        out = vg.appendStr(out, subject.sub(last, pmatch.at(0).*.So));
+        out = vg.appendStr(mem, out, subject.sub(last, pmatch.at(0).*.So));
         {
             var i: i64 = 0;
             while ((i < parts.len)) : (i +%= 1) {
                 if ((parts.at(i).*.lit.len != 0)) {
-                    out = vg.appendStr(out, parts.at(i).*.lit);
+                    out = vg.appendStr(mem, out, parts.at(i).*.lit);
                     continue;
                 }
                 const ref: Match = pmatch.at(parts.at(i).*.group).*;
                 if ((ref.So >= 0)) {
-                    out = vg.appendStr(out, subject.sub(ref.So, ref.Eo));
+                    out = vg.appendStr(mem, out, subject.sub(ref.So, ref.Eo));
                 }
             }
         }
@@ -4489,8 +4489,8 @@ pub fn ReplaceAll(re: *Regexp, subject: vg.Str, replacement: vg.Str, limit: i64,
     if ((!any)) {
         return .{ subject, noError() };
     }
-    out = vg.appendStr(out, subject.tail(last));
-    return .{ vg.strFromBytes(out), noError() };
+    out = vg.appendStr(mem, out, subject.tail(last));
+    return .{ vg.strFromBytes(mem, out), noError() };
 }
 
 pub fn fail(p: *parser, code: i32, pos: i64) i32 {
@@ -4500,10 +4500,10 @@ pub fn fail(p: *parser, code: i32, pos: i64) i32 {
     return (-%1);
 }
 
-pub fn addNode(p: *parser, op: u8) i32 {
+pub fn addNode(mem: vg.Allocator, p: *parser, op: u8) i32 {
     var n: node = .{};
     n.op = op;
-    p.nodes = vg.append(node, p.nodes, n);
+    p.nodes = vg.append(mem, node, p.nodes, n);
     return vg.cv(i32, (p.nodes.len -% 1));
 }
 
@@ -4537,10 +4537,10 @@ pub fn nextRune(p: *parser) i32 {
     return r;
 }
 
-pub fn parse(p: *parser, loc: *Locale, pattern: vg.Str, flags: u32) i32 {
+pub fn parse(mem: vg.Allocator, p: *parser, loc: *Locale, pattern: vg.Str, flags: u32) i32 {
     p.src = pattern;
     p.flags = flags;
-    const root: i32 = parseAlt(p, loc, false);
+    const root: i32 = parseAlt(mem, p, loc, false);
     if ((root < 0)) {
         return (-%1);
     }
@@ -4550,29 +4550,29 @@ pub fn parse(p: *parser, loc: *Locale, pattern: vg.Str, flags: u32) i32 {
     return root;
 }
 
-pub fn parseAlt(p: *parser, loc: *Locale, inGroup: bool) i32 {
-    const first: i32 = parseBranch(p, loc, inGroup);
+pub fn parseAlt(mem: vg.Allocator, p: *parser, loc: *Locale, inGroup: bool) i32 {
+    const first: i32 = parseBranch(mem, p, loc, inGroup);
     if ((first < 0)) {
         return (-%1);
     }
     if ((peekByte(p) != 124)) {
         return first;
     }
-    const alt: i32 = addNode(p, opAlt);
-    p.nodes.at(alt).*.ch = vg.append(i32, p.nodes.at(alt).*.ch, first);
+    const alt: i32 = addNode(mem, p, opAlt);
+    p.nodes.at(alt).*.ch = vg.append(mem, i32, p.nodes.at(alt).*.ch, first);
     while ((peekByte(p) == 124)) {
         p.pos +%= 1;
-        const branch: i32 = parseBranch(p, loc, inGroup);
+        const branch: i32 = parseBranch(mem, p, loc, inGroup);
         if ((branch < 0)) {
             return (-%1);
         }
-        p.nodes.at(alt).*.ch = vg.append(i32, p.nodes.at(alt).*.ch, branch);
+        p.nodes.at(alt).*.ch = vg.append(mem, i32, p.nodes.at(alt).*.ch, branch);
     }
     return alt;
 }
 
-pub fn parseBranch(p: *parser, loc: *Locale, inGroup: bool) i32 {
-    var exprs: vg.Slice(i32) = vg.makeCap(i32, 0, 4);
+pub fn parseBranch(mem: vg.Allocator, p: *parser, loc: *Locale, inGroup: bool) i32 {
+    var exprs: vg.Slice(i32) = vg.makeCap(mem, i32, 0, 4);
     while (true) {
         if (eof(p)) {
             break;
@@ -4584,11 +4584,11 @@ pub fn parseBranch(p: *parser, loc: *Locale, inGroup: bool) i32 {
         if (((c == 41) and inGroup)) {
             break;
         }
-        const expr: i32 = parseExpr(p, loc);
+        const expr: i32 = parseExpr(mem, p, loc);
         if ((expr < 0)) {
             return (-%1);
         }
-        exprs = vg.append(i32, exprs, expr);
+        exprs = vg.append(mem, i32, exprs, expr);
     }
     if ((exprs.len == 0)) {
         return fail(p, ErrBadPat, p.pos);
@@ -4596,7 +4596,7 @@ pub fn parseBranch(p: *parser, loc: *Locale, inGroup: bool) i32 {
     if ((exprs.len == 1)) {
         return exprs.at(0).*;
     }
-    const cat: i32 = addNode(p, opConcat);
+    const cat: i32 = addNode(mem, p, opConcat);
     p.nodes.at(cat).*.ch = exprs;
     return cat;
 }
@@ -4605,7 +4605,7 @@ pub fn isDupByte(c: u8) bool {
     return ((((c == 42) or (c == 43)) or (c == 63)) or (c == 123));
 }
 
-pub fn parseExpr(p: *parser, loc: *Locale) i32 {
+pub fn parseExpr(mem: vg.Allocator, p: *parser, loc: *Locale) i32 {
     const start: i64 = p.pos;
     const c: u8 = peekByte(p);
     if (((c == 94) or (c == 36))) {
@@ -4614,9 +4614,9 @@ pub fn parseExpr(p: *parser, loc: *Locale) i32 {
             return fail(p, ErrBadRpt, p.pos);
         }
         if ((c == 94)) {
-            return addNode(p, opBOL);
+            return addNode(mem, p, opBOL);
         }
-        return addNode(p, opEOL);
+        return addNode(mem, p, opEOL);
     }
     if (isDupByte(c)) {
         return fail(p, ErrBadRpt, start);
@@ -4627,7 +4627,7 @@ pub fn parseExpr(p: *parser, loc: *Locale) i32 {
             p.pos +%= 1;
             p.groups +%= 1;
             const index: i64 = p.groups;
-            const sub: i32 = parseAlt(p, loc, true);
+            const sub: i32 = parseAlt(mem, p, loc, true);
             if ((sub < 0)) {
                 return (-%1);
             }
@@ -4635,12 +4635,12 @@ pub fn parseExpr(p: *parser, loc: *Locale) i32 {
                 return fail(p, ErrEParen, start);
             }
             p.pos +%= 1;
-            primary = addNode(p, opGroup);
-            p.nodes.at(primary).*.ch = vg.append(i32, p.nodes.at(primary).*.ch, sub);
+            primary = addNode(mem, p, opGroup);
+            p.nodes.at(primary).*.ch = vg.append(mem, i32, p.nodes.at(primary).*.ch, sub);
             p.nodes.at(primary).*.index = index;
         },
         91 => {
-            primary = parseBracket(p, loc);
+            primary = parseBracket(mem, p, loc);
             if ((primary < 0)) {
                 return (-%1);
             }
@@ -4655,40 +4655,40 @@ pub fn parseExpr(p: *parser, loc: *Locale) i32 {
                 return (-%1);
             }
             if (((((((((((((((r == 94) or (r == 46)) or (r == 91)) or (r == 93)) or (r == 36)) or (r == 40)) or (r == 41)) or (r == 124)) or (r == 42)) or (r == 43)) or (r == 63)) or (r == 123)) or (r == 125)) or (r == 92))) {
-                primary = charNode(p, loc, r);
+                primary = charNode(mem, p, loc, r);
             } else {
                 return fail(p, ErrBadPat, start);
             }
         },
         46 => {
             p.pos +%= 1;
-            primary = addNode(p, opAny);
+            primary = addNode(mem, p, opAny);
         },
         else => {
             const r_2: i32 = nextRune(p);
             if ((r_2 < 0)) {
                 return (-%1);
             }
-            primary = charNode(p, loc, r_2);
+            primary = charNode(mem, p, loc, r_2);
         },
     }
-    return parseDup(p, primary);
+    return parseDup(mem, p, primary);
 }
 
-pub fn charNode(p: *parser, loc: *Locale, r: i32) i32 {
-    const n: i32 = addNode(p, opChar);
+pub fn charNode(mem: vg.Allocator, p: *parser, loc: *Locale, r: i32) i32 {
+    const n: i32 = addNode(mem, p, opChar);
     p.nodes.at(n).*.r = r;
     if (((p.flags & FlagICase) != 0)) {
-        var fold: vg.Slice(i32) = vg.makeCap(i32, 0, 3);
-        fold = appendUnique(fold, r);
-        fold = appendUnique(fold, localeToUpper(loc, r));
-        fold = appendUnique(fold, localeToLower(loc, r));
+        var fold: vg.Slice(i32) = vg.makeCap(mem, i32, 0, 3);
+        fold = appendUnique(mem, fold, r);
+        fold = appendUnique(mem, fold, localeToUpper(loc, r));
+        fold = appendUnique(mem, fold, localeToLower(loc, r));
         p.nodes.at(n).*.fold = fold;
     }
     return n;
 }
 
-pub fn appendUnique(runes: vg.Slice(i32), r: i32) vg.Slice(i32) {
+pub fn appendUnique(mem: vg.Allocator, runes: vg.Slice(i32), r: i32) vg.Slice(i32) {
     {
         var i: i64 = 0;
         while ((i < runes.len)) : (i +%= 1) {
@@ -4697,10 +4697,10 @@ pub fn appendUnique(runes: vg.Slice(i32), r: i32) vg.Slice(i32) {
             }
         }
     }
-    return vg.append(i32, runes, r);
+    return vg.append(mem, i32, runes, r);
 }
 
-pub fn parseDup(p: *parser, operand: i32) i32 {
+pub fn parseDup(mem: vg.Allocator, p: *parser, operand: i32) i32 {
     const c: u8 = peekByte(p);
     var lo: i64 = 0;
     var hi: i64 = 0;
@@ -4742,8 +4742,8 @@ pub fn parseDup(p: *parser, operand: i32) i32 {
     if (isDupByte(peekByte(p))) {
         return fail(p, ErrBadRpt, p.pos);
     }
-    const rep: i32 = addNode(p, opRepeat);
-    p.nodes.at(rep).*.ch = vg.append(i32, p.nodes.at(rep).*.ch, operand);
+    const rep: i32 = addNode(mem, p, opRepeat);
+    p.nodes.at(rep).*.ch = vg.append(mem, i32, p.nodes.at(rep).*.ch, operand);
     p.nodes.at(rep).*.min = lo;
     p.nodes.at(rep).*.max = hi;
     p.nodes.at(rep).*.minimal = minimal;
@@ -4831,11 +4831,11 @@ pub fn satMul(a: i64, b: i64) i64 {
     return product;
 }
 
-pub fn computeLengths(nodes: vg.Slice(node), loc: *Locale, brackets: vg.Slice(bracketSet), ni: i32) void {
+pub fn computeLengths(mem: vg.Allocator, nodes: vg.Slice(node), loc: *Locale, brackets: vg.Slice(bracketSet), ni: i32) void {
     {
         var i: i64 = 0;
         while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-            computeLengths(nodes, loc, brackets, nodes.at(ni).*.ch.at(i).*);
+            computeLengths(mem, nodes, loc, brackets, nodes.at(ni).*.ch.at(i).*);
         }
     }
     switch (nodes.at(ni).*.op) {
@@ -4861,8 +4861,8 @@ pub fn computeLengths(nodes: vg.Slice(node), loc: *Locale, brackets: vg.Slice(br
         },
         opConcat => {
             const count: i64 = nodes.at(ni).*.ch.len;
-            nodes.at(ni).*.sufMin = vg.make(i64, (count +% 1));
-            nodes.at(ni).*.sufMax = vg.make(i64, (count +% 1));
+            nodes.at(ni).*.sufMin = vg.make(mem, i64, (count +% 1));
+            nodes.at(ni).*.sufMax = vg.make(mem, i64, (count +% 1));
             {
                 var k: i64 = (count -% 1);
                 while ((k >= 0)) : (k -%= 1) {

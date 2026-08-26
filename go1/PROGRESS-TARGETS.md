@@ -148,3 +148,30 @@ The three printers, the three runtimes, the crosscheck harness
 and the probe suite exist and pass. Every driver agrees with the
 Go engine on every corpus line (191689 commands in the extended
 run), and every probe binary agrees with the Go probe package.
+
+## Follow-up: explicit memory contexts (2026-08-26)
+
+The first design kept the three arenas as globals in each runtime,
+behind a mode switch the driver flipped between calls. That made
+the generated engines single-instance and thread-unsafe, and the
+Rust runtime needed `static mut`.
+
+The rework makes memory explicit and removes every global:
+
+- vegoc computes a transitive per-function `Allocates` flag. The
+  allocation sites are make, append, the two string conversions,
+  and slice composite literals.
+- Each printer gives every allocating function a synthetic first
+  parameter named `mem` (reserved in the subset, enforced by the
+  checker) and threads it through call sites. Zig passes a
+  `std.mem.Allocator`, C++ a `vg::Arena&`, Rust a `&vg::Arena`
+  whose block list sits in an UnsafeCell, so `Arena` is !Sync and
+  cross-thread sharing rejects at compile time.
+- The runtimes hold no state. The drivers own the three arenas as
+  locals in main and pass the right one to each call; the mode
+  API is gone. Spec section 9.1 records the scheme.
+
+Functions that never allocate keep their plain signatures; the
+analysis shows LocaleLoad, LocalePOSIX, MatchIterInit and the
+contract queries allocate nothing. Crosscheck and probecheck pass
+on all three targets after the rework.

@@ -4,9 +4,9 @@
 
 namespace probe {
 
-int64_t bump(Counter& c, int32_t tag) {
+int64_t bump(vg::Arena& mem, Counter& c, int32_t tag) {
     c.n += 1LL;
-    c.log = vg::append(c.log, tag);
+    c.log = vg::append(mem, c.log, tag);
     return int64_t(tag);
 }
 
@@ -26,8 +26,8 @@ Tup_i32_i32 DivMod32(int32_t a, int32_t b) {
     return Tup_i32_i32{vg::sdiv<int32_t>(a, b), vg::srem<int32_t>(a, b)};
 }
 
-int64_t BytesProbe(vg::Str s) {
-    vg::Slice<uint8_t> b = vg::bytes_from_str(s);
+int64_t BytesProbe(vg::Arena& mem, vg::Str s) {
+    vg::Slice<uint8_t> b = vg::bytes_from_str(mem, s);
     if ((vg::len(b) > 0LL)) {
         b[0LL] = 88;
     }
@@ -38,19 +38,19 @@ int64_t BytesProbe(vg::Str s) {
     return t;
 }
 
-vg::Slice<int32_t> sliceFrom(Counter& c, int64_t n) {
+vg::Slice<int32_t> sliceFrom(vg::Arena& mem, Counter& c, int64_t n) {
     c.n += 1LL;
-    vg::Slice<int32_t> out = vg::make<int32_t>(n);
+    vg::Slice<int32_t> out = vg::make<int32_t>(mem, n);
     for (int64_t i = 0LL; (i < n); i += 1LL) {
         out[i] = int32_t((i + 1LL));
     }
     return out;
 }
 
-int64_t RangeProbe(Counter& c) {
+int64_t RangeProbe(vg::Arena& mem, Counter& c) {
     int64_t t = int64_t(0LL);
     {
-        auto _t1 = sliceFrom(c, 4LL);
+        auto _t1 = sliceFrom(mem, c, 4LL);
         for (int64_t _t2 = 0; _t2 < _t1.len; _t2++) {
             int64_t i = _t2;
             int32_t v = _t1[_t2];
@@ -107,33 +107,33 @@ int64_t three(int64_t a, int64_t b, int64_t x) {
     return (((a * 100LL) + (b * 10LL)) + x);
 }
 
-int64_t OrderArgs(Counter& c) {
-    return ([&]{ auto _t1 = ([&]{ auto _t3 = bump(c, 1); auto _t4 = bump(c, 2); auto _t5 = bump(c, 3); return three(_t3, _t4, _t5); }()); auto _t2 = logCode(c); return (_t1 + _t2); }());
+int64_t OrderArgs(vg::Arena& mem, Counter& c) {
+    return ([&]{ auto _t1 = ([&]{ auto _t3 = bump(mem, c, 1); auto _t4 = bump(mem, c, 2); auto _t5 = bump(mem, c, 3); return three(_t3, _t4, _t5); }()); auto _t2 = logCode(c); return (_t1 + _t2); }());
 }
 
-int64_t OrderBinary(Counter& c) {
-    int64_t v = ([&]{ auto _t1 = bump(c, 4); auto _t2 = (2LL * bump(c, 5)); return (_t1 - _t2); }());
+int64_t OrderBinary(vg::Arena& mem, Counter& c) {
+    int64_t v = ([&]{ auto _t1 = bump(mem, c, 4); auto _t2 = (2LL * bump(mem, c, 5)); return (_t1 - _t2); }());
     return ([&]{ auto _t3 = (v * 10000LL); auto _t4 = logCode(c); return (_t3 + _t4); }());
 }
 
-int64_t OrderIndex(Counter& c) {
-    vg::Slice<int32_t> s = sliceFrom(c, 6LL);
-    int64_t v = int64_t(([&]() -> decltype(auto) { auto&& _t1 = s; auto _t2 = bump(c, 2); return _t1[_t2]; }()));
+int64_t OrderIndex(vg::Arena& mem, Counter& c) {
+    vg::Slice<int32_t> s = sliceFrom(mem, c, 6LL);
+    int64_t v = int64_t(([&]() -> decltype(auto) { auto&& _t1 = s; auto _t2 = bump(mem, c, 2); return _t1[_t2]; }()));
     return ([&]{ auto _t3 = (v * 10000LL); auto _t4 = logCode(c); return (_t3 + _t4); }());
 }
 
-int64_t SpareProbe() {
-    vg::Slice<int64_t> s = vg::make_cap<int64_t>(0LL, 4LL);
-    s = vg::append(s, 5LL);
+int64_t SpareProbe(vg::Arena& mem) {
+    vg::Slice<int64_t> s = vg::make_cap<int64_t>(mem, 0LL, 4LL);
+    s = vg::append(mem, s, 5LL);
     s = s.head(4LL);
     int64_t t = int64_t(0LL);
     for (int64_t i = 0LL; (i < vg::len(s)); i += 1LL) {
         t = (((t * 10LL) + s[i]) + 1LL);
     }
-    vg::Slice<int64_t> g = vg::make_cap<int64_t>(0LL, 2LL);
-    g = vg::append(g, 1LL);
-    g = vg::append(g, 2LL);
-    g = vg::append(g, 3LL);
+    vg::Slice<int64_t> g = vg::make_cap<int64_t>(mem, 0LL, 2LL);
+    g = vg::append(mem, g, 1LL);
+    g = vg::append(mem, g, 2LL);
+    g = vg::append(mem, g, 3LL);
     if ((g.cap >= 4LL)) {
         g = g.head(4LL);
     }
@@ -143,17 +143,17 @@ int64_t SpareProbe() {
     return t;
 }
 
-int64_t NilProbe() {
+int64_t NilProbe(vg::Arena& mem) {
     vg::Slice<int32_t> s{};
     int64_t t = int64_t(0LL);
     if ((s.p == nullptr)) {
         t += 1LL;
     }
-    vg::Slice<int32_t> s2 = vg::make<int32_t>(0LL);
+    vg::Slice<int32_t> s2 = vg::make<int32_t>(mem, 0LL);
     if ((s2.p != nullptr)) {
         t += 2LL;
     }
-    s = vg::append(s, 5);
+    s = vg::append(mem, s, 5);
     if ((s.p != nullptr)) {
         t += 4LL;
     }
@@ -186,8 +186,8 @@ uint64_t ConvProbe(int64_t x) {
     return (uint64_t(uint8_t(x)) + (uint64_t(uint32_t(int32_t(x))) * 1000ULL));
 }
 
-int64_t SubWrite(int64_t n) {
-    vg::Slice<int64_t> s = vg::make<int64_t>(n);
+int64_t SubWrite(vg::Arena& mem, int64_t n) {
+    vg::Slice<int64_t> s = vg::make<int64_t>(mem, n);
     s.tail(1LL)[0LL] = 7LL;
     s.tail(1LL).tail(1LL)[0LL] = 9LL;
     int64_t t = int64_t(0LL);
@@ -197,10 +197,10 @@ int64_t SubWrite(int64_t n) {
     return t;
 }
 
-int64_t AndNotOrder(Counter& c) {
-    vg::Slice<uint64_t> s = vg::make<uint64_t>(8LL);
+int64_t AndNotOrder(vg::Arena& mem, Counter& c) {
+    vg::Slice<uint64_t> s = vg::make<uint64_t>(mem, 8LL);
     s[3LL] = 255ULL;
-    { auto&& _p = ([&]() -> decltype(auto) { auto&& _t1 = s; auto _t2 = (bump(c, 1) + 2LL); return _t1[_t2]; }()); _p &= ~((uint64_t(bump(c, 2)) + 15ULL)); }
+    { auto&& _p = ([&]() -> decltype(auto) { auto&& _t1 = s; auto _t2 = (bump(mem, c, 1) + 2LL); return _t1[_t2]; }()); _p &= ~((uint64_t(bump(mem, c, 2)) + 15ULL)); }
     return ([&]{ auto _t3 = (int64_t(s[3LL]) * 100000LL); auto _t4 = logCode(c); return (_t3 + _t4); }());
 }
 
@@ -214,8 +214,8 @@ int64_t ZeroArray() {
     return t;
 }
 
-int64_t MakeU64(uint64_t n) {
-    vg::Slice<int32_t> s = vg::make<int32_t>(n);
+int64_t MakeU64(vg::Arena& mem, uint64_t n) {
+    vg::Slice<int32_t> s = vg::make<int32_t>(mem, n);
     return int64_t(vg::len(s));
 }
 
@@ -227,8 +227,8 @@ std::array<int64_t, 3> mkTriple(int64_t x) {
     return a;
 }
 
-int64_t PickArray(Counter& c) {
-    int64_t v = ([&]() { auto&& _t1 = mkTriple(40LL); auto _t2 = bump(c, 2); return _t1[size_t(_t2)]; }());
+int64_t PickArray(vg::Arena& mem, Counter& c) {
+    int64_t v = ([&]() { auto&& _t1 = mkTriple(40LL); auto _t2 = bump(mem, c, 2); return _t1[size_t(_t2)]; }());
     return ([&]{ auto _t3 = (v * 10000LL); auto _t4 = logCode(c); return (_t3 + _t4); }());
 }
 

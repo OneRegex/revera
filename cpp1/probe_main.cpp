@@ -20,6 +20,8 @@ static int eq(const probe::Tagged& x, const probe::Tagged& y) {
 }
 
 int main() {
+    vg::Arena mem;
+
     const int64_t pairs[5][2] = {
         {minI64, -1}, {7, -2}, {-7, 2}, {minI64, 1}, {1, minI64}};
     for (auto& ab : pairs) {
@@ -32,11 +34,11 @@ int main() {
     auto qr32b = probe::DivMod32(9, -4);
     std::printf("divmod32b = %" PRId32 " %" PRId32 "\n", qr32b.r0, qr32b.r1);
     std::printf("bytes = %" PRId64 " %" PRId64 "\n",
-                probe::BytesProbe(vg::lit("hello")), probe::BytesProbe(vg::Str{}));
+                probe::BytesProbe(mem, vg::lit("hello")), probe::BytesProbe(mem, vg::Str{}));
     probe::Counter c1{};
-    std::printf("range = %" PRId64 "\n", probe::RangeProbe(c1));
+    std::printf("range = %" PRId64 "\n", probe::RangeProbe(mem, c1));
     std::printf("rangeval = %" PRId64 "\n",
-                probe::RangeValProbe(vg::slice_of<int32_t>({3, 5, 7})));
+                probe::RangeValProbe(vg::slice_of<int32_t>(mem, {3, 5, 7})));
     std::printf("rangeint = %" PRId64 "\n", probe::RangeIntProbe(5));
     std::printf("partial = %" PRId64 "\n", probe::PartialArray());
     std::printf("tagged = %d %d %d\n",
@@ -44,11 +46,11 @@ int main() {
                 eq(mk(vg::lit("a"), vg::lit("b"), 1), mk(vg::lit("a"), vg::lit("c"), 1)),
                 eq(mk(vg::lit("a"), vg::lit("b"), 1), mk(vg::lit("a"), vg::lit("b"), 2)));
     probe::Counter c2{}, c3{}, c4{};
-    std::printf("orderargs = %" PRId64 "\n", probe::OrderArgs(c2));
-    std::printf("orderbinary = %" PRId64 "\n", probe::OrderBinary(c3));
-    std::printf("orderindex = %" PRId64 "\n", probe::OrderIndex(c4));
-    std::printf("spare = %" PRId64 "\n", probe::SpareProbe());
-    std::printf("nil = %" PRId64 "\n", probe::NilProbe());
+    std::printf("orderargs = %" PRId64 "\n", probe::OrderArgs(mem, c2));
+    std::printf("orderbinary = %" PRId64 "\n", probe::OrderBinary(mem, c3));
+    std::printf("orderindex = %" PRId64 "\n", probe::OrderIndex(mem, c4));
+    std::printf("spare = %" PRId64 "\n", probe::SpareProbe(mem));
+    std::printf("nil = %" PRId64 "\n", probe::NilProbe(mem));
     std::printf("wrap = %" PRId64 " %" PRId64 "\n",
                 probe::WrapProbe(minI64, 3), probe::WrapProbe(7, -9));
     std::printf("narrow32 = %" PRId32 " %" PRId32 "\n",
@@ -58,12 +60,12 @@ int main() {
     std::printf("shift = %" PRIu64 "\n", probe::ShiftProbe(0x8000000000000001ULL, 7));
     std::printf("conv = %" PRIu64 " %" PRIu64 "\n",
                 probe::ConvProbe(-99), probe::ConvProbe(300));
-    std::printf("subwrite = %" PRId64 "\n", probe::SubWrite(4));
+    std::printf("subwrite = %" PRId64 "\n", probe::SubWrite(mem, 4));
     probe::Counter c5{};
-    std::printf("andnotorder = %" PRId64 "\n", probe::AndNotOrder(c5));
+    std::printf("andnotorder = %" PRId64 "\n", probe::AndNotOrder(mem, c5));
     std::printf("zeroarray = %" PRId64 "\n", probe::ZeroArray());
-    std::printf("makeu64 = %" PRId64 "\n", probe::MakeU64(6));
+    std::printf("makeu64 = %" PRId64 "\n", probe::MakeU64(mem, 6));
     probe::Counter c6{};
-    std::printf("pickarray = %" PRId64 "\n", probe::PickArray(c6));
+    std::printf("pickarray = %" PRId64 "\n", probe::PickArray(mem, c6));
     return 0;
 }

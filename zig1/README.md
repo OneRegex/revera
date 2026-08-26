@@ -15,10 +15,14 @@ the minimal runtime the Vego spec requires each target to supply.
 
 - `src/vg.zig` is the runtime: the `Slice` and `Str` value types
   with Go slice-header semantics, the integer conversion helper,
-  string comparison, and three arenas (persistent locale data,
-  per-pattern, per-operation scratch).
+  and string comparison. It holds no state. Every generated
+  function that allocates takes an allocator as its first
+  parameter, `mem`; the engine is re-entrant, and each thread can
+  run its own instance.
 - `src/main.zig` is the differential driver. It speaks the line
-  protocol defined in `go1/revera/driver_host.go`.
+  protocol defined in `go1/revera/driver_host.go`. It owns three
+  arenas (persistent locale data, per-pattern, per-operation
+  scratch) and passes the right one to each engine call.
 - `src/data.bin` is the CLDR locale blob, embedded at build time.
 
 ## Build and verify

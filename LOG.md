@@ -572,3 +572,52 @@ opaque reference type for the generation tags (a violation already
 traps deterministically). Probe, edge, heavy-segment and 3000-
 command checks pass on the refactored code; the theorem build and
 the full replay were relaunched to re-establish the proofs.
+
+## Thread safety: no globals, explicit memory contexts
+
+The user asked to make the generated engines thread-safe: no
+global variables, no global allocators, with the root cause and
+the specification fixed, and API changes allowed. The old scheme
+kept three arenas as globals in each runtime behind a mode switch
+the drivers flipped; Rust even used `static mut`. The fix makes
+memory explicit end to end. vegoc now computes a transitive
+per-function Allocates flag (make, append, the two string
+conversions, slice composite literals, plus calls to allocating
+functions) and reserves the identifier `mem`. Each printer gives
+every allocating function a synthetic first parameter `mem` and
+threads it through call sites: a `std.mem.Allocator` in Zig, a
+`vg::Arena&` in C++, and a `&vg::Arena` in Rust, where the block
+list sits in an UnsafeCell so Arena is !Sync and cross-thread
+sharing is a compile error. The runtimes lost all their state,
+including the C++ zero-length-array sentinel (the view now points
+at the array object itself). The drivers own the three arenas as
+locals in main, pass the right one to each call, and moved their
+own file-scope state (locale, compiled pattern, buffers) into
+main. Spec section 9.1 documents the scheme; the READMEs and
+PROGRESS-TARGETS.md follow. The Vego JSON is unchanged, so the
+LEAN4 artifacts stand. Verified: go tests, probecheck (29 lines,
+all targets) and the full crosscheck (86691 commands, all three
+drivers agree with the Go engine).
+
+## Simplify pass on the memory-context change set
+
+The user ran /simplify over the thread-safety diff. Four review
+angles (reuse, simplification, efficiency, altitude) ran as
+parallel agents. Applied: the callee-allocates lookup moved into
+vegoc as Program.CalleeAllocates, used by all three printers; the
+allocation-site predicate became the exported vegoc.ExprAllocates,
+now also used to reject allocating package-level initializers
+(they would reference a memory context that does not exist at
+global scope); a new vegoc test pins every allocation form to the
+Allocates flag, the transitive propagation, the reserved name and
+the initializer rejection; vg.rs dropped the dead unsafe Send and
+Sync impls (only Sync for Str stays, for the generated static
+tables); the Zig Host lost its rows buffer (the 'I' handler takes
+it from the scratch arena) and keeps the persistent arena as a
+plain allocator; the Rust driver gained the same three-arena
+header comment as the other two. Skipped: a MemName constant (the
+name sits inside per-language format strings; the new test guards
+the drift) and reverting the C++ line buffer to a function-local
+static (that is global storage again). Regenerated engines are
+byte-identical; probecheck and a quick crosscheck re-verify the
+rebuilt Zig and Rust drivers.

@@ -279,6 +279,11 @@ type FuncDecl struct {
 	// Filled by the checker, keyed by post-rename local or
 	// parameter name. Names are unique per function.
 	Info map[string]*LocalInfo
+
+	// Filled by the checker: the function allocates, directly or
+	// through a callee. Printers give it the synthetic memory
+	// context parameter "mem".
+	Allocates bool
 }
 
 type Program struct {

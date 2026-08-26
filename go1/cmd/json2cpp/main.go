@@ -1,7 +1,9 @@
 // Command json2cpp converts the Vego JSON form into a C++ header
 // and source pair. The output includes the hand-written runtime
-// vg.hpp, which supplies the Slice and Str value types, the arena
-// allocator, and the Go conversion and comparison helpers.
+// vg.hpp, which supplies the Slice and Str value types, the Arena
+// allocator, and the Go conversion and comparison helpers. Every
+// function that allocates receives an Arena reference as its first
+// parameter, "mem"; the output holds no global state.
 //
 // Usage:
 //
@@ -284,6 +286,9 @@ func (g *gen) typ(t *vegoc.Type) string {
 
 func (g *gen) signature(f *vegoc.FuncDecl) string {
 	var params []string
+	if f.Allocates {
+		params = append(params, "vg::Arena& mem")
+	}
 	for _, pa := range f.Params {
 		params = append(params, g.typ(pa.Type)+" "+ident(pa.Name))
 	}
@@ -684,7 +689,7 @@ func (g *gen) expr(e *vegoc.Expr) string {
 		if h, ok := g.hoistArgs(e); ok {
 			return h
 		}
-		return ident(e.Name) + "(" + strings.Join(g.callArgs(e.Args), ", ") + ")"
+		return ident(e.Name) + "(" + strings.Join(g.callArgs(e.Name, e.Args), ", ") + ")"
 	case "builtin":
 		if h, ok := g.hoistArgs(e); ok {
 			return h
@@ -692,10 +697,10 @@ func (g *gen) expr(e *vegoc.Expr) string {
 		return g.builtin(e)
 	case "conv":
 		if e.TypeRef.K == vegoc.KStr {
-			return "vg::str_from_bytes(" + g.expr(e.X) + ")"
+			return "vg::str_from_bytes(mem, " + g.expr(e.X) + ")"
 		}
 		if e.TypeRef.K == vegoc.KSlice {
-			return "vg::bytes_from_str(" + g.expr(e.X) + ")"
+			return "vg::bytes_from_str(mem, " + g.expr(e.X) + ")"
 		}
 		return g.typ(e.TypeRef) + "(" + g.expr(e.X) + ")"
 	case "unary":
@@ -767,19 +772,19 @@ func (g *gen) builtin(e *vegoc.Expr) string {
 	case "make":
 		elem := g.typ(e.TypeRef.Elem)
 		if len(e.Args) == 2 {
-			return fmt.Sprintf("vg::make_cap<%s>(%s, %s)", elem, g.expr(e.Args[0]), g.expr(e.Args[1]))
+			return fmt.Sprintf("vg::make_cap<%s>(mem, %s, %s)", elem, g.expr(e.Args[0]), g.expr(e.Args[1]))
 		}
-		return fmt.Sprintf("vg::make<%s>(%s)", elem, g.expr(e.Args[0]))
+		return fmt.Sprintf("vg::make<%s>(mem, %s)", elem, g.expr(e.Args[0]))
 	case "append":
 		if e.Spread {
 			if e.Args[1].Typ.K == vegoc.KStr {
-				return fmt.Sprintf("vg::append_str(%s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
+				return fmt.Sprintf("vg::append_str(mem, %s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
 			}
-			return fmt.Sprintf("vg::append_slice(%s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
+			return fmt.Sprintf("vg::append_slice(mem, %s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
 		}
 		out := g.expr(e.Args[0])
 		for _, a := range e.Args[1:] {
-			out = fmt.Sprintf("vg::append(%s, %s)", out, g.expr(a))
+			out = fmt.Sprintf("vg::append(mem, %s, %s)", out, g.expr(a))
 		}
 		return out
 	case "copy":
@@ -800,10 +805,14 @@ func isNil(e *vegoc.Expr) bool {
 	return e.K == "ident" && e.Name == "nil"
 }
 
-// callArgs renders call arguments. A unary & argument binds the
-// callee's reference parameter directly.
-func (g *gen) callArgs(args []*vegoc.Expr) []string {
+// callArgs renders call arguments, with the memory context first
+// when the callee allocates. A unary & argument binds the callee's
+// reference parameter directly.
+func (g *gen) callArgs(callee string, args []*vegoc.Expr) []string {
 	var out []string
+	if g.p.CalleeAllocates(callee) {
+		out = append(out, "mem")
+	}
 	for _, a := range args {
 		if a.K == "unary" && a.Op == "&" {
 			out = append(out, g.expr(a.X))
@@ -854,7 +863,7 @@ func (g *gen) hoistArgs(e *vegoc.Expr) (string, bool) {
 	}
 	var body string
 	if clone.K == "call" {
-		body = ident(clone.Name) + "(" + strings.Join(g.callArgs(clone.Args), ", ") + ")"
+		body = ident(clone.Name) + "(" + strings.Join(g.callArgs(clone.Name, clone.Args), ", ") + ")"
 	} else {
 		body = g.builtin(&clone)
 	}
@@ -968,7 +977,7 @@ func (g *gen) composite(e *vegoc.Expr) string {
 		for _, el := range e.Elems {
 			parts = append(parts, g.expr(el))
 		}
-		return fmt.Sprintf("vg::slice_of<%s>({%s})", g.typ(t.Elem), strings.Join(parts, ", "))
+		return fmt.Sprintf("vg::slice_of<%s>(mem, {%s})", g.typ(t.Elem), strings.Join(parts, ", "))
 	case vegoc.KArray:
 		var parts []string
 		for _, el := range e.Elems {

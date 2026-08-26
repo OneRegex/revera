@@ -26,34 +26,34 @@ struct Tup_i32_i32 { int32_t r0; int32_t r1; };
 struct Tup_i64_i64 { int64_t r0; int64_t r1; };
 
 
-int64_t bump(Counter& c, int32_t tag);
+int64_t bump(vg::Arena& mem, Counter& c, int32_t tag);
 int64_t logCode(Counter& c);
 Tup_i64_i64 DivMod(int64_t a, int64_t b);
 Tup_i32_i32 DivMod32(int32_t a, int32_t b);
-int64_t BytesProbe(vg::Str s);
-vg::Slice<int32_t> sliceFrom(Counter& c, int64_t n);
-int64_t RangeProbe(Counter& c);
+int64_t BytesProbe(vg::Arena& mem, vg::Str s);
+vg::Slice<int32_t> sliceFrom(vg::Arena& mem, Counter& c, int64_t n);
+int64_t RangeProbe(vg::Arena& mem, Counter& c);
 int64_t RangeValProbe(vg::Slice<int32_t> xs);
 int64_t RangeIntProbe(int64_t n);
 int64_t PartialArray();
 bool TaggedEq(Tagged a, Tagged b);
 int64_t three(int64_t a, int64_t b, int64_t x);
-int64_t OrderArgs(Counter& c);
-int64_t OrderBinary(Counter& c);
-int64_t OrderIndex(Counter& c);
-int64_t SpareProbe();
-int64_t NilProbe();
+int64_t OrderArgs(vg::Arena& mem, Counter& c);
+int64_t OrderBinary(vg::Arena& mem, Counter& c);
+int64_t OrderIndex(vg::Arena& mem, Counter& c);
+int64_t SpareProbe(vg::Arena& mem);
+int64_t NilProbe(vg::Arena& mem);
 int64_t WrapProbe(int64_t a, int64_t b);
 int32_t Narrow32(int32_t a, int32_t b);
 uint8_t WrapU8(uint8_t a, uint8_t b);
 uint32_t AndNotProbe(uint32_t a, uint32_t b);
 uint64_t ShiftProbe(uint64_t x, int64_t n);
 uint64_t ConvProbe(int64_t x);
-int64_t SubWrite(int64_t n);
-int64_t AndNotOrder(Counter& c);
+int64_t SubWrite(vg::Arena& mem, int64_t n);
+int64_t AndNotOrder(vg::Arena& mem, Counter& c);
 int64_t ZeroArray();
-int64_t MakeU64(uint64_t n);
+int64_t MakeU64(vg::Arena& mem, uint64_t n);
 std::array<int64_t, 3> mkTriple(int64_t x);
-int64_t PickArray(Counter& c);
+int64_t PickArray(vg::Arena& mem, Counter& c);
 
 } // namespace probe

@@ -15,14 +15,19 @@ the minimal runtime the Vego spec requires each target to supply.
 
 - `src/vg.rs` is the runtime: Copy `Slice<T>` and `Str` header
   types with Go slice semantics, conversion and comparison
-  helpers, and three arenas (persistent locale data, per-pattern,
-  per-operation scratch). Vego views can alias, which Rust
-  references cannot express, so slices lower to raw pointer and
-  length pairs, the route the Vego spec names for generated code.
-  Every access stays bounds-checked.
+  helpers, and the `Arena` allocator. It holds no state. Every
+  generated function that allocates takes an `&Arena` as its
+  first parameter, `mem`. `Arena` is `!Sync`, so the compiler
+  rejects sharing one between threads; each thread runs its own
+  engine instance. Vego views can alias, which Rust references
+  cannot express, so slices lower to raw pointer and length
+  pairs, the route the Vego spec names for generated code. Every
+  access stays bounds-checked.
 - `src/main.rs` is the differential driver. It speaks the line
   protocol defined in `go1/revera/driver_host.go` and embeds
-  `data.bin` with `include_bytes!`.
+  `data.bin` with `include_bytes!`. It owns three arenas
+  (persistent locale data, per-pattern, per-operation scratch)
+  and passes the right one to each engine call.
 
 ## Build and verify
 

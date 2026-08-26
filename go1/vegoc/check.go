@@ -50,13 +50,18 @@ type checker struct {
 	taken map[string]bool
 }
 
-// reserved names the runtimes of the targets claim.
+// reserved names the runtimes of the targets claim. "mem" is the
+// memory context every allocating function receives; a program
+// must leave the name free at the package level, and locals of
+// that name get renamed like any other clash.
 var reserved = map[string]bool{
 	"vg": true, "std": true, "Str": true, "Slice": true,
 	"self": true, "Self": true, "crate": true, "super": true,
+	"mem": true,
 }
 
 func (c *checker) run() {
+	c.checkReservedPackageNames()
 	for _, d := range c.p.Consts {
 		c.ensureConst(d)
 	}
@@ -69,6 +74,31 @@ func (c *checker) run() {
 	}
 	for _, f := range c.p.Funcs {
 		c.rewriteMutatedParams(f)
+	}
+	markAllocates(c.p)
+}
+
+// checkReservedPackageNames rejects package-level declarations
+// whose name a target runtime claims. Locals get renamed instead;
+// a package-level name reaches every target verbatim, so it must
+// stay clear.
+func (c *checker) checkReservedPackageNames() {
+	check := func(kind, name string) {
+		if reserved[name] {
+			panic(fmt.Sprintf("%s %s: the name is reserved for the target runtimes", kind, name))
+		}
+	}
+	for _, d := range c.p.Consts {
+		check("const", d.Name)
+	}
+	for _, d := range c.p.Vars {
+		check("var", d.Name)
+	}
+	for _, s := range c.p.Types {
+		check("type", s.Name)
+	}
+	for _, f := range c.p.Funcs {
+		check("func", f.Name)
 	}
 }
 
@@ -179,11 +209,19 @@ func (c *checker) tryFold(e *Expr) (v int64, ok bool) {
 
 func (c *checker) checkVarDecl(d *ValueDecl) {
 	c.inferDecl(d)
-	// cmd/vego2json enforces the same rule at the Go front end,
+	// cmd/vego2json enforces the same rules at the Go front end,
 	// with source positions; this guards other JSON producers.
 	if c.typeContainsSlice(d.Inferred) {
 		panic("package variable " + d.Name + " contains a slice; globals are static constant data")
 	}
+	// Globals are static constant data, so the initializer must
+	// not allocate or call: there is no memory context and no
+	// evaluation order at package scope.
+	WalkExpr(d.Value, func(e *Expr) {
+		if ExprAllocates(e) || e.K == "call" {
+			panic("package variable " + d.Name + " has a non-constant initializer")
+		}
+	})
 }
 
 func (c *checker) typeContainsSlice(t *Type) bool {

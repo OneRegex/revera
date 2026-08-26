@@ -25,9 +25,9 @@ pub fn vg_eq_Tagged(a: Tagged, b: Tagged) -> bool {
     a.Tags.iter().zip(b.Tags.iter()).all(|(x, y)| vg::streq(*x, *y)) && a.N == b.N
 }
 
-pub fn bump(c: &mut Counter, tag: i32) -> i64 {
+pub fn bump(mem: &vg::Arena, c: &mut Counter, tag: i32) -> i64 {
     c.n += 1i64;
-    c.log = vg::append(c.log, tag);
+    c.log = vg::append(mem, c.log, tag);
     return ((tag) as i64);
 }
 
@@ -53,8 +53,8 @@ pub fn DivMod32(a: i32, b: i32) -> (i32, i32) {
     return ((a).wrapping_div(b), (a).wrapping_rem(b));
 }
 
-pub fn BytesProbe(s: vg::Str) -> i64 {
-    let b: vg::Slice<u8> = vg::bytes_from_str(s);
+pub fn BytesProbe(mem: &vg::Arena, s: vg::Str) -> i64 {
+    let b: vg::Slice<u8> = vg::bytes_from_str(mem, s);
     if (b.len > 0i64) {
         unsafe { (*b.ptr(0i64)) = 88u8; }
     }
@@ -71,9 +71,9 @@ pub fn BytesProbe(s: vg::Str) -> i64 {
     return t;
 }
 
-pub fn sliceFrom(c: &mut Counter, n: i64) -> vg::Slice<i32> {
+pub fn sliceFrom(mem: &vg::Arena, c: &mut Counter, n: i64) -> vg::Slice<i32> {
     c.n += 1i64;
-    let out: vg::Slice<i32> = vg::make::<i32>(n);
+    let out: vg::Slice<i32> = vg::make::<i32>(mem, n);
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < n) {
@@ -86,10 +86,10 @@ pub fn sliceFrom(c: &mut Counter, n: i64) -> vg::Slice<i32> {
     return out;
 }
 
-pub fn RangeProbe(c: &mut Counter) -> i64 {
+pub fn RangeProbe(mem: &vg::Arena, c: &mut Counter) -> i64 {
     let mut t: i64 = ((0i64) as i64);
     {
-        let _t1 = { let _t4 = 4i64; sliceFrom(c, _t4) };
+        let _t1 = { let _t4 = 4i64; sliceFrom(mem, c, _t4) };
         let mut _t2: i64 = 0;
         '_b3: while _t2 < _t1.len {
             '_c3: {
@@ -170,24 +170,24 @@ pub fn three(a: i64, b: i64, x: i64) -> i64 {
     return (((a * 100i64) + (b * 10i64)) + x);
 }
 
-pub fn OrderArgs(c: &mut Counter) -> i64 {
-    return (three({ let _t1 = 1i32; bump(c, _t1) }, { let _t2 = 2i32; bump(c, _t2) }, { let _t3 = 3i32; bump(c, _t3) }) + logCode(c));
+pub fn OrderArgs(mem: &vg::Arena, c: &mut Counter) -> i64 {
+    return (three({ let _t1 = 1i32; bump(mem, c, _t1) }, { let _t2 = 2i32; bump(mem, c, _t2) }, { let _t3 = 3i32; bump(mem, c, _t3) }) + logCode(c));
 }
 
-pub fn OrderBinary(c: &mut Counter) -> i64 {
-    let v: i64 = ({ let _t1 = 4i32; bump(c, _t1) } - (2i64 * { let _t2 = 5i32; bump(c, _t2) }));
+pub fn OrderBinary(mem: &vg::Arena, c: &mut Counter) -> i64 {
+    let v: i64 = ({ let _t1 = 4i32; bump(mem, c, _t1) } - (2i64 * { let _t2 = 5i32; bump(mem, c, _t2) }));
     return ((v * 10000i64) + logCode(c));
 }
 
-pub fn OrderIndex(c: &mut Counter) -> i64 {
-    let s: vg::Slice<i32> = { let _t1 = 6i64; sliceFrom(c, _t1) };
-    let v: i64 = ((s.get({ let _t2 = 2i32; bump(c, _t2) })) as i64);
+pub fn OrderIndex(mem: &vg::Arena, c: &mut Counter) -> i64 {
+    let s: vg::Slice<i32> = { let _t1 = 6i64; sliceFrom(mem, c, _t1) };
+    let v: i64 = ((s.get({ let _t2 = 2i32; bump(mem, c, _t2) })) as i64);
     return ((v * 10000i64) + logCode(c));
 }
 
-pub fn SpareProbe() -> i64 {
-    let mut s: vg::Slice<i64> = vg::make_cap::<i64>(0i64, 4i64);
-    s = vg::append(s, 5i64);
+pub fn SpareProbe(mem: &vg::Arena) -> i64 {
+    let mut s: vg::Slice<i64> = vg::make_cap::<i64>(mem, 0i64, 4i64);
+    s = vg::append(mem, s, 5i64);
     s = s.head(4i64);
     let mut t: i64 = ((0i64) as i64);
     {
@@ -199,10 +199,10 @@ pub fn SpareProbe() -> i64 {
             i += 1i64;
         }
     }
-    let mut g: vg::Slice<i64> = vg::make_cap::<i64>(0i64, 2i64);
-    g = vg::append(g, 1i64);
-    g = vg::append(g, 2i64);
-    g = vg::append(g, 3i64);
+    let mut g: vg::Slice<i64> = vg::make_cap::<i64>(mem, 0i64, 2i64);
+    g = vg::append(mem, g, 1i64);
+    g = vg::append(mem, g, 2i64);
+    g = vg::append(mem, g, 3i64);
     if (g.cap >= 4i64) {
         g = g.head(4i64);
     }
@@ -218,17 +218,17 @@ pub fn SpareProbe() -> i64 {
     return t;
 }
 
-pub fn NilProbe() -> i64 {
+pub fn NilProbe(mem: &vg::Arena) -> i64 {
     let mut s: vg::Slice<i32> = vg::zero();
     let mut t: i64 = ((0i64) as i64);
     if (s.p.is_null()) {
         t += 1i64;
     }
-    let s2: vg::Slice<i32> = vg::make::<i32>(0i64);
+    let s2: vg::Slice<i32> = vg::make::<i32>(mem, 0i64);
     if (!s2.p.is_null()) {
         t += 2i64;
     }
-    s = vg::append(s, 5i32);
+    s = vg::append(mem, s, 5i32);
     if (!s.p.is_null()) {
         t += 4i64;
     }
@@ -261,8 +261,8 @@ pub fn ConvProbe(x: i64) -> u64 {
     return (((((x) as u8)) as u64) + (((((((x) as i32)) as u32)) as u64) * 1000u64));
 }
 
-pub fn SubWrite(n: i64) -> i64 {
-    let s: vg::Slice<i64> = vg::make::<i64>(n);
+pub fn SubWrite(mem: &vg::Arena, n: i64) -> i64 {
+    let s: vg::Slice<i64> = vg::make::<i64>(mem, n);
     unsafe { (*s.tail(1i64).ptr(0i64)) = 7i64; }
     unsafe { (*s.tail(1i64).tail(1i64).ptr(0i64)) = 9i64; }
     let mut t: i64 = ((0i64) as i64);
@@ -278,10 +278,10 @@ pub fn SubWrite(n: i64) -> i64 {
     return t;
 }
 
-pub fn AndNotOrder(c: &mut Counter) -> i64 {
-    let s: vg::Slice<u64> = vg::make::<u64>(8i64);
+pub fn AndNotOrder(mem: &vg::Arena, c: &mut Counter) -> i64 {
+    let s: vg::Slice<u64> = vg::make::<u64>(mem, 8i64);
     unsafe { (*s.ptr(3i64)) = 255u64; }
-    { let _p = unsafe { std::ptr::addr_of_mut!((*s.ptr(({ let _t1 = 1i32; bump(c, _t1) } + 2i64)))) }; let _v = !(((({ let _t2 = 2i32; bump(c, _t2) }) as u64) + 15u64)); unsafe { *_p &= _v; } }
+    { let _p = unsafe { std::ptr::addr_of_mut!((*s.ptr(({ let _t1 = 1i32; bump(mem, c, _t1) } + 2i64)))) }; let _v = !(((({ let _t2 = 2i32; bump(mem, c, _t2) }) as u64) + 15u64)); unsafe { *_p &= _v; } }
     return ((((s.get(3i64)) as i64) * 100000i64) + logCode(c));
 }
 
@@ -295,8 +295,8 @@ pub fn ZeroArray() -> i64 {
     return t;
 }
 
-pub fn MakeU64(n: u64) -> i64 {
-    let s: vg::Slice<i32> = vg::make::<i32>(((n) as i64));
+pub fn MakeU64(mem: &vg::Arena, n: u64) -> i64 {
+    let s: vg::Slice<i32> = vg::make::<i32>(mem, ((n) as i64));
     return ((s.len) as i64);
 }
 
@@ -308,8 +308,8 @@ pub fn mkTriple(x: i64) -> [i64; (3) as usize] {
     return a;
 }
 
-pub fn PickArray(c: &mut Counter) -> i64 {
-    let v: i64 = mkTriple(40i64)[({ let _t1 = 2i32; bump(c, _t1) }) as usize];
+pub fn PickArray(mem: &vg::Arena, c: &mut Counter) -> i64 {
+    let v: i64 = mkTriple(40i64)[({ let _t1 = 2i32; bump(mem, c, _t1) }) as usize];
     return ((v * 10000i64) + logCode(c));
 }
 

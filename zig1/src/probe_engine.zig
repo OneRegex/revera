@@ -18,9 +18,9 @@ pub const Tagged = struct {
     N: i32 = 0,
 };
 
-pub fn bump(c: *Counter, tag: i32) i64 {
+pub fn bump(mem: vg.Allocator, c: *Counter, tag: i32) i64 {
     c.n +%= 1;
-    c.log = vg.append(i32, c.log, tag);
+    c.log = vg.append(mem, i32, c.log, tag);
     return vg.cv(i64, tag);
 }
 
@@ -43,8 +43,8 @@ pub fn DivMod32(a: i32, b: i32) Tup_i32_i32 {
     return .{ vg.divT(a, b), vg.remT(a, b) };
 }
 
-pub fn BytesProbe(s: vg.Str) i64 {
-    const b: vg.Slice(u8) = vg.bytesFromStr(s);
+pub fn BytesProbe(mem: vg.Allocator, s: vg.Str) i64 {
+    const b: vg.Slice(u8) = vg.bytesFromStr(mem, s);
     if ((b.len > 0)) {
         b.at(0).* = 88;
     }
@@ -58,9 +58,9 @@ pub fn BytesProbe(s: vg.Str) i64 {
     return t;
 }
 
-pub fn sliceFrom(c: *Counter, n: i64) vg.Slice(i32) {
+pub fn sliceFrom(mem: vg.Allocator, c: *Counter, n: i64) vg.Slice(i32) {
     c.n +%= 1;
-    const out: vg.Slice(i32) = vg.make(i32, n);
+    const out: vg.Slice(i32) = vg.make(mem, i32, n);
     {
         var i: i64 = 0;
         while ((i < n)) : (i +%= 1) {
@@ -70,10 +70,10 @@ pub fn sliceFrom(c: *Counter, n: i64) vg.Slice(i32) {
     return out;
 }
 
-pub fn RangeProbe(c: *Counter) i64 {
+pub fn RangeProbe(mem: vg.Allocator, c: *Counter) i64 {
     var t: i64 = vg.cv(i64, 0);
     {
-        const _t1 = sliceFrom(c, 4);
+        const _t1 = sliceFrom(mem, c, 4);
         var _t2: i64 = 0;
         while (_t2 < _t1.len) : (_t2 += 1) {
             var i: i64 = _t2;
@@ -139,24 +139,24 @@ pub fn three(a: i64, b: i64, x: i64) i64 {
     return (((a *% 100) +% (b *% 10)) +% x);
 }
 
-pub fn OrderArgs(c: *Counter) i64 {
-    return (three(bump(c, 1), bump(c, 2), bump(c, 3)) +% logCode(c));
+pub fn OrderArgs(mem: vg.Allocator, c: *Counter) i64 {
+    return (three(bump(mem, c, 1), bump(mem, c, 2), bump(mem, c, 3)) +% logCode(c));
 }
 
-pub fn OrderBinary(c: *Counter) i64 {
-    const v: i64 = (bump(c, 4) -% (2 *% bump(c, 5)));
+pub fn OrderBinary(mem: vg.Allocator, c: *Counter) i64 {
+    const v: i64 = (bump(mem, c, 4) -% (2 *% bump(mem, c, 5)));
     return ((v *% 10000) +% logCode(c));
 }
 
-pub fn OrderIndex(c: *Counter) i64 {
-    const s: vg.Slice(i32) = sliceFrom(c, 6);
-    const v: i64 = vg.cv(i64, s.at(bump(c, 2)).*);
+pub fn OrderIndex(mem: vg.Allocator, c: *Counter) i64 {
+    const s: vg.Slice(i32) = sliceFrom(mem, c, 6);
+    const v: i64 = vg.cv(i64, s.at(bump(mem, c, 2)).*);
     return ((v *% 10000) +% logCode(c));
 }
 
-pub fn SpareProbe() i64 {
-    var s: vg.Slice(i64) = vg.makeCap(i64, 0, 4);
-    s = vg.append(i64, s, 5);
+pub fn SpareProbe(mem: vg.Allocator) i64 {
+    var s: vg.Slice(i64) = vg.makeCap(mem, i64, 0, 4);
+    s = vg.append(mem, i64, s, 5);
     s = s.head(4);
     var t: i64 = vg.cv(i64, 0);
     {
@@ -165,10 +165,10 @@ pub fn SpareProbe() i64 {
             t = (((t *% 10) +% s.at(i).*) +% 1);
         }
     }
-    var g: vg.Slice(i64) = vg.makeCap(i64, 0, 2);
-    g = vg.append(i64, g, 1);
-    g = vg.append(i64, g, 2);
-    g = vg.append(i64, g, 3);
+    var g: vg.Slice(i64) = vg.makeCap(mem, i64, 0, 2);
+    g = vg.append(mem, i64, g, 1);
+    g = vg.append(mem, i64, g, 2);
+    g = vg.append(mem, i64, g, 3);
     if ((g.cap >= 4)) {
         g = g.head(4);
     }
@@ -181,17 +181,17 @@ pub fn SpareProbe() i64 {
     return t;
 }
 
-pub fn NilProbe() i64 {
+pub fn NilProbe(mem: vg.Allocator) i64 {
     var s: vg.Slice(i32) = .{};
     var t: i64 = vg.cv(i64, 0);
     if ((s.p == null)) {
         t +%= 1;
     }
-    const s2: vg.Slice(i32) = vg.make(i32, 0);
+    const s2: vg.Slice(i32) = vg.make(mem, i32, 0);
     if ((s2.p != null)) {
         t +%= 2;
     }
-    s = vg.append(i32, s, 5);
+    s = vg.append(mem, i32, s, 5);
     if ((s.p != null)) {
         t +%= 4;
     }
@@ -224,8 +224,8 @@ pub fn ConvProbe(x: i64) u64 {
     return (vg.cv(u64, vg.cv(u8, x)) +% (vg.cv(u64, vg.cv(u32, vg.cv(i32, x))) *% 1000));
 }
 
-pub fn SubWrite(n: i64) i64 {
-    const s: vg.Slice(i64) = vg.make(i64, n);
+pub fn SubWrite(mem: vg.Allocator, n: i64) i64 {
+    const s: vg.Slice(i64) = vg.make(mem, i64, n);
     s.tail(1).at(0).* = 7;
     s.tail(1).tail(1).at(0).* = 9;
     var t: i64 = vg.cv(i64, 0);
@@ -238,10 +238,10 @@ pub fn SubWrite(n: i64) i64 {
     return t;
 }
 
-pub fn AndNotOrder(c: *Counter) i64 {
-    const s: vg.Slice(u64) = vg.make(u64, 8);
+pub fn AndNotOrder(mem: vg.Allocator, c: *Counter) i64 {
+    const s: vg.Slice(u64) = vg.make(mem, u64, 8);
     s.at(3).* = 255;
-    s.at((bump(c, 1) +% 2)).* &= ~((vg.cv(u64, bump(c, 2)) +% 15));
+    s.at((bump(mem, c, 1) +% 2)).* &= ~((vg.cv(u64, bump(mem, c, 2)) +% 15));
     return ((vg.cv(i64, s.at(3).*) *% 100000) +% logCode(c));
 }
 
@@ -255,8 +255,8 @@ pub fn ZeroArray() i64 {
     return t;
 }
 
-pub fn MakeU64(n: u64) i64 {
-    const s: vg.Slice(i32) = vg.make(i32, @intCast(n));
+pub fn MakeU64(mem: vg.Allocator, n: u64) i64 {
+    const s: vg.Slice(i32) = vg.make(mem, i32, @intCast(n));
     return vg.cv(i64, s.len);
 }
 
@@ -268,8 +268,8 @@ pub fn mkTriple(x: i64) [3]i64 {
     return a;
 }
 
-pub fn PickArray(c: *Counter) i64 {
-    const v: i64 = mkTriple(40)[@intCast(bump(c, 2))];
+pub fn PickArray(mem: vg.Allocator, c: *Counter) i64 {
+    const v: i64 = mkTriple(40)[@intCast(bump(mem, c, 2))];
     return ((v *% 10000) +% logCode(c));
 }
 

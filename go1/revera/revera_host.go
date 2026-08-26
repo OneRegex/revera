@@ -7,7 +7,6 @@ package revera
 
 import (
 	_ "embed"
-	"sync"
 )
 
 //go:embed data.bin
@@ -22,16 +21,16 @@ func EmbeddedLocaleData() string {
 // DupMax is the largest supported interval count.
 const DupMax = dupMax
 
-var embeddedOnce sync.Once
-var embeddedData Locale
-
 // Open resolves a locale name against the embedded data. It mirrors
-// go0's locale.Open. The embedded blob is loaded and validated once.
+// go0's locale.Open. The blob is validated on every call, which is
+// cheap: LocaleLoad only builds views into it. A host that keeps a
+// base locale around calls LocaleLoad itself.
 func Open(name, collationType string) (Locale, bool) {
-	embeddedOnce.Do(func() {
-		embeddedData, _ = LocaleLoad(embeddedLocaleData)
-	})
-	return LocaleSelect(&embeddedData, name, collationType)
+	base, ok := LocaleLoad(embeddedLocaleData)
+	if !ok {
+		return Locale{}, false
+	}
+	return LocaleSelect(&base, name, collationType)
 }
 
 // MatchAll calls fn for every non-overlapping match, left to right,

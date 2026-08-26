@@ -2,11 +2,18 @@
 // engine. It reads protocol commands on stdin, one per line, and
 // prints one output line per command. The protocol is defined by
 // go1/revera/driver_host.go, the Go reference implementation.
+//
+// The host owns three arenas. Locale data lives in the persistent
+// arena. A compiled pattern lives in the pattern arena until the
+// next compile. Everything one operation allocates comes from the
+// scratch arena, reset before each operation. Each engine call
+// receives the arena that must back its allocations.
 
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "engine.hpp"
 
@@ -16,11 +23,6 @@ static const char data_bin[] = {
 
 using namespace revera;
 
-static Locale base_loc;
-static Locale cur_loc;
-static Regexp cur_re;
-static bool re_valid = false;
-
 static uint8_t hexval(char c) {
     if (c >= '0' && c <= '9') {
         return uint8_t(c - '0');
@@ -28,12 +30,12 @@ static uint8_t hexval(char c) {
     return uint8_t(c - 'a' + 10);
 }
 
-static vg::Str decode(const std::string& tok) {
+static vg::Str decode(vg::Arena& mem, const std::string& tok) {
     if (tok == "-") {
         return vg::Str{};
     }
     int64_t n = int64_t(tok.size() / 2);
-    vg::Slice<uint8_t> buf = vg::make<uint8_t>(n);
+    vg::Slice<uint8_t> buf = vg::make<uint8_t>(mem, n);
     for (int64_t i = 0; i < n; i++) {
         buf.p[i] = uint8_t(hexval(tok[2 * i]) << 4 | hexval(tok[2 * i + 1]));
     }
@@ -59,7 +61,15 @@ static char* tok_next(char** cursor) {
 }
 
 int main() {
-    vg::use_persistent_arena();
+    vg::Arena persistent;
+    vg::Arena pattern;
+    vg::Arena scratch;
+
+    Locale base_loc;
+    Locale cur_loc;
+    Regexp cur_re;
+    bool re_valid = false;
+
     auto loaded = LocaleLoad(vg::Str{data_bin, int64_t(sizeof(data_bin))});
     if (!loaded.r1) {
         std::fputs("embedded locale data failed to load\n", stderr);
@@ -67,11 +77,10 @@ int main() {
     }
     base_loc = loaded.r0;
     cur_loc = LocalePOSIX();
-    vg::use_scratch_arena();
 
-    static char line[1 << 20];
-    while (std::fgets(line, sizeof(line), stdin) != nullptr) {
-        char* cursor = line;
+    std::vector<char> line(1 << 20);
+    while (std::fgets(line.data(), int(line.size()), stdin) != nullptr) {
+        char* cursor = line.data();
         char* cmd = tok_next(&cursor);
         if (cmd == nullptr) {
             continue;
@@ -83,11 +92,9 @@ int main() {
             break;
         }
         case 'L': {
-            vg::use_persistent_arena();
-            vg::Str name = decode(tok_next(&cursor));
-            vg::Str coll = decode(tok_next(&cursor));
-            auto res = LocaleSelect(base_loc, name, coll);
-            vg::use_scratch_arena();
+            vg::Str name = decode(persistent, tok_next(&cursor));
+            vg::Str coll = decode(persistent, tok_next(&cursor));
+            auto res = LocaleSelect(persistent, base_loc, name, coll);
             if (res.r1) {
                 cur_loc = res.r0;
             }
@@ -99,11 +106,10 @@ int main() {
             std::string patTok = tok_next(&cursor);
             re_valid = false;
             cur_re = Regexp{};
-            vg::reset_pattern_arena();
-            vg::use_pattern_arena();
-            vg::Str pat = decode(patTok);
-            auto res = Compile(pat, cur_loc, flags);
-            vg::use_scratch_arena();
+            pattern.reset();
+            scratch.reset();
+            vg::Str pat = decode(pattern, patTok);
+            auto res = Compile(pattern, pat, cur_loc, flags);
             if (res.r1.Code != 0) {
                 std::printf("C %" PRId32 " %" PRId64 " 0\n", res.r1.Code, res.r1.Pos);
                 break;
@@ -118,11 +124,11 @@ int main() {
                 std::puts("X ERR");
                 break;
             }
-            vg::reset_scratch_arena();
+            scratch.reset();
             uint32_t eflags = uint32_t(std::strtoul(tok_next(&cursor), nullptr, 10));
-            vg::Str subject = decode(tok_next(&cursor));
-            auto pmatch = vg::make<Match>(NumSub(cur_re) + 1);
-            auto res = Exec(cur_re, subject, pmatch, eflags);
+            vg::Str subject = decode(scratch, tok_next(&cursor));
+            auto pmatch = vg::make<Match>(scratch, NumSub(cur_re) + 1);
+            auto res = Exec(scratch, cur_re, subject, pmatch, eflags);
             if (res.r1.Code != 0) {
                 std::printf("X %" PRId32 " 0\n", res.r1.Code);
                 break;
@@ -143,12 +149,12 @@ int main() {
                 std::puts("R ERR");
                 break;
             }
-            vg::reset_scratch_arena();
+            scratch.reset();
             int64_t limit = std::strtoll(tok_next(&cursor), nullptr, 10);
             uint32_t eflags = uint32_t(std::strtoul(tok_next(&cursor), nullptr, 10));
-            vg::Str repl = decode(tok_next(&cursor));
-            vg::Str subject = decode(tok_next(&cursor));
-            auto res = ReplaceAll(cur_re, subject, repl, limit, eflags);
+            vg::Str repl = decode(scratch, tok_next(&cursor));
+            vg::Str subject = decode(scratch, tok_next(&cursor));
+            auto res = ReplaceAll(scratch, cur_re, subject, repl, limit, eflags);
             if (res.r1.Code != 0) {
                 std::printf("R %" PRId32 " %lld -\n", res.r1.Code, (long long)res.r1.Pos);
                 break;
@@ -163,22 +169,22 @@ int main() {
                 std::puts("I ERR");
                 break;
             }
-            vg::reset_scratch_arena();
+            scratch.reset();
             int64_t limit = std::strtoll(tok_next(&cursor), nullptr, 10);
             uint32_t eflags = uint32_t(std::strtoul(tok_next(&cursor), nullptr, 10));
-            vg::Str subject = decode(tok_next(&cursor));
+            vg::Str subject = decode(scratch, tok_next(&cursor));
             auto ires = MatchIterInit(cur_re, limit);
             if (ires.r1.Code != 0) {
                 std::printf("I %" PRId32 " 0\n", ires.r1.Code);
                 break;
             }
             MatchIter iter = ires.r0;
-            auto pmatch = vg::make<Match>(NumSub(cur_re) + 1);
+            auto pmatch = vg::make<Match>(scratch, NumSub(cur_re) + 1);
             std::string rows;
             int64_t count = 0;
             bool failed = false;
             for (;;) {
-                auto res = MatchIterNext(cur_re, iter, subject, eflags, pmatch);
+                auto res = MatchIterNext(scratch, cur_re, iter, subject, eflags, pmatch);
                 if (res.r1.Code != 0) {
                     std::printf("I %" PRId32 " 0\n", res.r1.Code);
                     failed = true;
@@ -213,7 +219,7 @@ int main() {
                 std::puts("T ERR");
                 break;
             }
-            vg::reset_scratch_arena();
+            scratch.reset();
             int64_t maxInput = std::strtoll(tok_next(&cursor), nullptr, 10);
             Contract c = ContractFor(cur_re, maxInput);
             std::printf("T %d %" PRId64 " %" PRId64 " %" PRId64 "\n",
