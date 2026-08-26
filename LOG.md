@@ -542,3 +542,33 @@ commands exactly like the Go engine, trap free. Each theorem
 depends only on propext, Classical.choice, Quot.sound and its
 native_decide axiom. The proofs live in their own lake target, so
 building the vegocheck tool no longer replays them.
+
+## Simplify pass on the LEAN4 model
+
+Four parallel review agents (reuse, simplification, efficiency,
+altitude) went over the Lean sources and the crosscheck change.
+Applied: the corpus replay policy now lives in one corpusStep
+function that both runCorpusFuel and the vegocheck loop fold over,
+with parseCorpus shared the same way; the Session resolves every
+protocol function index and struct field position once at start
+(the O digest alone was re-scanning 195 function names twice per
+rune); Session.call1/call2 replaced fourteen hand-written arity
+matches; Machine.call now enters the interpreter through the same
+runFn as in-language calls; append, copy and the byte conversions
+use bulk buffer reads and writes instead of per-element cell
+round-trips; byteCompare, strCompare and applyCmp moved to the
+core so the elaborator's constant folding shares them; the dead
+probeProg/reveraProg pair left Data.lean; the probe harness lost
+its m1..m32 numbering; hex encoding uses Nat.digitChar and decodes
+without a char list; and a dozen smaller cleanups (List.lookup,
+refutable let patterns, merged match arms, dropped unused
+constructor fields, an always_inline monad instance). Skipped by
+choice: hoisting the per-arm fuel matches (the boilerplate is the
+price of first-order termination, and a forty-arm rewrite of the
+verified interpreter risks silent fuel drift for a cosmetic gain),
+the path-list avoidance in place resolution and pre-evaluated
+switch tables (deeper interpreter rework than the payoff), and an
+opaque reference type for the generation tags (a violation already
+traps deterministically). Probe, edge, heavy-segment and 3000-
+command checks pass on the refactored code; the theorem build and
+the full replay were relaunched to re-establish the proofs.

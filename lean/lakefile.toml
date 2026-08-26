@@ -1,0 +1,14 @@
+name = "vego"
+defaultTargets = ["Vego", "vegocheck", "Proofs"]
+
+[[lean_lib]]
+name = "Vego"
+precompileModules = true
+
+[[lean_lib]]
+name = "Proofs"
+roots = ["Vego.Theorems"]
+
+[[lean_exe]]
+name = "vegocheck"
+root = "Main"
