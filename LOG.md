@@ -788,3 +788,163 @@ hardcoding 256, which needs the elaborator to carry its folded
 const environment onto TProgram, and grouping the meter fields
 into a nested record, which touches every one of the fifty MOK
 lemmas. Both are worth doing and neither is cleanup.
+
+## Idiomatic public APIs for the four targets
+
+The user asked for public interfaces that look idiomatic and are
+simple to use, in the generated Go, C++, Rust and Zig
+implementations.
+
+The generated engine was the whole surface until now. It exports
+every internal function, asks the caller for an arena, returns
+integer error codes, and names things after the Vego package. That
+shape is right for a translator and wrong for a programmer. So
+each target now carries one hand-written file above the engine.
+The engine did not change; only C++ needed a printer flag, and the
+Vego JSON is untouched, so the LEAN4 proofs stand as they were.
+
+Go got the surface back in `revera_host.go`. `New` returns
+`(*Regexp, error)` and `MustNew` panics for build-time patterns.
+The options are functions: `CaseInsensitive()`,
+`NewlineSensitive()`, `NoCaptures()`, `ShortestMatch()` and
+`In(loc)`. The methods copy the standard `regexp` package names,
+so `MatchString`, `FindStringSubmatch`, `FindAllStringIndex`,
+`ReplaceAllString` and the rest all read as a Go user expects.
+`Error` implements `error`, and `Contract` grew `HeapBytes`,
+`StackBytes` and `Steps` methods. The old ad-hoc wrappers `Open`,
+`MatchAll`, `ReplaceAllFunc` and `CompileWithContract` are gone.
+
+Rust got `src/lib.rs`, and the crate is now a library with the two
+drivers as its binaries. `Regex::new` and `RegexBuilder` compile;
+`find`, `captures`, `find_iter` and `captures_iter` search. A
+missing match is `None` and only a real failure is `Err`, so the
+signatures read `Result<Option<Match>>`. `Match` borrows the
+subject and answers `as_str`, `range`, `start` and `end`.
+`Captures` indexes with `[]` and panics on a group that took no
+part, exactly like the `regex` crate. `Error` implements
+`std::error::Error` and carries an `ErrorKind` and a byte offset.
+
+`Regex` is `Send` and `Sync` in Rust. The claim rests on three
+facts: nothing writes the arena after `build`, every search copies
+the header it walks, and every allocation a search makes goes to
+an arena that search owns and frees. The first fact was checked
+against the Go source; only `Compile` and its helpers write the
+`Regexp` or its nodes.
+
+Zig got `src/revera.zig`, exported by `build.zig` as the module
+`revera`. `Regex.compile` takes an allocator, the pattern and an
+options struct with default fields. Failures are a plain error
+set, and `Options.error_position` receives the byte offset.
+`matches` and `captureMatches` return iterators with `next`. Each
+iterator step owns its scratch arena and frees it, so no iterator
+needs a `deinit` and no caller has to remember one. Zig is the one
+target whose thread claim carries a condition: a search allocates
+from the allocator the caller gave `compile`, so that allocator
+must be thread safe.
+
+C++ got `revera.hpp` and `revera.cpp`. The header includes
+standard headers only: the engine sits behind a `unique_ptr`, so
+`vg.hpp` and the arenas never reach a caller. `revera::Regex`
+searches; `find` and `captures` return `std::optional`, and
+failures throw `revera::Error` with a `Failure` code and the
+offset. `Options` is a designated-initializer struct, so
+`revera::Regex re("ab+", {.case_insensitive = true});` works.
+This is the one target that needed a printer change: C++ has a
+single namespace mechanism for both levels, so `json2cpp` took a
+`-ns` flag and the generated engine moved to
+`namespace revera::engine`.
+
+The execution flags of `regexec()` stay off all four surfaces.
+`REG_NOTBOL` and `REG_NOTEOL` matter for scanning a buffer in
+pieces, and the iterators already handle that case themselves. A
+caller who still wants them drops to the generated engine, which
+every target keeps reachable and documents.
+
+Each target gained a test file for its API: `api_test.go`,
+`tests/api.rs`, `src/revera_test.zig` and `api_test.cpp`. All four
+cover the same ground, including a thread test that exercises the
+shared-search claim. The C++ and Zig builds gained a `test` target.
+
+Verification: the full Go suite passes, `cargo test` passes with
+its two doctests, `zig build test` passes ten tests, `make test`
+passes in cpp1, and the full crosscheck replays 86691 commands
+against all three drivers with no disagreement. Spec section 9.2
+records how each target separates the two levels.
+
+## Simplify pass on the public APIs
+
+The user ran /simplify over the API change. Four review angles ran
+as parallel agents, and the most valuable finding was a measured
+one. The C++ `find_all` gave the whole iteration a single arena,
+and `vg::Arena` frees only when it dies, so every match's search
+workspace stayed alive until the scan ended. A 20000-match subject
+peaked at 167 MB. One arena per step, with the match slice kept in
+an outer arena, brings the same call to 3 MB. Rust and Zig already
+built a fresh arena per step, so C++ was alone in this.
+
+Three findings were wrong and stayed unfixed. Two agents proposed
+allocating fewer match slots for whole-match iteration, but
+`MatchIterNext` refuses a slice shorter than `NumSub()+1` and
+reports `ESpace`. One agent read a `defer` inside a Zig loop body
+as deferring to the end of the function; Zig runs it at the end of
+each iteration.
+
+What the pass changed, beyond the arena fix. In Rust, `Contract`
+became a plain struct with public fields, which is what C++ and
+Zig already had, and that removed seven accessors and a
+hand-written `Debug`. The `Scan` tri-state became an enum, and the
+832-byte header copy moved out of the per-step path into the enum,
+where one copy serves the whole scan. `exec` and `step` now take a
+closure, so a search for one span no longer builds a `Vec` for it.
+`ErrorKind::NoMatch` went, because the engine never returns that
+code and the other two targets had already left it out.
+
+In Zig, the `Scratch` type was `std.heap.ArenaAllocator` under
+another name, so it went and the six call sites use the stdlib type
+directly. The `gpa` field duplicated `arena.child_allocator`, so it
+went too. `clamp` was `std.math.lossyCast`. The test file also lost
+fourteen `@as(usize, ...)` wrappers: `expectEqual` resolves the
+literal against the value it is compared with, so the casts said
+nothing. The casts that remain, in `revera.zig`, `main.zig` and
+`vg.zig`, are all conversions the compiler demands; removing the
+one in `Str.sub` fails with "@intCast must have a known result
+type", because pointer arithmetic gives it no result type.
+
+In Go, four `FindAll` methods repeated the same eight-line
+scaffold, and a generic `collect` replaced it. A `search` helper
+now holds the `FlagNoSub` rule that had been written twice and
+omitted four times. `texts` reads the match spans directly instead
+of routing them through a throwaway `[]int`. `ReplaceAllStringFunc`
+uses `strings.Builder`, which drops the final full copy that
+`string(out)` was making. The Go suite also gained the concurrency
+test the other three targets already had; it passes under `-race`.
+
+Both runtimes gained the two helpers the API layers had been
+writing for themselves: `str`/`view` to wrap caller bytes as a
+`Str`, which `vg.zig` already had, and `str_dup` to copy a string
+into an arena. That removed a `reinterpret_cast` from the C++ layer
+and a hand-built `Str` from the Rust one.
+
+The Rust driver went back to its own `mod engine; mod vg;`. Using
+the library put the differential driver, which is what proves the
+engine agrees with Go, downstream of the convenience layer; a
+broken `lib.rs` would have stopped the verification build.
+
+Skipped, with reasons. Moving the `FlagNoSub` guard into the Vego
+source would fix it once for all four targets and put it under the
+LEAN model, but it changes `revera.vego.json` and needs every
+engine and the proof artifacts regenerated, which is well outside
+this change. Carrying doc comments through the JSON so each printer
+can emit them is the root fix for several duplication findings, and
+it is a project of its own. The `-ns` default for `json2cpp` is
+still the package name, which is now wrong for cpp1; a regeneration
+that forgets the flag collides with `revera.hpp` and fails to
+compile, loudly, so the Makefile is adequate. The lossy UTF-8
+conversion in the Rust layer stays lossy: the input is always
+valid, and a panic would be worse than a replacement character.
+
+Verification after the pass: the full Go suite, `cargo test`,
+`zig build test`, `make test` in cpp1, and the full crosscheck over
+86691 commands against all three drivers, plus probecheck. The
+comment edit in `replace.go` is a subset file, so `vego2json` ran
+again and the JSON came back byte-identical.

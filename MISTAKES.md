@@ -210,3 +210,54 @@
   restructure two interpreter helpers into tail form. Lesson: read
   the elaborated term in the error before scripting tactics
   against imagined shapes.
+
+## 2026-08-27, public APIs of the four targets
+
+- My first Go wrapper filled the offset methods from a `pmatch`
+  slice that `Exec` refuses to write when the expression was
+  compiled with `FlagNoSub`. `Exec` reports success and leaves the
+  slice as it is, so `FindStringIndex` returned the zero value
+  `0, 0`, a silent wrong answer. The wrapper now checks the flag
+  itself and reports `ErrENoSub`. Lesson: when a low-level call
+  answers a narrower question than the wrapper's signature
+  promises, the wrapper has to close the gap, not assume it.
+- I gave the C++ `Options` struct default member initializers and
+  nested it inside `Regex`. A nested class's default member
+  initializers are parsed only after the enclosing class is
+  complete, so `const Options& options = {}` in a `Regex` member
+  declaration does not compile. Moving `Options` to namespace
+  scope fixed it. Lesson: a nested type with defaults cannot be a
+  default argument of its own enclosing class.
+- The Zig `captures` returned `Error!?Captures` while its body
+  allocated, so the compiler rejected `error.OutOfMemory`. Lesson:
+  in Zig, write the error union from what the body can produce,
+  not from the domain error set alone.
+- My first Zig iterator kept one scratch arena alive across steps
+  and reset it between them. That needed a `deinit` on the
+  iterator, which is easy to forget and which nothing else in the
+  API needs. Giving each step its own arena, and copying the
+  offsets out before it goes, removed the whole question. Lesson:
+  a lifetime the caller must remember is a design cost; pay one
+  arena per step to avoid it.
+- I claimed the Zig `Regex` serves any number of threads, in the
+  same words as the other three targets. It does not, on its own:
+  a search allocates its scratch arena from the allocator the
+  caller gave `compile`, and a Zig allocator need not be thread
+  safe. The other three reach a global allocator or the garbage
+  collector, which are. The review caught it, and the claim now
+  carries its condition. Lesson: a thread-safety statement covers
+  every resource a call touches, and an injected allocator is one
+  of them.
+- The Zig `error_position` slot took a 0 when the failure had no
+  position. Zero is a valid pattern offset, so the caller could
+  not tell the two apart. It now leaves the slot as the caller set
+  it. Lesson: do not encode "no value" as a value the domain
+  already uses.
+- The C++ `find_all` gave one arena to a whole iteration. Every
+  match's search workspace stayed alive until the scan ended,
+  because `vg::Arena` frees only when it dies. A 20000-match
+  subject peaked at 167 MB against the 3 MB it needs. Rust and Zig
+  got this right by accident of shape: their iterators build an
+  arena per step. Lesson: an arena's lifetime is a decision, not a
+  detail. Write down which call it serves, and check that a loop
+  did not silently widen it.

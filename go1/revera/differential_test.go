@@ -135,8 +135,8 @@ func TestDifferentialMultiElement(t *testing.T) {
 	if !ok {
 		t.Fatal("go0 cs locale missing")
 	}
-	cs1, ok1 := Open("cs", "")
-	if !ok1 {
+	cs1, err1 := OpenLocale("cs", "")
+	if err1 != nil {
 		t.Fatal("go1 cs locale missing")
 	}
 	rng := rand.New(rand.NewSource(5))
@@ -244,19 +244,18 @@ func TestErrorText(t *testing.T) {
 }
 
 func TestContractSmoke(t *testing.T) {
-	re, c, err := CompileWithContract("(a|ab)(c|bcd)(d*)", LocalePOSIX(), 0, 1<<12)
-	if err.Code != ErrNone {
-		t.Fatalf("CompileWithContract failed: code %d", err.Code)
+	re, err := New("(a|ab)(c|bcd)(d*)")
+	if err != nil {
+		t.Fatalf("compile failed: %v", err)
 	}
+	c := re.Contract(1 << 12)
 	if !c.HasSolver {
 		t.Fatal("expected a solver contract")
 	}
-	if ContractHeapBytes(&c) <= 0 || ContractStackBytes(&c) <= 0 ||
-		ContractSteps(&c) <= 0 {
+	if c.HeapBytes() <= 0 || c.StackBytes() <= 0 || c.Steps() <= 0 {
 		t.Fatalf("contract has nonpositive figures: %+v", c)
 	}
-	small := ContractFor(&re, 16)
-	if ContractSteps(&small) > ContractSteps(&c) {
+	if re.Contract(16).Steps() > c.Steps() {
 		t.Fatal("contract steps must grow with the input bound")
 	}
 }

@@ -1,12 +1,19 @@
 package revera
 
 // Host file, outside the Vego subset. It supplies what the subset
-// cannot express on purpose: the embedded locale data and the
-// callback-style convenience wrappers. Every language a translator
-// targets replaces this file with its own minimal runtime.
+// cannot express on purpose: the embedded locale data, and the
+// idiomatic Go surface over the subset functions. Every language a
+// translator targets writes the same two things for itself.
+//
+// The subset functions stay available and unchanged. They are the
+// low level: an explicit locale, numeric flags, caller-owned match
+// slices, and an Error value instead of an error. Everything below
+// is a thin layer over them.
 
 import (
 	_ "embed"
+	"fmt"
+	"strings"
 )
 
 //go:embed data.bin
@@ -21,74 +28,329 @@ func EmbeddedLocaleData() string {
 // DupMax is the largest supported interval count.
 const DupMax = dupMax
 
-// Open resolves a locale name against the embedded data. It mirrors
-// go0's locale.Open. The blob is validated on every call, which is
-// cheap: LocaleLoad only builds views into it. A host that keeps a
-// base locale around calls LocaleLoad itself.
-func Open(name, collationType string) (Locale, bool) {
-	base, ok := LocaleLoad(embeddedLocaleData)
-	if !ok {
-		return Locale{}, false
+// Error implements the error interface. The methods below return a
+// nil error for success, never a zero Error. A caller that stores a
+// subset result in an error variable must check the code first,
+// because an interface holding a zero Error is not nil.
+func (e Error) Error() string {
+	if e.Pos >= 0 {
+		return fmt.Sprintf("revera: %s at byte %d", ErrorText(e.Code), e.Pos)
 	}
-	return LocaleSelect(&base, name, collationType)
+	return "revera: " + ErrorText(e.Code)
 }
 
-// MatchAll calls fn for every non-overlapping match, left to right,
-// like go0's MatchAll. The pmatch slice is reused between calls, so
-// fn must copy what it keeps. A return of false stops the scan.
-func MatchAll(re *Regexp, subject string, limit int, eflags uint32, fn func(pmatch []Match) bool) Error {
-	it, err := MatchIterInit(re, limit)
+// asError maps the subset Error onto the Go convention: nil for
+// success, the value itself otherwise.
+func asError(e Error) error {
+	if e.Code == ErrNone {
+		return nil
+	}
+	return e
+}
+
+// An Option changes how New compiles a pattern.
+type Option func(*settings)
+
+type settings struct {
+	loc   Locale
+	flags uint32
+}
+
+// CaseInsensitive matches upper and lower case alike, like REG_ICASE.
+func CaseInsensitive() Option {
+	return func(s *settings) { s.flags |= FlagICase }
+}
+
+// NewlineSensitive gives ^ and $ their line meaning and stops dot
+// and negated brackets on a newline, like REG_NEWLINE.
+func NewlineSensitive() Option {
+	return func(s *settings) { s.flags |= FlagNewline }
+}
+
+// NoCaptures compiles for a yes-or-no answer only, like REG_NOSUB.
+// MatchString still works. Every method that reports offsets or
+// rewrites the subject fails with ErrENoSub.
+func NoCaptures() Option {
+	return func(s *settings) { s.flags |= FlagNoSub }
+}
+
+// ShortestMatch makes every duplication prefer the shortest
+// repetition. A repetition modifier reverses one duplication back.
+func ShortestMatch() Option {
+	return func(s *settings) { s.flags |= FlagMinimal }
+}
+
+// In compiles the pattern in loc instead of the POSIX locale. The
+// locale decides character classes, case folding, and the meaning
+// of collating elements and equivalence classes.
+func In(loc Locale) Option {
+	return func(s *settings) { s.loc = loc }
+}
+
+// New compiles pattern as a POSIX.1-2024 extended regular
+// expression. Without options it uses the POSIX locale and no
+// flags.
+func New(pattern string, opts ...Option) (*Regexp, error) {
+	s := settings{loc: LocalePOSIX()}
+	for _, opt := range opts {
+		opt(&s)
+	}
+	re, err := Compile(pattern, s.loc, s.flags)
+	if err.Code != ErrNone {
+		return nil, err
+	}
+	return &re, nil
+}
+
+// MustNew is New for patterns fixed at build time. It panics when
+// the pattern does not compile.
+func MustNew(pattern string, opts ...Option) *Regexp {
+	re, err := New(pattern, opts...)
+	if err != nil {
+		panic(err.Error())
+	}
+	return re
+}
+
+// OpenLocale resolves a CLDR locale name against the embedded data.
+// An empty collation type selects the standard collation of the
+// locale. LocaleNames lists the names this accepts.
+func OpenLocale(name, collationType string) (Locale, error) {
+	loc, ok := LocaleOpen(embeddedLocaleData, name, collationType)
+	if !ok {
+		return loc, fmt.Errorf("revera: no locale %q with collation %q", name, collationType)
+	}
+	return loc, nil
+}
+
+// LocaleNames returns every locale name in the embedded data, in
+// the order the data stores them.
+func LocaleNames() []string {
+	base, ok := LocaleLoad(embeddedLocaleData)
+	if !ok {
+		return nil
+	}
+	names := make([]string, LocaleCount(&base))
+	for i := range names {
+		names[i] = LocaleName(&base, i)
+	}
+	return names
+}
+
+// NumSubexp returns the number of parenthesized subexpressions,
+// like re_nsub.
+func (re *Regexp) NumSubexp() int {
+	return NumSub(re)
+}
+
+// MatchString reports whether the expression matches anywhere in
+// subject.
+func (re *Regexp) MatchString(subject string) (bool, error) {
+	ok, err := Exec(re, subject, nil, 0)
+	return ok, asError(err)
+}
+
+// FindStringIndex returns the byte offsets of the leftmost-longest
+// match as a two-element slice, or nil when there is no match.
+func (re *Regexp) FindStringIndex(subject string) ([]int, error) {
+	pmatch, err := re.search(subject, 1)
+	if pmatch == nil {
+		return nil, err
+	}
+	return flatten(pmatch), nil
+}
+
+// FindStringSubmatchIndex returns the byte offsets of the match and
+// of every capturing group, as consecutive start and end pairs. A
+// group that took no part in the match has the pair -1, -1. The
+// result is nil when there is no match.
+func (re *Regexp) FindStringSubmatchIndex(subject string) ([]int, error) {
+	pmatch, err := re.search(subject, NumSub(re)+1)
+	if pmatch == nil {
+		return nil, err
+	}
+	return flatten(pmatch), nil
+}
+
+// FindString returns the text of the leftmost-longest match. The
+// second result reports whether there was a match, because a match
+// of the null string returns an empty string too.
+func (re *Regexp) FindString(subject string) (string, bool, error) {
+	pmatch, err := re.search(subject, 1)
+	if pmatch == nil {
+		return "", false, err
+	}
+	return subject[pmatch[0].So:pmatch[0].Eo], true, nil
+}
+
+// FindStringSubmatch returns the text of the match and of every
+// capturing group. A group that took no part in the match holds the
+// empty string; FindStringSubmatchIndex tells the two cases apart.
+// The result is nil when there is no match.
+func (re *Regexp) FindStringSubmatch(subject string) ([]string, error) {
+	pmatch, err := re.search(subject, NumSub(re)+1)
+	if pmatch == nil {
+		return nil, err
+	}
+	return texts(subject, pmatch), nil
+}
+
+// FindAllStringIndex returns the offsets of the first n
+// non-overlapping matches, left to right. A negative n returns them
+// all. The result is nil when there is no match.
+func (re *Regexp) FindAllStringIndex(subject string, n int) ([][]int, error) {
+	return collect(re, subject, n, func(pmatch []Match) []int {
+		return []int{pmatch[0].So, pmatch[0].Eo}
+	})
+}
+
+// FindAllStringSubmatchIndex returns the offsets of the first n
+// non-overlapping matches and their groups, in the layout of
+// FindStringSubmatchIndex. A negative n returns them all.
+func (re *Regexp) FindAllStringSubmatchIndex(subject string, n int) ([][]int, error) {
+	return collect(re, subject, n, flatten)
+}
+
+// FindAllString returns the text of the first n non-overlapping
+// matches. A negative n returns them all.
+func (re *Regexp) FindAllString(subject string, n int) ([]string, error) {
+	return collect(re, subject, n, func(pmatch []Match) string {
+		return subject[pmatch[0].So:pmatch[0].Eo]
+	})
+}
+
+// FindAllStringSubmatch returns the text of the first n
+// non-overlapping matches and their groups. A negative n returns
+// them all.
+func (re *Regexp) FindAllStringSubmatch(subject string, n int) ([][]string, error) {
+	return collect(re, subject, n, func(pmatch []Match) []string {
+		return texts(subject, pmatch)
+	})
+}
+
+// ReplaceAllString returns subject with every non-overlapping match
+// replaced by replacement, like the sed s///g command. In
+// replacement, & stands for the whole match and \1 through \9 for
+// one group; a backslash escapes the next character.
+//
+// The subset function ReplaceAll takes a replacement limit.
+func (re *Regexp) ReplaceAllString(subject, replacement string) (string, error) {
+	out, err := ReplaceAll(re, subject, replacement, -1, 0)
+	return out, asError(err)
+}
+
+// ReplaceAllStringFunc returns subject with every non-overlapping
+// match replaced by the return value of repl, which receives the
+// text of the match.
+func (re *Regexp) ReplaceAllStringFunc(subject string, repl func(match string) string) (string, error) {
+	var out strings.Builder
+	last := 0
+	any := false
+	err := re.eachMatch(subject, -1, func(pmatch []Match) {
+		if !any {
+			out.Grow(len(subject) + len(subject)/8)
+			any = true
+		}
+		out.WriteString(subject[last:pmatch[0].So])
+		out.WriteString(repl(subject[pmatch[0].So:pmatch[0].Eo]))
+		last = pmatch[0].Eo
+	})
+	if err != nil {
+		return "", err
+	}
+	if !any {
+		return subject, nil
+	}
+	out.WriteString(subject[last:])
+	return out.String(), nil
+}
+
+// Contract bounds what one match can cost on a subject of at most
+// maxInput bytes. An application compares the figures against its
+// budget and refuses the expression before it ever runs.
+func (re *Regexp) Contract(maxInput int) Contract {
+	return ContractFor(re, maxInput)
+}
+
+// HeapBytes bounds the explicit heap allocation of one match, in
+// bytes.
+func (c Contract) HeapBytes() int64 {
+	return ContractHeapBytes(&c)
+}
+
+// StackBytes estimates the deepest call stack of one match, in
+// bytes.
+func (c Contract) StackBytes() int64 {
+	return ContractStackBytes(&c)
+}
+
+// Steps bounds the abstract operations of one match. The figure
+// counts unit-cost operations, not nanoseconds.
+func (c Contract) Steps() int64 {
+	return ContractSteps(&c)
+}
+
+// search runs one search for groups offsets. It returns nil when
+// there is no match, which the FlagNoSub error case reports too.
+func (re *Regexp) search(subject string, groups int) ([]Match, error) {
+	if re.flags&FlagNoSub != 0 {
+		return nil, compileError(ErrENoSub, -1)
+	}
+	pmatch := make([]Match, groups)
+	ok, err := Exec(re, subject, pmatch, 0)
+	if err.Code != ErrNone || !ok {
+		return nil, asError(err)
+	}
+	return pmatch, nil
+}
+
+// collect gathers one value per match, for the first n
+// non-overlapping matches.
+func collect[T any](re *Regexp, subject string, n int, one func(pmatch []Match) T) ([]T, error) {
+	var out []T
+	err := re.eachMatch(subject, n, func(pmatch []Match) {
+		out = append(out, one(pmatch))
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// eachMatch calls visit for the first n non-overlapping matches. It
+// reuses one pmatch slice, so visit must copy what it keeps.
+func (re *Regexp) eachMatch(subject string, n int, visit func(pmatch []Match)) error {
+	it, err := MatchIterInit(re, n)
 	if err.Code != ErrNone {
 		return err
 	}
 	pmatch := make([]Match, NumSub(re)+1)
 	for {
-		ok, nerr := MatchIterNext(re, &it, subject, eflags, pmatch)
+		ok, nerr := MatchIterNext(re, &it, subject, 0, pmatch)
 		if nerr.Code != ErrNone {
 			return nerr
 		}
 		if !ok {
-			return noError()
+			return nil
 		}
-		if !fn(pmatch) {
-			return noError()
-		}
+		visit(pmatch)
 	}
 }
 
-// ReplaceAllFunc returns subject with every non-overlapping match
-// replaced by the return value of repl, like go0's ReplaceAllFunc.
-func ReplaceAllFunc(re *Regexp, subject string, limit int, eflags uint32, repl func(pmatch []Match) string) (string, Error) {
-	var out []uint8
-	last := 0
-	any := false
-	err := MatchAll(re, subject, limit, eflags, func(pmatch []Match) bool {
-		if !any {
-			out = make([]uint8, 0, len(subject)+len(subject)/8)
-			any = true
-		}
-		out = append(out, subject[last:pmatch[0].So]...)
-		out = append(out, repl(pmatch)...)
-		last = pmatch[0].Eo
-		return true
-	})
-	if err.Code != ErrNone {
-		return "", err
+func flatten(pmatch []Match) []int {
+	out := make([]int, 0, 2*len(pmatch))
+	for _, m := range pmatch {
+		out = append(out, m.So, m.Eo)
 	}
-	if !any {
-		return subject, noError()
-	}
-	out = append(out, subject[last:]...)
-	return string(out), noError()
+	return out
 }
 
-// CompileWithContract compiles like Compile and also returns the
-// resource contract for subjects of at most maxInput bytes.
-func CompileWithContract(pattern string, loc Locale, flags uint32, maxInput int) (Regexp, Contract, Error) {
-	re, err := Compile(pattern, loc, flags)
-	if err.Code != ErrNone {
-		var c Contract
-		return re, c, err
+func texts(subject string, pmatch []Match) []string {
+	out := make([]string, len(pmatch))
+	for i, m := range pmatch {
+		if m.So >= 0 {
+			out[i] = subject[m.So:m.Eo]
+		}
 	}
-	return re, ContractFor(&re, maxInput), noError()
+	return out
 }

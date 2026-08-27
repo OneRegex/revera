@@ -2,7 +2,7 @@
 
 #include "engine.hpp"
 
-namespace revera {
+namespace revera::engine {
 
 int32_t parseBracket(vg::Arena& mem, parser& p, Locale& loc) {
     int64_t start = p.pos;
@@ -4204,4 +4204,4 @@ uint8_t utf8LeadByte(int32_t r) {
     return uint8_t(int32_t(240 | int32_t(r >> 18LL)));
 }
 
-} // namespace revera
+} // namespace revera::engine

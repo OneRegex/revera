@@ -18,6 +18,7 @@
 #include <cstring>
 #include <initializer_list>
 #include <new>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -94,6 +95,12 @@ struct Str {
 template <size_t N>
 constexpr Str lit(const char (&s)[N]) {
     return Str{s, int64_t(N - 1)};
+}
+
+// str wraps runtime bytes as a Str without copying. The caller
+// keeps the bytes alive.
+inline Str str(std::string_view s) {
+    return Str{s.data(), int64_t(s.size())};
 }
 
 inline bool streq(Str a, Str b) {
@@ -263,6 +270,16 @@ inline Slice<uint8_t> bytes_from_str(Arena& mem, Str s) {
         std::memcpy(out.p, s.p, size_t(s.len));
     }
     return out;
+}
+
+// str_dup copies a string into the arena, so the result outlives
+// the buffer it came from.
+inline Str str_dup(Arena& mem, Str s) {
+    char* p = alloc_elems<char>(mem, s.len);
+    if (s.len > 0) {
+        std::memcpy(p, s.p, size_t(s.len));
+    }
+    return Str{p, s.len};
 }
 
 inline Str str_from_bytes(Arena& mem, Slice<uint8_t> b) {

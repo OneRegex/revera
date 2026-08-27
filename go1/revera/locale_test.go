@@ -51,9 +51,10 @@ func TestLocaleOpenDifferential(t *testing.T) {
 		"tr", "sv", "de@collation=dictionary"}
 	for _, name := range names {
 		_, ok0 := g0loc.Open(name, "")
-		_, ok1 := Open(name, "")
+		_, err1 := OpenLocale(name, "")
+		ok1 := err1 == nil
 		if ok0 != ok1 {
-			t.Fatalf("Open(%q): go0 ok=%v, go1 ok=%v", name, ok0, ok1)
+			t.Fatalf("OpenLocale(%q): go0 ok=%v, go1 ok=%v", name, ok0, ok1)
 		}
 	}
 	if g0loc.Count() != LocaleCountEmbedded(t) {
@@ -64,8 +65,8 @@ func TestLocaleOpenDifferential(t *testing.T) {
 // LocaleCountEmbedded opens one real locale to reach the loaded
 // section table, then counts.
 func LocaleCountEmbedded(t *testing.T) int {
-	l, ok := Open("en", "")
-	if !ok {
+	l, err := OpenLocale("en", "")
+	if err != nil {
 		t.Fatal("en locale missing")
 	}
 	return LocaleCount(&l)
@@ -75,9 +76,10 @@ func TestLocaleOpsDifferential(t *testing.T) {
 	runes := sampleRunes()
 	for _, sel := range localeSamples {
 		l0, ok0 := g0loc.Open(sel.name, sel.ctype)
-		l1, ok1 := Open(sel.name, sel.ctype)
+		l1, err1 := OpenLocale(sel.name, sel.ctype)
+		ok1 := err1 == nil
 		if ok0 != ok1 {
-			t.Fatalf("Open(%q,%q): go0 ok=%v, go1 ok=%v", sel.name, sel.ctype, ok0, ok1)
+			t.Fatalf("OpenLocale(%q,%q): go0 ok=%v, go1 ok=%v", sel.name, sel.ctype, ok0, ok1)
 		}
 		if !ok0 {
 			continue
@@ -122,7 +124,7 @@ func TestLocaleCollationDifferential(t *testing.T) {
 		if !ok0 {
 			continue
 		}
-		l1, _ := Open(sel.name, sel.ctype)
+		l1, _ := OpenLocale(sel.name, sel.ctype)
 		for _, seq := range seqs {
 			if c0, c1 := l0.IsCollatingElement(seq), localeIsCollatingElement(&l1, seq); c0 != c1 {
 				t.Fatalf("%s: IsCollatingElement(%v): go0 %v, go1 %v", sel.name, seq, c0, c1)

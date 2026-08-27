@@ -21,7 +21,7 @@ static const char data_bin[] = {
 #embed "data.bin"
 };
 
-using namespace revera;
+using namespace revera::engine;
 
 static uint8_t hexval(char c) {
     if (c >= '0' && c <= '9') {

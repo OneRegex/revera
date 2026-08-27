@@ -33,10 +33,40 @@ and its JSON representation in full.
   prints its results with the Go original, and `cmd/probecheck`
   diffs each target's probe binary against them.
 
+## Using it
+
+```go
+re, err := revera.New("([a-z]+)([0-9]*)")
+groups, err := re.FindStringSubmatch("__abc12__")
+// groups == []string{"abc12", "abc", "12"}
+```
+
+`revera_host.go` holds the idiomatic Go surface. It is a host file,
+outside the subset, so every target writes the same thing for
+itself.
+
+- `New` compiles and returns `(*Regexp, error)`. `MustNew` panics
+  instead, for patterns fixed at build time.
+- The options are functions: `CaseInsensitive()`,
+  `NewlineSensitive()`, `NoCaptures()`, `ShortestMatch()`, and
+  `In(loc)` for a locale.
+- The methods take the names of the standard `regexp` package:
+  `MatchString`, `FindStringIndex`, `FindStringSubmatch`,
+  `FindAllString`, `ReplaceAllString`, and the rest. Each one adds
+  an `error` result, because a subject can exceed what the engine
+  has capacity for. They return `nil` for a subject that does not
+  match.
+- `Error` implements the `error` interface.
+- `OpenLocale("cs", "")` selects a CLDR locale for bracket
+  expressions. The default is POSIX.
+- `re.Contract(maxInput)` reports what one match can cost before it
+  runs.
+
 ## API differences against go0
 
 The subset has no methods, no interfaces, and no function values, so
-the surface changed shape without changing behavior:
+the low-level surface below the host file changed shape without
+changing behavior:
 
 - Functions replace methods: `Exec(&re, subject, pmatch, eflags)`
   instead of `re.Exec(...)`. `Compile` returns the `Regexp` by
@@ -45,15 +75,13 @@ the surface changed shape without changing behavior:
   success, not a Go `error`.
 - Flags and error codes are plain `uint32` and `int32` constants
   (`FlagICase`, `ExecNotBOL`, `ErrESpace`, ...). The numeric values
-  match go0.
+  match go0. The execution flags reach only this level; the
+  methods above pass none.
 - The callback API became an iterator: `MatchIterInit` and
   `MatchIterNext` drive the scan, and `ReplaceAll` builds on them.
-  The host file restores `MatchAll` and `ReplaceAllFunc` for Go
-  users.
-- `ContractFor(&re, maxInput)` computes the resource contract; the
-  host file keeps `CompileWithContract`. The contract's byte
-  constants track this implementation's records (index arenas and
-  open-addressing memo tables), so the figures differ from go0
+- `ContractFor(&re, maxInput)` computes the resource contract. Its
+  byte constants track this implementation's records (index arenas
+  and open-addressing memo tables), so the figures differ from go0
   while covering the same allocations.
 - Workspaces are fresh per `Exec` call instead of pooled. A
   compiled `Regexp` is never written after `Compile`, so concurrent

@@ -26,9 +26,12 @@ A Vego program is one Go package in one directory.
 - A host file is a file whose name ends in `_host.go` or `_test.go`.
   Host files are ordinary Go, outside the subset. They supply what the
   subset cannot express on purpose: embedded data, test harnesses,
-  and convenience wrappers. A translation of the program to another
-  language must replace the host files with equivalents; this is the
-  "minimal runtime" of that language.
+  and the public API a caller of the program expects. A translation
+  of the program to another language must replace the host files
+  with equivalents; this is the "minimal runtime" of that language.
+  The generated code is the low level of a target, and the target's
+  own public API sits above it. Section 9.2 records how each target
+  keeps the two apart.
 - Subset files must not contain any `import` declaration. The subset
   is hermetic: builtin operations only.
 - The package must compile with `go build` and be clean under
@@ -483,6 +486,38 @@ Two threads with separate contexts share only immutable data, so
 each thread runs its own engine safely. One context must never be
 shared between threads; the Rust runtime rejects that at compile
 time.
+
+### 9.2 The public API of a target
+
+Generated code is the low level of a target. Its names come from
+the Vego package, its errors are integer codes, and it asks the
+caller for a memory context. That surface is right for a
+translator and wrong for a programmer.
+
+Each target therefore adds one hand-written file that wraps the
+generated engine in the shape its own language expects. The
+wrapper owns the memory context, turns the error codes into the
+target's error type, and hides the runtime types. The generated
+engine stays reachable underneath for the few calls the wrapper
+leaves out.
+
+The four targets keep the two levels apart like this:
+
+| Target | Generated engine    | Public API                |
+|--------|---------------------|---------------------------|
+| Go     | package `revera`    | methods in `*_host.go`    |
+| C++    | `revera::engine`    | `revera` in `revera.hpp`  |
+| Rust   | hidden `engine` mod | crate root, `lib.rs`      |
+| Zig    | `engine.zig`        | `revera.zig` module       |
+
+Only C++ needs help from its printer: both levels share one
+namespace mechanism, so `json2cpp` takes a `-ns` flag that moves
+the generated code out of the way.
+
+Go is the exception in the other direction. The subset program is
+itself the Go target, so the public API shares one package with the
+generated engine and cannot hide it. A Go caller sees `New` beside
+`Compile`. The file naming is the only boundary there.
 
 ## 10. Conformance
 

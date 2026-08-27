@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "revera-rust"
+name = "revera"
 version = "0.1.0"

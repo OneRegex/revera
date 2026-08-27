@@ -1,7 +1,11 @@
 [package]
-name = "revera-rust"
+name = "revera"
 version = "0.1.0"
 edition = "2021"
+
+[lib]
+name = "revera"
+path = "src/lib.rs"
 
 [[bin]]
 name = "driver"

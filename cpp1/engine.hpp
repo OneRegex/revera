@@ -4,7 +4,7 @@
 
 #include "vg.hpp"
 
-namespace revera {
+namespace revera::engine {
 
 inline constexpr uint8_t itemChar = 0;
 inline constexpr uint8_t itemElem = 1;
@@ -709,4 +709,4 @@ Tup_i32_i64 decodeRuneAt(vg::Str s, int64_t at);
 int64_t runeCount(vg::Str s);
 uint8_t utf8LeadByte(int32_t r);
 
-} // namespace revera
+} // namespace revera::engine

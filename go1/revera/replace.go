@@ -3,9 +3,9 @@ package revera
 // Global operations. The subset has no function values, so the
 // callback API of go0 becomes an iterator: MatchIterInit and
 // MatchIterNext walk the non-overlapping matches, and ReplaceAll
-// builds on them. A host wrapper can rebuild the callback forms
-// (MatchAll, ReplaceAllFunc) on top of the iterator with a few
-// lines per language.
+// builds on them. A host wrapper rebuilds the callback and
+// collection forms on top of the iterator with a few lines per
+// language; the Go one is ReplaceAllStringFunc.
 
 // MatchIter walks every non-overlapping match, left to right.
 type MatchIter struct {

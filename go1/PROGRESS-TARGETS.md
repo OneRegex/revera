@@ -175,3 +175,37 @@ Functions that never allocate keep their plain signatures; the
 analysis shows LocaleLoad, LocalePOSIX, MatchIterInit and the
 contract queries allocate nothing. Crosscheck and probecheck pass
 on all three targets after the rework.
+
+## Follow-up: public APIs (2026-08-27)
+
+The generated engine was the only surface each target offered. It
+exports every internal function, takes a memory context, and
+returns integer error codes. Each target now adds one hand-written
+file above it, in the shape its own language expects: methods and
+`error` in Go, a crate root with `Result` and iterators in Rust, a
+module with an error set and optionals in Zig, and a pimpl header
+with `std::optional` and exceptions in C++.
+
+Three findings from the work:
+
+- Only C++ needed a printer change. Go, Rust and Zig each have a
+  second scope to put the generated code in (a host file, a
+  private module, a separate file), while C++ has one namespace
+  mechanism for both levels. `json2cpp` took a `-ns` flag, and the
+  engine moved to `namespace revera::engine`.
+- The wrapper cannot assume the engine answers its own question.
+  `Exec` leaves `pmatch` untouched under `FlagNoSub` and still
+  reports success, so an offset-returning wrapper has to refuse
+  the call itself.
+- Sharing one compiled expression between threads is sound in all
+  four targets. Nothing writes the `Regexp` or its nodes after
+  `Compile`; the wrappers copy the header per call and give each
+  call its own arena. Rust states this with `unsafe impl Sync`,
+  and every target's tests exercise it. Zig adds one condition:
+  its searches allocate from the allocator the caller gave
+  `compile`, so that allocator has to be thread safe. The other
+  three reach a global allocator or the garbage collector.
+
+The execution flags of `regexec()` stay off the four surfaces. The
+iterators handle the piecewise-scan case that needs them, and the
+generated engine stays reachable for the rest.

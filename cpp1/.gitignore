@@ -1,2 +1,6 @@
 driver
 driver.dSYM/
+probe
+probe.dSYM/
+api_test
+api_test.dSYM/

@@ -58,6 +58,9 @@ mappings, collating elements, and equivalence classes. The Go module in
   `cmd/json2zig` and `cmd/json2cpp` printers generate the engines in
   [`rust1/`](rust1/), [`zig1/`](zig1/) and [`cpp1/`](cpp1/);
   `cmd/crosscheck` and `cmd/probecheck` verify them differentially.
+  Each target adds a small hand-written public API over the
+  generated engine, in the shape its own language expects. Their
+  READMEs show it.
 - [`lean/`](lean/) holds the LEAN4 model of Vego: a formal semantics
   for the subset and machine-checked theorems that the exact JSON
   artifacts are well formed and reproduce the Go reference outputs,

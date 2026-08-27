@@ -108,6 +108,22 @@ impl Str {
     }
 }
 
+// view wraps runtime bytes as a Str without copying. The caller
+// keeps the bytes alive.
+pub fn view(s: &[u8]) -> Str {
+    Str {
+        p: s.as_ptr(),
+        len: s.len() as i64,
+    }
+}
+
+// str_dup copies a string into the arena, so the result outlives
+// the buffer it came from.
+pub fn str_dup(mem: &Arena, s: Str) -> Str {
+    let b = bytes_from_str(mem, s);
+    Str { p: b.p, len: b.len }
+}
+
 pub const fn lit(s: &'static [u8]) -> Str {
     Str {
         p: s.as_ptr(),
