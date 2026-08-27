@@ -1,23 +1,20 @@
 /-
 Universal theorems about the cost model.
 
-The corpus theorem checks recorded executions; the statements here
-quantify over all inputs and are proved by ordinary induction, so
-they hold universally and use no native evaluation. They pin down
-the arithmetic behind the resource meter:
+The corpus theorem checks recorded executions.
+The statements here quantify over all inputs, and ordinary induction proves them.
+They hold universally, and they use no native evaluation.
+They pin down the arithmetic behind the resource meter:
 
-- the growth rule of the portable append contract makes any run of
-  growing appends allocate at most a fixed multiple of the largest
-  buffer it ever needs (the geometric series argument, made
-  precise on Nat);
-- the layout function that prices buffer elements produces sizes
-  divisible by their alignment, with positive alignment, as the
-  64-bit layout of every target requires;
-- the meter primitives account allocations exactly: a charge adds
-  exactly its size, and the heap operations around it never touch
-  the counter, so a growing append raises the meter by exactly
-  newcap times the element size and an in-place append leaves it
-  unchanged.
+- The growth rule of the portable append contract bounds any run of growing appends.
+  Such a run allocates at most a fixed multiple of the largest buffer it ever needs.
+  This is the geometric series argument, made precise on Nat.
+- The layout function that prices buffer elements produces sizes divisible by their alignment.
+  Every alignment is positive, as the 64-bit layout of every target requires.
+- The meter primitives account allocations exactly.
+  A charge adds exactly its size, and the heap operations around it never touch the counter.
+  A growing append therefore raises the meter by exactly newcap times the element size.
+  An in-place append leaves it unchanged.
 -/
 
 import Vego.Interp
@@ -26,9 +23,9 @@ namespace Vego
 
 /-! ## The growth rule
 
-`growCap` is the interpreter's own definition, from `Interp.lean`,
-so these lemmas cannot drift away from the rule `doAppend`
-applies. -/
+`growCap` is the interpreter's own definition, from `Interp.lean`.
+These lemmas therefore cannot drift away from the rule `doAppend` applies.
+-/
 
 theorem growCap_ge_need (cap need : Nat) : need ≤ growCap cap need :=
   Nat.le_max_right _ _
@@ -37,22 +34,18 @@ theorem growCap_doubles (cap need : Nat) :
     2 * cap ≤ growCap cap need :=
   Nat.le_trans (Nat.le_max_left _ _) (Nat.le_max_left _ _)
 
-/-- A growth step only runs when the buffer is too small, and then
-the new capacity stays within twice the need, plus the floor. -/
+/-- A growth step only runs when the buffer is too small, and then the new capacity stays within twice the need, plus the floor. -/
 theorem growCap_le (cap need n : Nat) (hc : cap < need) (hn : need ≤ n) :
     growCap cap need ≤ 2 * n + 8 :=
   Nat.max_le.mpr ⟨Nat.max_le.mpr ⟨by omega, by omega⟩, by omega⟩
 
-/-- The capacities a buffer goes through, oldest first: every step
-at least doubles, which is what `growCap_doubles` gives each grown
-capacity. -/
+/-- The capacities a buffer goes through, oldest first: every step at least doubles, which is what `growCap_doubles` gives each grown capacity. -/
 def GrowthChain : List Nat → Prop
   | [] => True
   | [_] => True
   | a :: b :: rest => 2 * a ≤ b ∧ GrowthChain (b :: rest)
 
-/-- The geometric series bound: a doubling chain allocates less
-than twice its final capacity, over its whole history. -/
+/-- The geometric series bound: a doubling chain allocates less than twice its final capacity, over its whole history. -/
 theorem growthChain_total (a : Nat) (l : List Nat)
     (h : GrowthChain (a :: l)) :
     (a :: l).sum + a ≤ 2 * (a :: l).getLastD 0 := by
@@ -64,22 +57,23 @@ theorem growthChain_total (a : Nat) (l : List Nat)
     simp only [List.sum_cons, List.getLastD_cons] at *
     omega
 
-/-- Every run of growing appends whose needs stay within n
-allocates at most 2 * (2n + 8) elements in total, across all the
-buffers it ever abandons to the arena. This is the universal form
-of the doubling constants the resource contract folds into its
-per-record sizes. -/
+/--
+Take a run of growing appends whose needs stay within n.
+It allocates at most 2 * (2n + 8) elements in total.
+That total covers every buffer it ever abandons to the arena.
+This is the universal form of the doubling constants the resource contract folds into its per-record sizes.
+-/
 theorem growthChain_total_le (a : Nat) (l : List Nat) (n : Nat)
     (h : GrowthChain (a :: l)) (hlast : (a :: l).getLastD 0 ≤ 2 * n + 8) :
     (a :: l).sum ≤ 2 * (2 * n + 8) := by
   have := growthChain_total a l h
   omega
 
-/-- Chains that arise from real append histories: each grown
-capacity is one growCap step over the previous capacity, for some
-need. `growCap_doubles` turns any such history into a doubling
-chain, so the geometric bound applies to every buffer the
-interpreter can ever grow, not only to abstract chains. -/
+/--
+These are the chains that real append histories produce.
+Each grown capacity is one growCap step over the previous capacity, for some need.
+`growCap_doubles` turns any such history into a doubling chain, so the geometric bound applies to every buffer the interpreter can ever grow, not only to abstract chains.
+-/
 theorem growthChain_of_steps (a : Nat) (l : List Nat)
     (h : ∀ i, (hi : i + 1 < (a :: l).length) →
       ∃ need, (a :: l)[i + 1] = growCap ((a :: l)[i]'(by omega)) need) :
@@ -96,8 +90,7 @@ theorem growthChain_of_steps (a : Nat) (l : List Nat)
 
 /-! ## The layout function -/
 
-/-- Alignments are positive, so the rounding in the layout never
-divides by zero. -/
+/-- Alignments are positive, so the rounding in the layout never divides by zero. -/
 theorem sizeAlignD_align_pos (d : Nat) (structs : Array (Array VTy))
     (ty : VTy) : 1 ≤ (sizeAlignD d structs ty).2 := by
   induction ty generalizing d with
@@ -132,9 +125,10 @@ theorem sizeAlignD_align_pos (d : Nat) (structs : Array (Array VTy))
           apply ihl
           exact Nat.le_trans hacc (Nat.le_max_left _ _)
 
-/-- The layout sizes are multiples of their alignment, exactly as
-the 64-bit layout of the targets requires: array strides need no
-extra padding, and struct sizes end at their own alignment. -/
+/--
+The layout sizes are multiples of their alignment, exactly as the 64-bit layout of the targets requires.
+Array strides need no extra padding, and struct sizes end at their own alignment.
+-/
 theorem sizeAlignD_align_dvd (d : Nat) (structs : Array (Array VTy))
     (ty : VTy) :
     (sizeAlignD d structs ty).2 ∣ (sizeAlignD d structs ty).1 := by
@@ -164,8 +158,7 @@ theorem sizeAlignD_align_dvd (d : Nat) (structs : Array (Array VTy))
 
 /-! ## The meter primitives -/
 
-/-- The monadic glue, definitionally: running a bind runs the
-first action and feeds its heap to the second. -/
+/-- The monadic glue, definitionally: running a bind runs the first action and feeds its heap to the second. -/
 theorem M.bind_def {α β : Type} (x : M α) (f : α → M β) (h : Heap) :
     (x >>= f) h = match x h with
       | .ok v h' => f v h'
@@ -256,8 +249,7 @@ theorem writeElems_allocBytes (base : Option Loc) (off k : Nat)
         · cases e
       next => cases e
 
-/-- A make charges exactly its capacity priced at the element
-size. -/
+/-- A make charges exactly its capacity priced at the element size. -/
 theorem doMake_allocBytes (c : Ctx) (elemTy : VTy) (n cp : Int)
     (h h' : Heap) (v : Val) (e : doMake c elemTy n cp h = .ok v h') :
     h'.allocBytes = h.allocBytes +
@@ -275,8 +267,7 @@ theorem doMake_allocBytes (c : Ctx) (elemTy : VTy) (n cp : Int)
       next => cases e
     next => cases e
 
-/-- A slice literal charges exactly its element count priced at
-the element size. -/
+/-- A slice literal charges exactly its element count priced at the element size. -/
 theorem doSliceLit_allocBytes (c : Ctx) (elemTy : VTy)
     (vs : Array Val) (h h' : Heap) (v : Val)
     (e : doSliceLit c elemTy vs h = .ok v h') :
@@ -293,8 +284,7 @@ theorem doSliceLit_allocBytes (c : Ctx) (elemTy : VTy)
     next => cases e
   next => cases e
 
-/-- A string-to-bytes conversion charges exactly one byte per
-character of the string. -/
+/-- A string-to-bytes conversion charges exactly one byte per character of the string. -/
 theorem doStrToBytes_allocBytes (s : ByteArray) (h h' : Heap)
     (v : Val) (e : doStrToBytes s h = .ok v h') :
     h'.allocBytes = h.allocBytes + s.size := by
@@ -309,8 +299,7 @@ theorem doStrToBytes_allocBytes (s : ByteArray) (h h' : Heap)
     next => cases e
   next => cases e
 
-/-- A bytes-to-string conversion charges exactly one byte per
-element. -/
+/-- A bytes-to-string conversion charges exactly one byte per element. -/
 theorem doBytesToStr_allocBytes (vs : Array Val) (h h' : Heap)
     (v : Val) (e : doBytesToStr vs h = .ok v h') :
     h'.allocBytes = h.allocBytes + vs.size := by
@@ -326,10 +315,11 @@ theorem doBytesToStr_allocBytes (vs : Array Val) (h h' : Heap)
     | none => rw [hv] at e; cases e
   next => cases e
 
-/-- The in-place branch of an append never touches the allocation
-meter, and the growing branch raises it by exactly the new
-capacity priced at the element size: the meter counts what the
-arena of a target would hand out, nothing else. -/
+/--
+The in-place branch of an append never touches the allocation meter.
+The growing branch raises it by exactly the new capacity, priced at the element size.
+The meter counts what the arena of a target would hand out, and nothing else.
+-/
 theorem doAppend_allocBytes (c : Ctx) (base : Option Loc)
     (off len cap : Nat) (adds : Array Val) (elemTy : VTy)
     (h h' : Heap) (v : Val)
@@ -384,13 +374,13 @@ theorem doAppend_allocBytes (c : Ctx) (base : Option Loc)
 
 /-! ## The saturating contract arithmetic
 
-contract.go computes every figure with cAdd and cMul, which
-saturate at 1<<62 to mark a bound too large to be useful. The
-contract only ever feeds them values in [0, 1<<62], so the Nat
-mirror below is exact on that domain, and the theorems pin the
-algebra down: figures never pass the saturation mark, and a figure
-below the mark is the exact arithmetic value, so saturation can
-flag but never shrink a bound. -/
+contract.go computes every figure with cAdd and cMul.
+Those two saturate at 1<<62, which marks a bound too large to be useful.
+The contract only ever feeds them values in [0, 1<<62], so the Nat mirror below is exact on that domain.
+The theorems pin the algebra down.
+No figure ever passes the saturation mark.
+A figure below the mark is the exact arithmetic value, so saturation can flag a bound but never shrink one.
+-/
 
 def contractCap : Nat := 4611686018427387904
 

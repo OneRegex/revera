@@ -1,12 +1,11 @@
-// Minimal runtime for the generated Vego engine. It supplies what
-// the Go runtime supplied implicitly: growable buffers, immutable
-// string views, conversions with Go semantics, and memory.
+// Minimal runtime for the generated Vego engine.
+// It supplies what the Go runtime supplied implicitly: growable buffers, immutable string views, conversions with Go semantics, and memory.
 //
-// Memory is explicit. Every generated function that allocates
-// takes an allocator as its first parameter, so the runtime holds
-// no state at all. The host owns the arenas and decides which one
-// backs each engine call; two threads with separate arenas never
-// share anything mutable.
+// Memory is explicit.
+// Every generated function that allocates takes an allocator as its first parameter.
+// The runtime therefore holds no state at all.
+// The host owns the arenas and decides which one backs each engine call.
+// Two threads with separate arenas never share anything mutable.
 
 const std = @import("std");
 
@@ -15,7 +14,7 @@ pub const Allocator = std.mem.Allocator;
 const zeroOf = std.mem.zeroes;
 
 // Str is an immutable byte view, the translation of a Go string.
-// The zero value is the empty string.
+// Its zero value is the empty string.
 pub const Str = struct {
     p: ?[*]const u8 = null,
     len: i64 = 0,
@@ -53,8 +52,8 @@ pub fn lit(comptime s: []const u8) Str {
     return .{ .p = s.ptr, .len = s.len };
 }
 
-// str wraps runtime bytes as a Str without copying. The caller
-// keeps the bytes alive.
+// str wraps runtime bytes as a Str without copying.
+// The caller keeps the bytes alive.
 pub fn str(s: []const u8) Str {
     return .{ .p = s.ptr, .len = @intCast(s.len) };
 }
@@ -72,9 +71,9 @@ pub fn strcmp3(a: Str, b: Str) i32 {
 }
 
 // Slice is a Go slice header: pointer, length, capacity.
-// Assignment copies the header and shares the buffer, exactly like
-// Go. A null pointer is the nil slice; every allocation, even a
-// zero-length one, produces a non-null pointer.
+// Assignment copies the header and shares the buffer, exactly like Go.
+// A null pointer is the nil slice.
+// Every allocation, even a zero-length one, produces a non-null pointer.
 pub fn Slice(comptime T: type) type {
     return struct {
         p: ?[*]T = null,
@@ -139,9 +138,9 @@ fn grow(gpa: Allocator, comptime T: type, s: Slice(T), need: i64) Slice(T) {
     if (newcap < need) {
         newcap = need;
     }
-    // The spare region must read as zero: Go allocates zeroed
-    // memory, and extending a slice inside its capacity exposes
-    // that memory. The prefix gets the live elements instead.
+    // The spare region must read as zero.
+    // Go allocates zeroed memory, and a slice extended inside its capacity shows that memory.
+    // The prefix gets the live elements instead.
     const p = allocElems(gpa, T, newcap);
     const n: usize = @intCast(s.len);
     @memset(p[n..@intCast(newcap)], zeroOf(T));
@@ -168,8 +167,8 @@ pub fn appendSlice(gpa: Allocator, comptime T: type, s: Slice(T), more: Slice(T)
     }
     const n: usize = @intCast(more.len);
     if (n > 0) {
-        // The source may alias the old buffer; the old buffer is
-        // still intact after a grow, so a plain copy is right.
+        // The source may alias the old buffer.
+        // The old buffer stays intact after a grow, so a plain copy is right.
         @memmove(out.p.?[@intCast(out.len)..][0..n], more.p.?[0..n]);
     }
     out.len += more.len;
@@ -232,9 +231,8 @@ pub fn sliceOf(gpa: Allocator, comptime T: type, src: anytype) Slice(T) {
     return out;
 }
 
-// structEq compares two struct values field by field, the way Go
-// compares comparable values. Str fields compare by content, and
-// arrays compare element by element.
+// structEq compares two struct values field by field, the way Go compares comparable values.
+// Str fields compare by content, and arrays compare element by element.
 pub fn structEq(a: anytype, b: @TypeOf(a)) bool {
     const T = @TypeOf(a);
     if (T == Str) {
@@ -261,9 +259,9 @@ pub fn structEq(a: anytype, b: @TypeOf(a)) bool {
     }
 }
 
-// divT and remT are Go's truncating division and remainder. Go
-// defines MinInt / -1 as MinInt (wrapping) and MinInt % -1 as 0;
-// the plain Zig builtins trap on that pair.
+// divT and remT are Go's truncating division and remainder.
+// Go defines MinInt / -1 as MinInt, which wraps, and MinInt % -1 as 0.
+// The plain Zig builtins trap on that pair.
 pub fn divT(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
     const T = @TypeOf(a);
     if (T != comptime_int and @typeInfo(T).int.signedness == .signed) {
@@ -284,17 +282,15 @@ pub fn remT(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
     return @rem(a, b);
 }
 
-// bytesFromStr copies a string into a fresh mutable byte buffer,
-// the []uint8(s) conversion.
+// bytesFromStr copies a string into a fresh mutable byte buffer, the []uint8(s) conversion.
 pub fn bytesFromStr(gpa: Allocator, s: Str) Slice(u8) {
     const out = make(gpa, u8, s.len);
     _ = copyStr(out, s);
     return out;
 }
 
-// cv converts between integer types with Go semantics: widen with
-// the sign of the source, then truncate to the target width and
-// reinterpret.
+// cv converts between integer types with Go semantics.
+// It widens with the sign of the source, then truncates to the target width and reinterprets.
 pub inline fn cv(comptime B: type, x: anytype) B {
     const A = @TypeOf(x);
     if (A == comptime_int) {

@@ -1,10 +1,9 @@
 package revera
 
-// Host file, outside the Vego subset. It implements the reference
-// side of the cross-language differential driver protocol. The Zig,
-// C++ and Rust drivers implement the same line protocol; the
-// crosscheck harness feeds every driver the same commands and
-// compares outputs against this implementation.
+// Host file, outside the Vego subset.
+// It implements the reference side of the cross-language differential driver protocol.
+// The Zig, C++ and Rust drivers implement the same line protocol.
+// The crosscheck harness feeds every driver the same commands and compares the outputs against this implementation.
 //
 // Commands, one per line, strings hex-encoded with "-" for empty:
 //
@@ -49,9 +48,8 @@ func driverDecode(tok string) string {
 	return string(b)
 }
 
-// DriverEncode hex-encodes a protocol string, with "-" standing
-// for the empty string. crosscheck uses the same encoding when it
-// builds command lines.
+// DriverEncode hex-encodes a protocol string, with "-" standing for the empty string.
+// crosscheck uses the same encoding when it builds command lines.
 func DriverEncode(s string) string {
 	if s == "" {
 		return "-"

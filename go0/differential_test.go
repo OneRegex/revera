@@ -115,8 +115,7 @@ func runDifferential(t *testing.T, seed int64, rounds int, cflags CompileFlags, 
 		pattern := genPattern(rng, 3)
 		re, err := Compile(pattern, locale.POSIX(), cflags)
 		if err != nil {
-			// The generator can build rejected undefined spellings,
-			// such as adjacent duplications via concatenation.
+			// The generator can build rejected undefined spellings, such as adjacent duplications from a concatenation.
 			continue
 		}
 		for range 6 {
@@ -155,8 +154,8 @@ func TestDifferentialMinimal(t *testing.T) {
 	runDifferential(t, 4, 1500, Minimal, "abc")
 }
 
-// FuzzDifferential drives arbitrary patterns and subjects through both
-// engines and requires identical results.
+// FuzzDifferential drives arbitrary patterns and subjects through both engines.
+// It requires identical results.
 func FuzzDifferential(f *testing.F) {
 	f.Add("a|b*", "abab", uint8(0))
 	f.Add("(a*)(a*?)c", "aaac", uint8(0))
@@ -177,7 +176,7 @@ func FuzzDifferential(f *testing.F) {
 		okGot, errGot := re.Exec(subject, got, 0)
 		okWant, errWant := re.oracleFullExec(subject, want, 0)
 		if errGot != nil || errWant != nil {
-			// Work-limit errors are acceptable; wrong answers are not.
+			// A work-limit error is acceptable, but a wrong answer is not.
 			return
 		}
 		if okGot != okWant {

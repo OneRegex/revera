@@ -1,9 +1,8 @@
 package revera
 
-// Differential tests: the Vego rewrite must agree with the go0
-// engine on everything observable. go0 is itself validated against
-// an enumerating reference matcher and against host regcomp(), so
-// agreement with go0 carries that assurance over.
+// Differential tests: the Vego rewrite must agree with the go0 engine on everything observable.
+// An enumerating reference matcher and the host regcomp() both check go0 itself.
+// Agreement with go0 therefore carries that assurance over.
 
 import (
 	"math/rand"
@@ -111,9 +110,8 @@ func TestDifferentialICaseMinimal(t *testing.T) {
 	runDifferential(t, 7, 1000, FlagICase|FlagMinimal, "abAB")
 }
 
-// TestDifferentialFixed drives a corpus of interesting patterns,
-// including the spec section 16 shapes and the capacity fallbacks,
-// through both engines.
+// TestDifferentialFixed drives a corpus of interesting patterns through both engines.
+// The corpus includes the spec section 16 shapes and the capacity fallbacks.
 func TestDifferentialFixed(t *testing.T) {
 	for _, cflags := range FixedFlagSets {
 		for _, pattern := range FixedPatterns {

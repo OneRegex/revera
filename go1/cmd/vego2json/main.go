@@ -1,14 +1,13 @@
-// Command vego2json checks that a package conforms to the Vego
-// subset and translates it into the JSON representation defined in
-// VEGO-SPECIFICATION.md.
+// Command vego2json checks that a package conforms to the Vego subset.
+// It then translates the package into the JSON representation that VEGO-SPECIFICATION.md defines.
 //
 // Usage:
 //
 //	vego2json [-o output.json] <package-directory>
 //
-// Files whose names end in _host.go or _test.go are host files and
-// are skipped. Any construct outside the subset is reported with a
-// file and line, and the tool then exits nonzero without output.
+// Files whose names end in _host.go or _test.go are host files, and the tool skips them.
+// The tool reports any construct outside the subset with a file and a line.
+// It then exits nonzero without output.
 package main
 
 import (
@@ -77,8 +76,8 @@ type checker struct {
 	pkg     *types.Package
 	structs map[string]bool
 	errs    []string
-	// breakable tracks the enclosing break targets, innermost last;
-	// true marks a loop, false a switch.
+	// breakable tracks the enclosing break targets, innermost last.
+	// True marks a loop, and false marks a switch.
 	breakable []bool
 }
 
@@ -120,8 +119,8 @@ func main() {
 	}
 }
 
-// translate checks the package in dir and returns its JSON form,
-// or the list of subset violations.
+// translate checks the package in dir.
+// It returns the JSON form of the package, or the list of subset violations.
 func translate(dir string) ([]byte, []string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -149,8 +148,8 @@ func translate(dir string) ([]byte, []string, error) {
 		files = append(files, f)
 	}
 
-	// Imports leave the hermetic subset and would also defeat the
-	// importer-less type check below, so they stop the run first.
+	// Imports leave the hermetic subset.
+	// They would also defeat the importer-less type check below, so they stop the run first.
 	var importErrs []string
 	for _, f := range files {
 		for _, imp := range f.Imports {
@@ -236,8 +235,7 @@ func orEmpty(list []any) []any {
 	return list
 }
 
-// typeRef translates a type expression outside parameter position,
-// where pointers are not allowed.
+// typeRef translates a type expression outside parameter position, where pointers are not allowed.
 func (c *checker) typeRef(e ast.Expr) map[string]any {
 	if _, isPtr := e.(*ast.StarExpr); isPtr {
 		c.errorf(e.Pos(), "pointer types only appear as parameters")
@@ -336,10 +334,9 @@ func (c *checker) varDecls(decl *ast.GenDecl) []any {
 	return out
 }
 
-// typeContainsSlice walks a type for a slice at any depth. A
-// package variable is static constant data in every target, which
-// a slice buffer cannot be. The vegoc checker enforces the same
-// rule over the JSON, for producers that bypass this tool.
+// typeContainsSlice walks a type for a slice at any depth.
+// A package variable is static constant data in every target, and a slice buffer cannot be that.
+// The vegoc checker applies the same rule over the JSON, for producers that bypass this tool.
 func typeContainsSlice(t types.Type) bool {
 	switch u := t.Underlying().(type) {
 	case *types.Slice:
@@ -356,8 +353,7 @@ func typeContainsSlice(t types.Type) bool {
 	return false
 }
 
-// checkConstInitializer accepts constant expressions and composite
-// literals of constants.
+// checkConstInitializer accepts constant expressions and composite literals of constants.
 func (c *checker) checkConstInitializer(e ast.Expr) {
 	if tv, ok := c.info.Types[e]; ok && tv.Value != nil {
 		return
@@ -629,9 +625,8 @@ func (c *checker) assign(st *ast.AssignStmt) any {
 		"lhs": c.expr(st.Lhs[0]), "value": c.expr(st.Rhs[0])}
 }
 
-// checkSliceStore enforces the locally decidable part of the buffer
-// model: a slice-typed struct field or element takes only a fresh
-// buffer, a moved variable or field, or a truncation of itself.
+// checkSliceStore applies the locally decidable part of the buffer model.
+// A slice-typed struct field or element takes only a fresh buffer, a moved variable or field, or a truncation of itself.
 func (c *checker) checkSliceStore(lhs ast.Expr, rhs ast.Expr) {
 	switch lhs.(type) {
 	case *ast.SelectorExpr, *ast.IndexExpr:
@@ -858,8 +853,7 @@ func (c *checker) expr(e ast.Expr) any {
 	return map[string]any{"k": "int", "value": "0"}
 }
 
-// exprArg translates one call argument, the only position where &
-// is allowed.
+// exprArg translates one call argument, the only position that allows &.
 func (c *checker) exprArg(a ast.Expr) any {
 	if u, ok := a.(*ast.UnaryExpr); ok && u.Op == token.AND {
 		c.checkAddress(u.X)
@@ -868,8 +862,7 @@ func (c *checker) exprArg(a ast.Expr) any {
 	return c.expr(a)
 }
 
-// baseExpr unwraps parentheses, indexes, fields, and slices down to
-// the base identifier, or nil.
+// baseExpr unwraps parentheses, indexes, fields and slices down to the base identifier, or to nil.
 func baseExpr(e ast.Expr) *ast.Ident {
 	for {
 		switch x := e.(type) {
@@ -888,9 +881,8 @@ func baseExpr(e ast.Expr) *ast.Ident {
 	}
 }
 
-// globalBase returns the base identifier of e when it names a
-// package-level variable, and nil otherwise. Every global rule
-// (immutable, never sliced, never borrowed) goes through it.
+// globalBase returns the base identifier of e when it names a package-level variable, and nil in every other case.
+// Every global rule goes through it: never written, never sliced, and never borrowed.
 func (c *checker) globalBase(e ast.Expr) *ast.Ident {
 	id := baseExpr(e)
 	if id == nil || id.Name == "_" {

@@ -9,9 +9,8 @@ import (
 	"revera/locale"
 )
 
-// genStdlibPattern builds patterns inside the subset that Go's
-// regexp.CompilePOSIX also implements: no minimal modifiers, no collating
-// syntax, no locale classes beyond what RE2 knows.
+// genStdlibPattern builds patterns inside the subset that regexp.CompilePOSIX of Go also implements.
+// That subset has no minimal modifiers, no collating syntax, and no locale classes beyond what RE2 knows.
 func genStdlibPattern(rng *rand.Rand, depth int) string {
 	if depth <= 0 {
 		return genStdlibAtom(rng)
@@ -54,8 +53,8 @@ func genStdlibPattern(rng *rand.Rand, depth int) string {
 	}
 }
 
-// genStdlibAtom avoids negated classes: Go's POSIX mode keeps newline out
-// of them, and POSIX does not.
+// genStdlibAtom avoids negated classes.
+// The POSIX mode of Go keeps newline out of them, and POSIX does not.
 func genStdlibAtom(rng *rand.Rand) string {
 	switch rng.Intn(7) {
 	case 0:
@@ -71,9 +70,9 @@ func genStdlibAtom(rng *rand.Rand) string {
 	}
 }
 
-// TestWholeMatchAgainstStdlib compares the selected whole match with Go's
-// leftmost-longest engine on subjects too long for the exhaustive oracle.
-// Only pmatch[0] is comparable; RE2 does not promise POSIX captures.
+// TestWholeMatchAgainstStdlib compares the selected whole match with the leftmost-longest engine of Go.
+// It uses subjects too long for the exhaustive oracle.
+// Only pmatch[0] is comparable, because RE2 does not promise POSIX captures.
 func TestWholeMatchAgainstStdlib(t *testing.T) {
 	rng := rand.New(rand.NewSource(7))
 	tested := 0
@@ -83,9 +82,8 @@ func TestWholeMatchAgainstStdlib(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		// Subjects hold no newline: Go's POSIX mode gives dot,
-		// negated classes, and anchors newline-sensitive behavior
-		// that plain POSIX does not have.
+		// The subjects hold no newline.
+		// The POSIX mode of Go gives dot, negated classes and anchors a newline-sensitive behavior that plain POSIX does not have.
 		std, err := stdregexp.CompilePOSIX(pattern)
 		if err != nil {
 			continue
@@ -130,8 +128,7 @@ func TestConcurrentExec(t *testing.T) {
 					t.Errorf("concurrent Exec failed: %v %v", ok, err)
 					return
 				}
-				// Section 4.3 rule 3: subpatterns resolve left to
-				// right, each taking its longest compatible match.
+				// Rule 3 of section 4.3 resolves subpatterns left to right, and each one takes its longest compatible match.
 				// Group 1 can take "ab" and still let the rest match.
 				want := []Match{{1, 5}, {1, 3}, {3, 4}, {4, 5}}
 				for idx := range want {
@@ -146,8 +143,7 @@ func TestConcurrentExec(t *testing.T) {
 	wg.Wait()
 }
 
-// TestPhaseAAllocations checks the steady-state allocation count of the
-// match-only path.
+// TestPhaseAAllocations checks the steady-state allocation count of the match-only path.
 func TestPhaseAAllocations(t *testing.T) {
 	if raceEnabled {
 		t.Skip("race instrumentation changes allocation counts")

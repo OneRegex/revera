@@ -1,16 +1,13 @@
 package probe
 
-// This package probes the Vego constructs the revera engine never
-// uses, so the target printers stay correct beyond the engine:
-// division overflow, byte-slice conversion, range semantics,
-// partial array literals, comparable structs with string arrays,
-// evaluation order, and spare-capacity zeroing. Every function is
-// pure or works through a Counter borrow, so the four
-// instantiations can print and compare identical results.
+// This package probes the Vego constructs that the revera engine never uses.
+// The target printers therefore stay correct beyond the engine.
+// It covers division overflow, byte-slice conversion, range semantics, partial array literals, comparable structs with string arrays, evaluation order, and spare-capacity zeroing.
+// Every function is pure or works through a Counter borrow.
+// The four instantiations can therefore print and compare identical results.
 
-// minI64 is exercised through the pipeline on purpose: emitting
-// MinInt64 stresses each printer's literal handling. The host
-// report uses it too.
+// minI64 goes through the pipeline on purpose, because MinInt64 stresses the literal handling of each printer.
+// The host report uses it too.
 const minI64 = -9223372036854775808
 
 // Counter records call order, for the evaluation-order probes.
@@ -43,8 +40,7 @@ func DivMod32(a int32, b int32) (int32, int32) {
 	return a / b, a % b
 }
 
-// BytesProbe converts a string to a fresh byte buffer and mutates
-// it.
+// BytesProbe converts a string to a fresh byte buffer and then writes to it.
 func BytesProbe(s string) int64 {
 	b := []uint8(s)
 	if len(b) > 0 {
@@ -66,8 +62,8 @@ func sliceFrom(c *Counter, n int) []int32 {
 	return out
 }
 
-// RangeProbe checks that the range operand evaluates once and that
-// writing the index variable cannot change the iteration.
+// RangeProbe checks that the range operand evaluates once.
+// It also checks that a write to the index variable cannot change the iteration.
 func RangeProbe(c *Counter) int64 {
 	t := int64(0)
 	for i, v := range sliceFrom(c, 4) {
@@ -142,9 +138,8 @@ func OrderIndex(c *Counter) int64 {
 	return v*10000 + logCode(c)
 }
 
-// SpareProbe checks that extending a slice inside its capacity
-// exposes zeroed memory, both from make and after a growing
-// append.
+// SpareProbe checks that a slice extended inside its capacity shows zeroed memory.
+// It covers both a fresh make and a grown append.
 func SpareProbe() int64 {
 	s := make([]int64, 0, 4)
 	s = append(s, 5)
@@ -211,8 +206,7 @@ func ConvProbe(x int64) uint64 {
 	return uint64(uint8(x)) + uint64(uint32(int32(x)))*1000
 }
 
-// SubWrite assigns through a subslice view, so the write must land
-// in the shared buffer.
+// SubWrite assigns through a subslice view, so the write must land in the shared buffer.
 func SubWrite(n int) int64 {
 	s := make([]int64, n)
 	s[1:][0] = 7
@@ -224,8 +218,8 @@ func SubWrite(n int) int64 {
 	return t
 }
 
-// AndNotOrder checks that a compound &^= evaluates its place
-// before its value, like every other compound assignment.
+// AndNotOrder checks that a compound &^= evaluates its place before its value.
+// Every other compound assignment does the same.
 func AndNotOrder(c *Counter) int64 {
 	s := make([]uint64, 8)
 	s[3] = 0xFF
@@ -233,7 +227,7 @@ func AndNotOrder(c *Counter) int64 {
 	return int64(s[3])*100000 + logCode(c)
 }
 
-// ZeroArray slices a zero-length array; the view must be non-nil.
+// ZeroArray slices a zero-length array, and the view must be non-nil.
 func ZeroArray() int64 {
 	var a [0]int32
 	t := int64(0)
@@ -250,8 +244,7 @@ func MakeU64(n uint64) int64 {
 	return int64(len(s))
 }
 
-// PickArray indexes an array-typed call result while the index
-// mutates state.
+// PickArray indexes an array-typed call result while the index changes state.
 func mkTriple(x int64) [3]int64 {
 	var a [3]int64
 	a[0] = x

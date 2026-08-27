@@ -948,3 +948,72 @@ Verification after the pass: the full Go suite, `cargo test`,
 86691 commands against all three drivers, plus probecheck. The
 comment edit in `replace.go` is a subset file, so `vego2json` ran
 again and the JSON came back byte-identical.
+
+## Comment pass over every source file
+
+The user asked for one sweep over the whole tree: drop the code
+comments that only repeat the code, make the rest say why a thing
+exists rather than how it works, write them in ASD-STE100, use no
+em dash, stop wrapping at a column, and break the line after every
+long sentence or paragraph.
+
+The last two rules changed the shape of almost every comment in
+the repository. The old style wrapped prose at about seventy
+columns, so one sentence spanned three or four lines and two
+sentences shared a line. The new style puts one sentence on one
+line, whatever its length. A diff of a comment now shows which
+sentence changed, and nothing else. The paragraph breaks stay.
+
+The prose changed with the layout. ASD-STE100 wants one idea per
+sentence and simple tenses, so the semicolons and the explanatory
+colons that had been joining two facts became separate sentences.
+Dozens of them, across Go, Rust, C++, Zig and LEAN4. A few passive
+constructions became active where the actor was obvious: "the
+queue gets compacted" is now "the queue compacts", and "a blob
+that fails any check is rejected" is now "the loader rejects a
+blob that fails any check".
+
+The house rule of twenty words per sentence took a second pass. A
+count over the finished tree found eighty-three sentences above
+it, thirty-eight in the four target languages and forty-five in
+the LEAN4 model. Most held two facts joined by "so" or "and", and
+split cleanly. Four survive, and each one is a single idea with a
+list inside it, where a split would only scatter the list.
+
+What I removed. The four edge flags of the `decoded` window in
+`go0/oracle.go` and `go1/revera/match.go` each carried a line that
+spelled the field name out in words, and the type comment above
+them already says the flags carry the anchor context. The
+`inRanges` and `bracketInRanges` comments said the function tests
+range membership, which is the name, plus "with a binary search",
+which is the implementation. Both went. That is the whole list:
+the rest of the comments in this tree earn their place, and the
+doc comments on the public API of the four targets stay even where
+they read as obvious, because they are the rendered documentation.
+
+The LEAN4 files needed a script. Their block comments have no line
+prefix, so a reflow had to find each block, keep its delimiters,
+join the prose paragraphs and split them at sentence boundaries,
+and leave the indented code samples and the numbered lists alone.
+I hand-wrote the lists afterwards, because a bullet that ends in a
+semicolon is not a sentence.
+
+Verification. Every target builds and passes: `make test` for the
+C locale runtime, the full Go suite in `go0` and `go1`, `cargo
+test`, `zig build test`, `make test` in cpp1, and `lake build` for
+the LEAN4 model. `vego2json` ran again over both subset packages
+and the two JSON artifacts came back byte-identical, so the
+comment edits inside the subset changed nothing the printers can
+see. Regenerating all six engine files from that JSON reproduced
+them byte for byte. probecheck passes against the three target
+probes, and crosscheck replays all 86691 commands against the Zig,
+C++ and Rust drivers.
+
+The `swival` review did not run. Its provider returned "servers are
+currently overloaded" on every retry, twice, so I read the diff
+myself instead. The read found five slips of my own and fixed
+them: `clamp` saturates rather than clamps, the loader is what
+rejects a malformed blob, a rename covers every local and not only
+a renamed one, one printer sentence had left its verb without a
+subject, and "this branch cannot happen" said "branch" in a file
+where a branch is an alternation arm.

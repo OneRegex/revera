@@ -1,10 +1,9 @@
 /-
 The probe harness: the Lean instantiation of probe_host.go.
 
-It runs the same call matrix as the Go, Zig, C++ and Rust probe
-hosts against the interpreted probe program, and formats the same
-report lines. The theorem in Theorems.lean states that the lines
-equal the output of the Go original byte for byte.
+It runs the same call matrix as the Go, Zig, C++ and Rust probe hosts, against the interpreted probe program.
+It formats the same report lines.
+The theorem in Theorems.lean states that the lines equal the output of the Go original byte for byte.
 -/
 
 import Vego.Machine

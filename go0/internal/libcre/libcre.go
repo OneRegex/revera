@@ -1,7 +1,7 @@
 //go:build cgo && unix
 
-// Package libcre wraps the host C library's POSIX regcomp and regexec
-// for differential testing. It is not part of the matcher.
+// Package libcre wraps the POSIX regcomp and regexec of the host C library, for differential testing.
+// It is not part of the matcher.
 package libcre
 
 /*
@@ -12,15 +12,15 @@ import "C"
 
 import "unsafe"
 
-// Result holds one regexec outcome. Compiled reports regcomp success.
+// Result holds one regexec outcome.
+// Compiled reports whether regcomp succeeded.
 type Result struct {
 	Compiled bool
 	Matched  bool
 	Spans    [][2]int
 }
 
-// Run compiles pattern with REG_EXTENDED and runs it on subject with
-// nmatch capture slots.
+// Run compiles pattern with REG_EXTENDED, then runs it on subject with nmatch capture slots.
 func Run(pattern, subject string, nmatch int) Result {
 	cpat := C.CString(pattern)
 	defer C.free(unsafe.Pointer(cpat))

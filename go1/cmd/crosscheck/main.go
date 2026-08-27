@@ -1,8 +1,7 @@
-// Command crosscheck verifies the target-language instantiations of
-// the revera engine against the Go engine. It generates the same
-// corpora as the go1 differential tests, encodes them as driver
-// protocol commands, computes the expected output with the Go
-// engine in-process, and diffs each driver's output line by line.
+// Command crosscheck checks the target-language instantiations of the revera engine against the Go engine.
+// It generates the same corpora as the go1 differential tests, and encodes them as driver protocol commands.
+// It computes the expected output with the Go engine in-process.
+// It then diffs the output of each driver line by line.
 //
 // Usage:
 //
@@ -36,8 +35,8 @@ func enc(s string) string {
 	return revera.DriverEncode(s)
 }
 
-// compile emits a C command. Every exec-shaped command that follows
-// applies to this pattern.
+// compile emits a C command.
+// Every exec-shaped command that follows applies to this pattern.
 func (c *corpus) compile(flags uint32, pattern string) {
 	c.add("C %d %s", flags, enc(pattern))
 }
@@ -94,9 +93,8 @@ func (c *corpus) multiElement() {
 }
 
 func (c *corpus) replace() {
-	// The shared corpus plus replacement-error shapes the Go
-	// differential cannot observe (go0 has no positioned errors to
-	// compare there).
+	// This is the shared corpus, plus the replacement-error shapes that the Go differential cannot observe.
+	// go0 has no positioned errors to compare there.
 	cases := append([]revera.ReplaceCase{}, revera.ReplaceCases...)
 	cases = append(cases,
 		revera.ReplaceCase{Pattern: "(a+)(b+)", Subject: "aabb xab", Replacement: `\9`, Limit: -1},
@@ -126,15 +124,14 @@ func (c *corpus) iter() {
 }
 
 func (c *corpus) locales() {
-	// Case-map sweeps across the BMP start, plus a wide sweep, for
-	// a set of locales with distinct case behavior.
+	// These are case-map sweeps across the BMP start, plus one wide sweep.
+	// They cover a set of locales with distinct case behavior.
 	names := []string{"tr", "az", "el", "de", "fr", "cs", "en", "nosuchlocale"}
 	c.add("O 0 4096")
-	// Locale-sensitive matching: the digest sweep alone could hide
-	// a divergence behind a hash collision, so each locale also
-	// compiles and executes case-insensitive patterns over
-	// subjects with interesting case behavior (dotted and dotless
-	// i, sharp s, final sigma).
+	// This is locale-sensitive matching.
+	// The digest sweep alone could hide a divergence behind a hash collision.
+	// Each locale therefore also compiles and runs case-insensitive patterns over subjects with interesting case behavior.
+	// Those subjects hold dotted and dotless i, sharp s, and final sigma.
 	patterns := []string{"i+", "k", "[[:alpha:]]+", "s(a|s)*", "(σ|i)+"}
 	subjects := []string{
 		"IİıiIi", "KkK", "straße", "SS ss ſ", "ΣΟΦΟΣ σοφος τέλος ς",
@@ -153,8 +150,8 @@ func (c *corpus) locales() {
 	}
 	c.add("P")
 	c.add("O 0 65536")
-	// The drivers convert the O bounds to int32 before iterating;
-	// these bounds sit outside that range on purpose.
+	// The drivers convert the O bounds to int32 before they iterate.
+	// These bounds sit outside that range on purpose.
 	c.add("O -2147483649 -2147483648")
 	c.add("O 2147483646 2147483650")
 }
@@ -172,8 +169,8 @@ func build(extra int64) *corpus {
 	c.replace()
 	c.iter()
 	c.locales()
-	// Extra rounds walk fresh seeds over rotating flag sets, so
-	// repeated runs can widen the random coverage without bound.
+	// Extra rounds walk fresh seeds over rotating flag sets.
+	// Repeated runs can therefore widen the random coverage without bound.
 	flagSets := []uint32{0, revera.FlagICase, revera.FlagNewline, revera.FlagMinimal,
 		revera.FlagICase | revera.FlagMinimal, revera.FlagNewline | revera.FlagMinimal, revera.FlagNoSub}
 	alphabets := []string{"abc", "ab\nc", "abcABC", "abAB"}
@@ -222,8 +219,8 @@ func main() {
 		}
 	}
 
-	// The drivers are independent processes; run them together and
-	// report in argument order once all finish.
+	// The drivers are independent processes.
+	// They run together, and the report follows argument order once all of them finish.
 	texts := make([]string, flag.NArg())
 	fails := make([]bool, flag.NArg())
 	var wg sync.WaitGroup
@@ -245,8 +242,8 @@ func main() {
 	}
 }
 
-// runDriver feeds one driver the corpus and diffs its output,
-// returning the report text and whether it failed.
+// runDriver feeds one driver the corpus and diffs its output.
+// It returns the report text and whether the driver failed.
 func runDriver(driver, input string, cmds, expected []string) (string, bool) {
 	var b strings.Builder
 	cmd := exec.Command(driver)

@@ -3,20 +3,18 @@ package revera
 import "strings"
 
 // MatchAll calls fn for every non-overlapping match, left to right.
-// Offsets in pmatch are absolute in subject. The slice has NumSub()+1
-// elements and is reused between calls, so fn must copy what it keeps.
+// The offsets in pmatch are absolute in subject.
+// The slice has NumSub()+1 elements, and every call reuses it, so fn must copy what it keeps.
 // A return of false from fn stops the scan early.
 //
-// The scan reports at most limit matches. A negative limit means no
-// bound, like the preg_replace limit or the n of FindAll.
+// The scan reports at most limit matches.
+// A negative limit means no bound, like the preg_replace limit or the n of FindAll.
 //
-// Selection follows the classic global-substitution rule: after a
-// match, the next search starts at its end, and a null match that
-// starts exactly there is skipped. A null match otherwise counts and
-// the scan then moves one character forward.
+// Selection follows the classic global-substitution rule.
+// After a match, the next search starts at its end, and it skips a null match that starts exactly there.
+// A null match otherwise counts, and the scan then moves one character forward.
 //
-// An expression compiled with NoSub reports ENoSub, because iteration
-// needs the match offsets.
+// An expression compiled with NoSub reports ENoSub, because iteration needs the match offsets.
 func (re *Regexp) MatchAll(subject string, limit int, eflags ExecFlags, fn func(pmatch []Match) bool) error {
 	if re.flags&NoSub != 0 {
 		return &Error{Code: ENoSub, Pos: -1}
@@ -66,17 +64,18 @@ func (re *Regexp) MatchAll(subject string, limit int, eflags ExecFlags, fn func(
 	return nil
 }
 
-// replPart is one piece of a parsed replacement text. A part with text
-// is a literal; otherwise it names a group, where 0 is the whole match.
+// replPart is one piece of a parsed replacement text.
+// A part with text is a literal.
+// Every other part names a group, where 0 is the whole match.
 type replPart struct {
 	lit   string
 	group int
 }
 
 // parseReplacement splits the sed-style replacement text into parts.
-// An ampersand inserts the whole match and a backslash-digit pair
-// inserts one group. Backslash escapes the next character. A digit
-// above nsub reports ESubReg; a trailing backslash reports EEscape.
+// An ampersand inserts the whole match, and a backslash-digit pair inserts one group.
+// A backslash escapes the next character.
+// A digit above nsub reports ESubReg, and a trailing backslash reports EEscape.
 func parseReplacement(replacement string, nsub int) ([]replPart, error) {
 	parts := make([]replPart, 0, 4)
 	start := 0
@@ -116,8 +115,8 @@ func parseReplacement(replacement string, nsub int) ([]replPart, error) {
 }
 
 // replaceAll walks every match with MatchAll and rebuilds the subject.
-// The write callback emits the replacement for one match. A subject
-// without any match comes back unchanged and without a copy.
+// The write callback emits the replacement for one match.
+// A subject without any match comes back unchanged and without a copy.
 func (re *Regexp) replaceAll(subject string, limit int, eflags ExecFlags,
 	write func(out *strings.Builder, pmatch []Match)) (string, error) {
 	var out strings.Builder
@@ -125,8 +124,7 @@ func (re *Regexp) replaceAll(subject string, limit int, eflags ExecFlags,
 	any := false
 	err := re.MatchAll(subject, limit, eflags, func(pmatch []Match) bool {
 		if !any {
-			// One reservation covers the common case where the result
-			// stays near the subject size.
+			// One reservation covers the common case, where the result stays near the subject size.
 			out.Grow(len(subject) + len(subject)/8)
 			any = true
 		}
@@ -145,14 +143,12 @@ func (re *Regexp) replaceAll(subject string, limit int, eflags ExecFlags,
 	return out.String(), nil
 }
 
-// ReplaceAll returns subject with every non-overlapping match replaced
-// by replacement, like the sed s///g command. In replacement, & stands
-// for the whole match and \1 through \9 for one group. Backslash
-// escapes the next character, so \& and \\ are literal. A reference to
-// a nonparticipating group inserts nothing; a reference past NumSub()
-// reports ESubReg. Match iteration follows the MatchAll rules, and
-// limit bounds the replacement count the same way; the rest of the
-// subject stays as it is.
+// ReplaceAll returns subject with every non-overlapping match replaced by replacement, like the sed s///g command.
+// In replacement, & stands for the whole match and \1 through \9 for one group.
+// A backslash escapes the next character, so \& and \\ are literal.
+// A reference to a nonparticipating group inserts nothing, and a reference past NumSub() reports ESubReg.
+// Match iteration follows the MatchAll rules, and limit bounds the replacement count the same way.
+// The rest of the subject stays as it is.
 //
 // An expression compiled with NoSub reports ENoSub.
 func (re *Regexp) ReplaceAll(subject, replacement string, limit int, eflags ExecFlags) (string, error) {
@@ -174,12 +170,10 @@ func (re *Regexp) ReplaceAll(subject, replacement string, limit int, eflags Exec
 	})
 }
 
-// ReplaceAllFunc returns subject with every non-overlapping match
-// replaced by the return value of repl. The callback receives the
-// same pmatch slice as MatchAll: absolute offsets, reused between
-// calls. Its result is inserted literally, with no & or backslash
-// expansion. Match iteration follows the MatchAll rules, and limit
-// bounds the replacement count the same way.
+// ReplaceAllFunc returns subject with every non-overlapping match replaced by the return value of repl.
+// The callback receives the same pmatch slice as MatchAll: absolute offsets, reused between calls.
+// Its result goes in as literal text, with no & or backslash expansion.
+// Match iteration follows the MatchAll rules, and limit bounds the replacement count the same way.
 //
 // An expression compiled with NoSub reports ENoSub.
 func (re *Regexp) ReplaceAllFunc(subject string, limit int, eflags ExecFlags,

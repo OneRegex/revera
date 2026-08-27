@@ -1,8 +1,9 @@
 package revera
 
-// The ERE parser. The AST lives in a flat arena: every node is one
-// element of a []node slice, and children are indexes into it. A
-// negative index means "no node" and only appears on the error path.
+// The ERE parser.
+// The AST lives in a flat arena.
+// Every node is one element of a []node slice, and children are indexes into it.
+// A negative index means "no node", and it only appears on the error path.
 
 // Node operators.
 const (
@@ -32,21 +33,19 @@ type node struct {
 	// br indexes the bracket arena for opBracket.
 	br      int32
 	min     int  // opRepeat
-	max     int  // opRepeat; infinite means no bound
+	max     int  // opRepeat, where infinite means no bound
 	minimal bool // opRepeat: shortest-preferring
-	index   int  // opGroup: capture number; opRepeat: counter slot
+	index   int  // opGroup capture number, or opRepeat counter slot
 
-	// minL and maxL bound the character count one match of this node
-	// can consume. maxL saturates at lenInf. The capture solver uses
-	// them to clamp its split ranges.
+	// minL and maxL bound the character count one match of this node can consume.
+	// maxL saturates at lenInf.
+	// The capture solver uses both to clamp its split ranges.
 	minL int
 	maxL int
-	// sufMin and sufMax bound the children from index k onward, for
-	// opConcat only.
+	// sufMin and sufMax bound the children from index k onward, for opConcat only.
 	sufMin []int
 	sufMax []int
-	// firsts holds the branch first sets of a one-pass alternation
-	// that needs lookahead to select its branch.
+	// firsts holds the branch first sets of a one-pass alternation that needs lookahead to select its branch.
 	firsts [][]int32
 }
 
@@ -58,7 +57,8 @@ type parser struct {
 	groups   int
 	nodes    []node
 	brackets []bracketSet
-	// err keeps the first failure. A zero code means none yet.
+	// err keeps the first failure.
+	// A zero code means that nothing failed yet.
 	err Error
 }
 
@@ -82,8 +82,7 @@ func eof(p *parser) bool {
 	return p.pos >= len(p.src)
 }
 
-// peekByte returns the next byte without consuming it, or 0 at the
-// end.
+// peekByte returns the next byte without consuming it, or 0 at the end.
 func peekByte(p *parser) uint8 {
 	if eof(p) {
 		return 0
@@ -98,8 +97,8 @@ func peekByteAt(p *parser, ahead int) uint8 {
 	return p.src[p.pos+ahead]
 }
 
-// nextRune consumes and returns one character, or invalidRune on
-// invalid UTF-8, which it also records as an error.
+// nextRune consumes and returns one character.
+// Invalid UTF-8 gives invalidRune, and it also records an error.
 func nextRune(p *parser) int32 {
 	r, size := decodeRuneAt(p.src, p.pos)
 	if r < 0 {
@@ -110,8 +109,9 @@ func nextRune(p *parser) int32 {
 	return r
 }
 
-// parse builds the AST for pattern. On success the parser holds the
-// arena and the root index; on failure p.err holds the first error.
+// parse builds the AST for pattern.
+// On success, the parser holds the arena and the root index.
+// On failure, p.err holds the first error.
 func parse(p *parser, loc *Locale, pattern string, flags uint32) int32 {
 	p.src = pattern
 	p.flags = flags
@@ -120,9 +120,8 @@ func parse(p *parser, loc *Locale, pattern string, flags uint32) int32 {
 		return -1
 	}
 	if !eof(p) {
-		// Only an unmatched ')' inside parseAlt(false) can stop
-		// early, and parseBranch treats it as ordinary, so this
-		// cannot happen.
+		// Only an unmatched ')' inside parseAlt(false) can stop early.
+		// parseBranch treats that character as ordinary, so this case cannot happen.
 		return fail(p, ErrBadPat, p.pos)
 	}
 	return root
@@ -186,8 +185,7 @@ func isDupByte(c uint8) bool {
 	return c == '*' || c == '+' || c == '?' || c == '{'
 }
 
-// parseExpr parses one anchor, or one primary with optional
-// duplication.
+// parseExpr parses one anchor, or one primary with an optional duplication.
 func parseExpr(p *parser, loc *Locale) int32 {
 	start := p.pos
 	c := peekByte(p)
@@ -283,8 +281,7 @@ func appendUnique(runes []int32, r int32) []int32 {
 	return append(runes, r)
 }
 
-// parseDup parses an optional duplication and its repetition
-// modifier.
+// parseDup parses an optional duplication and its repetition modifier.
 func parseDup(p *parser, operand int32) int32 {
 	c := peekByte(p)
 	var lo int
@@ -318,8 +315,7 @@ func parseDup(p *parser, operand int32) int32 {
 		minimal = !minimal
 	}
 	if isDupByte(peekByte(p)) {
-		// Adjacent duplication symbols beyond one modifier are
-		// undefined.
+		// Adjacent duplication symbols past one modifier are undefined.
 		return fail(p, ErrBadRpt, p.pos)
 	}
 	rep := addNode(p, opRepeat)
@@ -405,8 +401,7 @@ func parseCount(p *parser) (int, bool) {
 }
 
 func satAdd(a int, b int) int {
-	// Both operands stay at or below lenInf, so 64-bit addition
-	// cannot overflow before the clamp.
+	// Both operands stay at or below lenInf, so 64-bit addition cannot overflow before the clamp.
 	return min(a+b, lenInf)
 }
 
@@ -418,8 +413,7 @@ func satMul(a int, b int) int {
 	return product
 }
 
-// computeLengths fills minL, maxL, and the concatenation suffix
-// bounds, bottom-up.
+// computeLengths fills minL, maxL, and the concatenation suffix bounds, from the bottom up.
 func computeLengths(nodes []node, loc *Locale, brackets []bracketSet, ni int32) {
 	for i := 0; i < len(nodes[ni].ch); i++ {
 		computeLengths(nodes, loc, brackets, nodes[ni].ch[i])

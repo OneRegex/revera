@@ -1,9 +1,8 @@
 package revera
 
-// This file lowers the AST into a flat instruction program for the
-// phase A executor. Phase A only needs the match relation, the
-// minimal repetition counters, and anchors; groups compile to
-// nothing here.
+// This file lowers the AST into a flat instruction program for the phase A executor.
+// Phase A only needs the match relation, the minimal repetition counters, and anchors.
+// Groups compile to nothing here.
 
 // Instruction opcodes.
 const (
@@ -24,19 +23,17 @@ type instr struct {
 	next uint32
 	alt  uint32
 	arg  uint32
-	// mask marks the shortest-preferring repetitions this consuming
-	// instruction sits inside, one bit per counter slot below 64.
+	// mask marks the shortest-preferring repetitions this consuming instruction sits inside.
+	// It holds one bit per counter slot below 64.
 	mask uint64
-	// extra lists counter slots at 64 and above; almost always nil.
+	// extra lists counter slots at 64 and above, and is almost always nil.
 	extra []uint32
 }
 
-// scanFilter speeds up positions where no thread is live. It holds
-// the bytes that can begin a match from an ordinary mid-subject
-// boundary. The executor may skip every byte outside the set: no
-// match can start there, because the start closure at such a
-// boundary reaches only the listed consuming instructions and no
-// accepting state.
+// scanFilter speeds up positions where no thread is live.
+// It holds the bytes that can begin a match from an ordinary mid-subject boundary.
+// The executor may skip every byte outside the set, because no match can start there.
+// The start closure at such a boundary reaches only the listed consuming instructions, and no accepting state.
 type scanFilter struct {
 	enabled bool
 	single  bool
@@ -50,13 +47,11 @@ type program struct {
 	foldSets [][]int32
 	// multi is true when some bracket can consume several characters.
 	multi bool
-	// failMin is the smallest minimum match length over every
-	// subtree that was pruned to iFail for size. The program is
-	// exact for any subject with fewer characters, because a pruned
-	// subtree cannot participate in a match of such a subject.
-	// failMinNone means nothing was pruned; a pruned subtree's
-	// saturated minimum can legitimately reach lenInf, so lenInf
-	// cannot be the sentinel.
+	// failMin is the smallest minimum match length over every subtree that size pruning replaced with iFail.
+	// The program stays exact for any subject with fewer characters.
+	// A pruned subtree cannot take part in such a match.
+	// failMinNone means that nothing was pruned.
+	// The saturated minimum of a pruned subtree can legitimately reach lenInf, so lenInf cannot be the sentinel.
 	failMin int
 	scan    scanFilter
 }
@@ -64,11 +59,10 @@ type program struct {
 // failMinNone marks a program with no pruned subtree.
 const failMinNone = int(1) << 62
 
-// maxProgram caps the expanded program size. Interval expansion can
-// multiply nested counts. Compilation still succeeds past the cap;
-// the expression then answers through the minimum-length fallback,
-// and only a subject long enough to need the huge program reports
-// ESpace.
+// maxProgram caps the expanded program size, because interval expansion can multiply nested counts.
+// Compilation still succeeds past the cap.
+// The expression then answers through the minimum-length fallback.
+// Only a subject long enough to need the huge program reports ESpace.
 const maxProgram = 1 << 20
 
 // maskWidth is the number of counter slots one mask word covers.
@@ -92,12 +86,11 @@ type progBuilder struct {
 	icase   bool
 }
 
-// buildScanFilter derives the skip byte set for mid-subject
-// boundaries. It walks epsilon transitions from the start with both
-// anchors off, records the first bytes of the reachable consuming
-// instructions, and gives up when dot, a bracket, or a reachable
-// accept makes the filter unsound. newlineMode forces a stop at
-// every newline, because anchors gain line boundaries there.
+// buildScanFilter derives the skip byte set for mid-subject boundaries.
+// It walks epsilon transitions from the start, with both anchors off.
+// It records the first bytes of the reachable consuming instructions.
+// It gives up when dot, a bracket, or a reachable accept makes the filter unsound.
+// newlineMode forces a stop at every newline, because anchors gain line boundaries there.
 func buildScanFilter(pr *program, newlineMode bool) {
 	ok := true
 	matchReachable := false
@@ -197,10 +190,9 @@ func instrEstimate(nodes []node, ni int32) int {
 	return 1
 }
 
-// compileProgram lowers the AST into b.prog. The caller sets icase
-// before the call and reads tooBig and errCode after it: tooBig with
-// a zero code means the expansion passed the size cap, and execution
-// then uses the minimum-length fallback.
+// compileProgram lowers the AST into b.prog.
+// The caller sets icase before the call, and reads tooBig and errCode after it.
+// tooBig with a zero code means the expansion passed the size cap, and execution then uses the minimum-length fallback.
 func compileProgram(b *progBuilder, nodes []node, root int32, multi bool, newlineMode bool) {
 	b.failMin = failMinNone
 	body := emit(b, nodes, root, 0, nil)
@@ -265,8 +257,7 @@ func epsilonFrag(b *progBuilder) frag {
 	return f
 }
 
-// copyExtra duplicates an extra-slot list, so instructions never
-// share one buffer.
+// copyExtra duplicates an extra-slot list, so instructions never share one buffer.
 func copyExtra(extra []uint32) []uint32 {
 	if len(extra) == 0 {
 		return nil
@@ -276,8 +267,7 @@ func copyExtra(extra []uint32) []uint32 {
 	return dup
 }
 
-// consumeFrag appends one consuming instruction and wraps it as a
-// fragment.
+// consumeFrag appends one consuming instruction and wraps it as a fragment.
 func consumeFrag(b *progBuilder, op uint8, arg uint32, mask uint64, extra []uint32) frag {
 	var ins instr
 	ins.op = op
@@ -365,8 +355,8 @@ func emitAlt(b *progBuilder, nodes []node, ni int32, mask uint64, extra []uint32
 	return result
 }
 
-// fragAppend chains f after result, or starts result with f. It
-// returns true so callers can update their have flag in one line.
+// fragAppend chains f after result, or starts result with f.
+// It returns true, so a caller can update its have flag in one line.
 func fragAppend(b *progBuilder, result *frag, have bool, f frag) bool {
 	if !have {
 		result.start = f.start
@@ -381,9 +371,8 @@ func fragAppend(b *progBuilder, result *frag, have bool, f frag) bool {
 func emitRepeat(b *progBuilder, nodes []node, ni int32, mask uint64, extra []uint32) frag {
 	var none frag
 	if instrEstimate(nodes, ni) > maxProgram-len(b.prog.ins) {
-		// Prune the oversized expansion to a dead end. The program
-		// stays exact for subjects shorter than this subtree's
-		// minimum match length; Exec checks that bound.
+		// The oversized expansion becomes a dead end.
+		// The program stays exact for subjects shorter than the minimum match length of this subtree, and Exec checks that bound.
 		var fi instr
 		fi.op = iFail
 		idx := addInstr(b, fi)
@@ -397,8 +386,7 @@ func emitRepeat(b *progBuilder, nodes []node, ni int32, mask uint64, extra []uin
 		if slot < maskWidth {
 			mask |= uint64(1) << slot
 		} else {
-			// The copy keeps sibling fragments from sharing the
-			// grown list.
+			// The copy keeps sibling fragments from sharing the grown list.
 			grown := make([]uint32, len(extra)+1)
 			copy(grown, extra)
 			grown[len(extra)] = uint32(slot)
@@ -416,8 +404,8 @@ func emitRepeat(b *progBuilder, nodes []node, ni int32, mask uint64, extra []uin
 	var result frag
 	haveResult := false
 
-	// Required copies: the last one loops when the maximum is
-	// unbounded.
+	// These are the required copies.
+	// The last one loops when the maximum is unbounded.
 	for i := 0; i < lo; i++ {
 		if b.errCode != ErrNone || b.tooBig {
 			return none
@@ -432,13 +420,13 @@ func emitRepeat(b *progBuilder, nodes []node, ni int32, mask uint64, extra []uin
 	}
 
 	if hi == infinite {
-		// The minimum is zero here: a plain star.
+		// The minimum is zero here, so this is a plain star.
 		haveResult = fragAppend(b, &result, haveResult,
 			emitStar(b, nodes, child, mask, extra))
 		return result
 	}
 
-	// Optional copies: each may skip straight to the shared exit.
+	// These are the optional copies, and each one may skip straight to the shared exit.
 	skips := make([]patchSlot, 0, max(hi-lo, 1))
 	for i := lo; i < hi; i++ {
 		if b.errCode != ErrNone || b.tooBig {

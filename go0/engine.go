@@ -1,13 +1,13 @@
 package revera
 
-// This file holds the phase A executor. It scans the subject once, runs
-// every viable automaton path in lockstep, and returns the selected match
-// start and end. Thread payloads hold the match start and the minimal
-// repetition counters; captures are phase B's job.
+// This file holds the phase A executor.
+// It scans the subject once, runs every viable automaton path in lockstep, and returns the selected match start and end.
+// Thread payloads hold the match start and the minimal repetition counters.
+// Captures are the job of phase B.
 //
-// Merging keeps the best (start, counters) payload per instruction and
-// position. Futures from a shared instruction are identical and counters
-// only grow, so the merge preserves the selected candidate.
+// Merging keeps the best (start, counters) payload per instruction and position.
+// Futures from a shared instruction are identical, and counters only grow.
+// The merge therefore keeps the selected candidate.
 
 import (
 	"fmt"
@@ -19,8 +19,8 @@ import (
 )
 
 // maxElemAhead is the largest character count one transition can consume.
-// It must cover the locale data's longest collating element; init checks
-// that the data still fits after a regeneration.
+// It must cover the longest collating element of the locale data.
+// init checks that the data still fits after a regeneration.
 const maxElemAhead = 8
 
 func init() {
@@ -42,7 +42,8 @@ type slotTable struct {
 type engineWS struct {
 	slots []slotTable
 	queue []uint32
-	// onq is scratch for compactQueue. It is all false between calls.
+	// onq is scratch for compactQueue.
+	// It is all false between calls.
 	onq     []bool
 	bestCtr []uint32
 	ctrBuf  []uint32
@@ -63,8 +64,8 @@ func (re *Regexp) putWS(ws *engineWS) {
 	re.pool.Put(ws)
 }
 
-// prepare sizes the workspace for this program. workspaceHeapBound
-// mirrors this sizing for the resource contract; keep them in step.
+// prepare sizes the workspace for this program.
+// workspaceHeapBound mirrors this sizing for the resource contract, so the two must stay in step.
 func (ws *engineWS) prepare(prog *program, k, ring int) {
 	if ws.base > 0xf000_0000 {
 		for i := range ws.slots {
@@ -99,27 +100,24 @@ func (ws *engineWS) prepare(prog *program, k, ring int) {
 	ws.queue = ws.queue[:0]
 }
 
-// workspaceHeapBound bounds the bytes prepare and the closure queue
-// can allocate for a program of n instructions with k counter slots
-// and the given ring size. It uses fixed 64-bit sizes, so the resource
-// contract can report the same figure on every platform. Update it
-// together with prepare and the workspace fields.
+// workspaceHeapBound bounds the bytes prepare and the closure queue can allocate.
+// It covers a program of n instructions with k counter slots and the given ring size.
+// It uses fixed 64-bit sizes, so the resource contract reports the same figure on every platform.
+// It must change together with prepare and the workspace fields.
 func workspaceHeapBound(n, k, ring int64) int64 {
-	// Per ring slot: the stamp, start, and active arrays, and the
-	// counter matrix. The active array grows by append, and doubling
-	// can leave twice the needed room.
+	// Each ring slot holds the stamp, start and active arrays, and the counter matrix.
+	// The active array grows by append, and doubling can leave twice the needed room.
 	heap := cMul(ring, cMul(n, 16+4*k))
 	// The queue and its compaction marks.
 	heap = cAdd(heap, 8*(queueCompactFactor*n+2)+n)
-	// The slot structs, the workspace struct, the three counter
-	// vectors, and the lookahead buffer.
+	// The slot structs, the workspace struct, the three counter vectors, and the lookahead buffer.
 	heap = cAdd(heap, cMul(ring, 112)+256)
 	return cAdd(heap, 12*k+4*maxElemAhead)
 }
 
-// ctrLess compares two counter vectors lexicographically. It stays a
-// hand-written loop instead of slices.Compare so prune and store keep
-// fitting in the inline budget; they run on every transition.
+// ctrLess compares two counter vectors lexicographically.
+// It stays a hand-written loop instead of slices.Compare, so prune and store keep fitting in the inline budget.
+// Those two run on every transition.
 func ctrLess(a, b []uint32) bool {
 	for i := range a {
 		if a[i] != b[i] {
@@ -135,8 +133,8 @@ type engineResult struct {
 	so, eo  int
 }
 
-// phaseA carries the per-call executor state, so the hot path builds no
-// closures and allocates nothing after workspace warmup.
+// phaseA carries the per-call executor state.
+// The hot path therefore builds no closures, and it allocates nothing after the workspace warmup.
 type phaseA struct {
 	re      *Regexp
 	prog    *program
@@ -192,8 +190,8 @@ func (e *phaseA) gen(boundary int) uint32 {
 	return e.ws.base + uint32(boundary) + 1
 }
 
-// consider records a match candidate: earliest start, then smallest
-// counters, then longest end.
+// consider records a match candidate.
+// It prefers the earliest start, then the smallest counters, then the longest end.
 func (e *phaseA) consider(start int32, ctr []uint32, end int) {
 	if !e.matched || int(start) < e.so {
 		e.matched = true
@@ -235,7 +233,8 @@ func (e *phaseA) prune(start int32, ctr []uint32) bool {
 	return ctrLess(e.bestCtr, ctr)
 }
 
-// store merges a payload into a slot and reports whether it was kept.
+// store merges a payload into a slot.
+// It reports whether the payload stayed.
 func (e *phaseA) store(t *slotTable, pc uint32, start int32, ctr []uint32) bool {
 	if e.prune(start, ctr) {
 		return false
@@ -265,26 +264,24 @@ func (e *phaseA) store(t *slotTable, pc uint32, start int32, ctr []uint32) bool 
 	return true
 }
 
-// relax merges a payload at the current boundary and queues it for the
-// epsilon closure.
+// relax merges a payload at the current boundary and queues it for the epsilon closure.
 func (e *phaseA) relax(t *slotTable, pc uint32, start int32, ctr []uint32) {
 	if e.store(t, pc, start, ctr) {
 		e.ws.queue = append(e.ws.queue, pc)
 	}
 }
 
-// queueCompactFactor sets the compaction threshold as a multiple of
-// the program length. The queue can pass it by two pushes before the
-// next pop checks, and append doubling can leave twice the needed
-// room; workspaceHeapBound and the queue test derive their figures
-// from this factor.
+// queueCompactFactor sets the compaction threshold as a multiple of the program length.
+// The queue can pass that threshold by two pushes before the next pop checks it.
+// Append doubling can also leave twice the needed room.
+// workspaceHeapBound and the queue test derive their figures from this factor.
 const queueCompactFactor = 2
 
-// compactQueue drops duplicate queue entries. A duplicate is harmless: a
-// pop reads the current slot payload, so one entry per instruction does
-// the same work. Dropping them keeps the queue linear in the program, a
-// bound the resource contract relies on. The onq marks live only inside
-// this function.
+// compactQueue drops duplicate queue entries.
+// A duplicate does no harm, because a pop reads the current slot payload.
+// One entry per instruction therefore does the same work.
+// Dropping the duplicates keeps the queue linear in the program, a bound the resource contract needs.
+// The onq marks live only inside this function.
 func (e *phaseA) compactQueue() {
 	kept := e.ws.queue[:0]
 	for _, pc := range e.ws.queue {
@@ -300,9 +297,8 @@ func (e *phaseA) compactQueue() {
 }
 
 // closure drains the relaxation queue over the epsilon instructions.
-// The queue may hold duplicates; past twice the program length it gets
-// compacted, so its memory stays linear and the hot push stays a bare
-// append.
+// The queue may hold duplicates, and it compacts past twice the program length.
+// Its memory therefore stays linear, and the hot push stays a bare append.
 func (e *phaseA) closure(t *slotTable) {
 	limit := queueCompactFactor * len(e.prog.ins)
 	for len(e.ws.queue) > 0 {
@@ -341,8 +337,8 @@ func (e *phaseA) closure(t *slotTable) {
 }
 
 // arrive files a consuming transition into a future boundary slot.
-// delta counts consumed characters; they also increment the counters
-// selected by the instruction's mask.
+// delta counts the consumed characters.
+// Those characters also increment the counters that the instruction's mask selects.
 func (e *phaseA) arrive(pc uint32, delta int, start int32, ctr []uint32) {
 	future := &e.ws.slots[(e.ci+delta)%e.ring]
 	g := e.gen(e.ci + delta)
@@ -366,8 +362,7 @@ func (e *phaseA) arrive(pc uint32, delta int, start int32, ctr []uint32) {
 	e.store(future, ins.next, start, newCtr)
 }
 
-// consume advances every consuming instruction over the current
-// character or collating element.
+// consume advances every consuming instruction over the current character or collating element.
 func (e *phaseA) consume(t *slotTable) {
 	aheadReady := false
 	for _, pc := range t.active {
@@ -417,8 +412,7 @@ func (e *phaseA) consume(t *slotTable) {
 	}
 }
 
-// decodeAhead fills the lookahead buffer with up to maxElemAhead
-// characters starting at the current position.
+// decodeAhead fills the lookahead buffer with up to maxElemAhead characters, starting at the current position.
 func (e *phaseA) decodeAhead() {
 	e.ws.ahead = e.ws.ahead[:0]
 	at := e.pos
@@ -429,9 +423,9 @@ func (e *phaseA) decodeAhead() {
 	}
 }
 
-// scanAhead returns the offset of the next byte in the stop set, or the
-// subject length. Stop bytes are ASCII or UTF-8 lead bytes, so the
-// returned offset is always a boundary the sequential scan would visit.
+// scanAhead returns the offset of the next byte in the stop set, or the subject length.
+// Stop bytes are ASCII or UTF-8 lead bytes.
+// The returned offset is therefore always a boundary that the sequential scan would visit.
 func (e *phaseA) scanAhead() int {
 	s := e.subject
 	if e.prog.scan.single {
@@ -450,17 +444,16 @@ func (e *phaseA) scanAhead() int {
 	return len(s)
 }
 
-// bolAt reports whether a line begins at the current position, given the
-// preceding character.
+// bolAt reports whether a line begins at the current position, for the given preceding character.
 func (e *phaseA) bolAt(prev rune) bool {
 	return (e.pos == 0 && e.eflags&NotBOL == 0) ||
 		(e.nlMode && prev == '\n')
 }
 
-// continuationFlags adapts eflags for a search that restarts at pos on
-// a sliced subject, keeping the bolAt rule above: a restart is never
-// the true start, and only a preceding newline in newline mode leaves
-// a line boundary before it.
+// continuationFlags adapts eflags for a search that restarts at pos on a sliced subject.
+// It keeps the bolAt rule above.
+// A restart is never the true start.
+// Only a preceding newline in newline mode leaves a line boundary before it.
 func (re *Regexp) continuationFlags(subject string, pos int, eflags ExecFlags) ExecFlags {
 	if pos == 0 {
 		return eflags
@@ -488,8 +481,8 @@ func (e *phaseA) run() {
 		if len(t.active) == 0 && !e.matched && e.prog.scan.enabled &&
 			e.pos < len(e.subject) {
 			if !e.bolAt(prev) {
-				// No thread is live and no match can begin on a byte
-				// outside the filter, so jump to the next stop byte.
+				// No thread is live, and no match can begin on a byte outside the filter.
+				// The scan therefore jumps to the next stop byte.
 				next := e.scanAhead()
 				if next > e.pos {
 					e.pos = next

@@ -4,8 +4,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
 
-    // The public module. A package that depends on this one imports
-    // it as @import("revera").
+    // The public module.
+    // A package that depends on this one imports it as @import("revera").
     _ = b.addModule("revera", .{
         .root_source_file = b.path("src/revera.zig"),
         .target = target,

@@ -1,8 +1,8 @@
 package revera
 
-// This file lowers the AST into a flat instruction program for the
-// phase A executor. Phase A only needs the match relation, the minimal
-// repetition counters, and anchors; groups compile to nothing here.
+// This file lowers the AST into a flat instruction program for the phase A executor.
+// Phase A only needs the match relation, the minimal repetition counters, and anchors.
+// Groups compile to nothing here.
 
 import (
 	"math"
@@ -30,10 +30,10 @@ type instr struct {
 	next uint32
 	alt  uint32
 	arg  uint32
-	// mask marks the shortest-preferring repetitions this consuming
-	// instruction sits inside, one bit per counter slot below 64.
+	// mask marks the shortest-preferring repetitions this consuming instruction sits inside.
+	// It holds one bit per counter slot below 64.
 	mask uint64
-	// extra lists counter slots at 64 and above; almost always nil.
+	// extra lists counter slots at 64 and above, and is almost always nil.
 	extra []uint32
 }
 
@@ -44,21 +44,19 @@ type program struct {
 	brackets []*bracketSet
 	// multi is true when some bracket can consume several characters.
 	multi bool
-	// failMin is the smallest minimum match length over every subtree
-	// that was pruned to iFail for size. The program is exact for any
-	// subject with fewer characters, because a pruned subtree cannot
-	// participate in a match of such a subject. failMinNone means
-	// nothing was pruned; a pruned subtree's saturated minimum can
-	// legitimately reach lenInf, so lenInf cannot be the sentinel.
+	// failMin is the smallest minimum match length over every subtree that size pruning replaced with iFail.
+	// The program stays exact for any subject with fewer characters.
+	// A pruned subtree cannot take part in such a match.
+	// failMinNone means that nothing was pruned.
+	// The saturated minimum of a pruned subtree can legitimately reach lenInf, so lenInf cannot be the sentinel.
 	failMin int
 	scan    scanFilter
 }
 
-// scanFilter speeds up positions where no thread is live. It holds the
-// bytes that can begin a match from an ordinary mid-subject boundary.
-// The executor may skip every byte outside the set: no match can start
-// there, because the start closure at such a boundary reaches only the
-// listed consuming instructions and no accepting state.
+// scanFilter speeds up positions where no thread is live.
+// It holds the bytes that can begin a match from an ordinary mid-subject boundary.
+// The executor may skip every byte outside the set, because no match can start there.
+// The start closure at such a boundary reaches only the listed consuming instructions, and no accepting state.
 type scanFilter struct {
 	enabled bool
 	single  bool
@@ -66,9 +64,9 @@ type scanFilter struct {
 	stop    [256]bool
 }
 
-// closureScan walks epsilon transitions from the start with the given
-// anchor context. It reports the reachable consuming instructions and
-// whether an accepting state is reachable without consuming.
+// closureScan walks epsilon transitions from the start, in the given anchor context.
+// It reports the reachable consuming instructions.
+// It also reports whether an accepting state is reachable without any consumption.
 func (p *program) closureScan(bol, eol bool, visit func(pc uint32)) (matchReachable bool) {
 	seen := make([]bool, len(p.ins))
 	stack := []uint32{p.start}
@@ -105,8 +103,7 @@ func (p *program) closureScan(bol, eol bool, visit func(pc uint32)) (matchReacha
 }
 
 // buildScanFilter derives the skip byte set for mid-subject boundaries.
-// newlineMode forces a stop at every newline, because anchors gain line
-// boundaries there.
+// newlineMode forces a stop at every newline, because anchors gain line boundaries there.
 func (p *program) buildScanFilter(newlineMode bool) {
 	ok := true
 	addRune := func(r rune) {
@@ -148,10 +145,10 @@ func (p *program) buildScanFilter(newlineMode bool) {
 // failMinNone marks a program with no pruned subtree.
 const failMinNone = math.MaxInt
 
-// maxProgram caps the expanded program size. Interval expansion can
-// multiply nested counts. Compilation still succeeds past the cap; the
-// expression then answers through the minimum-length fallback, and only
-// a subject long enough to need the huge program reports ESpace.
+// maxProgram caps the expanded program size, because interval expansion can multiply nested counts.
+// Compilation still succeeds past the cap.
+// The expression then answers through the minimum-length fallback.
+// Only a subject long enough to need the huge program reports ESpace.
 const maxProgram = 1 << 20
 
 // maskWidth is the number of counter slots one mask word covers.
@@ -217,9 +214,9 @@ func instrEstimate(n *node) int64 {
 	return 1
 }
 
-// compileProgram lowers the AST. A nil program with a nil error means
-// the expansion passed the size cap; execution then uses the
-// minimum-length fallback.
+// compileProgram lowers the AST.
+// A nil program with a nil error means the expansion passed the size cap.
+// Execution then uses the minimum-length fallback.
 func compileProgram(re *Regexp) (*program, *Error) {
 	b := &progBuilder{re: re, prog: &program{}, failMin: failMinNone}
 	body := b.emit(re.root, 0, nil)
@@ -348,9 +345,8 @@ func (b *progBuilder) emitAlt(n *node, mask uint64, extra []uint32) frag {
 
 func (b *progBuilder) emitRepeat(n *node, mask uint64, extra []uint32) frag {
 	if instrEstimate(n) > int64(maxProgram-len(b.prog.ins)) {
-		// Prune the oversized expansion to a dead end. The program
-		// stays exact for subjects shorter than this subtree's minimum
-		// match length; Exec checks that bound.
+		// The oversized expansion becomes a dead end.
+		// The program stays exact for subjects shorter than the minimum match length of this subtree, and Exec checks that bound.
 		idx := b.add(instr{op: iFail})
 		b.failMin = min(b.failMin, n.minL)
 		return frag{start: idx}
@@ -359,8 +355,7 @@ func (b *progBuilder) emitRepeat(n *node, mask uint64, extra []uint32) frag {
 		if n.index < maskWidth {
 			mask |= 1 << uint(n.index)
 		} else {
-			// Clip forces a copy, so sibling fragments never share the
-			// grown list.
+			// Clip forces a copy, so sibling fragments never share the grown list.
 			extra = append(slices.Clip(extra), uint32(n.index))
 		}
 	}
@@ -383,7 +378,8 @@ func (b *progBuilder) emitRepeat(n *node, mask uint64, extra []uint32) frag {
 		result.out = f.out
 	}
 
-	// Required copies: the last one loops when max is unbounded.
+	// These are the required copies.
+	// The last one loops when max is unbounded.
 	for i := range min {
 		if b.err != nil || b.tooBig {
 			return frag{}
@@ -396,12 +392,12 @@ func (b *progBuilder) emitRepeat(n *node, mask uint64, extra []uint32) frag {
 	}
 
 	if max == infinite {
-		// min is zero here: a plain star.
+		// min is zero here, so this is a plain star.
 		appendFrag(b.emitStar(child, mask, extra))
 		return result
 	}
 
-	// Optional copies: each may skip straight to the shared exit.
+	// These are the optional copies, and each one may skip straight to the shared exit.
 	var skips []patchSlot
 	for i := min; i < max; i++ {
 		if b.err != nil || b.tooBig {

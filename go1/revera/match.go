@@ -1,8 +1,7 @@
 package revera
 
-// Shared matching helpers: the decoded subject window, the atom
-// tests, and the pmatch conversion. The phase B backends and the
-// engine both use them.
+// Shared matching helpers: the decoded subject window, the atom tests, and the pmatch conversion.
+// The phase B backends and the engine both use them.
 
 // Match reports one substring as byte offsets, half-open [So, Eo).
 // A nonparticipating subexpression has So == -1 and Eo == -1.
@@ -11,27 +10,22 @@ type Match struct {
 	Eo int
 }
 
-// decoded is a subject window decoded into characters with byte
-// boundaries. The edge flags carry the anchor context of the text
-// around the window.
+// decoded is a subject window decoded into characters with byte boundaries.
+// The edge flags carry the anchor context of the text around the window.
 type decoded struct {
 	runes []int32
 	// byteAt[i] is the absolute byte offset of character boundary i.
 	// Its length is len(runes)+1.
-	byteAt []int
-	// atSubjectStart is true when the window begins the subject.
+	byteAt         []int
 	atSubjectStart bool
-	// atSubjectEnd is true when the window ends the subject.
-	atSubjectEnd bool
-	// prevIsNewline is true when a newline precedes the window.
-	prevIsNewline bool
-	// nextIsNewline is true when a newline follows the window.
-	nextIsNewline bool
+	atSubjectEnd   bool
+	prevIsNewline  bool
+	nextIsNewline  bool
 }
 
-// decodeWindow decodes s[so:eo]. Both offsets sit on character
-// boundaries. captureHeap in the resource contract counts these
-// allocations.
+// decodeWindow decodes s[so:eo].
+// Both offsets sit on character boundaries.
+// captureHeap in the resource contract counts these allocations.
 func decodeWindow(s string, so int, eo int) decoded {
 	var d decoded
 	d.runes = make([]int32, 0, eo-so)
@@ -93,8 +87,7 @@ func anyMatches(re *Regexp, c int32) bool {
 	return true
 }
 
-// atBOL reports a line beginning at character boundary i of the
-// window.
+// atBOL reports a line beginning at character boundary i of the window.
 func atBOL(re *Regexp, d *decoded, i int, eflags uint32) bool {
 	if i == 0 {
 		if d.atSubjectStart {
@@ -116,8 +109,7 @@ func atEOL(re *Regexp, d *decoded, i int, eflags uint32) bool {
 	return re.flags&FlagNewline != 0 && d.runes[i] == '\n'
 }
 
-// fillMatches converts character spans to byte offsets and fills
-// pmatch per section 12.5.
+// fillMatches converts character spans to byte offsets, and fills pmatch under section 12.5.
 func fillMatches(re *Regexp, d *decoded, caps []Match, pmatch []Match) {
 	if re.flags&FlagNoSub != 0 || len(pmatch) == 0 {
 		return

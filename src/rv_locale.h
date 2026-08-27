@@ -33,9 +33,10 @@ typedef struct rv_locale {
 
 /*
  * Opens a CLDR locale and optional collation type without consulting the host.
- * Locale names are ASCII case-insensitive and accept '-' or '_' separators and
- * an optional .UTF-8 suffix. C and POSIX select the POSIX locale. The collation
- * type is a CLDR long name such as "traditional" or its BCP 47 short alias.
+ * Locale names are ASCII case-insensitive.
+ * They accept '-' or '_' separators and an optional .UTF-8 suffix.
+ * C and POSIX select the POSIX locale.
+ * The collation type is a CLDR long name such as "traditional", or its BCP 47 short alias.
  */
 bool rv_locale_open(const char *name, const char *collation_type,
                     rv_locale *result);

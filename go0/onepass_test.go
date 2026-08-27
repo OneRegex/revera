@@ -49,9 +49,8 @@ func TestOnePassDetection(t *testing.T) {
 }
 
 func TestOnePassWalk(t *testing.T) {
-	// The walk itself must succeed and apply the section 12.7 rule:
-	// the last loop instance takes branch b, so the nested group (a)
-	// is cleared even though an earlier instance set it.
+	// The walk itself must succeed and apply the section 12.7 rule.
+	// The last loop instance takes branch b, so the nested group (a) clears, even though an earlier instance set it.
 	re := compileOK(t, "((a)|b)*", 0)
 	if !re.onePass {
 		t.Fatal("pattern must be one-pass")
@@ -66,9 +65,8 @@ func TestOnePassWalk(t *testing.T) {
 	}
 }
 
-// TestOnePassAgainstSolver drives random patterns through the one-pass
-// walk, the phase B solver, and the oracle, and requires identical
-// capture vectors from all three.
+// TestOnePassAgainstSolver drives random patterns through the one-pass walk, the phase B solver, and the oracle.
+// It requires identical capture vectors from all three.
 func TestOnePassAgainstSolver(t *testing.T) {
 	rng := rand.New(rand.NewSource(7))
 	eligible := 0
@@ -147,8 +145,8 @@ func benchCaptureWalk(b *testing.B, onePass bool) {
 	}
 }
 
-// The pair below isolates phase B: the same span solved by the
-// one-pass walk and by the memoized solver.
+// The pair below isolates phase B.
+// The one-pass walk and the memoized solver each solve the same span.
 func BenchmarkCaptureWalkOnePass(b *testing.B) {
 	benchCaptureWalk(b, true)
 }

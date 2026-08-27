@@ -1,20 +1,16 @@
 /-
 Soundness of the resource meter, universally.
 
-The driver measures one Exec by resetting the meter, running the
-call, and reading the counters. That methodology is only sound if
-no interpreter step can shrink a counter, and if the call-depth
-counter returns to its entry value whenever a call completes, so
-the recorded maximum is the true peak of the run. This file proves
-both, for every function of the interpreter, by one induction on
-fuel. Nothing here uses native evaluation.
+The driver measures one Exec by resetting the meter, running the call, and reading the counters.
+That method is only sound if no interpreter step can shrink a counter.
+The call-depth counter must also return to its entry value whenever a call completes.
+The recorded maximum is then the true peak of the run.
+This file proves both, for every function of the interpreter, by one induction on fuel.
+Nothing here uses native evaluation.
 
-`MeterOK h h'` is the per-step contract: the allocation, step and
-loop counters never decrease, the depth is balanced, and the
-recorded maximum never decreases. `MOK x` lifts it to a whole
-computation: every successful run of x satisfies it. The final
-corollary lifts it to harness calls, which is the form the driver
-session relies on.
+`MeterOK h h'` is the per-step contract: the allocation, step and loop counters never decrease, the depth is balanced, and the recorded maximum never decreases.
+`MOK x` lifts it to a whole computation: every successful run of x satisfies it.
+The final corollary lifts it to harness calls, which is the form the driver session relies on.
 -/
 
 import Vego.Machine
@@ -29,8 +25,7 @@ def sameMeter (h h' : Heap) : Prop :=
   h'.allocBytes = h.allocBytes ∧ h'.steps = h.steps ∧
   h'.loops = h.loops ∧ h'.depth = h.depth ∧ h'.maxDepth = h.maxDepth
 
-/-- What one completed interpreter action guarantees: counters
-grow monotonically, and the depth is balanced. -/
+/-- What one completed interpreter action guarantees: counters grow monotonically, and the depth is balanced. -/
 def MeterOK (h h' : Heap) : Prop :=
   h.allocBytes ≤ h'.allocBytes ∧ h.steps ≤ h'.steps ∧
   h.loops ≤ h'.loops ∧ h'.depth = h.depth ∧ h.maxDepth ≤ h'.maxDepth
@@ -378,10 +373,10 @@ theorem MOK_forIn_list {α β : Type} (xs : List α) (b : β)
 
 /-! ## The interpreter, whole
 
-One mutual induction on fuel: every function of the interpreter
-satisfies MeterOK on success. Counters never shrink and the call
-depth is balanced, so the driver's reset-run-read measurement of
-one Exec is sound. -/
+One mutual induction on fuel shows that every function of the interpreter satisfies MeterOK on success.
+Counters never shrink, and the call depth is balanced.
+The reset-run-read measurement of one Exec in the driver is therefore sound.
+-/
 
 mutual
 
@@ -1812,11 +1807,13 @@ theorem MOK_evalCallExpr (fuel : Nat) (c : Ctx) (fr : Frame)
 
 end
 
-/-- The harness form: any successful engine call through the
-machine keeps every meter counter monotone and returns with the
-call depth balanced. Resetting the meter before a call and reading
-it after therefore measures exactly that call, which is what the
-driver's per-Exec contract check does. -/
+/--
+The harness form.
+Any successful engine call through the machine keeps every meter counter monotone.
+It also returns with the call depth balanced.
+A reset before a call and a read after it therefore measure exactly that call.
+That is what the per-Exec contract check of the driver does.
+-/
 theorem callIdx_meterOK (m : Machine) (idx : Nat) (args : List Val)
     (fuel : Nat) (vs : List Val) (m' : Machine)
     (e : m.callIdx idx args fuel = .ok (vs, m')) :

@@ -1,10 +1,9 @@
-// Command genlocale converts the generated C locale tables into a compact
-// binary blob for the Go locale package.
+// Command genlocale converts the generated C locale tables into a compact binary blob for the Go locale package.
 //
-// The input is src/rv_locale_data.inc at the repository root. The output is
-// locale/data.bin. The blob is a sequence of sections. Each section is a
-// little-endian u32 byte length followed by the section payload. The locale
-// package knows the section order.
+// The input is src/rv_locale_data.inc at the repository root, and the output is locale/data.bin.
+// The blob is a sequence of sections.
+// Each section is a little-endian u32 byte length, followed by the section payload.
+// The locale package knows the section order.
 package main
 
 import (
@@ -61,7 +60,7 @@ func need(tables map[string][]uint64, name string) ([]uint64, error) {
 	return values, nil
 }
 
-// checkCount verifies one declared row count against the parsed flat length.
+// checkCount compares one declared row count against the parsed flat length.
 func checkCount(scalars map[string]uint64, name string, flat, width int) error {
 	declared, ok := scalars[name+"_count"]
 	if !ok {
@@ -74,9 +73,9 @@ func checkCount(scalars map[string]uint64, name string, flat, width int) error {
 	return nil
 }
 
-// caseInverse builds sorted (target, source) pairs for one direction of a
-// merged case map. rows holds (cp, upper, lower) triples. Identity mappings
-// are skipped; the runtime always considers the character itself.
+// caseInverse builds sorted (target, source) pairs for one direction of a merged case map.
+// rows holds (cp, upper, lower) triples.
+// It skips identity mappings, because the runtime always considers the character itself.
 func caseInverse(rows [][3]uint32, toUpper bool) []uint64 {
 	type pair struct{ target, source uint32 }
 	pairs := make([]pair, 0, len(rows))
@@ -100,8 +99,8 @@ func caseInverse(rows [][3]uint32, toUpper bool) []uint64 {
 	return out
 }
 
-// mergedCaseRows applies the turkic override rows on top of the default
-// rows and returns the merged (cp, upper, lower) triples.
+// mergedCaseRows applies the turkic override rows over the default rows.
+// It returns the merged (cp, upper, lower) triples.
 func mergedCaseRows(defaults, overrides []uint64) [][3]uint32 {
 	rows := make([][3]uint32, 0, len(defaults)/3)
 	for i := 0; i+3 <= len(defaults); i += 3 {

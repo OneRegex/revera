@@ -1,5 +1,5 @@
-// Probe runner for the Rust instantiation. It prints the same
-// lines as go1/cmd/proberef; go1/cmd/probecheck diffs them.
+// Probe runner for the Rust instantiation.
+// It prints the same lines as go1/cmd/proberef, and go1/cmd/probecheck diffs them.
 
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #![allow(unused_parens, unused_mut, unused_variables, dead_code)]

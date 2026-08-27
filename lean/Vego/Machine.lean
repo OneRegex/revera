@@ -1,8 +1,7 @@
 /-
-A machine wraps a checked program with a live heap, so host-side
-harnesses can call functions, allocate cells for borrows and
-buffers, and keep state between calls the way the cross-language
-driver protocol does.
+A machine wraps a checked program with a live heap.
+A host-side harness can then call functions and allocate cells for borrows and buffers.
+It can also keep state between calls, the way the cross-language driver protocol does.
 -/
 
 import Vego.Interp
@@ -41,9 +40,10 @@ def zeroStruct (m : Machine) (name : String) : Val :=
   | some si => zeroVal m.ctx.structs (.strukt si)
   | none => .b false
 
-/-- Allocate a heap cell, for a borrowed struct or a buffer. The
-harness never frees its cells, so their generation stays 0 and
-references to them carry generation 0. -/
+/--
+Allocate a heap cell, for a borrowed struct or a buffer.
+The harness never frees its cells, so their generation stays 0 and references to them carry generation 0.
+-/
 def alloc (m : Machine) (v : Val) : Machine × Nat :=
   ({ m with heap := { m.heap with cells := m.heap.cells.push (0, v) } },
    m.heap.cells.size)
@@ -58,8 +58,7 @@ def writeRoot (m : Machine) (cell : Nat) (v : Val) : Machine :=
     { m with heap := { m.heap with cells := m.heap.cells.set! cell (g, v) } }
   | none => m
 
-/-- Allocate a buffer holding the given elements and return the
-slice header for it. -/
+/-- Allocate a buffer holding the given elements and return the slice header for it. -/
 def mkSlice (m : Machine) (elems : Array Val) : Machine × Val :=
   let (m', cell) := m.alloc (.arr elems)
   (m', .slice (some (cell, 0, [])) 0 elems.size elems.size)
@@ -76,18 +75,17 @@ def sliceElems (m : Machine) (v : Val) : Option (Array Val) :=
     | _ => none
   | _ => none
 
-/-- Clear the resource meter, so the next call is measured on its
-own. -/
+/-- Clear the resource meter, so the next call is measured on its own. -/
 def resetMeter (m : Machine) : Machine :=
   { m with heap := { m.heap with allocBytes := 0, steps := 0, loops := 0,
                                  depth := 0, maxDepth := 0 } }
 
 def defaultFuel : Nat := 1000000000000
 
-/-- Call a function by its resolved index: the same entry as
-in-language calls (`runFn`). The heap keeps whatever the call
-allocated, so borrowed cells stay readable and session state
-persists. -/
+/--
+Call a function by its resolved index: the same entry as in-language calls (`runFn`).
+The heap keeps whatever the call allocated, so borrowed cells stay readable and session state persists.
+-/
 def callIdx (m : Machine) (idx : Nat) (args : List Val)
     (fuel : Nat := defaultFuel) : Except Trap (List Val × Machine) := do
   match m.prog.funcs[idx]? with

@@ -1,6 +1,5 @@
 // Command proberef prints the probe results of the Go original.
-// The Zig, C++ and Rust probe binaries print the same lines; the
-// probecheck harness diffs them.
+// The Zig, C++ and Rust probe binaries print the same lines, and the probecheck harness diffs them.
 package main
 
 import (

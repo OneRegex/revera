@@ -2,7 +2,8 @@ package revera
 
 import "strconv"
 
-// Code is a POSIX regex status code. The zero value means success.
+// Code is a POSIX regex status code.
+// The zero value means success.
 type Code int
 
 // These values mirror the <regex.h> error constants.
@@ -12,7 +13,7 @@ const (
 	ECollate                 // invalid collating element reference
 	ECType                   // invalid character class reference
 	EEscape                  // trailing backslash
-	ESubReg                  // invalid backreference; unused in ERE
+	ESubReg                  // invalid backreference, unused in ERE
 	EBrack                   // bracket imbalance
 	EParen                   // parenthesis imbalance
 	EBrace                   // brace imbalance
@@ -20,8 +21,8 @@ const (
 	ERange                   // invalid range endpoint
 	ESpace                   // insufficient memory or capacity
 	BadRpt                   // repetition without a valid operand
-	// ENoSub is an extension with no <regex.h> counterpart: a call
-	// needed match offsets from an expression compiled with NoSub.
+	// ENoSub is an extension with no <regex.h> counterpart.
+	// A call needed match offsets from an expression compiled with NoSub.
 	ENoSub
 )
 
@@ -53,8 +54,7 @@ func (c Code) String() string {
 // Error reports a compilation or execution failure.
 type Error struct {
 	Code Code
-	// Pos is the byte offset in the pattern where compilation failed,
-	// or -1 when the error has no position.
+	// Pos is the byte offset in the pattern where compilation failed, or -1 when the error has no position.
 	Pos int
 }
 

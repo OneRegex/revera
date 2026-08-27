@@ -1,9 +1,8 @@
-// Command json2go converts a Vego JSON object back into one Go
-// source file. It is the reference converter: the same recipe with
-// a different printer produces the C++, Rust, or Zig instantiation.
-// It also closes the verification loop: regenerating the engine
-// from revera.vego.json and running the test suite against the
-// result shows that the JSON carries the whole program.
+// Command json2go converts a Vego JSON object back into one Go source file.
+// It is the reference converter, because the same recipe with a different printer produces the C++, Rust or Zig instantiation.
+// It also closes the verification loop.
+// The engine rebuilds from revera.vego.json, and the test suite runs against the result.
+// Success shows that the JSON carries the whole program.
 //
 // Usage:
 //
@@ -135,8 +134,7 @@ func emitBody(b *strings.Builder, body []any, depth int) {
 	}
 }
 
-// inlineStmt renders a statement without indentation or newline,
-// for loop init and post positions.
+// inlineStmt renders a statement without indentation or newline, for loop init and post positions.
 func inlineStmt(s object) string {
 	var b strings.Builder
 	emitStmt(&b, s, 0)
@@ -311,9 +309,8 @@ func expr(e any) string {
 		return o["fn"].(string) + "(" + strings.Join(args, ", ") + suffix + ")"
 	case "conv":
 		t := typeRef(o["type"])
-		// A composite type name needs parens to parse as the
-		// conversion operand: ([]uint8)(x). Decide by JSON kind, so
-		// a future ptr or array conversion lands here too.
+		// A composite type name needs parentheses to parse as the conversion operand, as in ([]uint8)(x).
+		// The choice looks at the JSON kind, so a future ptr or array conversion lands here too.
 		kind := o["type"].(object)["k"].(string)
 		if kind != "named" && kind != "struct_ref" {
 			t = "(" + t + ")"

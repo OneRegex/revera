@@ -1,17 +1,17 @@
 package revera
 
-// This file holds the phase B capture solver. Phase A fixed the
-// match span; this solver finds the best parse of that span under
-// the selection order, then reads the group spans from the winning
-// parse.
+// This file holds the phase B capture solver.
+// Phase A fixed the match span.
+// This solver finds the best parse of that span under the selection order.
+// It then reads the group spans from the winning parse.
 //
-// Sibling segments of the comparison vector are independent, so the
-// best parse of a node over a span does not depend on its context,
-// and memoization per (node, span) is valid.
+// Sibling segments of the comparison vector are independent.
+// The best parse of a node over a span therefore does not depend on its context.
+// Memoization per (node, span) is valid.
 //
-// Parse trees live in a flat arena: a tree is an index into trees,
-// and a child list is a (kidsOff, kidsLen) window of kidStore. The
-// memo tables key on packed int32 tuples.
+// Parse trees live in a flat arena.
+// A tree is an index into trees, and a child list is a (kidsOff, kidsLen) window of kidStore.
+// The memo tables key on packed int32 tuples.
 
 // ptree is one parse of a pattern node over a character span.
 type ptree struct {
@@ -35,14 +35,14 @@ type capSolver struct {
 	ctrA  []int
 	ctrB  []int
 	work  int
-	// failed becomes true when the work limit is passed.
+	// failed becomes true when the search passes the work limit.
 	failed   bool
 	trees    []ptree
 	kidStore []int32
 }
 
-// capWorkLimit bounds the polynomial parse search. Reaching it
-// reports ESpace instead of looping for a very long time.
+// capWorkLimit bounds the polynomial parse search.
+// A search that reaches it reports ESpace instead of looping for a very long time.
 const capWorkLimit = 50000000
 
 func capStep(s *capSolver) bool {
@@ -53,16 +53,15 @@ func capStep(s *capSolver) bool {
 	return !s.failed
 }
 
-// solverArenaLimit caps each arena's entry count. A search that
-// needs more reports ESpace, exactly like one that passes the work
-// limit, and the int32 arena offsets can never overflow.
+// solverArenaLimit caps each arena's entry count.
+// A search that needs more reports ESpace, exactly like one that passes the work limit.
+// The int32 arena offsets can therefore never overflow.
 const solverArenaLimit = 1 << 26
 
 // seedArenas gives each arena one scratch entry at offset zero.
-// After a failure the allocators keep handing out offset zero, and
-// candidate comparisons still read structurally valid records, so
-// the search unwinds without extra guards; the failure wins at the
-// end.
+// After a failure, the allocators keep handing out offset zero.
+// Candidate comparisons then still read valid records, so the search unwinds without extra guards.
+// The failure wins at the end.
 func seedArenas(s *capSolver) {
 	var scratch ptree
 	s.trees = append(s.trees, scratch)
@@ -80,8 +79,8 @@ func newTree(s *capSolver, t ptree) int32 {
 	return int32(len(s.trees) - 1)
 }
 
-// kidAlloc reserves a child window of the given length and returns
-// its offset. The caller overwrites every entry.
+// kidAlloc reserves a child window of the given length and returns its offset.
+// The caller overwrites every entry.
 func kidAlloc(s *capSolver, length int) int {
 	if s.failed || len(s.kidStore)+length > solverArenaLimit {
 		s.failed = true
@@ -92,8 +91,7 @@ func kidAlloc(s *capSolver, length int) int {
 	}
 	off := len(s.kidStore)
 	if off+length <= cap(s.kidStore) {
-		// The caller fills the window, so the grown entries need no
-		// clearing.
+		// The caller fills the window, so the grown entries need no clearing.
 		s.kidStore = s.kidStore[:off+length]
 		return off
 	}
@@ -110,8 +108,7 @@ func kidAlloc1(s *capSolver, t int32) int {
 	return off
 }
 
-// kidPrepend builds a new window holding head followed by a copy of
-// an existing tail window.
+// kidPrepend builds a new window that holds head, followed by a copy of an existing tail window.
 func kidPrepend(s *capSolver, head int32, tailOff int, tailLen int) int {
 	off := kidAlloc(s, tailLen+1)
 	s.kidStore[off] = head
@@ -125,8 +122,7 @@ func setMatch(caps []Match, idx int, so int, eo int) {
 	caps[idx].Eo = eo
 }
 
-// addCounters accumulates the consumed totals of every
-// shortest-preferring repetition, by counter slot.
+// addCounters accumulates the consumed totals of every shortest-preferring repetition, by counter slot.
 func addCounters(s *capSolver, re *Regexp, t int32, out []int) {
 	ni := s.trees[t].n
 	if re.nodes[ni].op == opRepeat && re.nodes[ni].minimal {
@@ -139,9 +135,8 @@ func addCounters(s *capSolver, re *Regexp, t int32, out []int) {
 	}
 }
 
-// structCmp compares two parses of the same pattern node in
-// pre-order. It returns a negative value when a wins, positive when
-// b wins.
+// structCmp compares two parses of the same pattern node in pre-order.
+// It returns a negative value when a wins, and a positive value when b wins.
 func structCmp(s *capSolver, re *Regexp, a int32, b int32) int {
 	spanA := int(s.trees[a].j - s.trees[a].i)
 	spanB := int(s.trees[b].j - s.trees[b].i)
@@ -159,8 +154,8 @@ func structCmp(s *capSolver, re *Regexp, a int32, b int32) int {
 	switch re.nodes[ni].op {
 	case opAlt:
 		if s.trees[a].branch != s.trees[b].branch {
-			// Equal outer results: the earlier branch participates
-			// at an earlier pre-order position, so it wins.
+			// The outer results are equal.
+			// The earlier branch takes part at an earlier pre-order position, so it wins.
 			return int(s.trees[a].branch - s.trees[b].branch)
 		}
 		return structCmp(s, re, s.kidStore[offA], s.kidStore[offB])
@@ -198,9 +193,9 @@ func structCmp(s *capSolver, re *Regexp, a int32, b int32) int {
 	return 0
 }
 
-// cmpCand compares two parses of the same pattern node over the same
-// span: minimal repetition counters first, then structure. A
-// negative result means a wins.
+// cmpCand compares two parses of the same pattern node over the same span.
+// It compares the minimal repetition counters first, then the structure.
+// A negative result means a wins.
 func cmpCand(s *capSolver, re *Regexp, a int32, b int32) int {
 	if re.minSlots > 0 {
 		for idx := 0; idx < re.minSlots; idx++ {
@@ -218,8 +213,7 @@ func cmpCand(s *capSolver, re *Regexp, a int32, b int32) int {
 	return structCmp(s, re, a, b)
 }
 
-// bestParse returns the arena index of the best parse of node ni
-// over exactly [i, j), or -1.
+// bestParse returns the arena index of the best parse of node ni over exactly [i, j), or -1.
 func bestParse(s *capSolver, re *Regexp, d *decoded, ni int32, i int, j int) int32 {
 	// A saturated maxL means unbounded, never an actual limit.
 	span := j - i
@@ -289,9 +283,8 @@ func bestParse(s *capSolver, re *Regexp, d *decoded, ni int32, i int, j int) int
 		}
 	case opRepeat:
 		if i == j && re.nodes[ni].min == 0 {
-			// Mirror the reference matcher: one null occurrence when
-			// the operand has a null match and the maximum is not
-			// zero.
+			// This mirrors the reference matcher.
+			// It takes one null occurrence when the operand has a null match and the maximum is not zero.
 			sub := int32(-1)
 			if re.nodes[ni].max != 0 {
 				sub = bestParse(s, re, d, re.nodes[ni].ch[0], i, i)
@@ -317,9 +310,8 @@ func bestParse(s *capSolver, re *Regexp, d *decoded, ni int32, i int, j int) int
 	return best
 }
 
-// bestConcat returns the kid window of the best child parses of
-// ni.ch[idx:] covering [i, j), or a negative offset when none
-// exists.
+// bestConcat returns the kid window of the best child parses of ni.ch[idx:] that cover [i, j).
+// It returns a negative offset when no such parse exists.
 func bestConcat(s *capSolver, re *Regexp, d *decoded, ni int32, idx int, i int, j int) (int, int) {
 	if idx == len(re.nodes[ni].ch)-1 {
 		sub := bestParse(s, re, d, re.nodes[ni].ch[idx], i, j)
@@ -380,8 +372,7 @@ func bestConcat(s *capSolver, re *Regexp, d *decoded, ni int32, idx int, i int, 
 	return bestOff, bestLen
 }
 
-// repBest tracks the winning instance list while bestRep scans the
-// split points.
+// repBest tracks the winning instance list while bestRep scans the split points.
 type repBest struct {
 	off    int
 	length int
@@ -400,22 +391,19 @@ func repTry(s *capSolver, re *Regexp, ni int32, i int, j int, off int, length in
 	}
 }
 
-// repWin is the outcome of one bestRep search: the winning kid
-// window, or ok == false when no instance list exists.
+// repWin is the outcome of one bestRep search.
+// It holds the winning kid window, and ok is false when no instance list exists.
 type repWin struct {
 	off    int
 	length int
 	ok     bool
 }
 
-// bestRep returns the best remaining instance list of repetition ni
-// over [i, j) after done instances. The section 8.5 rule holds: a
-// null instance is allowed only while the final count stays at the
-// minimum.
+// bestRep returns the best remaining instance list of repetition ni over [i, j), after done instances.
+// It keeps the section 8.5 rule: a null instance is allowed only while the final count stays at the minimum.
 func bestRep(s *capSolver, re *Regexp, d *decoded, ni int32, i int, j int, done int, hasEmpty bool) repWin {
-	// With no upper bound, behavior only depends on done through the
-	// comparison with the minimum. Folding larger values onto the
-	// minimum keeps the memoized state space quadratic in the span.
+	// With no upper bound, done only changes behavior through its comparison with the minimum.
+	// Folding larger values onto the minimum keeps the memoized state space quadratic in the span.
 	if re.nodes[ni].max == infinite && done > re.nodes[ni].min {
 		done = re.nodes[ni].min
 	}
@@ -447,8 +435,7 @@ func bestRep(s *capSolver, re *Regexp, d *decoded, ni int32, i int, j int, done 
 	canTake := re.nodes[ni].max == infinite || done < re.nodes[ni].max
 	if canTake && !(hasEmpty && done >= re.nodes[ni].min) {
 		child := re.nodes[ni].ch[0]
-		// The remaining instances after this one bound the tail
-		// span.
+		// The remaining instances after this one bound the tail span.
 		tailMin := satMul(max(re.nodes[ni].min-done-1, 0),
 			re.nodes[child].minL)
 		tailMax := lenInf
@@ -500,8 +487,7 @@ func bestRep(s *capSolver, re *Regexp, d *decoded, ni int32, i int, j int, done 
 	return win
 }
 
-// solveCaptures fills caps (character spans) for the fixed span
-// [so, eo).
+// solveCaptures fills caps with the character spans of the fixed span [so, eo).
 func solveCaptures(re *Regexp, d *decoded, so int, eo int, eflags uint32, caps []Match) Error {
 	if re.onePass {
 		for idx := 0; idx < len(caps); idx++ {
@@ -511,8 +497,8 @@ func solveCaptures(re *Regexp, d *decoded, so int, eo int, eflags uint32, caps [
 		if onePassCaps(re, d, re.root, so, eo, eflags, caps) {
 			return noError()
 		}
-		// The walk hit an inconsistency; the solver below re-derives
-		// everything, so a failure here only costs speed.
+		// The walk hit an inconsistency.
+		// The solver below derives everything again, so a failure here only costs speed.
 	}
 	var s capSolver
 	s.eflags = eflags
@@ -524,7 +510,7 @@ func solveCaptures(re *Regexp, d *decoded, so int, eo int, eflags uint32, caps [
 		return compileError(ErrESpace, -1)
 	}
 	if best < 0 {
-		// Phase A guarantees a parse exists; reaching this is a bug.
+		// Phase A guarantees that a parse exists, so this branch is a bug.
 		return compileError(ErrESpace, -1)
 	}
 	for idx := 0; idx < len(caps); idx++ {
@@ -535,9 +521,9 @@ func solveCaptures(re *Regexp, d *decoded, so int, eo int, eflags uint32, caps [
 	return noError()
 }
 
-// assignCaps records group spans from the winning parse. Entering a
-// group clears every group nested inside it, which implements the
-// recursive last-participation rule of section 12.7.
+// assignCaps records group spans from the winning parse.
+// Entry into a group clears every group nested inside it.
+// That is the recursive last-participation rule of section 12.7.
 func assignCaps(re *Regexp, s *capSolver, t int32, caps []Match) {
 	ni := s.trees[t].n
 	if re.nodes[ni].op == opGroup {

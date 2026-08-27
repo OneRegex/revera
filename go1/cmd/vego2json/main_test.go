@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-// check runs the translator on one source snippet and returns the
-// JSON blob and the violations.
+// check runs the translator on one source snippet.
+// It returns the JSON blob and the violations.
 func check(t *testing.T, src string) ([]byte, []string) {
 	t.Helper()
 	dir := t.TempDir()

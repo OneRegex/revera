@@ -184,8 +184,8 @@ func TestCasePreimages(t *testing.T) {
 	}
 }
 
-// TestCasePreimageRoundTrip checks soundness and completeness of the
-// inverse case tables against the forward mappings, over all scalars.
+// TestCasePreimageRoundTrip checks the inverse case tables against the forward mappings, over every scalar.
+// It checks both soundness and completeness.
 func TestCasePreimageRoundTrip(t *testing.T) {
 	for _, name := range []string{"en", "tr"} {
 		l, ok := Open(name, "")
@@ -263,8 +263,7 @@ func TestMinEquivLength(t *testing.T) {
 		seq    string
 		want   int
 	}{
-		// No single character shares the primary weight of these
-		// digraphs, so their classes need two characters.
+		// No single character shares the primary weight of these digraphs, so their classes need two characters.
 		{"cs", "ch", 2},
 		{"hu", "cs", 2},
 		{"cy", "ch", 2},

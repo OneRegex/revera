@@ -5,11 +5,11 @@ import (
 	"math/big"
 )
 
-// Check resolves the type of every expression, folds constant
-// values, renames locals so every name is unique inside its
-// function (and never shadows a package-level name or a runtime
-// name), and records which locals are used and mutated. It must
-// run once, right after Load.
+// Check resolves the type of every expression and folds the constant values.
+// It renames locals, so every name is unique inside its function.
+// No local name hides a package-level name or a runtime name.
+// It also records which locals the program reads and writes.
+// It must run once, immediately after Load.
 func Check(p *Program) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -45,15 +45,15 @@ type checker struct {
 	p     *Program
 	fn    *FuncDecl
 	scope *scope
-	// taken holds every name already claimed inside the current
-	// function, so renames stay unique across sibling scopes.
+	// taken holds every name already claimed inside the current function.
+	// Renames therefore stay unique across sibling scopes.
 	taken map[string]bool
 }
 
-// reserved names the runtimes of the targets claim. "mem" is the
-// memory context every allocating function receives; a program
-// must leave the name free at the package level, and locals of
-// that name get renamed like any other clash.
+// reserved lists the names that the target runtimes claim.
+// "mem" is the memory context every allocating function receives.
+// A program must leave that name free at the package level.
+// A local with that name renames like any other clash.
 var reserved = map[string]bool{
 	"vg": true, "std": true, "Str": true, "Slice": true,
 	"self": true, "Self": true, "crate": true, "super": true,
@@ -78,10 +78,9 @@ func (c *checker) run() {
 	markAllocates(c.p)
 }
 
-// checkReservedPackageNames rejects package-level declarations
-// whose name a target runtime claims. Locals get renamed instead;
-// a package-level name reaches every target verbatim, so it must
-// stay clear.
+// checkReservedPackageNames rejects package-level declarations whose name a target runtime claims.
+// A local renames instead.
+// A package-level name reaches every target word for word, so it must stay clear.
 func (c *checker) checkReservedPackageNames() {
 	check := func(kind, name string) {
 		if reserved[name] {
@@ -121,8 +120,8 @@ func (c *checker) packageName(name string) bool {
 	return false
 }
 
-// ensureConst checks a constant declaration on demand, so constants
-// may reference each other in any source order.
+// ensureConst checks a constant declaration on demand.
+// Constants may therefore reference each other in any source order.
 func (c *checker) ensureConst(d *ValueDecl) {
 	if d.Inferred != nil {
 		return
@@ -133,8 +132,8 @@ func (c *checker) ensureConst(d *ValueDecl) {
 	}
 }
 
-// inferDecl types a declaration's value against its declared type,
-// or freezes the value's default type.
+// inferDecl types the value of a declaration against its declared type.
+// Without a declared type, it freezes the default type of the value.
 func (c *checker) inferDecl(d *ValueDecl) {
 	c.checkExpr(d.Value)
 	if d.Type != nil {
@@ -146,9 +145,8 @@ func (c *checker) inferDecl(d *ValueDecl) {
 	}
 }
 
-// resolveArrayLens folds every array type's length against the
-// checked constants, so Same can compare lengths by value and the
-// printers can zero-pad partial array literals.
+// resolveArrayLens folds the length of every array type against the checked constants.
+// Same can then compare lengths by value, and the printers can zero-pad partial array literals.
 func (c *checker) resolveArrayLens() {
 	var resolveType func(t *Type)
 	resolveType = func(t *Type) {
@@ -192,8 +190,8 @@ func (c *checker) resolveArrayLens() {
 	}
 }
 
-// tryFold folds an integer constant expression, reporting failure
-// instead of panicking.
+// tryFold folds an integer constant expression.
+// It reports a failure instead of a panic.
 func (c *checker) tryFold(e *Expr) (v int64, ok bool) {
 	defer func() {
 		if recover() != nil {
@@ -209,14 +207,13 @@ func (c *checker) tryFold(e *Expr) (v int64, ok bool) {
 
 func (c *checker) checkVarDecl(d *ValueDecl) {
 	c.inferDecl(d)
-	// cmd/vego2json enforces the same rules at the Go front end,
-	// with source positions; this guards other JSON producers.
+	// cmd/vego2json applies the same rules at the Go front end, with source positions.
+	// This check guards the other JSON producers.
 	if c.typeContainsSlice(d.Inferred) {
 		panic("package variable " + d.Name + " contains a slice; globals are static constant data")
 	}
-	// Globals are static constant data, so the initializer must
-	// not allocate or call: there is no memory context and no
-	// evaluation order at package scope.
+	// Globals are static constant data, so the initializer must not allocate or call.
+	// Package scope has no memory context and no evaluation order.
 	WalkExpr(d.Value, func(e *Expr) {
 		if ExprAllocates(e) || e.K == "call" {
 			panic("package variable " + d.Name + " has a non-constant initializer")
@@ -254,8 +251,9 @@ func (c *checker) checkFunc(f *FuncDecl) {
 	c.fn = nil
 }
 
-// declare adds a local, renaming it if the name is already taken in
-// this function or clashes with a package-level or reserved name.
+// declare adds a local.
+// It renames the local when this function already took the name.
+// It also renames it when the name clashes with a package-level or reserved name.
 func (c *checker) declare(name string, t *Type) *local {
 	unique := name
 	if name != "_" {
@@ -335,9 +333,8 @@ func (c *checker) checkStmt(s *Stmt) {
 				if !Same(lt, t.Tup[i]) {
 					panic("two-value assign type mismatch")
 				}
-				// Every printer evaluates the call before the
-				// places; Go evaluates the places first, so a
-				// place with side effects cannot translate.
+				// Every printer evaluates the call before the places, but Go evaluates the places first.
+				// A place with side effects therefore cannot translate.
 				if Impure(l) {
 					panic("two-value assign place with side effects is not supported")
 				}
@@ -383,8 +380,8 @@ func (c *checker) checkStmt(s *Stmt) {
 			c.checkExpr(s.Cond)
 			c.retype(s.Cond, TBool)
 		}
-		// The body runs before the post statement, and the body
-		// scope must not capture the post statement's names.
+		// The body runs before the post statement.
+		// The body scope must not capture the names of the post statement.
 		c.checkBody(s.Body)
 		if s.Post != nil {
 			c.checkStmt(s.Post)
@@ -403,9 +400,8 @@ func (c *checker) checkStmt(s *Stmt) {
 		default:
 			panic("range over unsupported type " + t.String())
 		}
-		// The lowered loops copy a hidden counter into the user
-		// variables each iteration, so their mutability follows
-		// the body alone.
+		// The lowered loops copy a hidden counter into the user variables on each iteration.
+		// The mutability of those variables therefore follows the body alone.
 		if s.IdxName != "" && s.IdxName != "_" {
 			l := c.declare(s.IdxName, TInt)
 			s.IdxName = l.unique
@@ -466,10 +462,10 @@ func (c *checker) checkPlace(e *Expr) *Type {
 	return t
 }
 
-// markMutated records that an assignment writes into the storage of
-// a local. Writes that pass through a slice element or a pointer
-// parameter land outside the local's own storage and do not count.
-// Identifier names were already rewritten to their unique form.
+// markMutated records that an assignment writes into the storage of a local.
+// A write through a slice element or a pointer parameter lands outside the storage of the local.
+// Such a write does not count.
+// The identifier names already carry their unique form.
 func (c *checker) markMutated(e *Expr) {
 	if c.fn == nil {
 		return
@@ -498,9 +494,9 @@ func (c *checker) markMutated(e *Expr) {
 	}
 }
 
-// checkExpr computes e.Typ bottom-up. For a constant expression it
-// sets Untyped and stores the default type; a parent then either
-// retypes it against context or leaves the default.
+// checkExpr computes e.Typ from the bottom up.
+// For a constant expression it sets Untyped and stores the default type.
+// A parent then retypes the expression against its context, or keeps the default.
 func (c *checker) checkExpr(e *Expr) *Type {
 	switch e.K {
 	case "int":
@@ -603,8 +599,8 @@ func (c *checker) checkExpr(e *Expr) *Type {
 	case "conv":
 		c.checkExpr(e.X)
 		if e.X.Untyped {
-			// A constant conversion: the operand takes the target
-			// type directly. Go guarantees the value fits.
+			// This is a constant conversion, so the operand takes the target type directly.
+			// Go guarantees that the value fits.
 			c.retype(e.X, e.TypeRef)
 		}
 		e.Typ = e.TypeRef
@@ -663,16 +659,16 @@ func (c *checker) checkExpr(e *Expr) *Type {
 	return e.Typ
 }
 
-// markConst flags compile-time constant expressions. Printers use
-// the flag for literal emission decisions (Zig comptime contexts,
-// C++ literal suffixes).
+// markConst flags compile-time constant expressions.
+// The printers use the flag to decide how to emit a literal.
+// A Zig comptime context and a C++ literal suffix both need that choice.
 func (c *checker) markConst(e *Expr) {
 	switch e.K {
 	case "int", "char", "str", "bool":
 		e.IsConst = true
 	case "ident":
-		// Locals never share a package-level name: declare renames
-		// them, and checkExpr rewrote this ident already.
+		// A local never shares a package-level name, because declare renames it.
+		// checkExpr already rewrote this identifier.
 		_, e.IsConst = c.p.ConstMap[e.Name]
 	case "unary":
 		e.IsConst = e.Op != "&" && e.X.IsConst
@@ -769,8 +765,8 @@ func (c *checker) checkBuiltin(e *Expr) {
 	}
 }
 
-// unifyDefaults picks the default type of a constant operator pair:
-// rune wins over int, like Go.
+// unifyDefaults picks the default type of a constant operator pair.
+// Rune wins over int, like Go.
 func unifyDefaults(a, b *Type) *Type {
 	if a.K == KI32 || b.K == KI32 {
 		return TI32
@@ -790,8 +786,8 @@ func (c *checker) checkBinary(e *Expr) {
 	case "==", "!=", "<", "<=", ">", ">=":
 		c.unifyOperands(e)
 		e.Untyped = e.X.Untyped && e.Y.Untyped
-		// Operands never take a type from above a comparison, so
-		// freeze constant operands at their unified default now.
+		// Operands never take a type from above a comparison.
+		// A constant operand therefore freezes at its unified default here.
 		c.defaultType(e.X)
 		c.defaultType(e.Y)
 		e.Typ = TBool
@@ -831,9 +827,8 @@ func (c *checker) unifyOperands(e *Expr) {
 	}
 }
 
-// retype forces a concrete type onto an untyped constant
-// expression, recursing into the constant's structure. On an
-// already-typed expression it only cross-checks.
+// retype forces a concrete type onto an untyped constant expression, and it recurses into the structure of the constant.
+// On an expression that already has a type, it only cross-checks.
 func (c *checker) retype(e *Expr, t *Type) {
 	if t.K == KTuple {
 		panic("tuple in value position")
@@ -855,8 +850,7 @@ func (c *checker) retype(e *Expr, t *Type) {
 		case "<<", ">>":
 			c.retype(e.X, t)
 		case "&&", "||", "==", "!=", "<", "<=", ">", ">=":
-			// Comparison results are plain bools; operands keep
-			// their own unified type.
+			// A comparison result is a plain bool, and the operands keep their own unified type.
 			e.Typ = TBool
 		default:
 			c.retype(e.X, t)
@@ -885,9 +879,9 @@ func (c *checker) defaultType(e *Expr) {
 	c.retype(e, t)
 }
 
-// fold evaluates an integer constant expression. It follows Go
-// constant arithmetic (arbitrary precision, then the declared type
-// bounds the value; the source compiled, so no truncation happens).
+// fold evaluates an integer constant expression.
+// It follows Go constant arithmetic: arbitrary precision first, then the declared type bounds the value.
+// The source compiled, so no truncation happens.
 func (c *checker) fold(e *Expr) *big.Int {
 	switch e.K {
 	case "int", "char":
@@ -972,8 +966,8 @@ func truncateTo(v *big.Int, t *Type) *big.Int {
 	return v
 }
 
-// rewriteMutatedParams gives every parameter that the body assigns
-// a local shadow copy, so targets can keep parameters immutable.
+// rewriteMutatedParams gives a local shadow copy to every parameter the body assigns.
+// A target can then keep its parameters read-only.
 func (c *checker) rewriteMutatedParams(f *FuncDecl) {
 	var pre []*Stmt
 	for i := range f.Params {

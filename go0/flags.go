@@ -1,7 +1,7 @@
 package revera
 
-// CompileFlags select compilation behavior. The library implements only
-// the ERE language, so REG_EXTENDED is implicit and has no flag here.
+// CompileFlags select compilation behavior.
+// The library implements only the ERE language, so REG_EXTENDED is implicit and has no flag here.
 type CompileFlags uint32
 
 const (
@@ -26,6 +26,6 @@ const (
 	NotEOL
 )
 
-// DupMax is the largest supported interval count. POSIX requires at
-// least 255.
+// DupMax is the largest supported interval count.
+// POSIX requires at least 255.
 const DupMax = 255

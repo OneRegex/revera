@@ -33,9 +33,8 @@ func load(src string) (*Program, error) {
 	return p, nil
 }
 
-// TestAllocates pins the contract between the Allocates analysis
-// and the printers: every form a printer renders with the "mem"
-// context must set the flag, directly and through a call.
+// TestAllocates pins the contract between the Allocates analysis and the printers.
+// Every form a printer renders with the "mem" context must set the flag, directly and through a call.
 func TestAllocates(t *testing.T) {
 	const su8 = `{"k": "slice", "elem": {"k": "named", "name": "uint8"}}`
 	const str = `{"k": "named", "name": "string"}`
@@ -103,8 +102,8 @@ func TestCheckEngine(t *testing.T) {
 	if len(p.Funcs) == 0 || len(p.Types) == 0 {
 		t.Fatal("empty program")
 	}
-	// Every expression that a printer needs a type for must have
-	// one. Walk everything and verify.
+	// Every expression that a printer needs a type for must have one.
+	// This walk checks all of them.
 	for _, f := range p.Funcs {
 		WalkBody(f.Body, func(e *Expr) {
 			if e.Typ == nil && e.K != "call" && e.K != "builtin" {

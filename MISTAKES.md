@@ -261,3 +261,21 @@
   arena per step. Lesson: an arena's lifetime is a decision, not a
   detail. Write down which call it serves, and check that a loop
   did not silently widen it.
+
+## 2026-08-27, comment pass over every source file
+
+- I rewrote comments with exact-match string replacements driven
+  by a script, and one replacement in `go0/edge_test.go` kept
+  failing with a count of zero while the target text looked
+  identical on screen. The comment discusses the Kelvin sign, and
+  it carries a real U+212A where I had typed an ASCII `K`. The two
+  render the same in a terminal. Lesson: when an exact match fails
+  on text that looks right, compare the code points before
+  comparing anything else. A file that discusses Unicode is likely
+  to contain it.
+- My first pass at the Zig doc comments left a stray blank line
+  inside a `///` block. `zig fmt` removed it on the next save, so
+  the mistake cost nothing, but I only noticed because the harness
+  reported that the file had changed under me. Lesson: read the
+  formatter's result rather than assuming the edit landed as
+  written.

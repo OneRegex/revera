@@ -1,5 +1,4 @@
-// Command godriver runs the driver protocol with the Go engine, for
-// debugging the cross-language drivers.
+// Command godriver runs the driver protocol with the Go engine, to help debug the cross-language drivers.
 package main
 
 import (

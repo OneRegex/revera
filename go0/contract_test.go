@@ -127,10 +127,9 @@ func TestContractClampAndSaturation(t *testing.T) {
 	}
 }
 
-// The fixed byte constants describe 64-bit layouts of types that live
-// in other files. unsafe stays out of the shipped figures so they are
-// platform-independent; here it anchors them, so a grown type fails a
-// test instead of silently shrinking a contract.
+// The fixed byte constants describe 64-bit layouts of types that live in other files.
+// unsafe stays out of the shipped figures, so those figures work on every platform.
+// Here it anchors them, so a grown type fails a test instead of quietly shrinking a contract.
 func TestContractSizeConstants(t *testing.T) {
 	if strconv.IntSize != 64 {
 		t.Skip("the layout constants describe 64-bit platforms")
@@ -177,9 +176,9 @@ func measureHeap(f func()) int64 {
 	return int64(after.TotalAlloc - before.TotalAlloc)
 }
 
-// The matcher contract must cover the measured workspace, including the
-// allocator and header overhead the estimate leaves out. A pattern of
-// this size gives the payload enough weight over the fixed overhead.
+// The matcher contract must cover the measured workspace.
+// That includes the allocator and header overhead the estimate leaves out.
+// A pattern of this size gives the payload enough weight over the fixed overhead.
 func TestContractCoversMatcherHeap(t *testing.T) {
 	pattern := strings.Repeat("a", 200)
 	subject := strings.Repeat("b", 1000)
@@ -211,10 +210,9 @@ func TestContractCoversSolverHeap(t *testing.T) {
 	}
 }
 
-// The structural step bound must cover the work counter of a real
-// solver run. The counter is not observable through Exec, so the test
-// drives the solver the way solveCaptures does: a full-window parse
-// with a pooled solver, returned to the pool afterwards.
+// The structural step bound must cover the work counter of a real solver run.
+// Exec cannot show that counter, so the test drives the solver the way solveCaptures does.
+// It runs a full-window parse with a pooled solver, and returns the solver to the pool afterwards.
 func TestContractCoversSolverWork(t *testing.T) {
 	cases := []struct {
 		pattern  string
@@ -256,10 +254,9 @@ func TestContractCoversSolverWork(t *testing.T) {
 	}
 }
 
-// Compaction must keep one entry per instruction, preserve the queued
-// set, and leave the scratch marks zero. These properties carry the
-// relaxation fixpoint: an improved, unprocessed instruction stays
-// queued at least once.
+// Compaction must keep one entry per instruction, keep the queued set, and leave the scratch marks zero.
+// These properties carry the relaxation fixpoint.
+// An improved instruction that nothing processed yet stays queued at least once.
 func TestCompactQueue(t *testing.T) {
 	e := &phaseA{ws: &engineWS{
 		onq:   make([]bool, 8),
@@ -276,15 +273,15 @@ func TestCompactQueue(t *testing.T) {
 	}
 }
 
-// The closure queue must stay linear in the program; the matcher heap
-// contract depends on that bound.
+// The closure queue must stay linear in the program.
+// The matcher heap contract depends on that bound.
 func TestContractQueueStaysLinear(t *testing.T) {
 	subject := strings.Repeat("ab", 2048) + "abb"
 	re, err := Compile("(a|b)*(ab|ba)*abb", locale.POSIX(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// An owned workspace; the pooled one can vanish under GC pressure.
+	// This workspace is owned, because the pooled one can vanish under GC pressure.
 	ws := &engineWS{}
 	if !re.runPhaseAWith(ws, subject, 0).matched {
 		t.Fatal("phase A must match")

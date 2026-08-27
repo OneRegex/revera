@@ -1,14 +1,12 @@
 package revera
 
-// This file supplies the LC_CTYPE and ERE-relevant LC_COLLATE
-// operations that the engine needs. It does not read the host locale
-// database. The data comes from CLDR 48.2 and covers all 1,122 CLDR
-// locales plus the POSIX locale.
+// This file supplies the LC_CTYPE and ERE-relevant LC_COLLATE operations that the engine needs.
+// It does not read the host locale database.
+// The data comes from CLDR 48.2 and covers all 1,122 CLDR locales plus the POSIX locale.
 //
-// The caller hands the data blob to LocaleOpen as a string. A Locale
-// value keeps that string and a parsed section table, so every lookup
-// reads fixed-width little-endian fields in place and allocates
-// nothing.
+// The caller hands the data blob to LocaleOpen as a string.
+// A Locale value keeps that string and a parsed section table.
+// Every lookup therefore reads fixed-width little-endian fields in place and allocates nothing.
 
 // The twelve standard LC_CTYPE classes, in mask bit order.
 const (
@@ -27,8 +25,8 @@ const (
 	numClasses        = 12
 )
 
-// firstSequenceID is the element ID of the first multi-character
-// collating element. Smaller IDs are Unicode scalar values.
+// firstSequenceID is the element ID of the first multi-character collating element.
+// Smaller IDs are Unicode scalar values.
 const firstSequenceID = 0x110000
 
 // Section indexes match the generator's layout order.
@@ -65,9 +63,9 @@ type SecRange struct {
 	End int
 }
 
-// Locale identifies one opened locale and collation selection, and
-// carries the immutable data it reads from. The zero value is not
-// valid; use LocalePOSIX or LocaleOpen.
+// Locale identifies one opened locale and collation selection.
+// It also carries the data it reads from, which never changes.
+// The zero value is not valid, so use LocalePOSIX or LocaleOpen.
 type Locale struct {
 	blob             string
 	sec              [numSections]SecRange
@@ -88,8 +86,7 @@ func LocalePOSIX() Locale {
 	return l
 }
 
-// LocaleValid reports whether this locale came from a successful
-// LocalePOSIX or LocaleOpen.
+// LocaleValid reports whether this locale came from a successful LocalePOSIX or LocaleOpen.
 func LocaleValid(l *Locale) bool {
 	return l.valid
 }
@@ -112,8 +109,7 @@ func sectionLen(l *Locale, sec int) int {
 	return l.sec[sec].End - l.sec[sec].Off
 }
 
-// byteString returns the NUL-terminated string at off inside a name
-// pool section.
+// byteString returns the NUL-terminated string at off inside a name pool section.
 func byteString(l *Locale, sec int, off int) string {
 	start := l.sec[sec].Off + off
 	end := start
@@ -153,8 +149,8 @@ func localeLoad(l *Locale, blob string) bool {
 	}
 	l.maxSeq = int(u32At(l, secScalars, 0))
 	if l.maxSeq < 1 || l.maxSeq > maxElemAhead {
-		// The engine sizes its lookahead buffers with maxElemAhead;
-		// data with longer collating elements cannot be used.
+		// The engine sizes its lookahead buffers with maxElemAhead.
+		// It cannot use data with longer collating elements.
 		return false
 	}
 	if !localeValidate(l) {
@@ -167,13 +163,12 @@ func localeLoad(l *Locale, blob string) bool {
 	return true
 }
 
-// ctypeStage1Entries is the first-stage table size: one entry per
-// possible value of r >> 8 for a Unicode scalar r.
+// ctypeStage1Entries is the first-stage table size.
+// It holds one entry per possible value of r >> 8 for a Unicode scalar r.
 const ctypeStage1Entries = 0x1100
 
-// localeValidate checks every cross-section reference in the blob,
-// so no later lookup can read outside its section. A blob that
-// fails any check is rejected as malformed.
+// localeValidate checks every cross-section reference in the blob, so no later lookup can read outside its section.
+// The loader rejects a blob that fails any check as malformed.
 func localeValidate(l *Locale) bool {
 	if sectionLen(l, secCtypeStage1) < 2*ctypeStage1Entries {
 		return false
@@ -215,8 +210,7 @@ func localeValidate(l *Locale) bool {
 		sectionLen(l, secCollationOverrides)%8 != 0 {
 		return false
 	}
-	// Every contraction ID must name a real sequence row, because
-	// the shortest-equivalent search reads that row.
+	// Every contraction ID must name a real sequence row, because the shortest-equivalent search reads that row.
 	if !contractionIDsValid(l, secRootContractions, seqCount) {
 		return false
 	}
@@ -277,8 +271,7 @@ func localeValidate(l *Locale) bool {
 	return true
 }
 
-// contractionIDsValid checks that every multi-character element ID
-// in a contraction section points at a sequence row.
+// contractionIDsValid checks that every multi-character element ID in a contraction section points at a sequence row.
 func contractionIDsValid(l *Locale, sec int, seqCount int) bool {
 	count := sectionLen(l, sec) / 4
 	for i := 0; i < count; i++ {
@@ -290,8 +283,7 @@ func contractionIDsValid(l *Locale, sec int, seqCount int) bool {
 	return true
 }
 
-// localeMaxElementLength returns the largest character count of any
-// multi-character collating element in the data.
+// localeMaxElementLength returns the largest character count of any multi-character collating element in the data.
 func localeMaxElementLength(l *Locale) int {
 	return l.maxSeq
 }
@@ -310,8 +302,8 @@ func asciiLower(c uint8) uint8 {
 const normalizedNameMax = 127
 
 // normalizeName lowercases an ASCII locale name and maps '_' to '-'.
-// It stops before an optional codeset or modifier and validates the
-// codeset when present.
+// It stops before an optional codeset or modifier.
+// It also checks the codeset when the name carries one.
 func normalizeName(input string) (string, bool) {
 	if len(input) == 0 {
 		return "", false
@@ -352,8 +344,7 @@ func normalizeName(input string) (string, bool) {
 	return string(out), true
 }
 
-// embeddedModifier extracts the value of a @collation= modifier, if
-// any.
+// embeddedModifier extracts the value of a @collation= modifier, if the name has one.
 func embeddedModifier(name string) (string, bool) {
 	at := indexOfByte(name, '@')
 	if at < 0 {
@@ -423,10 +414,9 @@ func localesCount(l *Locale) int {
 	return sectionLen(l, secLocales) / 20
 }
 
-// LocaleRow mirrors one row of the locales section: name_id,
-// type_first, type_count, case_profile, default_collation, stored as
-// five u32 values. The name_id field is not needed after the name
-// search, so the row omits it.
+// LocaleRow mirrors one row of the locales section.
+// The row on disk holds five u32 values: name_id, type_first, type_count, case_profile and default_collation.
+// Nothing needs name_id after the name search, so this type omits it.
 type LocaleRow struct {
 	TypeFirst        int
 	TypeCount        int
@@ -451,8 +441,7 @@ type localeRequest struct {
 	posix bool
 }
 
-// normalizeRequest resolves the name, the embedded modifier, and the
-// collation type of one open request.
+// normalizeRequest resolves the name, the embedded modifier, and the collation type of one open request.
 func normalizeRequest(name string, collationType string) (localeRequest, bool) {
 	var req localeRequest
 	normalized, ok := normalizeName(name)
@@ -488,9 +477,9 @@ func posixSelect(ctype string) (Locale, bool) {
 	return LocalePOSIX(), true
 }
 
-// LocaleLoad parses and validates a data blob once. The result
-// carries the data only and is not usable directly; pass it to
-// LocaleSelect to resolve names against it.
+// LocaleLoad parses and checks a data blob once.
+// The result carries the data only and does not work on its own.
+// Pass it to LocaleSelect to resolve names against it.
 func LocaleLoad(blob string) (Locale, bool) {
 	var data Locale
 	if !localeLoad(&data, blob) {
@@ -500,8 +489,7 @@ func LocaleLoad(blob string) (Locale, bool) {
 	return data, true
 }
 
-// resolveLocale finds one CLDR locale row and collation profile in
-// loaded data.
+// resolveLocale finds one CLDR locale row and collation profile in loaded data.
 func resolveLocale(data *Locale, req localeRequest) (Locale, bool) {
 	var invalid Locale
 	var result Locale
@@ -545,12 +533,11 @@ func resolveLocale(data *Locale, req localeRequest) (Locale, bool) {
 	return invalid, false
 }
 
-// LocaleSelect resolves a locale name and optional collation type
-// against data from LocaleLoad. Locale names are ASCII
-// case-insensitive, accept '-' or '_' separators, an optional
-// .UTF-8 suffix, and an optional @collation=TYPE modifier. C and
-// POSIX select the POSIX locale. The result is invalid when the
-// name is unknown.
+// LocaleSelect resolves a locale name and optional collation type against data from LocaleLoad.
+// Locale names are ASCII case-insensitive.
+// They accept '-' or '_' separators, an optional .UTF-8 suffix, and an optional @collation=TYPE modifier.
+// C and POSIX select the POSIX locale.
+// The result is invalid when the name is unknown.
 func LocaleSelect(data *Locale, name string, collationType string) (Locale, bool) {
 	req, ok := normalizeRequest(name, collationType)
 	if !ok {
@@ -563,10 +550,9 @@ func LocaleSelect(data *Locale, name string, collationType string) (Locale, bool
 	return resolveLocale(data, req)
 }
 
-// LocaleOpen loads a data blob and resolves one locale name in a
-// single step, following the LocaleSelect rules. A caller that
-// opens several locales from the same blob loads it once with
-// LocaleLoad and selects from the result instead.
+// LocaleOpen loads a data blob and resolves one locale name in a single step, under the LocaleSelect rules.
+// A caller that opens several locales from the same blob loads it once with LocaleLoad.
+// It then selects from the result.
 func LocaleOpen(blob string, name string, collationType string) (Locale, bool) {
 	var invalid Locale
 	req, ok := normalizeRequest(name, collationType)
@@ -652,8 +638,7 @@ func posixMask(r int32) uint16 {
 	return mask
 }
 
-// localeClassMask returns the set of standard LC_CTYPE classes that
-// contain r, one bit per class value.
+// localeClassMask returns the set of standard LC_CTYPE classes that contain r, one bit per class value.
 func localeClassMask(l *Locale, r int32) uint16 {
 	if !l.valid || !validScalar(r) {
 		return 0
@@ -665,8 +650,7 @@ func localeClassMask(l *Locale, r int32) uint16 {
 	return u16At(l, secCtypeBlocks, block*256+int(r&0xff))
 }
 
-// CasePair is one case-map row: the uppercase and lowercase
-// counterparts of one scalar.
+// CasePair is one case-map row: the uppercase and lowercase counterparts of one scalar.
 type CasePair struct {
 	Upper int32
 	Lower int32
@@ -728,20 +712,17 @@ func caseConvert(l *Locale, r int32, toUpper bool) int32 {
 }
 
 // maxPreimages caps how many case preimages one scalar can have.
-// localeLoad verifies that the data never exceeds it, so the fixed
-// preimage buffer can never overflow.
+// localeLoad checks that the data never passes it, so the fixed preimage buffer can never overflow.
 const maxPreimages = 16
 
-// preimageBuf collects the case preimages of one scalar without an
-// allocation.
+// preimageBuf collects the case preimages of one scalar without an allocation.
 type preimageBuf struct {
 	r [maxPreimages]int32
 	n int
 }
 
-// pairSourcesRun finds the run of sources whose pair target equals r
-// and copies it into buf. The section holds sorted (target, source)
-// u32 pairs.
+// pairSourcesRun finds the run of sources whose pair target equals r, and copies it into buf.
+// The section holds sorted (target, source) u32 pairs.
 func pairSourcesRun(l *Locale, buf *preimageBuf, sec int, r int32) {
 	count := sectionLen(l, sec) / 8
 	low := 0
@@ -764,8 +745,7 @@ func pairSourcesRun(l *Locale, buf *preimageBuf, sec int, r int32) {
 	}
 }
 
-// maxPairRun returns the longest run of equal targets in one
-// (target, source) pair section.
+// maxPairRun returns the longest run of equal targets in one (target, source) pair section.
 func maxPairRun(l *Locale, sec int) int {
 	count := sectionLen(l, sec) / 8
 	longest := 0
@@ -784,19 +764,16 @@ func maxPairRun(l *Locale, sec int) int {
 	return longest
 }
 
-// preimageRunsFit reports whether every scalar's preimage count fits
-// the fixed buffer, for both case profiles.
+// preimageRunsFit reports whether every scalar's preimage count fits the fixed buffer, for both case profiles.
 func preimageRunsFit(l *Locale) bool {
 	def := maxPairRun(l, secInvUpperDefault) + maxPairRun(l, secInvLowerDefault)
 	turkic := maxPairRun(l, secInvUpperTurkic) + maxPairRun(l, secInvLowerTurkic)
 	return def <= maxPreimages && turkic <= maxPreimages
 }
 
-// localeCasePreimages fills buf with every scalar, other than r
-// itself, whose uppercase or lowercase counterpart is r. The
-// REG_ICASE closure rule needs these preimages: a subject character
-// matches when some accepted character maps to it, and case mappings
-// are not always involutions.
+// localeCasePreimages fills buf with every scalar, other than r itself, whose uppercase or lowercase counterpart is r.
+// The REG_ICASE closure rule needs these preimages.
+// A subject character matches when some accepted character maps to it, and case mappings are not always involutions.
 func localeCasePreimages(l *Locale, buf *preimageBuf, r int32) {
 	buf.n = 0
 	if !l.valid || !validScalar(r) {
@@ -821,7 +798,8 @@ func localeCasePreimages(l *Locale, buf *preimageBuf, r int32) {
 	}
 	pairSourcesRun(l, buf, upperSec, r)
 	pairSourcesRun(l, buf, lowerSec, r)
-	// Drop duplicates and r itself; the runs are tiny.
+	// Drop duplicates and r itself.
+	// The runs are tiny.
 	w := 0
 	for i := 0; i < buf.n; i++ {
 		candidate := buf.r[i]
@@ -833,20 +811,17 @@ func localeCasePreimages(l *Locale, buf *preimageBuf, r int32) {
 	buf.n = w
 }
 
-// localeToUpper returns the locale's one-character uppercase
-// counterpart, or the input itself.
+// localeToUpper returns the locale's one-character uppercase counterpart, or the input itself.
 func localeToUpper(l *Locale, r int32) int32 {
 	return caseConvert(l, r, true)
 }
 
-// localeToLower returns the locale's one-character lowercase
-// counterpart, or the input itself.
+// localeToLower returns the locale's one-character lowercase counterpart, or the input itself.
 func localeToLower(l *Locale, r int32) int32 {
 	return caseConvert(l, r, false)
 }
 
-// compareSequence orders a scalar sequence against a stored sequence
-// index.
+// compareSequence orders a scalar sequence against a stored sequence index.
 func compareSequence(l *Locale, seq []int32, index int) int {
 	off := int(u32At(l, secSequences, 2*index))
 	length := int(u32At(l, secSequences, 2*index+1))
@@ -870,8 +845,8 @@ func compareSequence(l *Locale, seq []int32, index int) int {
 }
 
 // elementID maps a scalar sequence to its collating-element ID.
-// A single scalar maps to itself. A known multi-scalar sequence maps
-// to firstSequenceID plus its table index.
+// A single scalar maps to itself.
+// A known multi-scalar sequence maps to firstSequenceID plus its table index.
 func elementID(l *Locale, seq []int32) (uint32, bool) {
 	if len(seq) == 0 {
 		return 0, false
@@ -959,8 +934,7 @@ func isContraction(l *Locale, element uint32) bool {
 		row.RemoveCount, element)
 }
 
-// collatingElementID maps seq to its element ID when seq is one
-// collating element in this locale.
+// collatingElementID maps seq to its element ID when seq is one collating element in this locale.
 func collatingElementID(l *Locale, seq []int32) (uint32, bool) {
 	element, ok := elementID(l, seq)
 	if !ok {
@@ -972,8 +946,7 @@ func collatingElementID(l *Locale, seq []int32) (uint32, bool) {
 	return element, true
 }
 
-// localeIsCollatingElement tests whether a scalar sequence is one
-// collating element in this locale.
+// localeIsCollatingElement tests whether a scalar sequence is one collating element in this locale.
 func localeIsCollatingElement(l *Locale, seq []int32) bool {
 	if !l.valid {
 		return false
@@ -982,8 +955,8 @@ func localeIsCollatingElement(l *Locale, seq []int32) bool {
 	return ok
 }
 
-// LocaleCollatingPrefix returns the length in scalars of the longest
-// collating-element prefix of seq, or zero for invalid input.
+// LocaleCollatingPrefix returns the length in scalars of the longest collating-element prefix of seq.
+// It returns zero for invalid input.
 func LocaleCollatingPrefix(l *Locale, seq []int32) int {
 	if !l.valid || len(seq) == 0 {
 		return 0
@@ -1000,8 +973,7 @@ func LocaleCollatingPrefix(l *Locale, seq []int32) int {
 	return 0
 }
 
-// findPair does a binary search in a section of sorted (element,
-// representative) u32 pairs.
+// findPair does a binary search in a section of sorted (element, representative) u32 pairs.
 func findPair(l *Locale, sec int, first int, count int, element uint32) (uint32, bool) {
 	low := first
 	high := first + count
@@ -1035,8 +1007,7 @@ func primaryToken(l *Locale, element uint32) uint64 {
 	return uint64(element)
 }
 
-// localePrimaryEqual tests primary LC_COLLATE equivalence between two
-// collating elements.
+// localePrimaryEqual tests primary LC_COLLATE equivalence between two collating elements.
 func localePrimaryEqual(l *Locale, left []int32, right []int32) bool {
 	if !l.valid {
 		return false
@@ -1058,10 +1029,8 @@ func localePrimaryEqual(l *Locale, left []int32, right []int32) bool {
 	return primaryToken(l, leftElement) == primaryToken(l, rightElement)
 }
 
-// localeMinEquivLength returns the smallest scalar count of any
-// collating element whose primary weight equals the element seq in
-// this locale. The bracket compiler uses it as the minimum length of
-// an equivalence-class match.
+// localeMinEquivLength returns the smallest scalar count of any collating element whose primary weight equals the element seq in this locale.
+// The bracket compiler uses it as the minimum length of an equivalence-class match.
 func localeMinEquivLength(l *Locale, seq []int32) int {
 	if !l.valid {
 		return len(seq)
@@ -1076,9 +1045,8 @@ func localeMinEquivLength(l *Locale, seq []int32) int {
 	if l.posix {
 		return len(seq)
 	}
-	// Every element that is not seq itself and shares its primary
-	// weight appears in the equivalence pair sections; an unlisted
-	// element keeps its own ID as its token, which cannot collide.
+	// Every element that is not seq itself and shares its primary weight appears in the equivalence pair sections.
+	// An unlisted element keeps its own ID as its token, which cannot collide.
 	token := primaryToken(l, element)
 	best := len(seq)
 	row := collationProfileRow(l, int(l.collationProfile))
@@ -1091,8 +1059,8 @@ func localeMinEquivLength(l *Locale, seq []int32) int {
 	return minTokenLength(l, secRootEquivalences, 0, rootCount, token, best)
 }
 
-// minTokenLength scans one (element, representative) pair section and
-// lowers best to the shortest collating element with the given token.
+// minTokenLength scans one (element, representative) pair section.
+// It lowers best to the shortest collating element with the given token.
 func minTokenLength(l *Locale, sec int, first int, count int, token uint64, best int) int {
 	for i := first; i < first+count; i++ {
 		candidate := u32At(l, sec, 2*i)
@@ -1111,21 +1079,18 @@ func minTokenLength(l *Locale, sec int, first int, count int, token uint64, best
 	return best
 }
 
-// localeSupportsRanges reports whether bracket ranges are defined in
-// this locale. Non-POSIX locale ranges intentionally use the
-// permitted reject policy.
+// localeSupportsRanges reports whether bracket ranges are defined in this locale.
+// Ranges in a non-POSIX locale use the permitted reject policy on purpose.
 func localeSupportsRanges(l *Locale) bool {
 	return l.valid && l.posix
 }
 
-// LocaleCount returns the CLDR locale count in the blob, excluding
-// the C and POSIX aliases.
+// LocaleCount returns the CLDR locale count in the blob, without the C and POSIX aliases.
 func LocaleCount(l *Locale) int {
 	return localesCount(l)
 }
 
-// LocaleName returns the normalized CLDR name at index, or "" when
-// out of range.
+// LocaleName returns the normalized CLDR name at index, or "" when the index is out of range.
 func LocaleName(l *Locale, index int) string {
 	if index < 0 || index >= localesCount(l) {
 		return ""

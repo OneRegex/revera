@@ -1,8 +1,8 @@
 package revera
 
-// A small open-addressing hash table for the capture solver's memo
-// records. The subset has no map type, so the table is spelled out:
-// power-of-two capacity, linear probing, and growth at 3/4 load.
+// A small open-addressing hash table for the memo records of the capture solver.
+// The subset has no map type, so this file spells the table out.
+// It uses a power-of-two capacity, linear probing, and growth at 3/4 load.
 
 type memoKey struct {
 	a int32

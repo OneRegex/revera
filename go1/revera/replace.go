@@ -1,11 +1,10 @@
 package revera
 
-// Global operations. The subset has no function values, so the
-// callback API of go0 becomes an iterator: MatchIterInit and
-// MatchIterNext walk the non-overlapping matches, and ReplaceAll
-// builds on them. A host wrapper rebuilds the callback and
-// collection forms on top of the iterator with a few lines per
-// language; the Go one is ReplaceAllStringFunc.
+// Global operations.
+// The subset has no function values, so the callback API of go0 becomes an iterator.
+// MatchIterInit and MatchIterNext walk the non-overlapping matches, and ReplaceAll builds on them.
+// A host wrapper rebuilds the callback and collection forms over the iterator with a few lines per language.
+// ReplaceAllStringFunc is the Go one.
 
 // MatchIter walks every non-overlapping match, left to right.
 type MatchIter struct {
@@ -15,10 +14,9 @@ type MatchIter struct {
 	done    bool
 }
 
-// MatchIterInit starts an iteration that reports at most limit
-// matches. A negative limit means no bound, like the preg_replace
-// limit or the n of FindAll. An expression compiled with FlagNoSub
-// reports ENoSub, because iteration needs the match offsets.
+// MatchIterInit starts an iteration that reports at most limit matches.
+// A negative limit means no bound, like the preg_replace limit or the n of FindAll.
+// An expression compiled with FlagNoSub reports ENoSub, because iteration needs the match offsets.
 func MatchIterInit(re *Regexp, limit int) (MatchIter, Error) {
 	var it MatchIter
 	it.lastEnd = -1
@@ -33,14 +31,13 @@ func MatchIterInit(re *Regexp, limit int) (MatchIter, Error) {
 	return it, noError()
 }
 
-// MatchIterNext reports the next match into pmatch, which must hold
-// at least NumSub()+1 elements. Offsets are absolute in subject. It
-// returns false when the iteration is over.
+// MatchIterNext reports the next match into pmatch, which must hold at least NumSub()+1 elements.
+// The offsets are absolute in subject.
+// It returns false when the iteration is over.
 //
-// Selection follows the classic global-substitution rule: after a
-// match, the next search starts at its end, and a null match that
-// starts exactly there is skipped. A null match otherwise counts
-// and the scan then moves one character forward.
+// Selection follows the classic global-substitution rule.
+// After a match, the next search starts at its end, and it skips a null match that starts exactly there.
+// A null match otherwise counts, and the scan then moves one character forward.
 func MatchIterNext(re *Regexp, it *MatchIter, subject string, eflags uint32, pmatch []Match) (bool, Error) {
 	if it.done {
 		return false, noError()
@@ -93,18 +90,18 @@ func MatchIterNext(re *Regexp, it *MatchIter, subject string, eflags uint32, pma
 	return false, noError()
 }
 
-// replPart is one piece of a parsed replacement text. A part with a
-// nonempty lit is a literal; otherwise it names a group, where 0 is
-// the whole match.
+// replPart is one piece of a parsed replacement text.
+// A part with a nonempty lit is a literal.
+// Every other part names a group, where 0 is the whole match.
 type replPart struct {
 	lit   string
 	group int
 }
 
 // parseReplacement splits the sed-style replacement text into parts.
-// An ampersand inserts the whole match and a backslash-digit pair
-// inserts one group. Backslash escapes the next character. A digit
-// above nsub reports ESubReg; a trailing backslash reports EEscape.
+// An ampersand inserts the whole match, and a backslash-digit pair inserts one group.
+// A backslash escapes the next character.
+// A digit above nsub reports ESubReg, and a trailing backslash reports EEscape.
 func parseReplacement(replacement string, nsub int) ([]replPart, Error) {
 	parts := make([]replPart, 0, 4)
 	start := 0
@@ -152,14 +149,12 @@ func parseReplacement(replacement string, nsub int) ([]replPart, Error) {
 	return parts, noError()
 }
 
-// ReplaceAll returns subject with every non-overlapping match
-// replaced by replacement, like the sed s///g command. In
-// replacement, & stands for the whole match and \1 through \9 for
-// one group. Backslash escapes the next character, so \& and \\ are
-// literal. A reference to a nonparticipating group inserts nothing;
-// a reference past NumSub() reports ESubReg. Match iteration
-// follows the MatchIterNext rules, and limit bounds the replacement
-// count the same way; the rest of the subject stays as it is.
+// ReplaceAll returns subject with every non-overlapping match replaced by replacement, like the sed s///g command.
+// In replacement, & stands for the whole match and \1 through \9 for one group.
+// A backslash escapes the next character, so \& and \\ are literal.
+// A reference to a nonparticipating group inserts nothing, and a reference past NumSub() reports ESubReg.
+// Match iteration follows the MatchIterNext rules, and limit bounds the replacement count the same way.
+// The rest of the subject stays as it is.
 //
 // An expression compiled with FlagNoSub reports ENoSub.
 func ReplaceAll(re *Regexp, subject string, replacement string, limit int, eflags uint32) (string, Error) {
@@ -184,8 +179,7 @@ func ReplaceAll(re *Regexp, subject string, replacement string, limit int, eflag
 			break
 		}
 		if !any {
-			// One reservation covers the common case where the
-			// result stays near the subject size.
+			// One reservation covers the common case, where the result stays near the subject size.
 			out = make([]uint8, 0, len(subject)+len(subject)/8)
 			any = true
 		}
@@ -203,8 +197,7 @@ func ReplaceAll(re *Regexp, subject string, replacement string, limit int, eflag
 		last = pmatch[0].Eo
 	}
 	if !any {
-		// A subject without any match comes back unchanged and
-		// without a copy.
+		// A subject without any match comes back unchanged and without a copy.
 		return subject, noError()
 	}
 	out = append(out, subject[last:]...)

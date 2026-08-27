@@ -31,7 +31,7 @@ func TestMatchAllSpans(t *testing.T) {
 		{"a*", "abc", []Match{{0, 1}, {2, 2}, {3, 3}}},
 		{"x*", "", []Match{{0, 0}}},
 		{"q", "abc", nil},
-		// Overlapping candidates: the scan restarts at the match end.
+		// The candidates overlap, and the scan restarts at the match end.
 		{"aba", "ababa", []Match{{0, 3}}},
 	}
 	for _, tc := range cases {
@@ -219,7 +219,7 @@ func TestReplaceAllFunc(t *testing.T) {
 		t.Fatalf("ReplaceAllFunc = %q", got)
 	}
 
-	// The callback result is literal: no & or backslash expansion.
+	// The callback result is literal text, with no & or backslash expansion.
 	got, err = re.ReplaceAllFunc("a", -1, 0, func(pmatch []Match) string {
 		return `&\1`
 	})

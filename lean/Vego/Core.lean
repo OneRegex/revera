@@ -1,19 +1,21 @@
 /-
 The typed core of Vego.
 
-The elaborator in Elab.lean turns the raw JSON syntax tree into
-this form. Every operation carries the width it wraps at, every
-name is resolved to an index, and every implicit zero fill is
-explicit. The interpreter in Interp.lean runs this form directly,
-so it never has to guess a type at run time.
+The elaborator in Elab.lean turns the raw JSON syntax tree into this form.
+Every operation carries the width it wraps at.
+Every name resolves to an index, and every implicit zero fill becomes explicit.
+The interpreter in Interp.lean runs this form directly, so it never has to guess a type at run time.
 -/
 
 import Vego.Ast
 
 namespace Vego
 
-/-- Semantic types. Struct and pointer types refer to the struct
-table by position. Array lengths are resolved constants. -/
+/--
+Semantic types.
+Struct and pointer types refer to the struct table by position.
+Array lengths are resolved constants.
+-/
 inductive VTy where
   | bool
   | int (w : IW)
@@ -29,17 +31,20 @@ inductive ArithOp where
   | add | sub | mul | quo | rem | band | bor | bxor | andNot
   deriving Repr, BEq
 
-/-- Ordering comparisons. Equality tests get their own typed
-constructors. -/
+/--
+Ordering comparisons.
+Equality tests get their own typed constructors.
+-/
 inductive CmpOp where
   | eq | ne | lt | le | gt | ge
   deriving Repr, BEq
 
 mutual
 
-/-- A place: a memory location an assignment or a borrow can hit.
-`indexSliceP` evaluates a slice-valued expression to a header and
-addresses one element of the shared buffer. -/
+/--
+A place: a memory location an assignment or a borrow can hit.
+`indexSliceP` evaluates a slice-valued expression to a header and addresses one element of the shared buffer.
+-/
 inductive TPlace where
   | localP (slot : Nat)
   | fieldP (base : TPlace) (i : Nat) (viaPtr : Bool)
@@ -47,8 +52,10 @@ inductive TPlace where
   | indexSliceP (sliceVal : TExpr) (i : TExpr)
   deriving Repr
 
-/-- Typed expressions. Literal integers are already wrapped into
-their width. -/
+/--
+Typed expressions.
+Literal integers are already wrapped into their width.
+-/
 inductive TExpr where
   | litInt (v : Int)
   | litBool (b : Bool)
@@ -98,8 +105,11 @@ inductive TExpr where
 
 end
 
-/-- Typed statements. Slots index the function frame; `none` in a
-slot or place position is the blank identifier. -/
+/--
+Typed statements.
+Slots index the function frame.
+`none` in a slot or place position is the blank identifier.
+-/
 inductive TStmt where
   | newVar (slot : Nat) (init : TExpr)
   | defineCall2 (s1 : Option Nat) (s2 : Option Nat) (call : TExpr)
@@ -126,8 +136,7 @@ inductive TStmt where
   | blockS (body : List TStmt)
   deriving Repr
 
-/-- Byte-order comparison of strings, shared by the interpreter and
-by the elaborator's constant folding. -/
+/-- Byte-order comparison of strings, shared by the interpreter and by the elaborator's constant folding. -/
 def byteCompare (a b : ByteArray) (i : Nat) (fuel : Nat) : Ordering :=
   match fuel with
   | 0 => .eq
@@ -163,8 +172,7 @@ structure TFunc where
   nslots : Nat
   deriving Repr
 
-/-- A checked program: struct layouts, evaluated globals come later
-at run time from `globalInits`, and functions by index. -/
+/-- A checked program: struct layouts, evaluated globals come later at run time from `globalInits`, and functions by index. -/
 structure TProgram where
   structNames : Array String
   structFields : Array (Array String)

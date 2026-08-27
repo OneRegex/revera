@@ -1,22 +1,21 @@
 package revera
 
-// This file holds the one-pass capture path. Compile-time analysis can
-// prove that every subject span has at most one parse of the pattern.
-// The selection order then has nothing to choose, so phase B can read
-// the group spans from one deterministic walk instead of running the
-// memoized best-parse search. This satisfies the POSIX proof obligation
-// for one-pass execution: parse uniqueness leaves no two derivations
-// whose ordering or captures could differ.
+// This file holds the one-pass capture path.
+// Compile-time analysis can prove that every subject span has at most one parse of the pattern.
+// The selection order then has nothing to choose.
+// Phase B can therefore read the group spans from one deterministic walk, instead of running the memoized best-parse search.
+// This meets the POSIX proof obligation for one-pass execution.
+// Parse uniqueness leaves no two derivations whose ordering or captures could differ.
 //
-// The walk verifies every step it takes. On any inconsistency it
-// reports failure and the caller falls back to the solver, so a defect
-// here can only cost speed, never a wrong result.
+// The walk checks every step it takes.
+// On any inconsistency it reports failure, and the caller falls back to the solver.
+// A defect here can therefore only cost speed, never a wrong result.
 
 import "slices"
 
-// onePassNode reports whether every span has at most one parse of n and
-// whether the walk can find it deterministically. It stores the branch
-// first sets on alternation nodes that need lookahead.
+// onePassNode reports whether every span has at most one parse of n.
+// It also reports whether one deterministic walk can find that parse.
+// It stores the branch first sets on alternation nodes that need lookahead.
 func onePassNode(n *node) bool {
 	switch n.op {
 	case opChar, opAny, opBOL, opEOL:
@@ -36,15 +35,14 @@ func onePassNode(n *node) bool {
 				variable++
 			}
 		}
-		// With at most one variable-length child, every split point
-		// follows from the span length by arithmetic.
+		// With at most one variable-length child, arithmetic on the span length gives every split point.
 		return variable <= 1
 	case opRepeat:
 		if n.max == 0 {
 			return true
 		}
-		// A fixed nonempty instance length forces the instance count,
-		// and rules out null occurrences entirely.
+		// A fixed nonempty instance length forces the instance count.
+		// It also rules out null occurrences.
 		return fixedLength(n.ch[0]) && n.ch[0].minL > 0 &&
 			onePassNode(n.ch[0])
 	case opAlt:
@@ -62,14 +60,13 @@ func onePassNode(n *node) bool {
 }
 
 // fixedLength reports whether every match of n has the same length.
-// Two saturated bounds compare equal without being exact, so they never
-// count as fixed.
+// Two saturated bounds compare equal without being exact, so they never count as fixed.
 func fixedLength(n *node) bool {
 	return n.minL == n.maxL && n.maxL < lenInf
 }
 
-// disjointLengths reports whether the branch length ranges never
-// overlap, so the span length alone selects the branch.
+// disjointLengths reports whether the branch length ranges never overlap.
+// The span length alone then selects the branch.
 func disjointLengths(branches []*node) bool {
 	for i, a := range branches {
 		for _, b := range branches[i+1:] {
@@ -81,9 +78,8 @@ func disjointLengths(branches []*node) bool {
 	return true
 }
 
-// firstSet returns the exact set of characters that can begin a
-// nonempty match of n. exact is false when the set is not enumerable,
-// as for dot and bracket expressions.
+// firstSet returns the exact set of characters that can begin a nonempty match of n.
+// exact is false when the set is not enumerable, as for dot and bracket expressions.
 func firstSet(n *node) (set []rune, exact bool) {
 	switch n.op {
 	case opChar:
@@ -131,10 +127,10 @@ func firstSet(n *node) (set []rune, exact bool) {
 	return nil, false
 }
 
-// disjointFirsts checks that one lookahead character selects the
-// branch: every branch has an exact first set, the sets never overlap,
-// and at most one branch has a null match. On success it stores the
-// sets for the walk.
+// disjointFirsts checks that one lookahead character selects the branch.
+// Every branch needs an exact first set, and the sets must never overlap.
+// At most one branch may have a null match.
+// On success it stores the sets for the walk.
 func disjointFirsts(n *node) bool {
 	firsts := make([][]rune, len(n.ch))
 	nullable := 0
@@ -164,8 +160,8 @@ func disjointFirsts(n *node) bool {
 	return true
 }
 
-// onePassCaps fills the group spans from the unique parse of n over
-// [i, j). It returns false when the walk hits an inconsistency.
+// onePassCaps fills the group spans from the unique parse of n over [i, j).
+// It returns false when the walk hits an inconsistency.
 func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, caps []Match) bool {
 	span := j - i
 	if span < n.minL || span > n.maxL {
@@ -183,8 +179,8 @@ func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, c
 	case opEOL:
 		return re.atEOL(d, i, eflags)
 	case opGroup:
-		// Entering a group clears every group nested inside it, the
-		// same section 12.7 rule assignCaps applies.
+		// Entry into a group clears every group nested inside it.
+		// This is the same section 12.7 rule that assignCaps applies.
 		for _, inner := range re.nested[n.index] {
 			caps[inner] = Match{-1, -1}
 		}
@@ -199,7 +195,7 @@ func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, c
 		for _, child := range n.ch {
 			length := child.minL
 			if !fixedLength(child) {
-				// The single variable child absorbs the remainder.
+				// The single variable child takes the remainder.
 				length += rest
 			}
 			if length < 0 || !re.onePassCaps(d, child, at, at+length, eflags, caps) {

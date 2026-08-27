@@ -1,12 +1,10 @@
 /-
 Elaboration of the raw syntax tree into the typed core.
 
-This pass replays the typing knowledge that the Go compiler and the
-vego2json checker guarantee: it resolves every name, gives every
-operation its wrapping width, folds untyped constant arithmetic
-exactly the way Go does, and inserts the implicit zero values.
-A program that elaborates is well formed; that success is one of
-the machine-checked theorems.
+This pass replays the typing knowledge that the Go compiler and the vego2json checker guarantee.
+It resolves every name and gives every operation its wrapping width.
+It folds untyped constant arithmetic exactly the way Go does, and it inserts the implicit zero values.
+A program that elaborates is well formed, and that success is one of the machine-checked theorems.
 -/
 
 import Vego.Core
@@ -15,8 +13,7 @@ namespace Vego
 
 abbrev E := Except String
 
-/-- Width bounds, as precomputed constants: the interpreter reads
-them on every wrap. -/
+/-- Width bounds, as precomputed constants: the interpreter reads them on every wrap. -/
 def IW.lo : IW → Int
   | .u8 | .u16 | .u32 | .u64 => 0
   | .i32 => -2147483648
@@ -41,9 +38,7 @@ def IW.signed : IW → Bool
 def IW.fits (w : IW) (v : Int) : Bool :=
   w.lo ≤ v && v ≤ w.hi
 
-/-- The value count of a width, as a precomputed constant: the
-interpreter wraps on every operation, so this must not recompute
-a power. -/
+/-- The value count of a width, as a precomputed constant: the interpreter wraps on every operation, so this must not recompute a power. -/
 def IW.modulus : IW → Int
   | .u8 => 256
   | .u16 => 65536
@@ -59,8 +54,10 @@ def IW.wrap (w : IW) (v : Int) : Int :=
   let u := if u < 0 then u + m else u
   if w.signed && u > w.hi then u - m else u
 
-/-- Constant values during elaboration. An integer carries its
-width when a conversion or a typed constant fixed it. -/
+/--
+Constant values during elaboration.
+An integer carries its width when a conversion or a typed constant fixed it.
+-/
 inductive CE where
   | i (v : Int) (w : Option IW)
   | b (v : Bool)
@@ -96,8 +93,7 @@ private def scalarIW? : String → Option IW
   | "int" => some .i64
   | _ => none
 
-/-- Bitwise operations on unbounded integers, two's complement
-with infinite sign extension. -/
+/-- Bitwise operations on unbounded integers, two's complement with infinite sign extension. -/
 def intAnd : Int → Int → Int
   | .ofNat x, .ofNat y => .ofNat (x &&& y)
   | .ofNat x, .negSucc y => .ofNat (x ^^^ (x &&& y))
@@ -116,8 +112,7 @@ def intXor : Int → Int → Int
   | .negSucc x, .ofNat y => .negSucc (x ^^^ y)
   | .negSucc x, .negSucc y => .ofNat (x ^^^ y)
 
-/-- Exact constant arithmetic, Go's untyped rules: no wrapping,
-truncated division. -/
+/-- Exact constant arithmetic, Go's untyped rules: no wrapping, truncated division. -/
 private def foldArith (op : BinOp) (a b : Int) : E Int :=
   match op with
   | .add => pure (a + b)
@@ -153,9 +148,10 @@ private def mergeW (a b : Option IW) : E (Option IW) :=
   | some x, some y =>
     if x == y then pure (some x) else throw "mismatched constant widths"
 
-/-- Evaluate a constant expression: literals, named constants, and
-the scalar operators. Used for constant declarations, array
-lengths, and global initializers. -/
+/--
+Evaluate a constant expression: literals, named constants, and the scalar operators.
+Used for constant declarations, array lengths, and global initializers.
+-/
 private def constEval (consts : List (String × CE)) : Expr → E CE
   | .intLit v => pure (.i v none)
   | .strLit s => pure (.s s)
@@ -243,8 +239,7 @@ private def Lctx.bind (c : Lctx) (n : String) (ty : VTy) :
     ({ c with scopes := ((n, slot, ty) :: sc) :: rest, nslots := slot + 1 },
      slot)
 
-/-- Elaboration result: a typed expression or a constant that still
-adapts to its context. -/
+/-- Elaboration result: a typed expression or a constant that still adapts to its context. -/
 inductive ER where
   | typed (e : TExpr) (ty : VTy)
   | ci (v : Int)
@@ -252,8 +247,10 @@ inductive ER where
   | cs (v : ByteArray)
   | cnil
 
-/-- Force a result to a concrete type. Untyped integer constants
-must be representable, as in Go. -/
+/--
+Force a result to a concrete type.
+Untyped integer constants must be representable, as in Go.
+-/
 private def coerce (r : ER) (want : Option VTy) : E (TExpr × VTy) :=
   match r, want with
   | .typed e t, none => pure (e, t)
@@ -275,8 +272,7 @@ private def coerce (r : ER) (want : Option VTy) : E (TExpr × VTy) :=
   | .cnil, some (.slice e) => pure (.zeroOf (.slice e), .slice e)
   | .cnil, _ => throw "nil outside a slice context"
 
-/-- An operand of any integer type, for indexes, shift counts, and
-make sizes. -/
+/-- An operand of any integer type, for indexes, shift counts, and make sizes. -/
 private def coerceAnyInt (r : ER) : E TExpr :=
   match r with
   | .typed e (.int _) => pure e
@@ -300,8 +296,10 @@ private def binToCmp : BinOp → Option CmpOp
 
 mutual
 
-/-- Elaborate an expression. `want` is the context type; untyped
-constants adapt to it. -/
+/--
+Elaborate an expression.
+`want` is the context type, and untyped constants adapt to it.
+-/
 private partial def elabExpr (g : Genv) (c : Lctx) (want : Option VTy)
     (e : Expr) : E ER := do
   match e with
@@ -658,8 +656,10 @@ private partial def elabStmts (g : Genv) (c : Lctx) (ss : List Stmt) :
     ctx := ctx'
   pure (out.toList, ctx)
 
-/-- Elaborate a block: fresh scope inside. The returned slot count
-carries the block's local slots up to the function total. -/
+/--
+Elaborate a block: fresh scope inside.
+The returned slot count carries the block's local slots up to the function total.
+-/
 private partial def elabBlock (g : Genv) (c : Lctx) (ss : List Stmt)
     (extraLoop : Bool := false) : E (List TStmt × Nat) := do
   let extra := if extraLoop then 1 else 0
@@ -854,8 +854,7 @@ private partial def elabStmt (g : Genv) (c : Lctx) (s : Stmt) :
 
 end
 
-/-- Resolve every constant declaration, iterating so declaration
-order does not matter, as in Go. -/
+/-- Resolve every constant declaration, iterating so declaration order does not matter, as in Go. -/
 private def resolveConsts (decls : List ConstDecl) :
     E (List (String × CE)) := do
   let mut resolved : List (String × CE) := []

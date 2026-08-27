@@ -1,8 +1,8 @@
 package probe
 
-// Host file, outside the Vego subset. ReportLines runs the probe
-// call matrix and formats one line per result. The Zig, C++ and
-// Rust probe binaries print the same lines.
+// Host file, outside the Vego subset.
+// ReportLines runs the probe call matrix and formats one line per result.
+// The Zig, C++ and Rust probe binaries print the same lines.
 
 import "fmt"
 

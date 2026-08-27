@@ -1,9 +1,8 @@
-// Command json2rust converts the Vego JSON form into one Rust
-// source file. The output imports the hand-written runtime vg.rs,
-// which supplies the Slice and Str value types, the Arena
-// allocator, and the Go comparison helpers. Every function that
-// allocates receives an Arena reference as its first parameter,
-// "mem"; the output holds no global state.
+// Command json2rust converts the Vego JSON form into one Rust source file.
+// The output imports the hand-written runtime vg.rs.
+// That runtime supplies the Slice and Str value types, the Arena allocator, and the Go comparison helpers.
+// Every function that allocates receives an Arena reference as its first parameter, "mem".
+// The output holds no global state.
 //
 // Usage:
 //
@@ -61,9 +60,8 @@ type gen struct {
 	eqs   map[string]bool
 }
 
-// Rust keywords that can hide behind a raw identifier. The names
-// that cannot (self, Self, super, crate) are already reserved by
-// the vegoc renamer.
+// Rust keywords that can hide behind a raw identifier.
+// The names that cannot are self, Self, super and crate, and the vegoc renamer already reserves them.
 var rustKeywords = map[string]bool{
 	"as": true, "break": true, "const": true, "continue": true,
 	"dyn": true, "else": true, "enum": true, "extern": true,
@@ -148,8 +146,7 @@ func (g *gen) typ(t *vegoc.Type) string {
 	return ""
 }
 
-// constPlain renders a compile-time length expression without
-// literal suffixes, for array-length positions.
+// constPlain renders a compile-time length expression without literal suffixes, for array-length positions.
 func (g *gen) constPlain(e *vegoc.Expr) string {
 	switch e.K {
 	case "int", "char":
@@ -165,10 +162,9 @@ func (g *gen) constPlain(e *vegoc.Expr) string {
 	return ""
 }
 
-// intLiteral renders an integer literal with its type suffix. A
-// signed literal past the type's maximum (the magnitude of MinInt
-// under unary minus) routes through the unsigned type; the `as`
-// cast wraps like Go.
+// intLiteral renders an integer literal with its type suffix.
+// A signed literal past the maximum of its type routes through the unsigned type.
+// That case is the magnitude of MinInt under unary minus, and the `as` cast wraps like Go.
 func intLiteral(e *vegoc.Expr) string {
 	t := e.Typ
 	if t.Signed() {
@@ -212,9 +208,9 @@ func litSuffix(t *vegoc.Type) string {
 	return ""
 }
 
-// Struct equality: Go compares structs field by field, with string
-// fields compared by content. The printer emits one function per
-// struct type that appears as an operand of == or !=.
+// Struct equality.
+// Go compares structs field by field, and it compares string fields by content.
+// The printer emits one function per struct type that appears as an operand of == or !=.
 
 func (g *gen) emitStructEqs() {
 	g.eqs = map[string]bool{}
@@ -301,9 +297,9 @@ func (g *gen) emitFunc(f *vegoc.FuncDecl) {
 	}
 	g.wf("pub fn %s(%s)%s {\n", ident(f.Name), strings.Join(params, ", "), ret)
 	g.body(f.Body, 1)
-	// Go guarantees a terminating statement, but a Rust block whose
-	// last statement is a loop still types as (). The marker keeps
-	// the tail well typed on every shape.
+	// Go guarantees a terminating statement.
+	// A Rust block whose last statement is a loop still types as ().
+	// The marker keeps the tail well typed on every shape.
 	if len(f.Results) > 0 && (len(f.Body) == 0 || f.Body[len(f.Body)-1].K != "return") {
 		g.wf("    unreachable!()\n")
 	}
@@ -328,8 +324,7 @@ func (g *gen) newTmp() string {
 	return fmt.Sprintf("_t%d", g.tmp)
 }
 
-// newLabels mints the break and continue labels of one lowered
-// loop.
+// newLabels mints the break and continue labels of one lowered loop.
 func (g *gen) newLabels() (string, string) {
 	g.tmp++
 	return fmt.Sprintf("'_b%d", g.tmp), fmt.Sprintf("'_c%d", g.tmp)
@@ -342,9 +337,9 @@ func (g *gen) letKw(name string) string {
 	return "let"
 }
 
-// place renders an assignable location. Slice elements go through a
-// raw element pointer, so writes reach the shared buffer; the
-// second result says whether the text needs an unsafe block.
+// place renders an assignable location.
+// A slice element goes through a raw element pointer, so writes reach the shared buffer.
+// The second result says whether the text needs an unsafe block.
 func (g *gen) place(e *vegoc.Expr) (string, bool) {
 	switch e.K {
 	case "ident":
@@ -355,9 +350,8 @@ func (g *gen) place(e *vegoc.Expr) (string, bool) {
 	case "index":
 		switch e.X.Typ.K {
 		case vegoc.KSlice:
-			// A slice base need not be a place: the header copy
-			// shares the buffer, so any slice-valued expression
-			// (including a subslice view) works.
+			// A slice base need not be a place, because the header copy shares the buffer.
+			// Any slice-valued expression works, a subslice view included.
 			return "(*" + g.expr(e.X) + ".ptr(" + g.idx(e.Index) + "))", true
 		case vegoc.KArray:
 			x, u := g.place(e.X)
@@ -385,8 +379,7 @@ func (g *gen) assignLine(depth int, lhs *vegoc.Expr, rhs string) {
 	pl, unsafeNeeded := g.place(lhs)
 	g.indent(depth)
 	if vegoc.Impure(lhs) {
-		// The place must be fixed before the value runs, to keep
-		// Go's left-to-right evaluation order.
+		// The place must be fixed before the value runs, to keep the left-to-right evaluation order of Go.
 		g.wf("{ let _p = unsafe { std::ptr::addr_of_mut!(%s) }; let _v = %s; unsafe { *_p = _v; } }\n", pl, rhs)
 		return
 	}
@@ -447,14 +440,13 @@ func (g *gen) stmt(s *vegoc.Stmt, depth int) {
 		op := s.Op
 		val := g.expr(s.Value)
 		if op == "&^=" {
-			// Rust has no &^=; complement the value and reuse &=.
+			// Rust has no &^=, so the printer complements the value and uses &=.
 			op = "&="
 			val = "!(" + val + ")"
 		}
 		g.indent(depth)
 		if vegoc.Impure(lhs) {
-			// Rust evaluates the value before the place; Go pins
-			// the place first.
+			// Rust evaluates the value before the place, but Go pins the place first.
 			g.wf("{ let _p = unsafe { std::ptr::addr_of_mut!(%s) }; let _v = %s; unsafe { *_p %s _v; } }\n", pl, val, op)
 			return
 		}
@@ -548,9 +540,8 @@ func (g *gen) stmt(s *vegoc.Stmt, depth int) {
 	}
 }
 
-// emitFor lowers the three Go loop forms. A loop with a post
-// statement gets labels, so continue still runs the post and break
-// still skips it.
+// emitFor lowers the three Go loop forms.
+// A loop with a post statement gets labels, so continue still runs the post and break still skips it.
 func (g *gen) emitFor(s *vegoc.Stmt, depth int) {
 	if s.Init == nil && s.Post == nil {
 		g.indent(depth)
@@ -598,11 +589,10 @@ func (g *gen) emitFor(s *vegoc.Stmt, depth int) {
 	g.wf("}\n")
 }
 
-// emitRange lowers a range statement to an index loop. The Vego
-// engine has none, but the form stays supported. The operand
-// evaluates once into a copy, and a hidden counter drives the
-// loop, so body writes to the user variables cannot change the
-// iteration.
+// emitRange lowers a range statement to an index loop.
+// The Vego engine has no range statement, but the form stays supported.
+// The operand evaluates once into a copy, and a hidden counter drives the loop.
+// A write to the user variables in the body therefore cannot change the iteration.
 func (g *gen) emitRange(s *vegoc.Stmt, depth int) {
 	over := g.newTmp()
 	counter := g.newTmp()
@@ -675,8 +665,8 @@ func (g *gen) expr(e *vegoc.Expr) string {
 		if e.Name == "nil" {
 			return "vg::zero::<" + g.typ(e.Typ) + ">()"
 		}
-		// An untyped constant adopts the type of its use site; the
-		// Rust declaration fixed one type, so other sites cast.
+		// An untyped constant adopts the type of its use site.
+		// The Rust declaration fixed one type, so every other site casts.
 		if d, ok := g.p.ConstMap[e.Name]; ok && !vegoc.Same(d.Inferred, e.Typ) {
 			return "((" + ident(e.Name) + ") as " + g.typ(e.Typ) + ")"
 		}
@@ -754,9 +744,9 @@ func (g *gen) expr(e *vegoc.Expr) string {
 	return ""
 }
 
-// call renders a function call. When an argument borrows a local,
-// the other arguments hoist into temps first, in Go's evaluation
-// order, so the borrow never overlaps their reads.
+// call renders a function call.
+// When an argument borrows a local, the other arguments hoist into temporaries first, in the evaluation order of Go.
+// The borrow then never overlaps their reads.
 func (g *gen) call(e *vegoc.Expr) string {
 	var memArg []string
 	if g.p.CalleeAllocates(e.Name) {
@@ -878,8 +868,8 @@ func (g *gen) binary(e *vegoc.Expr) string {
 	case "&^":
 		return fmt.Sprintf("(%s & !(%s))", x, y)
 	case "/":
-		// Go defines MinInt / -1 as MinInt; the plain operator
-		// panics on it regardless of overflow-checks.
+		// Go defines MinInt / -1 as MinInt.
+		// The plain operator panics on that pair, whatever the overflow-checks setting is.
 		if e.Typ.Signed() {
 			return fmt.Sprintf("(%s).wrapping_div(%s)", x, y)
 		}

@@ -1,48 +1,41 @@
 /-
-The embedded differential corpus, and the replay proposition the
-corpus theorem states.
+The embedded differential corpus, and the replay proposition the corpus theorem states.
 
-Two corpus patterns cannot be executed under the interpreter in
-any reasonable time, so the theorem leaves their executions out.
+Two corpus patterns cannot be executed under the interpreter in any reasonable time, so the theorem leaves their executions out.
 Both nest a star inside counted repetitions:
 
     ((a*){250}){250}b     six blocks
     ((a*){4}){4}          six blocks
 
-The parse search then explores a very large number of ways to
-split a subject among nullable instances, and the cost comes from
-the nesting rather than from the subject. Measured under the
-interpreter, `((a*){250}){250}b` needs about a minute on the empty
-subject and over an hour on a 120 byte one, and `((a*){4}){4}`
-needs minutes on the empty subject. Replaying all twelve blocks
-would take days.
+The parse search then explores a very large number of ways to split a subject among nullable instances.
+The cost comes from the nesting, not from the subject.
+Under the interpreter, `((a*){250}){250}b` needs about a minute on the empty subject.
+It needs over an hour on a 120 byte one.
+`((a*){4}){4}` needs minutes on the empty subject.
+Replaying all twelve blocks would take days.
 
-What the theorem drops is exactly the X commands of those blocks,
-1056 of 86691. It keeps their compile commands, so every pattern
-in the corpus is still compiled and checked, and it keeps their T
-commands, so the contract figures of those patterns are still
-compared against the Go reference. That matters most for these
-patterns, because their figures are the largest the corpus
-produces. Only the executions go.
+What the theorem drops is exactly the X commands of those blocks, 1056 of 86691.
+It keeps their compile commands, so every pattern in the corpus is still compiled and checked.
+It keeps their T commands, so the contract figures of those patterns are still compared against the Go reference.
+That matters most for these patterns, because their figures are the largest the corpus produces.
+Only the executions go.
 
-Dropping X commands is sound for the session state. An X command
-allocates its own match buffer and calls Exec; it writes no
-session root, so the commands after it see exactly the session
-they saw before.
+Dropping X commands is sound for the session state.
+An X command allocates its own match buffer and calls Exec.
+It writes no session root, so the commands after it see exactly the session they saw before.
 -/
 
 import Vego.Driver
 
 namespace Vego
 
-/-- The corpus with the expected output of the Go engine, tab
-separated. -/
+/-- The corpus with the expected output of the Go engine, tab separated. -/
 def corpusText : String := include_str "../data/corpus.tsv"
 
 def corpusPairs : List (String × String) := parseCorpus corpusText
 
-/-- The patterns whose executions the theorem leaves out, as the
-hex the protocol carries:
+/--
+The patterns whose executions the theorem leaves out, as the hex the protocol carries:
 
     2828612a297b3235307d297b3235307d62   ((a*){250}){250}b
     2828612a297b347d297b347d             ((a*){4}){4}
@@ -51,9 +44,10 @@ def intractablePatterns : List String :=
   ["2828612a297b3235307d297b3235307d62",
    "2828612a297b347d297b347d"]
 
-/-- What one command is, for the filter: a compile carrying its
-pattern, an execution, or anything else. One tokenization answers
-all three questions. -/
+/--
+What one command is, for the filter: a compile carrying its pattern, an execution, or anything else.
+One tokenization answers all three questions.
+-/
 inductive CmdKind where
   | compile (pat : Option String)
   | exec
@@ -71,11 +65,12 @@ def isCompile (cmd : String) : Bool :=
   | .compile _ => true
   | _ => false
 
-/-- Drop the executions of the intractable blocks. `inSlow` says
-whether the block being scanned is one of them; a compile command
-always starts a new block and is always kept. The accumulator
-keeps the recursion flat: the corpus is long enough that a
-non-tail recursion here overflows the Lean interpreter. -/
+/--
+Drop the executions of the intractable blocks.
+`inSlow` says whether the block being scanned is one of them.
+A compile command always starts a new block, and it always stays.
+The accumulator keeps the recursion flat: the corpus is long enough that a non-tail recursion here overflows the Lean interpreter.
+-/
 def dropSlowExecs (pats : List String) (inSlow : Bool)
     (acc : List (String × String)) :
     List (String × String) → List (String × String)
@@ -99,10 +94,10 @@ def sensiblePairs : List (String × String) :=
 def countCompiles (pairs : List (String × String)) : Nat :=
   pairs.countP (fun p => isCompile p.1)
 
-/-- Replay `pairs` and report whether every command was checked
-and answered exactly as the Go engine. The session enforces the
-resource contracts, so a command whose Exec passes its contract
-fails the replay. -/
+/--
+Replay `pairs` and report whether every command was checked and answered exactly as the Go engine.
+The session enforces the resource contracts, so a command whose Exec passes its contract fails the replay.
+-/
 def replayAgrees (pairs : List (String × String)) : Bool :=
   match reveraChecked with
   | .error _ => false
@@ -112,14 +107,14 @@ def replayAgrees (pairs : List (String × String)) : Bool :=
                r.checked > 0
     | .error _ => false
 
-/-- Every command of the corpus agrees and stays within contract,
-except the executions of the two intractable patterns.
+/--
+Every command of the corpus agrees and stays within contract, except the executions of the two intractable patterns.
 
-The coverage tests pin the filter down. It must keep every compile
-command, so no pattern escapes the check, and it must keep more
-than 98 percent of the corpus while dropping something. A filter
-that stopped matching, or that matched everything, would fail the
-theorem rather than weaken it. -/
+The coverage tests pin the filter down.
+It must keep every compile command, so no pattern escapes the check.
+It must also keep more than 98 percent of the corpus while it drops something.
+A filter that stopped matching, or that matched everything, would fail the theorem rather than weaken it.
+-/
 def corpusAgrees : Bool :=
   countCompiles sensiblePairs == countCompiles corpusPairs &&
   sensiblePairs.length * 100 > corpusPairs.length * 98 &&

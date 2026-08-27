@@ -1,25 +1,22 @@
 /-
-The operational semantics of Vego, as a definitional interpreter
-over the typed core.
+The operational semantics of Vego, as a definitional interpreter over the typed core.
 
-The memory model is a heap of cells. Every local variable lives in
-one cell, and every buffer produced by make, append, a slice
-literal, or a byte conversion lives in its own cell. A slice value
-is a header: a cell, a path to an array inside that cell, an
-offset, a length, and a capacity. Views of a local array point
-into the array's cell, so writes through a view and writes to the
-variable see each other, exactly as in Go.
+The memory model is a heap of cells.
+Every local variable lives in one cell.
+Every buffer from make, append, a slice literal, or a byte conversion lives in its own cell.
+A slice value is a header.
+It holds a cell, a path to an array inside that cell, an offset, a length, and a capacity.
+Views of a local array point into the cell of that array.
+A write through a view and a write to the variable therefore see each other, exactly as in Go.
 
-Everything is total: the interpreter recurses on an explicit fuel
-argument and reports exhaustion as a trap. The other traps are the
-abnormal terminations of the specification: out-of-range index or
-slice, division by zero, and an impossible shift. `stuck` marks a
-state the typed core can never reach; reaching it would mean the
-elaborator let an ill-typed program through.
+Everything is total: the interpreter recurses on an explicit fuel argument and reports exhaustion as a trap.
+The other traps are the abnormal terminations of the specification.
+Those are an out-of-range index or slice, a division by zero, and an impossible shift.
+`stuck` marks a state the typed core can never reach.
+A run that reached it would mean the elaborator let an ill-typed program through.
 
-Buffer growth follows the portable runtime contract implemented by
-the Zig, C++ and Rust runtimes: a growing append allocates
-max(2 * cap, 8, need) elements and zero-fills the spare region.
+Buffer growth follows the portable runtime contract that the Zig, C++ and Rust runtimes implement.
+A growing append allocates max(2 * cap, 8, need) elements, and it zero-fills the spare region.
 -/
 
 import Vego.Core
@@ -40,9 +37,11 @@ inductive Trap where
 /-- A path inside a cell: field or element positions. -/
 abbrev Path := List Nat
 
-/-- A location: cell, generation, path. The generation must match
-the cell's current generation, so a reference into a freed frame
-traps instead of reading whatever lives there next. -/
+/--
+A location: cell, generation, path.
+The generation must match the current generation of the cell.
+A reference into a freed frame therefore traps, instead of reading whatever lives there next.
+-/
 abbrev Loc := Nat × Nat × Path
 
 inductive Val where
@@ -57,23 +56,27 @@ inductive Val where
 
 instance : Inhabited Val := ⟨.b false⟩
 
-/-- A heap cell: its current generation and its value. Freeing a
-cell bumps the generation and pushes the id on the free list, so
-every function call can recycle its frame cells on return. Cell 0
-is a permanent dummy; frames use id 0 as the unset sentinel. -/
+/--
+A heap cell: its current generation and its value.
+A free bumps the generation of the cell and pushes the id on the free list.
+Every function call can therefore recycle its frame cells on return.
+Cell 0 is a permanent dummy, and frames use id 0 as the unset sentinel.
+-/
 abbrev Cell := Nat × Val
 
 structure Heap where
   cells : Array Cell
   free : Array Nat
-  /- The resource meter. It measures what a run of the interpreted
-  program costs in the units of the resource contract: bytes of
-  buffer allocations, the depth of the call stack, and abstract
-  steps. Harnesses reset it before a call and read it after.
-  `steps` counts statements, loop iterations, and calls. `loops`
-  counts only loop iterations and calls; the straight-line code
-  between two of those ticks is bounded by the program text, so
-  either counter bounds the total work up to a program constant. -/
+  /-
+  The resource meter.
+  It measures what a run of the interpreted program costs, in the units of the resource contract.
+  Those units are bytes of buffer allocations, the depth of the call stack, and abstract steps.
+  Harnesses reset it before a call and read it after.
+  `steps` counts statements, loop iterations, and calls.
+  `loops` counts only loop iterations and calls.
+  The program text bounds the straight-line code between two of those ticks.
+  Either counter therefore bounds the total work, up to a program constant.
+  -/
   allocBytes : Nat := 0
   steps : Nat := 0
   loops : Nat := 0
@@ -99,8 +102,10 @@ instance : Monad M where
 
 def M.trap {α : Type} (t : Trap) : M α := fun _ => .trap t
 
-/-- Allocate a cell, reusing a freed one when possible. The
-returned generation is the one references must carry. -/
+/--
+Allocate a cell, reusing a freed one when possible.
+The returned generation is the one references must carry.
+-/
 def M.alloc (v : Val) : M (Nat × Nat) := fun h =>
   match h.free.back? with
   | some id =>
@@ -120,9 +125,11 @@ def M.freeCell (id : Nat) : M Unit := fun h =>
                     free := h.free.push id }
   | none => .trap (.stuck "bad cell free")
 
-/-- Meter ticks. `tickStmt` counts one statement; `tickLoop`
-counts one loop iteration or one call, which also counts as a
-statement-level step. -/
+/--
+Meter ticks.
+`tickStmt` counts one statement.
+`tickLoop` counts one loop iteration or one call, which also counts as a statement-level step.
+-/
 @[always_inline]
 def M.tickStmt : M Unit := fun h =>
   .ok () { h with steps := h.steps + 1 }
@@ -136,9 +143,10 @@ def M.tickLoop : M Unit := fun h =>
 def M.charge (bytes : Nat) : M Unit := fun h =>
   .ok () { h with allocBytes := h.allocBytes + bytes }
 
-/-- Enter and leave one function call, tracking the deepest chain.
-A trap abandons the whole run, so a missed `exitFn` on a trap path
-cannot skew a completed measurement. -/
+/--
+Enter and leave one function call, tracking the deepest chain.
+A trap abandons the whole run, so a missed `exitFn` on a trap path cannot skew a completed measurement.
+-/
 @[always_inline]
 def M.enterFn : M Unit := fun h =>
   let d := h.depth + 1
@@ -149,14 +157,15 @@ def M.enterFn : M Unit := fun h =>
 def M.exitFn : M Unit := fun h =>
   .ok () { h with depth := h.depth - 1 }
 
-/- Byte sizes of the values a buffer allocation holds. The layout
-is the natural 64-bit layout every target shares: one byte for
-bool and u8, the declared width for the other integers, an 8-byte
-pointer, a 16-byte string header, and a 24-byte slice header.
-Struct fields are aligned to their natural alignment and the
-struct size is rounded up to the struct alignment, as Go and the
-generated targets lay them out. The depth argument only bounds the
-recursion through the struct table, like in `zeroValD`. -/
+/-
+Byte sizes of the values a buffer allocation holds.
+The layout is the natural 64-bit layout every target shares.
+It gives one byte for bool and u8, and the declared width for the other integers.
+A pointer takes 8 bytes, a string header 16, and a slice header 24.
+Every struct field sits at its natural alignment, and the struct size rounds up to the struct alignment.
+Go and the generated targets lay them out that way.
+The depth argument only bounds the recursion through the struct table, like in `zeroValD`.
+-/
 def IW.byteSize : IW → Nat
   | .u8 => 1
   | .u16 => 2
@@ -197,8 +206,7 @@ def sizeAlignD (depth : Nat) (structs : Array (Array VTy)) :
 def elemBytes (structs : Array (Array VTy)) (ty : VTy) : Nat :=
   (sizeAlignD 10000 structs ty).1
 
-/-- Unchecked cell read, for cells the caller owns: frame slots,
-loop cells, and harness roots, which are never freed while held. -/
+/-- Unchecked cell read, for cells the caller owns: frame slots, loop cells, and harness roots, which are never freed while held. -/
 def M.readCell (i : Nat) : M Val := fun h =>
   match h.cells[i]? with
   | some (_, v) => .ok v h
@@ -226,10 +234,11 @@ def Val.proj (v : Val) (path : Path) : Except Trap Val :=
       | none => .error (.stuck "bad path")
     | _ => .error (.stuck "bad path base")
 
-/-- Functionally update a value along a path. The touched slot is
-detached before the recursive update, so a uniquely referenced
-value updates in place instead of copying every array on the
-path. -/
+/--
+Functionally update a value along a path.
+The update detaches the touched slot before it recurses.
+A uniquely referenced value therefore updates in place, instead of copying every array on the path.
+-/
 def Val.store (v : Val) (path : Path) (nv : Val) : Except Trap Val :=
   match path with
   | [] => .ok nv
@@ -260,10 +269,12 @@ def M.readLoc (obj : Nat) (gen : Nat) (path : Path) : M Val := fun h =>
       | .error t => .trap t
   | none => .trap (.stuck "bad cell")
 
-/-- Write through a location. The generation is checked, the cell
-is detached first, and the one- and two-step paths that carry
-nearly all traffic are updated inline, so a uniquely referenced
-cell mutates in place instead of copying its arrays. -/
+/--
+Write through a location.
+The write checks the generation and detaches the cell first.
+The one- and two-step paths carry nearly all traffic, and they update inline.
+A uniquely referenced cell therefore changes in place, instead of copying its arrays.
+-/
 def M.writeLoc (obj : Nat) (gen : Nat) (path : Path) (nv : Val) :
     M Unit := fun h0 =>
   match h0.cells[obj]? with
@@ -302,8 +313,10 @@ def M.writeLoc (obj : Nat) (gen : Nat) (path : Path) (nv : Val) :
       | .ok v' => put v'
       | .error t => .trap t
 
-/-- Zero values. The depth argument only bounds the recursion
-through the struct table; real programs never come close. -/
+/--
+Zero values.
+The depth argument only bounds the recursion through the struct table, and real programs never come close.
+-/
 def zeroValD (depth : Nat) (structs : Array (Array VTy)) : VTy → Val
   | .bool => .b false
   | .int _ => .i 0
@@ -400,12 +413,16 @@ inductive Flow where
   | cont
   | retv (vs : List Val)
 
-/-- A function frame maps slots to cells; 0 is the unset sentinel
-(cell 0 is a permanent dummy). -/
+/--
+A function frame maps slots to cells.
+0 is the unset sentinel, because cell 0 is a permanent dummy.
+-/
 abbrev Frame := Array Nat
 
-/-- Free every cell a frame owns. Locals and parameters cannot
-legally outlive their call, so this runs at every return. -/
+/--
+Free every cell a frame owns.
+Locals and parameters cannot legally outlive their call, so this runs at every return.
+-/
 def M.freeFrameFrom (fr : Frame) (i : Nat) : M Unit := do
   if h : i < fr.size then
     if fr[i] != 0 then do
@@ -462,8 +479,7 @@ def blitInto (es : Array Val) (base : Nat) (vs : Array Val) :
     Array Val :=
   vs.size.fold (fun j _ acc => acc.set! (base + j) vs[j]!) es
 
-/-- Bulk-write values into a buffer starting at element k: one cell
-read-modify-write instead of one per element. -/
+/-- Bulk-write values into a buffer starting at element k: one cell read-modify-write instead of one per element. -/
 def M.writeElems (base : Option Loc) (off : Nat) (k : Nat)
     (vs : Array Val) : M Unit := do
   if vs.isEmpty then pure ()
@@ -498,8 +514,7 @@ def M.readElems (base : Option Loc) (off : Nat) (len : Nat) :
 def bytesToVals (s : ByteArray) : Array Val :=
   s.data.map (fun b => .i b.toNat)
 
-/-- Gather the elements a spread append or a copy reads: a snapshot,
-which is what makes both memmove-safe. -/
+/-- Gather the elements a spread append or a copy reads: a snapshot, which is what makes both memmove-safe. -/
 def M.gatherSrc (sv : Val) (srcIsStr : Bool) : M (Array Val) := do
   if srcIsStr then do
     pure (bytesToVals (← M.expectStr sv))
@@ -513,8 +528,7 @@ def M.bindSlot (fr : Frame) (slot : Nat) (v : Val) :
   let (cell, _) ← M.alloc v
   pure (fr.set! slot cell, cell)
 
-/-- Free the old cell in a frame slot, if any, and bind a fresh one
-holding v. -/
+/-- Free the old cell in a frame slot, if any, and bind a fresh one holding v. -/
 def M.rebindSlot (fr : Frame) (slot : Nat) (v : Val) :
     M (Frame × Nat) := do
   match fr[slot]? with
@@ -525,14 +539,14 @@ def M.rebindSlot (fr : Frame) (slot : Nat) (v : Val) :
     else M.bindSlot fr slot v
   | none => M.bindSlot fr slot v
 
-/-- The growth rule of the portable append contract, which the
-Zig, C++ and Rust runtimes implement. The cost lemmas reason about
-this definition, so the rule has one home. -/
+/--
+The growth rule of the portable append contract, which the Zig, C++ and Rust runtimes implement.
+The cost lemmas reason about this definition, so the rule has one home.
+-/
 def growCap (cap need : Nat) : Nat :=
   Nat.max (Nat.max (2 * cap) 8) need
 
-/-- The append primitive: in place inside capacity, else a grown
-buffer under the portable contract, with a zeroed spare region. -/
+/-- The append primitive: in place inside capacity, else a grown buffer under the portable contract, with a zeroed spare region. -/
 def doAppend (c : Ctx) (sv : Val) (adds : Array Val)
     (elemTy : VTy) : M Val := do
   let (base, off, len, cap) ← M.expectSlice sv
@@ -550,8 +564,7 @@ def doAppend (c : Ctx) (sv : Val) (adds : Array Val)
     let (cell, g) ← M.alloc (.arr buf)
     pure (.slice (some (cell, g, [])) 0 need newcap)
 
-/-- The make primitive: a zeroed buffer of the requested length
-and capacity. -/
+/-- The make primitive: a zeroed buffer of the requested length and capacity. -/
 def doMake (c : Ctx) (elemTy : VTy) (n cp : Int) : M Val := do
   if n < 0 || cp < n then M.trap .makeBad
   else do
@@ -561,22 +574,22 @@ def doMake (c : Ctx) (elemTy : VTy) (n cp : Int) : M Val := do
     let (cell, g) ← M.alloc (.arr buf)
     pure (.slice (some (cell, g, [])) 0 n.toNat cp.toNat)
 
-/-- The slice-literal primitive: a fresh exact-size buffer holding
-the evaluated elements. -/
+/-- The slice-literal primitive: a fresh exact-size buffer holding the evaluated elements. -/
 def doSliceLit (c : Ctx) (elemTy : VTy) (vs : Array Val) : M Val := do
   M.charge (vs.size * elemBytes c.structs elemTy)
   let (cell, g) ← M.alloc (.arr vs)
   pure (.slice (some (cell, g, [])) 0 vs.size vs.size)
 
-/-- The string-to-bytes conversion: a fresh buffer with one cell
-per byte. -/
+/-- The string-to-bytes conversion: a fresh buffer with one cell per byte. -/
 def doStrToBytes (s : ByteArray) : M Val := do
   M.charge s.size
   let (cell, g) ← M.alloc (.arr (bytesToVals s))
   pure (.slice (some (cell, g, [])) 0 s.size s.size)
 
-/-- The byte image of buffer elements, purely; none on a stray
-non-integer, which the typed core rules out. -/
+/--
+The byte image of buffer elements, purely.
+A stray non-integer gives none, and the typed core rules that case out.
+-/
 def valsToBytes (vs : Array Val) : Option ByteArray :=
   vs.foldl
     (fun acc v =>
@@ -585,8 +598,7 @@ def valsToBytes (vs : Array Val) : Option ByteArray :=
       | _, _ => none)
     (some (ByteArray.emptyWithCapacity vs.size))
 
-/-- The bytes-to-string conversion: the string storage counts as
-one allocation of its length. -/
+/-- The bytes-to-string conversion: the string storage counts as one allocation of its length. -/
 def doBytesToStr (vs : Array Val) : M Val := do
   M.charge vs.size
   match valsToBytes vs with
@@ -604,8 +616,7 @@ def allocLoopCell (fr : Frame) (slot : Option Nat) :
 
 mutual
 
-/-- Resolve a place to a location, evaluating its index
-expressions in source order. -/
+/-- Resolve a place to a location, evaluating its index expressions in source order. -/
 def evalPlace (fuel : Nat) (c : Ctx) (fr : Frame) :
     TPlace → M Loc
   | .localP slot => do
@@ -986,9 +997,10 @@ def evalExpr (fuel : Nat) (c : Ctx) (fr : Frame) : TExpr → M Val
       let vs ← evalExprs fuel c fr elems
       doSliceLit c elemTy vs.toArray
 
-/-- Run one function on already-evaluated arguments: build the
-frame, execute, free the frame, map the flow to results. The
-harness calls enter here too. -/
+/--
+Run one function on already-evaluated arguments: build the frame, execute, free the frame, map the flow to results.
+The harness calls enter here too.
+-/
 def runFn (fuel : Nat) (c : Ctx) (fn : TFunc) (avs : List Val) :
     M (List Val) := do
   match fuel with
@@ -1058,8 +1070,7 @@ def execForLoop (fuel : Nat) (c : Ctx) (fr : Frame)
           execForLoop fuel c fr cond post body
         | none => execForLoop fuel c fr cond post body
 
-/-- Range loops over an index sequence: `next` yields the element
-for the value variable, reading the buffer at each step. -/
+/-- Range loops over an index sequence: `next` yields the element for the value variable, reading the buffer at each step. -/
 def execRangeLoop (fuel : Nat) (c : Ctx) (fr : Frame) (k n : Nat)
     (iCell : Option Nat) (vCell : Option Nat)
     (elemAt : Nat → M Val) (body : List TStmt) : M Flow := do

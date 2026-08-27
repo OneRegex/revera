@@ -1,13 +1,11 @@
 /-
-The cross-language driver protocol, instantiated over the
-interpreted revera engine.
+The cross-language driver protocol, instantiated over the interpreted revera engine.
 
-This is the Lean counterpart of revera/driver_host.go: one session
-holds the base locale table, the selected locale, and the compiled
-pattern, and every protocol command maps to calls into the checked
-program. The crosscheck corpus, evaluated by the Go original,
-provides the expected output for every command; the corpus theorem
-states that this session reproduces those outputs exactly.
+This is the Lean counterpart of revera/driver_host.go.
+One session holds the base locale table, the selected locale, and the compiled pattern.
+Every protocol command maps to calls into the checked program.
+The crosscheck corpus, evaluated by the Go original, gives the expected output for every command.
+The corpus theorem states that this session reproduces those outputs exactly.
 -/
 
 import Vego.Machine
@@ -52,10 +50,12 @@ def tokDecode (t : String) : Option ByteArray :=
 def tokEncode (b : ByteArray) : String :=
   if b.size == 0 then "-" else hexEncode b
 
-/- Heap compaction. A long driver session allocates buffers that
-nothing references once a command finishes; this migrates the
-session roots into a fresh heap and drops the rest. Sharing
-between headers is kept through the memo table. -/
+/-
+Heap compaction.
+A long driver session allocates buffers that nothing references once a command finishes.
+This moves the session roots into a fresh heap and drops the rest.
+Sharing between headers is kept through the memo table.
+-/
 mutual
 
 partial def migrateVal (old : Array Cell) (memo : Array (Option Nat))
@@ -103,14 +103,15 @@ partial def migrateCell (old : Array Cell) (memo : Array (Option Nat))
 
 end
 
-/-- Session errors: running out of fuel is recoverable and
-deterministic; everything else is a hard fault. -/
+/--
+Session errors.
+A run out of fuel is recoverable and deterministic, and everything else is a hard fault.
+-/
 inductive DriverErr where
   | outOfFuel
   | fault (msg : String)
 
-/-- Function and field positions the protocol needs, resolved once
-at session start, plus the zero Match value. -/
+/-- Function and field positions the protocol needs, resolved once at session start, plus the zero Match value. -/
 structure SessionIds where
   localePOSIX : Nat
   localeSelect : Nat
@@ -133,13 +134,13 @@ structure SessionIds where
   contractHasSolver : Nat
   zeroMatch : Val
 
-/-- One interpreted call frame, in bytes, as the resource contract
-estimates it. Mirrors frameBytes in contract.go. -/
+/--
+One interpreted call frame, in bytes, as the resource contract estimates it.
+Mirrors frameBytes in contract.go.
+-/
 def frameBytes : Nat := 256
 
-/-- One Exec call measured against the pattern's contract: what the
-meter saw, next to the figures the engine's own contract code
-reported for this subject length. -/
+/-- One Exec call measured against the pattern's contract: what the meter saw, next to the figures the engine's own contract code reported for this subject length. -/
 structure MeterStat where
   heapUsed : Nat
   heapBound : Int
@@ -150,12 +151,14 @@ structure MeterStat where
   stepsBound : Int
   deriving Repr, Inhabited
 
-/-- One live driver session. `fuel` bounds the recursion depth of
-every engine call, not its aggregate work; the default never binds
-in practice. `calibrate` swaps enforcement for measurement: an
-Exec over its contract normally fails the session, but a
-calibrating session records the figures instead, which is what the
-vegocheck margin reports read. -/
+/--
+One live driver session.
+`fuel` bounds the recursion depth of every engine call, not its aggregate work.
+The default never binds in practice.
+`calibrate` swaps enforcement for measurement.
+An Exec over its contract normally fails the session.
+A calibrating session records the figures instead, which is what the vegocheck margin reports read.
+-/
 structure Session where
   m : Machine
   ids : SessionIds
@@ -166,11 +169,11 @@ structure Session where
   fuel : Nat := Machine.defaultFuel
   calibrate : Bool := false
   stats : Array MeterStat := #[]
-  /- Contract figures per argument, for the current pattern. Only
-  Compile writes the pattern, so between two C commands the
-  contract is a function of the argument alone; evaluating
-  ContractFor costs several AST walks, so each compile starts a
-  fresh cache. -/
+  /-
+  Contract figures per argument, for the current pattern.
+  Only Compile writes the pattern, so between two C commands the contract is a function of the argument alone.
+  Evaluating ContractFor costs several AST walks, so each compile starts a fresh cache.
+  -/
   conCache : List (Int × (Bool × Int × Int × Int)) := []
 
 namespace Session
@@ -188,8 +191,10 @@ private def trap {α : Type} (x : Except Trap α) (what : String) : SR α :=
 
 private def die {α : Type} (msg : String) : SR α := throw (.fault msg)
 
-/-- Engine calls under the session's fuel bound, by resolved index.
-`what` only labels errors. -/
+/--
+Engine calls under the session's fuel bound, by resolved index.
+`what` only labels errors.
+-/
 private def call1 (s : Session) (idx : Nat) (what : String)
     (args : List Val) : SR (Val × Session) := do
   match ← trap (s.m.callIdx idx args s.fuel) what with
@@ -256,9 +261,8 @@ def compact (s : Session) : Session :=
     let (base', memo, nh) := migrateCell old memo dummy s.baseCell
     let (cur', memo, nh) := migrateCell old memo nh s.curCell
     let (re', _, nh) := migrateCell old memo nh s.reCell
-    -- Keep the meter: a fresh Heap literal would reset the
-    -- counters to their defaults, and compaction must not erase a
-    -- measurement.
+    -- Keep the meter.
+    -- A fresh Heap literal would reset the counters to their defaults, and compaction must not erase a measurement.
     { s with m := { s.m with
                     heap := { s.m.heap with cells := nh, free := #[] } },
              baseCell := base', curCell := cur', reCell := re' }
@@ -318,16 +322,16 @@ private def strTok (t : String) : SR ByteArray :=
   | some b => pure b
   | none => die s!"bad hex token {t}"
 
-/-- The contract of the compiled pattern for subjects of at most
-maxInput bytes: whether a solver backend can run, then the heap,
-stack and step figures. Everything comes from the engine's own
-contract code under the formal semantics, through the same
-accessors the cross-language drivers call.
+/--
+The contract of the compiled pattern, for subjects of at most maxInput bytes.
+It reports whether a solver backend can run, then the heap, stack and step figures.
+Everything comes from the engine's own contract code under the formal semantics, through the same accessors the cross-language drivers call.
 
-The result is cached per argument. Only Compile writes the
-pattern, so between two C commands the contract is a function of
-the argument alone, and both the T command and the per-Exec check
-read the same cached figures. -/
+The result is cached per argument.
+Only Compile writes the pattern.
+Between two C commands the contract is a function of the argument alone.
+The T command and the per-Exec check therefore read the same cached figures.
+-/
 private def contractOf (s : Session) (maxInput : Int) :
     SR ((Bool × Int × Int × Int) × Session) := do
   match s.conCache.lookup maxInput with
@@ -350,17 +354,16 @@ private def contractOf (s : Session) (maxInput : Int) :
     let c := (hs, heapB, stackB, stepsB)
     pure (c, { s with conCache := (maxInput, c) :: s.conCache })
 
-/-- Compare one metered Exec against its contract. The heap meter
-counts every buffer byte the call allocated, which is what the
-arena-backed targets consume. The stack meter is the deepest call
-chain, priced at the contract's per-frame estimate. The step
-comparison uses the loop counter: one unit per loop iteration and
-per call, which is the granularity the contract's abstract
-operations describe. The straight-line code between two of those
-units is bounded by the program text, so the loop counter bounds
-the whole work up to a constant of the artifact. Exceeding any
-bound is a hard fault, so the corpus theorem fails if one real
-execution ever passes its contract. -/
+/--
+Compare one metered Exec against its contract.
+The heap meter counts every buffer byte the call allocated, which is what the arena-backed targets consume.
+The stack meter is the deepest call chain, priced at the contract's per-frame estimate.
+The step comparison uses the loop counter, which ticks once per loop iteration and once per call.
+That is the granularity the abstract operations of the contract describe.
+The program text bounds the straight-line code between two of those units.
+The loop counter therefore bounds the whole work, up to a constant of the artifact.
+Exceeding any bound is a hard fault, so the corpus theorem fails if one real execution ever passes its contract.
+-/
 private def meterCheck (s : Session) (heapB stackB stepsB : Int) :
     SR Session := do
   let h := s.m.heap
@@ -513,8 +516,7 @@ def eval (s : Session) (line : String) : SR (String × Session) := do
 
 end Session
 
-/-- Parse a corpus dump: one command and its expected output per
-line, tab separated. -/
+/-- Parse a corpus dump: one command and its expected output per line, tab separated. -/
 def parseCorpus (txt : String) : List (String × String) :=
   (txt.trim.splitOn "\n").filterMap fun line =>
     match line.splitOn "\t" with
@@ -532,13 +534,14 @@ inductive StepOut where
   | skipped
   | failed (msg : String)
 
-/-- Replay one command under the skip policy. `reStale` records
-that the last compile ran out of fuel, so the session's pattern is
-behind the reference; commands that depend on it are skipped until
-a compile completes. A stateful command out of fuel is a hard
-failure, because skipping one would silently desynchronize the
-session from the reference outputs. Every command that does run
-must produce the reference output exactly. -/
+/--
+Replay one command under the skip policy.
+`reStale` records that the last compile ran out of fuel, so the pattern of the session is behind the reference.
+Commands that depend on it are skipped until a compile completes.
+A stateful command out of fuel is a hard failure.
+A skip there would quietly pull the session out of step with the reference outputs.
+Every command that does run must produce the reference output exactly.
+-/
 def corpusStep (s : Session) (reStale : Bool) (cmd want : String) :
     StepOut × Session × Bool :=
   let kind := cmd.front
@@ -559,10 +562,11 @@ def corpusStep (s : Session) (reStale : Bool) (cmd want : String) :
       else
         (.checked, s'.compact, if kind == 'C' then false else reStale)
 
-/-- Replay command and expected-output pairs under a fuel bound.
-Fuel limits the recursion depth of each engine call, so the bound
-picks a deterministic subset of the corpus rather than a time
-limit. -/
+/--
+Replay command and expected-output pairs under a fuel bound.
+Fuel limits the recursion depth of each engine call.
+The bound therefore picks a deterministic subset of the corpus, not a time limit.
+-/
 def runCorpusFuel (tp : TProgram) (pairs : List (String × String))
     (fuel : Nat := Machine.defaultFuel) : Except String CorpusResult := do
   let render : DriverErr → String := fun e =>

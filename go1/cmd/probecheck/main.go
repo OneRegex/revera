@@ -1,7 +1,5 @@
-// Command probecheck verifies the target-language probe binaries
-// against the Go probe package. The probe covers the Vego
-// constructs the engine never uses, so the printers stay correct
-// beyond the engine.
+// Command probecheck checks the target-language probe binaries against the Go probe package.
+// The probe covers the Vego constructs that the engine never uses, so the printers stay correct beyond the engine.
 //
 // Usage:
 //

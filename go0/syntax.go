@@ -32,29 +32,26 @@ type node struct {
 	fold    []rune // opChar with ICase: the accepted closure set
 	br      *bracketSet
 	min     int  // opRepeat
-	max     int  // opRepeat; infinite means no bound
+	max     int  // opRepeat, where infinite means no bound
 	minimal bool // opRepeat: shortest-preferring
-	index   int  // opGroup: capture number; opRepeat: minimal counter slot
+	index   int  // opGroup capture number, or opRepeat minimal counter slot
 
-	// minL and maxL bound the character count one match of this node can
-	// consume. maxL saturates at lenInf. The capture solver uses them to
-	// clamp its split ranges.
+	// minL and maxL bound the character count one match of this node can consume.
+	// maxL saturates at lenInf.
+	// The capture solver uses both to clamp its split ranges.
 	minL int
 	maxL int
-	// sufMin and sufMax bound the children from index k onward, for
-	// opConcat only.
+	// sufMin and sufMax bound the children from index k onward, for opConcat only.
 	sufMin []int
 	sufMax []int
-	// firsts holds the branch first sets of a one-pass alternation
-	// that needs lookahead to select its branch.
+	// firsts holds the branch first sets of a one-pass alternation that needs lookahead to select its branch.
 	firsts [][]rune
 }
 
 // lenInf saturates node length bounds far above any supported span.
 const lenInf = 1 << 30
 
-// computeLengths fills minL, maxL, and the concatenation suffix bounds,
-// bottom-up.
+// computeLengths fills minL, maxL, and the concatenation suffix bounds, from the bottom up.
 func computeLengths(n *node) {
 	for _, child := range n.ch {
 		computeLengths(child)
@@ -101,8 +98,7 @@ func computeLengths(n *node) {
 }
 
 func satAdd(a, b int) int {
-	// int64 arithmetic avoids overflow on 32-bit platforms, where two
-	// saturated values exceed the int range.
+	// int64 arithmetic avoids overflow on 32-bit platforms, where two saturated values pass the int range.
 	return int(min(int64(a)+int64(b), int64(lenInf)))
 }
 
@@ -142,7 +138,8 @@ func (p *parser) peekByteAt(ahead int) byte {
 	return p.src[p.pos+ahead]
 }
 
-// nextRune consumes and returns one character. It reports invalid UTF-8.
+// nextRune consumes and returns one character.
+// It reports invalid UTF-8.
 func (p *parser) nextRune() (rune, *Error) {
 	r, size := utf8.DecodeRuneInString(p.src[p.pos:])
 	if r == utf8.RuneError && size <= 1 {
@@ -159,8 +156,8 @@ func parse(pattern string, loc locale.Locale, flags CompileFlags) (*node, int, *
 		return nil, 0, err
 	}
 	if !p.eof() {
-		// Only an unmatched ')' inside parseAlt(false) can stop early,
-		// and parseBranch treats it as ordinary, so this cannot happen.
+		// Only an unmatched ')' inside parseAlt(false) can stop early.
+		// parseBranch treats that character as ordinary, so this case cannot happen.
 		return nil, 0, compileError(BadPat, p.pos)
 	}
 	return root, p.groups, nil
@@ -221,7 +218,7 @@ func isDupByte(c byte) bool {
 	return c == '*' || c == '+' || c == '?' || c == '{'
 }
 
-// parseExpr parses one anchor, or one primary with optional duplication.
+// parseExpr parses one anchor, or one primary with an optional duplication.
 func (p *parser) parseExpr() (*node, *Error) {
 	start := p.pos
 	c := p.peekByte()
@@ -339,7 +336,7 @@ func (p *parser) parseDup(operand *node) (*node, *Error) {
 		minimal = !minimal
 	}
 	if isDupByte(p.peekByte()) {
-		// Adjacent duplication symbols beyond one modifier are undefined.
+		// Adjacent duplication symbols past one modifier are undefined.
 		return nil, compileError(BadRpt, p.pos)
 	}
 	return &node{op: opRepeat, ch: []*node{operand},

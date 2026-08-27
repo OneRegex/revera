@@ -1,10 +1,9 @@
 /-
 Decoder from the vego2json output into the Lean AST.
 
-The decoder is total: it recurses on an explicit depth budget, so
-every theorem downstream rests only on ordinary definitions. The
-budget is far above the real nesting depth of the two shipped
-programs; running out is reported as an error, never as silence.
+The decoder is total: it recurses on an explicit depth budget, so every theorem downstream rests only on ordinary definitions.
+The budget is far above the real nesting depth of the two shipped programs.
+A run out of budget is reported as an error, never as silence.
 -/
 
 import Lean.Data.Json

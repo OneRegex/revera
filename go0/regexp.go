@@ -1,12 +1,11 @@
-// Package revera is a cleanroom Go implementation of the POSIX.1-2024
-// Issue 8 Extended Regular Expression language, as specified by
-// docs/POSIX-1-2024-ERE-SPECIFICATION.md in this repository.
+// Package revera is a cleanroom Go implementation of the POSIX.1-2024 Issue 8 Extended Regular Expression language.
+// docs/POSIX-1-2024-ERE-SPECIFICATION.md in this repository is the contract it follows.
 //
-// The API mirrors the regcomp() family in Go form. Patterns and subjects
-// are UTF-8, length-delimited strings. NUL is an ordinary character; this
-// input lies outside the C-representable domain, so it is a permitted
-// extension. Dot never matches NUL. Bytes that are not valid UTF-8 match
-// nothing.
+// The API mirrors the regcomp() family in Go form.
+// Patterns and subjects are UTF-8, length-delimited strings.
+// NUL is an ordinary character.
+// That input lies outside the C-representable domain, so it is a permitted extension.
+// Dot never matches NUL, and bytes that are not valid UTF-8 match nothing.
 package revera
 
 import (
@@ -23,29 +22,28 @@ type Match struct {
 	Eo int
 }
 
-// Regexp is a compiled regular expression. It is immutable after
-// compilation and safe for concurrent Exec calls.
+// Regexp is a compiled regular expression.
+// It never changes after compilation, and concurrent Exec calls are safe.
 type Regexp struct {
 	root  *node
 	nsub  int
 	flags CompileFlags
 	loc   locale.Locale
-	// minSlots counts shortest-preferring repetitions. Each holds one
-	// counter slot, assigned in pattern pre-order.
+	// minSlots counts shortest-preferring repetitions.
+	// Each one holds a counter slot, assigned in pattern pre-order.
 	minSlots int
 	// nested lists, for every group, the groups strictly inside it.
 	nested [][]int
 	// multi is true when some bracket can consume several characters.
 	multi bool
 	// prog is nil when interval expansion passed the program size cap.
-	// minLen then holds the smallest possible match length in
-	// characters, for the fallback in Exec.
+	// minLen then holds the smallest possible match length in characters, for the fallback in Exec.
 	prog   *program
 	minLen int64
 	// anchors is true when the pattern contains ^ or $ anywhere.
 	anchors bool
-	// onePass is true when every span has at most one parse, so the
-	// capture walk in onepass.go replaces the phase B solver.
+	// onePass is true when every span has at most one parse.
+	// The capture walk in onepass.go then replaces the phase B solver.
 	onePass bool
 	pool    sync.Pool
 	capPool sync.Pool
@@ -93,17 +91,16 @@ func Compile(pattern string, loc locale.Locale, flags CompileFlags) (*Regexp, er
 	return re, nil
 }
 
-// subjectLimit is the largest subject Exec accepts, in bytes. Thread
-// payloads store match starts as int32, so a longer subject reports
-// ESpace. The resource contract clamps its input bound to it.
+// subjectLimit is the largest subject Exec accepts, in bytes.
+// Thread payloads store match starts as int32, so a longer subject reports ESpace.
+// The resource contract clamps its input bound to this value.
 const subjectLimit = int64(1)<<31 - 1
 
-// lengthCap saturates minimum-length arithmetic well above any real
-// subject size.
+// lengthCap saturates minimum-length arithmetic well above any real subject size.
 const lengthCap = int64(1) << 40
 
-// minMatchChars returns the smallest character count the node can
-// consume, saturating at lengthCap.
+// minMatchChars returns the smallest character count the node can consume.
+// The result saturates at lengthCap.
 func minMatchChars(n *node) int64 {
 	switch n.op {
 	case opChar, opAny:
@@ -139,11 +136,10 @@ func minMatchChars(n *node) int64 {
 	return 0
 }
 
-// bracketMinChars returns the smallest character count one bracket match
-// can consume. Only a positive list made of nothing but multi-character
-// collating symbols and equivalence classes can need more than one
-// character. An equivalence class contributes the length of the shortest
-// element in its class; ICase never changes match lengths.
+// bracketMinChars returns the smallest character count one bracket match can consume.
+// Only a positive list of nothing but multi-character collating symbols and equivalence classes can need more than one character.
+// An equivalence class contributes the length of the shortest element in its class.
+// ICase never changes match lengths.
 func bracketMinChars(b *bracketSet) int64 {
 	if b.negated || len(b.ranges) > 0 || b.classMask != 0 ||
 		(len(b.elems) == 0 && len(b.equivs) == 0) {
@@ -188,9 +184,9 @@ func (re *Regexp) NumSub() int {
 	return re.nsub
 }
 
-// trivialNullMatch reports whether existence alone answers an Exec call:
-// a nullable, anchor-free pattern matches the null string at the start of
-// any subject, and the caller asked for no offsets.
+// trivialNullMatch reports whether existence alone answers an Exec call.
+// A nullable, anchor-free pattern matches the null string at the start of any subject.
+// The call also has to ask for no offsets.
 func (re *Regexp) trivialNullMatch(pmatch []Match) bool {
 	return re.root.minL == 0 && !re.anchors &&
 		(re.flags&NoSub != 0 || len(pmatch) == 0)
@@ -198,20 +194,19 @@ func (re *Regexp) trivialNullMatch(pmatch []Match) bool {
 
 // Exec searches subject for the POSIX-selected match.
 //
-// On success it returns true and fills pmatch like regexec(): element 0 is
-// the whole match, element i is capturing subexpression i, and every
-// remaining element is set to -1, -1. When the expression was compiled
-// with NoSub, or pmatch is empty, pmatch stays untouched.
-// It returns false when no match exists.
+// On success it returns true and fills pmatch like regexec().
+// Element 0 is the whole match, element i is capturing subexpression i, and every remaining element becomes -1, -1.
+// pmatch stays untouched when the expression was compiled with NoSub, or when pmatch is empty.
+// Exec returns false when no match exists.
 func (re *Regexp) Exec(subject string, pmatch []Match, eflags ExecFlags) (bool, error) {
 	if int64(len(subject)) > subjectLimit {
 		return false, compileError(ESpace, -1)
 	}
 	if re.prog == nil {
-		// The expanded program passed the size cap. A subject with
-		// fewer bytes than the minimum match length cannot match; a
-		// longer one would really need the huge program. The nil-prog
-		// branch of matcherContract mirrors this fallback's cost.
+		// The expanded program passed the size cap.
+		// A subject with fewer bytes than the minimum match length cannot match.
+		// A longer one would really need the huge program.
+		// The nil-prog branch of matcherContract mirrors the cost of this fallback.
 		if int64(len(subject)) < re.minLen {
 			return false, nil
 		}
@@ -227,12 +222,10 @@ func (re *Regexp) Exec(subject string, pmatch []Match, eflags ExecFlags) (bool, 
 	if re.prog.failMin != failMinNone &&
 		int64(len(subject)) >= int64(re.prog.failMin) &&
 		utf8.RuneCountInString(subject) >= re.prog.failMin {
-		// An oversized subtree was pruned and this subject is long
-		// enough to reach it, so the program may miss matches or pick
-		// the wrong spans. Pruning removes possibilities and adds
-		// none, so a match the program still finds proves existence;
-		// a miss proves nothing, and offsets would need the full
-		// program.
+		// An oversized subtree was pruned, and this subject is long enough to reach it.
+		// The program may therefore miss matches or pick the wrong spans.
+		// Pruning removes possibilities and adds none, so a match the program still finds proves existence.
+		// A miss proves nothing, and offsets would need the full program.
 		if re.trivialNullMatch(pmatch) {
 			return true, nil
 		}

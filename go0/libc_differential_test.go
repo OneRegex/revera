@@ -2,12 +2,11 @@
 
 package revera
 
-// This file automates the libc differential harness that used to live
-// in tmp/ and run by hand. It generates the same 20,000 pattern and
-// subject pairs and compares full capture vectors against the host
-// regcomp and regexec. macOS libc is the validated reference; other
-// libc implementations diverge from POSIX in ways this harness does
-// not classify.
+// This file automates the libc differential harness that used to live in tmp/ and run by hand.
+// It generates the same 20,000 pattern and subject pairs.
+// It compares full capture vectors against the host regcomp and regexec.
+// The macOS libc is the checked reference.
+// Other libc implementations diverge from POSIX in ways this harness does not classify.
 
 import (
 	"math/rand"
@@ -56,17 +55,16 @@ func libcPattern(rng *rand.Rand, depth int) string {
 	}
 }
 
-// knownDivergence classifies the two documented libc divergence
-// classes. Anything outside them is a real failure.
+// knownDivergence sorts a result into the two documented libc divergence classes.
+// Anything outside them is a real failure.
 func knownDivergence(pattern string, ours []Match, theirs [][2]int) bool {
-	// libc skips a leftmost empty match in favor of a later non-empty
-	// one; section 4.3 rule 1 selects the earlier empty match.
+	// libc skips a leftmost empty match and takes a later non-empty one.
+	// Rule 1 of section 4.3 selects the earlier empty match.
 	if ours[0].So == ours[0].Eo && theirs[0][0] > ours[0].So {
 		return true
 	}
-	// libc reports nonparticipation for {0,n}-style intervals where it
-	// reports an empty participation for *; the spec states one rule
-	// for both, so this implementation stays uniform.
+	// libc reports nonparticipation for {0,n}-style intervals, but empty participation for *.
+	// The spec states one rule for both, so this implementation stays uniform.
 	if !strings.Contains(pattern, "{0") {
 		return false
 	}
@@ -128,19 +126,17 @@ func TestLibcDifferential(t *testing.T) {
 		}
 		t.Errorf("%q on %q: we %v, libc %v", pattern, subject, pmatch, theirs.Spans)
 	}
-	// The corpus is seeded, so the count is exact: 14 interval
-	// participation cases and 4 leftmost-empty cases. A drop means the
-	// implementation started copying a libc bug; a rise means new
-	// unclassified behavior slipped into a known class.
+	// The corpus is seeded, so the count is exact: 14 interval participation cases and 4 leftmost-empty cases.
+	// A drop means the implementation started to copy a libc bug.
+	// A rise means new unclassified behavior slipped into a known class.
 	if divergences != 18 {
 		t.Errorf("known divergences drifted: %d cases, want 18", divergences)
 	}
 }
 
-// TestLibcKnownDivergences pins one exemplar per documented divergence
-// class, on both sides. The our-side assertions fail if the
-// implementation converges toward the libc behavior; the libc-side
-// assertions document what the host actually returns.
+// TestLibcKnownDivergences pins one example per documented divergence class, on both sides.
+// The assertions on our side fail if the implementation moves toward the libc behavior.
+// The assertions on the libc side record what the host really returns.
 func TestLibcKnownDivergences(t *testing.T) {
 	cases := []struct {
 		pattern, subject string
@@ -154,7 +150,7 @@ func TestLibcKnownDivergences(t *testing.T) {
 		{"((ba){0,2}){0,2}", "bbaaa",
 			[]Match{{0, 0}, {0, 0}, {-1, -1}},
 			[][2]int{{0, 0}, {-1, -1}, {-1, -1}}},
-		// libc skips the leftmost empty match for a later non-empty one.
+		// libc skips the leftmost empty match and takes a later non-empty one.
 		{"((c){0,2}$)?", "caac",
 			[]Match{{0, 0}, {-1, -1}, {-1, -1}},
 			[][2]int{{3, 4}, {3, 4}, {3, 4}}},

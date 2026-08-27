@@ -1,7 +1,6 @@
 package revera
 
-// Locale differential: every observable locale operation must match
-// the go0 locale package on the same data.
+// Locale differential: every observable locale operation must match the go0 locale package on the same data.
 
 import (
 	"math/rand"
@@ -62,8 +61,7 @@ func TestLocaleOpenDifferential(t *testing.T) {
 	}
 }
 
-// LocaleCountEmbedded opens one real locale to reach the loaded
-// section table, then counts.
+// LocaleCountEmbedded opens one real locale to reach the loaded section table, then counts.
 func LocaleCountEmbedded(t *testing.T) int {
 	l, err := OpenLocale("en", "")
 	if err != nil {
@@ -147,10 +145,9 @@ func TestLocaleCollationDifferential(t *testing.T) {
 	}
 }
 
-// TestLocaleOpenMalformedData corrupts the blob and requires a clean
-// rejection or a working locale, never a panic. Every u32 field of
-// the locale-name offset table gets poisoned, and random single-byte
-// flips cover the rest of the layout.
+// TestLocaleOpenMalformedData corrupts the blob.
+// It requires a clean rejection or a working locale, never a panic.
+// It poisons every u32 field of the locale-name offset table, and random single-byte flips cover the rest of the layout.
 func TestLocaleOpenMalformedData(t *testing.T) {
 	blob := EmbeddedLocaleData()
 	probe := func(data string) {
@@ -209,9 +206,8 @@ func TestUTF8Differential(t *testing.T) {
 	}
 }
 
-// g0DecodeRune mirrors go0's decodeRune with the stdlib decoder: an
-// invalid sequence maps to the sentinel, an encoded U+FFFD stays a
-// three-byte character.
+// g0DecodeRune mirrors the decodeRune of go0 with the stdlib decoder.
+// An invalid sequence maps to the sentinel, and an encoded U+FFFD stays a three-byte character.
 func g0DecodeRune(s string) (rune, int) {
 	r, size := utf8.DecodeRuneInString(s)
 	if r == utf8.RuneError && size <= 1 {

@@ -33,7 +33,7 @@ type matchCase struct {
 	subject string
 	cflags  CompileFlags
 	eflags  ExecFlags
-	// want lists expected pmatch contents; nil means no match.
+	// want lists the expected pmatch contents, and nil means no match.
 	want []Match
 }
 
@@ -122,8 +122,8 @@ func TestRepetitionAndCaptures(t *testing.T) {
 	runMatchCases(t, []matchCase{
 		{pattern: "(a*)+", subject: "aa", want: []Match{{0, 2}, {0, 2}}},
 		{pattern: "(a*)+", subject: "", want: []Match{{0, 0}, {0, 0}}},
-		// A null repetition takes one null occurrence when the operand
-		// has one; null beats nonparticipation (sections 8.5 and 4.3).
+		// A null repetition takes one null occurrence when the operand has one.
+		// Null beats nonparticipation, under sections 8.5 and 4.3.
 		{pattern: "(a?)*", subject: "", want: []Match{{0, 0}, {0, 0}}},
 		{pattern: "(a*)*", subject: "b", want: []Match{{0, 0}, {0, 0}}},
 		{pattern: "(a)*", subject: "b", want: []Match{{0, 0}, {-1, -1}}},
@@ -136,8 +136,8 @@ func TestRepetitionAndCaptures(t *testing.T) {
 			want: []Match{{0, 0}, {0, 0}, {-1, -1}}},
 		{pattern: "((..)?)*", subject: "aa",
 			want: []Match{{0, 2}, {0, 2}, {0, 2}}},
-		// Rule 1 of section 4.3: a shorter earlier match beats a longer
-		// later match. BSD libc skips the leftmost empty match here.
+		// Rule 1 of section 4.3 makes a shorter earlier match beat a longer later match.
+		// BSD libc skips the leftmost empty match here.
 		{pattern: "((c){0,2}$)?", subject: "caac",
 			want: []Match{{0, 0}, {-1, -1}, {-1, -1}}},
 		{pattern: "(([^a-c])*$)?", subject: "bc",
@@ -300,7 +300,7 @@ func TestAPIReporting(t *testing.T) {
 		}
 	}
 
-	// Multibyte offsets are bytes; preference counts characters.
+	// Multibyte offsets count bytes, but preference counts characters.
 	re = compileOK(t, ".", 0)
 	caps := execCaps(t, re, "é", 0)
 	if caps[0] != (Match{0, 2}) {

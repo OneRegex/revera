@@ -1,17 +1,15 @@
-// Command json2cpp converts the Vego JSON form into a C++ header
-// and source pair. The output includes the hand-written runtime
-// vg.hpp, which supplies the Slice and Str value types, the Arena
-// allocator, and the Go conversion and comparison helpers. Every
-// function that allocates receives an Arena reference as its first
-// parameter, "mem"; the output holds no global state.
+// Command json2cpp converts the Vego JSON form into a C++ header and source pair.
+// The output includes the hand-written runtime vg.hpp.
+// That runtime supplies the Slice and Str value types, the Arena allocator, and the Go conversion and comparison helpers.
+// Every function that allocates receives an Arena reference as its first parameter, "mem".
+// The output holds no global state.
 //
 // Usage:
 //
 //	json2cpp [-hpp engine.hpp] [-cpp engine.cpp] [-ns name] input.json
 //
-// The output goes in a namespace named after the Vego package. The
-// -ns flag renames it, which lets a target keep the plain project
-// name for its own public header.
+// The output goes in a namespace named after the Vego package.
+// The -ns flag renames it, which lets a target keep the plain project name for its own public header.
 package main
 
 import (
@@ -73,8 +71,7 @@ type gen struct {
 	ns      string
 }
 
-// cppReserved holds C++ keywords and libc macro names that a Vego
-// identifier must not collide with.
+// cppReserved holds C++ keywords and libc macro names that a Vego identifier must not collide with.
 var cppReserved = map[string]bool{
 	"alignas": true, "alignof": true, "and": true, "and_eq": true,
 	"asm": true, "auto": true, "bitand": true, "bitor": true,
@@ -170,9 +167,8 @@ func (g *gen) files() (string, string) {
 	return h.String(), g.b.String()
 }
 
-// constOrder sorts constant declarations so every constant appears
-// after the constants its value mentions. Go accepts any order;
-// C++ does not.
+// constOrder sorts constant declarations, so every constant comes after the constants its value mentions.
+// Go accepts any order, but C++ does not.
 func (g *gen) constOrder() []*vegoc.ValueDecl {
 	var out []*vegoc.ValueDecl
 	state := map[string]int{}
@@ -205,10 +201,10 @@ func (g *gen) wf(format string, args ...any) {
 	fmt.Fprintf(&g.b, format, args...)
 }
 
-// comparable reports whether Go allows == on the type: scalars,
-// strings, comparable structs, and arrays of comparable elements.
-// Slices are not comparable. vg::Str carries a content-comparing
-// operator==, so a defaulted struct operator== stays correct.
+// comparable reports whether Go allows == on the type.
+// The comparable types are scalars, strings, comparable structs, and arrays of comparable elements.
+// A slice is never comparable.
+// vg::Str carries an operator== that compares content, so a defaulted struct operator== stays correct.
 func (g *gen) comparable(t *vegoc.Type) bool {
 	switch t.K {
 	case vegoc.KSlice, vegoc.KPtr:
@@ -226,9 +222,9 @@ func (g *gen) comparable(t *vegoc.Type) bool {
 	return true
 }
 
-// structOrder sorts struct declarations so a struct appears after
-// every struct it embeds by value (directly or through an array).
-// Go accepts any order; C++ does not.
+// structOrder sorts struct declarations, so a struct comes after every struct it embeds by value.
+// An array member counts as an embed.
+// Go accepts any order, but C++ does not.
 func (g *gen) structOrder() []*vegoc.StructDecl {
 	var out []*vegoc.StructDecl
 	state := map[string]int{}
@@ -445,8 +441,8 @@ func (g *gen) stmt(s *vegoc.Stmt, depth int) {
 	}
 }
 
-// simpleStmt emits a declaration or assignment, indented, with its
-// own newline. Two-value forms expand to a temporary block.
+// simpleStmt emits a declaration or assignment, indented, with its own newline.
+// A two-value form expands to a temporary block.
 func (g *gen) simpleStmt(s *vegoc.Stmt, depth int) {
 	switch s.K {
 	case "var_decl":
@@ -492,8 +488,8 @@ func (g *gen) simpleStmt(s *vegoc.Stmt, depth int) {
 			return
 		}
 		if vegoc.Impure(l) {
-			// Go evaluates the target place before the value; since
-			// C++17 a plain assignment sequences the value first.
+			// Go evaluates the target place before the value.
+			// Since C++17, a plain assignment sequences the value first.
 			g.wf("{ auto&& _p = %s; _p = %s; }\n", g.expr(l), g.expr(s.Value))
 			return
 		}
@@ -509,9 +505,9 @@ func (g *gen) simpleStmt(s *vegoc.Stmt, depth int) {
 	}
 }
 
-// opAssign renders a compound assignment against an already
-// rendered place. C++ has no &^=, and signed division overflow is
-// undefined even under -fwrapv, so those forms rewrite.
+// opAssign renders a compound assignment against a place that is already rendered.
+// C++ has no &^=, and signed division overflow stays undefined even under -fwrapv.
+// Those two forms therefore need a rewrite.
 func (g *gen) opAssign(s *vegoc.Stmt, place string) string {
 	val := g.expr(s.Value)
 	t := s.Lhs[0].Typ
@@ -530,8 +526,7 @@ func (g *gen) opAssign(s *vegoc.Stmt, place string) string {
 	return fmt.Sprintf("%s %s %s", place, s.Op, val)
 }
 
-// inlineStmt renders a loop init or post statement with no
-// indentation and no terminator.
+// inlineStmt renders a loop init or post statement, with no indentation and no terminator.
 func (g *gen) inlineStmt(s *vegoc.Stmt) string {
 	switch s.K {
 	case "var_decl":
@@ -556,11 +551,10 @@ func (g *gen) inlineStmt(s *vegoc.Stmt) string {
 	return ""
 }
 
-// emitRange lowers a range statement to an index loop. The Vego
-// engine has none, but the form stays supported for completeness.
-// The operand evaluates once into a copy, and a hidden counter
-// drives the loop, so body writes to the user variables cannot
-// change the iteration.
+// emitRange lowers a range statement to an index loop.
+// The Vego engine has no range statement, but the form stays supported for completeness.
+// The operand evaluates once into a copy, and a hidden counter drives the loop.
+// A write to the user variables in the body therefore cannot change the iteration.
 func (g *gen) emitRange(s *vegoc.Stmt, depth int) {
 	over := g.newTmp()
 	counter := g.newTmp()
@@ -596,8 +590,7 @@ func (g *gen) emitRange(s *vegoc.Stmt, depth int) {
 	g.wf("}\n")
 }
 
-// narrow reports whether a type needs a cast back after arithmetic
-// to defeat C++ integer promotion.
+// narrow reports whether a type needs a cast back after arithmetic, to defeat C++ integer promotion.
 func narrow(t *vegoc.Type) bool {
 	switch t.K {
 	case vegoc.KU8, vegoc.KU16, vegoc.KU32, vegoc.KI32:
@@ -625,12 +618,10 @@ func (g *gen) expr(e *vegoc.Expr) string {
 	case "field":
 		return g.expr(e.X) + "." + ident(e.Name)
 	case "index":
-		// The base and the index are unsequenced in C++; pin them
-		// in Go's order when a side effect can be observed. For an
-		// addressable base, the lambda returns decltype(auto) so
-		// an element place stays assignable. For an array-typed
-		// temporary the element reference would dangle past the
-		// lambda, so the element returns by value.
+		// C++ leaves the base and the index unsequenced.
+		// The printer therefore pins them in Go's order when a side effect can show the difference.
+		// For an addressable base, the lambda returns decltype(auto), so an element place stays assignable.
+		// For an array-typed temporary, the element reference would dangle past the lambda, so the element returns by value.
 		if (vegoc.Impure(e.X) && !constish(e.Index)) || (vegoc.Impure(e.Index) && !constish(e.X)) {
 			spec := " -> decltype(auto)"
 			if e.X.Typ.K == vegoc.KArray && !addressable(e.X) {
@@ -715,9 +706,8 @@ func (g *gen) expr(e *vegoc.Expr) string {
 	case "unary":
 		switch e.Op {
 		case "-":
-			// Unsigned arithmetic keeps negation defined in every
-			// context, constexpr included, and wraps like Go even
-			// for the minimum value.
+			// Unsigned arithmetic keeps negation defined in every context, constexpr included.
+			// It also wraps like Go, even for the minimum value.
 			if e.Typ.IsInteger() {
 				return fmt.Sprintf("%s(0ULL - uint64_t(%s))", g.typ(e.Typ), g.expr(e.X))
 			}
@@ -742,10 +732,10 @@ func (g *gen) expr(e *vegoc.Expr) string {
 	return ""
 }
 
-// intLiteral renders an integer literal. A literal the checker
-// typed as 64-bit always carries a suffix, so constant arithmetic
-// runs at 64 bits instead of overflowing int. Narrow literals stay
-// plain; the cast-backs around narrow arithmetic absorb promotion.
+// intLiteral renders an integer literal.
+// A literal that the checker typed as 64-bit always carries a suffix.
+// Constant arithmetic then runs at 64 bits, instead of overflowing int.
+// A narrow literal stays plain, because the cast-backs around narrow arithmetic absorb the promotion.
 func (g *gen) intLiteral(e *vegoc.Expr) string {
 	v, err := strconv.ParseUint(e.Value, 10, 64)
 	if err != nil {
@@ -756,9 +746,8 @@ func (g *gen) intLiteral(e *vegoc.Expr) string {
 		case vegoc.KU64:
 			return e.Value + "ULL"
 		case vegoc.KI64, vegoc.KInt:
-			// The magnitude of MinInt64 under unary minus has no
-			// signed spelling; convert from unsigned, which C++20
-			// defines as modular.
+			// The magnitude of MinInt64 under unary minus has no signed spelling.
+			// The conversion comes from unsigned instead, which C++20 defines as modular.
 			if v > 1<<63-1 {
 				return "int64_t(" + e.Value + "ULL)"
 			}
@@ -814,9 +803,8 @@ func isNil(e *vegoc.Expr) bool {
 	return e.K == "ident" && e.Name == "nil"
 }
 
-// callArgs renders call arguments, with the memory context first
-// when the callee allocates. A unary & argument binds the callee's
-// reference parameter directly.
+// callArgs renders call arguments, with the memory context first when the callee allocates.
+// A unary & argument binds the reference parameter of the callee directly.
 func (g *gen) callArgs(callee string, args []*vegoc.Expr) []string {
 	var out []string
 	if g.p.CalleeAllocates(callee) {
@@ -832,15 +820,14 @@ func (g *gen) callArgs(callee string, args []*vegoc.Expr) []string {
 	return out
 }
 
-// hoistArgs pins call and builtin arguments into temporaries, in
-// Go's left-to-right order, when C++'s unspecified argument order
-// could be observed: one argument has a side effect and another
-// non-constant argument exists. Borrow arguments (&x) bind the
-// same place whenever they evaluate, so they stay inline.
+// hoistArgs pins call and builtin arguments into temporaries, in Go's left-to-right order.
+// It does that when the unspecified argument order of C++ could show.
+// That happens when one argument has a side effect and another non-constant argument exists.
+// A borrow argument, written &x, binds the same place whenever it evaluates, so it stays inline.
 func (g *gen) hoistArgs(e *vegoc.Expr) (string, bool) {
-	// A pointer-typed argument lowers to a C++ reference. Copying
-	// it into a temporary would copy the referent, so it must stay
-	// inline; evaluating it has no side effects anyway.
+	// A pointer-typed argument lowers to a C++ reference.
+	// A copy into a temporary would copy the referent, so the argument must stay inline.
+	// Its evaluation has no side effects anyway.
 	inlineArg := func(a *vegoc.Expr) bool {
 		return (a.Typ != nil && a.Typ.K == vegoc.KPtr) || constish(a)
 	}
@@ -883,9 +870,9 @@ func constish(e *vegoc.Expr) bool {
 	return e.IsConst || isNil(e)
 }
 
-// addressable reports whether the expression names storage that
-// outlives the full expression. Crossing a slice or string means
-// heap storage; otherwise the chain must root in a variable.
+// addressable reports whether the expression names storage that outlives the full expression.
+// A step across a slice or string means heap storage.
+// In every other case the chain must root in a variable.
 func addressable(e *vegoc.Expr) bool {
 	switch e.K {
 	case "ident":
@@ -905,11 +892,10 @@ func addressable(e *vegoc.Expr) bool {
 }
 
 func (g *gen) binary(e *vegoc.Expr) string {
-	// C++ leaves binary operands unsequenced; Go is left to right.
-	// Pin operands into ordered temporaries when a side effect can
-	// make the difference observable, except for && and ||, which
-	// C++ already sequences. The rebuilt expression re-dispatches,
-	// so string and struct comparisons keep their helpers.
+	// C++ leaves binary operands unsequenced, but Go evaluates left to right.
+	// The printer therefore pins the operands into ordered temporaries when a side effect can show the difference.
+	// && and || are exempt, because C++ already sequences them.
+	// The rebuilt expression dispatches again, so string and struct comparisons keep their helpers.
 	if e.Op != "&&" && e.Op != "||" {
 		if (vegoc.Impure(e.X) && !constish(e.Y)) || (vegoc.Impure(e.Y) && !constish(e.X)) {
 			hx, hy := g.newTmp(), g.newTmp()
@@ -946,8 +932,8 @@ func (g *gen) binary(e *vegoc.Expr) string {
 		return fmt.Sprintf("(%s %s %s)", x, e.Op, y)
 	case "/":
 		if e.Typ.Signed() {
-			// Signed division overflow stays undefined even under
-			// -fwrapv; Go defines MinInt / -1 as MinInt.
+			// Signed division overflow stays undefined even under -fwrapv.
+			// Go defines MinInt / -1 as MinInt.
 			return fmt.Sprintf("vg::sdiv<%s>(%s, %s)", g.typ(e.Typ), x, y)
 		}
 		body = fmt.Sprintf("%s / %s", x, y)
@@ -998,9 +984,9 @@ func (g *gen) composite(e *vegoc.Expr) string {
 	return ""
 }
 
-// cppEscape escapes a string literal. Non-printable bytes use
-// three-digit octal escapes, whose length is fixed, so a following
-// digit cannot extend them the way a hex escape could.
+// cppEscape escapes a string literal.
+// A non-printable byte uses a three-digit octal escape, which has a fixed length.
+// A digit that follows therefore cannot extend it, the way it could extend a hex escape.
 func cppEscape(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {

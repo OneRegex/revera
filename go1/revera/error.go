@@ -1,12 +1,11 @@
 package revera
 
-// Error reports a compilation or execution failure. A Code of
-// ErrNone means success. The other values mirror the <regex.h>
-// error constants.
+// Error reports a compilation or execution failure.
+// A Code of ErrNone means success.
+// The other values mirror the <regex.h> error constants.
 type Error struct {
 	Code int32
-	// Pos is the byte offset in the pattern where compilation
-	// failed, or -1 when the error has no position.
+	// Pos is the byte offset in the pattern where compilation failed, or -1 when the error has no position.
 	Pos int
 }
 
@@ -23,7 +22,7 @@ const (
 	ErrECType int32 = 4
 	// ErrEEscape: trailing backslash.
 	ErrEEscape int32 = 5
-	// ErrESubReg: invalid backreference; unused in ERE.
+	// ErrESubReg: invalid backreference, which ERE never uses.
 	ErrESubReg int32 = 6
 	// ErrEBrack: bracket imbalance.
 	ErrEBrack int32 = 7
@@ -39,9 +38,8 @@ const (
 	ErrESpace int32 = 12
 	// ErrBadRpt: repetition without a valid operand.
 	ErrBadRpt int32 = 13
-	// ErrENoSub is an extension with no <regex.h> counterpart: a
-	// call needed match offsets from an expression compiled with
-	// FlagNoSub.
+	// ErrENoSub is an extension with no <regex.h> counterpart.
+	// A call needed match offsets from an expression compiled with FlagNoSub.
 	ErrENoSub int32 = 14
 )
 

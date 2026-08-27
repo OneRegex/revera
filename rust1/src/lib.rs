@@ -1,8 +1,8 @@
 //! POSIX.1-2024 extended regular expressions.
 //!
-//! This crate is the Rust instantiation of the revera engine. The
-//! engine itself is generated from a Vego program; this file is the
-//! public surface over it.
+//! This crate is the Rust instantiation of the revera engine.
+//! The engine itself is generated from a Vego program.
+//! This file is the public surface over it.
 //!
 //! ```
 //! # fn main() -> Result<(), revera::Error> {
@@ -14,20 +14,17 @@
 //! # }
 //! ```
 //!
-//! Patterns and subjects are UTF-8. The language is the POSIX ERE
-//! language: leftmost-longest matching, no backreferences, and no
-//! Perl escapes. Bracket expressions read their character classes,
-//! collating elements, and equivalence classes from a [`Locale`],
-//! which defaults to POSIX.
+//! Patterns and subjects are UTF-8.
+//! The language is the POSIX ERE language: leftmost-longest matching, no backreferences, and no Perl escapes.
+//! Bracket expressions read their character classes, collating elements, and equivalence classes from a [`Locale`].
+//! The default locale is POSIX.
 //!
-//! Every search returns a [`Result`] because a subject can exceed
-//! what the engine has capacity for. [`Regex::contract`] reports
-//! that capacity ahead of time.
+//! Every search returns a [`Result`], because a subject can exceed what the engine has capacity for.
+//! [`Regex::contract`] reports that capacity ahead of time.
 
-// The generated engine and its runtime. They are the low level:
-// explicit arenas, raw pointers, and numeric flags. Nothing here
-// needs them, but a caller who wants the execution flags of
-// regexec() can reach them.
+// The generated engine and its runtime.
+// They are the low level: explicit arenas, raw pointers, and numeric flags.
+// Nothing here needs them, but a caller who wants the execution flags of regexec() can reach them.
 #[doc(hidden)]
 pub mod engine;
 #[doc(hidden)]
@@ -49,16 +46,16 @@ pub const fn embedded_locale_data() -> &'static [u8] {
 /// The largest interval count a pattern may ask for, as in `a{0,255}`.
 pub const DUP_MAX: u32 = engine::dupMax as u32;
 
-// The engine counts in i64. A usize past that range cannot be a
-// real bound, so it clamps instead of wrapping.
+// The engine counts in i64.
+// A usize past that range cannot be a real bound, so clamp saturates it instead of wrapping.
 fn clamp(n: usize) -> i64 {
     n.min(i64::MAX as usize) as i64
 }
 
 /// What went wrong.
 ///
-/// The variants follow the `<regex.h>` error constants. `Unknown`
-/// covers a code this version of the crate does not name.
+/// The variants follow the `<regex.h>` error constants.
+/// `Unknown` covers a code this version of the crate does not name.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ErrorKind {
     /// The pattern is not a valid extended regular expression.
@@ -79,15 +76,13 @@ pub enum ErrorKind {
     Brace,
     /// The interval content is not a valid count or count range.
     Interval,
-    /// A range like `[z-a]` runs backwards, or its endpoint is not
-    /// a single character.
+    /// A range like `[z-a]` runs backwards, or its endpoint is not a single character.
     Range,
     /// The work needed passed a capacity limit.
     Capacity,
     /// A repetition operator has no operand to repeat.
     Repeat,
-    /// The expression was built with `no_captures`, and the call
-    /// needs match offsets.
+    /// The expression was built with `no_captures`, and the call needs match offsets.
     NoCaptures,
     /// A code this version does not name.
     Unknown,
@@ -134,15 +129,13 @@ impl Error {
         ErrorKind::from_code(self.code)
     }
 
-    /// Returns the byte offset in the pattern where compilation
-    /// stopped, when the failure has one.
+    /// Returns the byte offset in the pattern where compilation stopped, when the failure has one.
     pub fn offset(&self) -> Option<usize> {
         self.offset
     }
 
     fn message(&self) -> &'static str {
-        // The engine returns a static literal, so the bytes outlive
-        // any borrow of self.
+        // The engine returns a static literal, so the bytes outlive any borrow of self.
         std::str::from_utf8(engine::ErrorText(self.code).bytes()).unwrap_or("unknown error")
     }
 }
@@ -206,9 +199,9 @@ impl<'t> From<Match<'t>> for Range<usize> {
 
 /// One match and the spans of its capturing groups.
 ///
-/// Group 0 is the whole match. A group that took no part in the
-/// match reads as `None`. Indexing such a group panics, so reach
-/// for [`Captures::get`] when a group is optional.
+/// Group 0 is the whole match.
+/// A group that took no part in the match reads as `None`.
+/// Indexing such a group panics, so use [`Captures::get`] when a group is optional.
 #[derive(Clone, Debug)]
 pub struct Captures<'t> {
     text: &'t str,
@@ -224,8 +217,7 @@ impl<'t> Captures<'t> {
         }
     }
 
-    /// Returns group `i`, or `None` when it took no part in the
-    /// match or does not exist.
+    /// Returns group `i`, or `None` when it took no part in the match or does not exist.
     pub fn get(&self, i: usize) -> Option<Match<'t>> {
         let (so, eo) = *self.spans.get(i)?;
         if so < 0 {
@@ -259,15 +251,14 @@ impl<'t> Index<usize> for Captures<'t> {
     }
 }
 
-/// A locale: the source of character classes, case folding,
-/// collating elements, and equivalence classes.
+/// A locale: the source of character classes, case folding, collating elements, and equivalence classes.
 #[derive(Clone, Copy)]
 pub struct Locale {
     inner: engine::Locale,
 }
 
-// A Locale reads the blob compiled into this crate, which is
-// immutable and lives for the whole program.
+// A Locale reads the blob compiled into this crate.
+// That blob never changes and lives for the whole program.
 unsafe impl Send for Locale {}
 unsafe impl Sync for Locale {}
 
@@ -279,10 +270,9 @@ impl Locale {
         }
     }
 
-    /// Resolves a CLDR locale name against the embedded data, for
-    /// example `Locale::open("cs", "")`. An empty collation type
-    /// takes the standard collation of the locale. The result is
-    /// `None` when the name or the collation type is unknown.
+    /// Resolves a CLDR locale name against the embedded data, for example `Locale::open("cs", "")`.
+    /// An empty collation type takes the standard collation of the locale.
+    /// The result is `None` when the name or the collation type is unknown.
     pub fn open(name: &str, collation_type: &str) -> Option<Locale> {
         let mem = vg::Arena::new();
         let (inner, ok) = engine::LocaleOpen(
@@ -323,21 +313,22 @@ impl fmt::Debug for Locale {
 
 /// A compiled regular expression.
 ///
-/// Searching takes `&self` and keeps no state between calls, so one
-/// `Regex` serves any number of threads.
+/// A search takes `&self` and keeps no state between calls.
+/// One `Regex` therefore serves any number of threads.
 pub struct Regex {
-    // The arena owns the compiled program. It is written once, by
-    // build(), and only read afterwards. Nothing reads the field
-    // itself: it is here to free the program with the Regex.
+    // The arena owns the compiled program.
+    // build() writes it once, and every later call only reads it.
+    // Nothing reads the field itself.
+    // It is here to free the program with the Regex.
     #[allow(dead_code)]
     mem: vg::Arena,
     re: engine::Regexp,
     groups: usize,
 }
 
-// The compiled program never changes after build(), every search
-// copies the header it walks, and every allocation a search makes
-// goes to an arena that search owns.
+// The compiled program never changes after build().
+// Every search copies the header it walks.
+// Every allocation a search makes goes to an arena that the search owns.
 unsafe impl Send for Regex {}
 unsafe impl Sync for Regex {}
 
@@ -347,15 +338,13 @@ impl Regex {
         RegexBuilder::new(pattern).build()
     }
 
-    /// Returns the number of groups a search reports, counting the
-    /// whole match. It is one more than the number of parenthesized
-    /// subexpressions.
+    /// Returns the number of groups a search reports, counting the whole match.
+    /// It is one more than the number of parenthesized subexpressions.
     pub fn captures_len(&self) -> usize {
         self.groups
     }
 
-    /// Reports whether the expression matches anywhere in
-    /// `subject`.
+    /// Reports whether the expression matches anywhere in `subject`.
     pub fn is_match(&self, subject: &str) -> Result<bool> {
         Ok(self.exec(subject, 0, |_| ())?.is_some())
     }
@@ -373,8 +362,7 @@ impl Regex {
         })
     }
 
-    /// Returns the leftmost-longest match with its groups, if there
-    /// is one.
+    /// Returns the leftmost-longest match with its groups, if there is one.
     pub fn captures<'t>(&self, subject: &'t str) -> Result<Option<Captures<'t>>> {
         self.refuse_without_captures()?;
         self.exec(subject, self.groups, |pmatch| {
@@ -382,42 +370,37 @@ impl Regex {
         })
     }
 
-    /// Returns every non-overlapping match, left to right. An
-    /// expression built with `no_captures` reports
-    /// [`ErrorKind::NoCaptures`] from the first `next`.
+    /// Returns every non-overlapping match, left to right.
+    /// An expression built with `no_captures` reports [`ErrorKind::NoCaptures`] from the first `next`.
     pub fn find_iter<'r, 't>(&'r self, subject: &'t str) -> Matches<'r, 't> {
         Matches {
             inner: Scan::new(self, subject),
         }
     }
 
-    /// Returns every non-overlapping match with its groups, left to
-    /// right. An expression built with `no_captures` reports
-    /// [`ErrorKind::NoCaptures`] from the first `next`.
+    /// Returns every non-overlapping match with its groups, left to right.
+    /// An expression built with `no_captures` reports [`ErrorKind::NoCaptures`] from the first `next`.
     pub fn captures_iter<'r, 't>(&'r self, subject: &'t str) -> CaptureMatches<'r, 't> {
         CaptureMatches {
             inner: Scan::new(self, subject),
         }
     }
 
-    /// Returns `subject` with every non-overlapping match replaced,
-    /// like the `sed` command `s///g`.
+    /// Returns `subject` with every non-overlapping match replaced, like the `sed` command `s///g`.
     ///
-    /// In `replacement`, `&` stands for the whole match and `\1`
-    /// through `\9` for one group. A backslash escapes the next
-    /// character, so `\&` and `\\` are literal.
+    /// In `replacement`, `&` stands for the whole match and `\1` through `\9` for one group.
+    /// A backslash escapes the next character, so `\&` and `\\` are literal.
     pub fn replace_all(&self, subject: &str, replacement: &str) -> Result<String> {
         self.replace_bounded(subject, replacement, -1)
     }
 
-    /// Returns `subject` with at most `limit` matches replaced. The
-    /// rest of the subject stays as it is.
+    /// Returns `subject` with at most `limit` matches replaced.
+    /// The rest of the subject stays as it is.
     pub fn replacen(&self, subject: &str, limit: usize, replacement: &str) -> Result<String> {
         self.replace_bounded(subject, replacement, clamp(limit))
     }
 
-    /// Returns `subject` with every non-overlapping match replaced
-    /// by what `repl` returns for it.
+    /// Returns `subject` with every non-overlapping match replaced by what `repl` returns for it.
     pub fn replace_all_with(
         &self,
         subject: &str,
@@ -444,10 +427,9 @@ impl Regex {
         Ok(out)
     }
 
-    /// Returns what one search can cost on a subject of at most
-    /// `max_input` bytes. An application compares the figures
-    /// against its budget and refuses the expression before it ever
-    /// runs.
+    /// Returns what one search can cost on a subject of at most `max_input` bytes.
+    /// An application compares the figures against its budget.
+    /// It can then refuse the expression before the expression ever runs.
     pub fn contract(&self, max_input: usize) -> Contract {
         let mut re = self.re;
         let mut c = engine::ContractFor(&mut re, clamp(max_input));
@@ -472,9 +454,10 @@ impl Regex {
         Ok(())
     }
 
-    // exec runs one search in an arena of its own. groups is the
-    // number of offsets to fill; zero asks for existence only. On a
-    // match it calls take before the arena goes.
+    // exec runs one search in an arena of its own.
+    // groups is the number of offsets to fill.
+    // Zero asks for existence only.
+    // On a match, exec calls take before the arena goes.
     fn exec<T>(
         &self,
         subject: &str,
@@ -552,8 +535,7 @@ pub struct RegexBuilder<'p> {
 }
 
 impl<'p> RegexBuilder<'p> {
-    /// Starts a builder for `pattern`, in the POSIX locale with no
-    /// options.
+    /// Starts a builder for `pattern`, in the POSIX locale with no options.
     pub fn new(pattern: &'p str) -> RegexBuilder<'p> {
         RegexBuilder {
             pattern,
@@ -567,21 +549,21 @@ impl<'p> RegexBuilder<'p> {
         self.flag(engine::FlagICase, yes)
     }
 
-    /// Gives `^` and `$` their line meaning and stops dot and
-    /// negated brackets on a newline, like `REG_NEWLINE`.
+    /// Gives `^` and `$` their line meaning, like `REG_NEWLINE`.
+    /// It also stops dot and negated brackets on a newline.
     pub fn newline_sensitive(self, yes: bool) -> RegexBuilder<'p> {
         self.flag(engine::FlagNewline, yes)
     }
 
     /// Compiles for a yes-or-no answer only, like `REG_NOSUB`.
-    /// [`Regex::is_match`] still works; every other search reports
-    /// [`ErrorKind::NoCaptures`].
+    /// [`Regex::is_match`] still works.
+    /// Every other search reports [`ErrorKind::NoCaptures`].
     pub fn no_captures(self, yes: bool) -> RegexBuilder<'p> {
         self.flag(engine::FlagNoSub, yes)
     }
 
-    /// Makes every duplication prefer the shortest repetition. A
-    /// repetition modifier reverses one duplication back.
+    /// Makes every duplication prefer the shortest repetition.
+    /// A repetition modifier reverses one duplication back.
     pub fn shortest_match(self, yes: bool) -> RegexBuilder<'p> {
         self.flag(engine::FlagMinimal, yes)
     }
@@ -595,8 +577,7 @@ impl<'p> RegexBuilder<'p> {
     /// Compiles the pattern.
     pub fn build(&self) -> Result<Regex> {
         let mem = vg::Arena::new();
-        // The pattern goes into the arena first, so the caller may
-        // build one, compile it and drop it.
+        // The pattern goes into the arena first, so the caller may build one, compile it and drop it.
         let pattern = vg::str_dup(&mem, vg::view(self.pattern.as_bytes()));
         let (mut re, err) = engine::Compile(&mem, pattern, self.locale.inner, self.flags);
         if err.Code != engine::ErrNone {
@@ -616,19 +597,19 @@ impl<'p> RegexBuilder<'p> {
     }
 }
 
-// Scan drives one iteration over the non-overlapping matches. Both
-// public iterators wrap it.
+// Scan drives one iteration over the non-overlapping matches.
+// Both public iterators wrap it.
 struct Scan<'r, 't> {
     re: &'r Regex,
     text: &'t str,
     state: State,
 }
 
-// State names what the scan can do next. The walk carries the
-// engine's iteration cursor and the header copy it walks, so one
-// copy of the header serves every step. That copy is what makes
-// the variants uneven, and boxing it would trade the imbalance
-// for an allocation the scan does not need.
+// State names what the scan can do next.
+// The walk carries the engine's iteration cursor and the header copy it walks.
+// One copy of the header therefore serves every step.
+// That copy is what makes the variants uneven.
+// Boxing it would trade the imbalance for an allocation the scan does not need.
 #[allow(clippy::large_enum_variant)]
 enum State {
     Walking(engine::Regexp, engine::MatchIter),
@@ -648,8 +629,8 @@ impl<'r, 't> Scan<'r, 't> {
         Scan { re, text, state }
     }
 
-    // step runs one iteration and hands the offsets to take, which
-    // reads them before the arena goes.
+    // step runs one iteration and hands the offsets to take.
+    // take reads them before the arena goes.
     fn step<T>(&mut self, take: impl FnOnce(vg::Slice<engine::Match>) -> T) -> Option<Result<T>> {
         if let State::Failed(err) = &self.state {
             let err = *err;
@@ -675,8 +656,7 @@ impl<'r, 't> Scan<'r, 't> {
     }
 }
 
-/// The non-overlapping matches of one search, from
-/// [`Regex::find_iter`].
+/// The non-overlapping matches of one search, from [`Regex::find_iter`].
 pub struct Matches<'r, 't> {
     inner: Scan<'r, 't>,
 }
@@ -697,8 +677,7 @@ impl<'r, 't> Iterator for Matches<'r, 't> {
     }
 }
 
-/// The non-overlapping matches of one search with their groups,
-/// from [`Regex::captures_iter`].
+/// The non-overlapping matches of one search with their groups, from [`Regex::captures_iter`].
 pub struct CaptureMatches<'r, 't> {
     inner: Scan<'r, 't>,
 }
@@ -720,15 +699,14 @@ pub struct BackendContract {
     pub heap_bytes: u64,
     /// The estimate of the deepest call stack, in bytes.
     pub stack_bytes: u64,
-    /// The bound on abstract operations. These are unit-cost
-    /// operations, not nanoseconds.
+    /// The bound on abstract operations.
+    /// These are unit-cost operations, not nanoseconds.
     pub steps: u64,
 }
 
 /// What one search can cost, from [`Regex::contract`].
 ///
-/// Every figure saturates at `1 << 62`, which marks a bound too
-/// large to be useful.
+/// Every figure saturates at `1 << 62`, which marks a bound too large to be useful.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Contract {
     /// The subject length the figures cover, in bytes.
@@ -741,11 +719,9 @@ pub struct Contract {
     pub steps: u64,
     /// The figures of the automaton, which every search runs.
     pub matcher: BackendContract,
-    /// The figures of the one-pass capture walk, set when
-    /// compilation proved that every span has one parse.
+    /// The figures of the one-pass capture walk, set when compilation proved that every span has one parse.
     pub one_pass: Option<BackendContract>,
-    /// The figures of the memoized capture search, the ceiling for
-    /// any search that fills group offsets.
+    /// The figures of the memoized capture search, the ceiling for any search that fills group offsets.
     pub solver: Option<BackendContract>,
 }
 

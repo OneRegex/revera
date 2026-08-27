@@ -1,13 +1,12 @@
-// Differential driver for the Zig instantiation of the revera
-// engine. It reads protocol commands on stdin, one per line, and
-// prints one output line per command. The protocol is defined by
-// go1/revera/driver_host.go, the Go reference implementation.
+// Differential driver for the Zig instantiation of the revera engine.
+// It reads protocol commands on stdin, one per line, and prints one output line per command.
+// go1/revera/driver_host.go, the Go reference implementation, defines the protocol.
 //
-// The host owns three arenas. Locale data lives in the persistent
-// arena. A compiled pattern lives in the pattern arena until the
-// next compile. Everything one operation allocates comes from the
-// scratch arena, reset before each operation. Each engine call
-// receives the arena that must back its allocations.
+// The host owns three arenas.
+// Locale data lives in the persistent arena.
+// A compiled pattern lives in the pattern arena until the next compile.
+// Everything one operation allocates comes from the scratch arena, which resets before each operation.
+// Each engine call receives the arena that must back its allocations.
 
 const std = @import("std");
 const Io = std.Io;
@@ -16,8 +15,8 @@ const vg = @import("vg.zig");
 
 const data = @embedFile("data.bin");
 
-// The persistent arena never resets, so its plain allocator is
-// enough; pattern and scratch keep the arena for reset().
+// The persistent arena never resets, so its plain allocator is enough.
+// The pattern and scratch arenas stay whole, because they need reset().
 const Host = struct {
     persistent: vg.Allocator,
     pattern: *std.heap.ArenaAllocator,

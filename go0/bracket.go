@@ -11,13 +11,13 @@ import (
 
 type runeRange struct{ lo, hi rune }
 
-// maxPreimages sizes the stack buffers for case preimages. It is only a
-// hint: a character with more preimages spills to the heap through append.
+// maxPreimages sizes the stack buffers for case preimages.
+// It is only a hint, because a character with more preimages spills to the heap through append.
 const maxPreimages = 4
 
-// bracketSet is the compiled form of one bracket expression. The locale
-// and the flags that shape matching are bound at compile time, so every
-// matcher tests membership with the same context.
+// bracketSet is the compiled form of one bracket expression.
+// The locale and the flags that shape matching are fixed at compile time.
+// Every matcher therefore tests membership in the same context.
 type bracketSet struct {
 	negated   bool
 	loc       locale.Locale
@@ -27,8 +27,8 @@ type bracketSet struct {
 	classMask uint16      // union of standard LC_CTYPE classes
 	elems     [][]rune    // explicit multi-character collating symbols
 	equivs    [][]rune    // named equivalence-class elements
-	// multiLens has bit L set when a multi-character match of length L is
-	// possible, so the executor only probes those lengths.
+	// multiLens has bit L set when a multi-character match of length L is possible.
+	// The executor therefore probes only those lengths.
 	multiLens uint16
 }
 
@@ -88,7 +88,7 @@ func (p *parser) parseBracket() (*node, *Error) {
 				return nil, compileError(ERange, rangeStart)
 			}
 			if !p.loc.SupportsRanges() {
-				// Non-POSIX-locale ranges use the permitted reject policy.
+				// Ranges in a non-POSIX locale use the permitted reject policy.
 				return nil, compileError(ERange, rangeStart)
 			}
 			if item.r > end.r {
@@ -120,10 +120,9 @@ func (p *parser) parseBracket() (*node, *Error) {
 	}
 }
 
-// parseBracketItem parses one list member: an ordinary character, a literal
-// leading ']', a collating symbol, an equivalence class, or a character
-// class. A single-character collating symbol becomes an ordinary character
-// item, so it stays usable as a range endpoint.
+// parseBracketItem parses one list member.
+// A member is an ordinary character, a literal leading ']', a collating symbol, an equivalence class, or a character class.
+// A single-character collating symbol becomes an ordinary character item, so it stays usable as a range endpoint.
 func (p *parser) parseBracketItem(bracketStart int) (bracketItem, *Error) {
 	c := p.peekByte()
 	if c == '[' {
@@ -134,8 +133,8 @@ func (p *parser) parseBracketItem(bracketStart int) (bracketItem, *Error) {
 				return bracketItem{}, err
 			}
 			if !p.loc.IsCollatingElement(seq) {
-				// This case is invalid, not undefined: the RE must be
-				// rejected when the element does not exist.
+				// This case is invalid, not undefined.
+				// The RE must fail when the element does not exist.
 				return bracketItem{}, compileError(ECollate, bracketStart)
 			}
 			if len(seq) == 1 {
@@ -170,8 +169,8 @@ func (p *parser) parseBracketItem(bracketStart int) (bracketItem, *Error) {
 	return bracketItem{kind: itemChar, r: r}, nil
 }
 
-// scanInner consumes "[X content X]" where X is '.', '=', or ':' and
-// returns the content characters. emptyCode reports empty content.
+// scanInner consumes "[X content X]", where X is '.', '=', or ':', and returns the content characters.
+// emptyCode reports empty content.
 func (p *parser) scanInner(closer string, emptyCode Code) ([]rune, *Error) {
 	start := p.pos
 	p.pos += 2
@@ -191,16 +190,15 @@ func (p *parser) scanInner(closer string, emptyCode Code) ([]rune, *Error) {
 	return []rune(content), nil
 }
 
-// finalize sorts and merges the single-character ranges, and records the
-// lengths a multi-character match can take.
+// finalize sorts and merges the single-character ranges.
+// It also records the lengths a multi-character match can take.
 func (b *bracketSet) finalize() {
 	if b.hasMultiMembers() {
 		for _, e := range b.elems {
 			b.multiLens |= 1 << len(e)
 		}
 		if len(b.equivs) > 0 {
-			// An equivalence class can match any collating element with
-			// an equal primary weight, whatever its length.
+			// An equivalence class can match any collating element with an equal primary weight, whatever its length.
 			for length := 2; length <= locale.MaxElementLength(); length++ {
 				b.multiLens |= 1 << length
 			}
@@ -226,7 +224,6 @@ func (b *bracketSet) finalize() {
 	b.ranges = merged
 }
 
-// inRanges tests range membership with a binary search.
 func (b *bracketSet) inRanges(c rune) bool {
 	_, ok := slices.BinarySearchFunc(b.ranges, c, func(r runeRange, c rune) int {
 		switch {
@@ -240,8 +237,8 @@ func (b *bracketSet) inRanges(c rune) bool {
 	return ok
 }
 
-// positiveSingle tests case-sensitive membership of one character in the
-// positive list, ignoring multi-character elements.
+// positiveSingle tests case-sensitive membership of one character in the positive list.
+// It ignores multi-character elements.
 func (b *bracketSet) positiveSingle(c rune) bool {
 	if b.inRanges(c) {
 		return true
@@ -259,13 +256,11 @@ func (b *bracketSet) positiveSingle(c rune) bool {
 }
 
 // matchesOne tests whether the bracket accepts the single character c.
-// Under ICase the closure applies after inversion for a negated list,
-// exactly as section 10.2 requires: the character matches when some case
-// variant of it lands on the accepted side of the positive list.
+// Under ICase, the closure applies after inversion for a negated list, exactly as section 10.2 requires.
+// The character matches when some case variant of it lands on the accepted side of the positive list.
 func (b *bracketSet) matchesOne(c rune) bool {
 	if c < 0 {
-		// The invalid-byte sentinel matches nothing, not even a
-		// negated list.
+		// The invalid-byte sentinel matches nothing, not even a negated list.
 		return false
 	}
 	if b.negated && b.nlMode && c == '\n' {
@@ -287,8 +282,7 @@ func (b *bracketSet) matchesOne(c rune) bool {
 	return false
 }
 
-// counterpartMatch tests one subject character against one element
-// character under the ICase replacement rule.
+// counterpartMatch tests one subject character against one element character, under the ICase replacement rule.
 func (b *bracketSet) counterpartMatch(t, e rune) bool {
 	if t == e {
 		return true
@@ -299,15 +293,13 @@ func (b *bracketSet) counterpartMatch(t, e rune) bool {
 	return t == b.loc.ToUpper(e) || t == b.loc.ToLower(e)
 }
 
-// hasMultiMembers reports whether the bracket can consume more than one
-// character. Only a positive list with explicit collating symbols or
-// equivalence classes can.
+// hasMultiMembers reports whether the bracket can consume more than one character.
+// Only a positive list with explicit collating symbols or equivalence classes can do that.
 func (b *bracketSet) hasMultiMembers() bool {
 	return !b.negated && (len(b.elems) > 0 || len(b.equivs) > 0)
 }
 
-// matchesMulti tests a multi-character candidate against the explicit
-// elements and equivalence classes of a positive list.
+// matchesMulti tests a multi-character candidate against the explicit elements and equivalence classes of a positive list.
 func (b *bracketSet) matchesMulti(t []rune) bool {
 	if len(t) > locale.MaxElementLength() {
 		// No collating element is longer than the data's limit.
@@ -335,9 +327,9 @@ func (b *bracketSet) matchesMulti(t []rune) bool {
 	return b.equivCandidate(t, candidate[:len(t)], 0)
 }
 
-// equivCandidate enumerates case preimages per position and tests each
-// candidate sequence for membership in some equivalence class. Without
-// ICase the only candidate is the subject sequence itself.
+// equivCandidate enumerates the case preimages of each position.
+// It tests every candidate sequence for membership in some equivalence class.
+// Without ICase, the only candidate is the subject sequence itself.
 func (b *bracketSet) equivCandidate(t, candidate []rune, at int) bool {
 	if at == len(t) {
 		if !b.loc.IsCollatingElement(candidate) {
@@ -367,8 +359,8 @@ func (b *bracketSet) equivCandidate(t, candidate []rune, at int) bool {
 	return false
 }
 
-// matchesSpan tests whether the bracket accepts exactly the character
-// span [i, j). The capture solver and the oracle share it.
+// matchesSpan tests whether the bracket accepts exactly the character span [i, j).
+// The capture solver and the oracle share it.
 func (b *bracketSet) matchesSpan(runes []rune, i, j int) bool {
 	k := j - i
 	if k < 1 {

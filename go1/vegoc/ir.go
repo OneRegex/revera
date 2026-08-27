@@ -1,8 +1,6 @@
-// Package vegoc loads the Vego JSON form into a typed IR for the
-// target-language printers. The checker in check.go gives every
-// expression its Go type, which the printers need for decisions the
-// JSON leaves implicit: literal widths, signedness of division,
-// shift operand casts, and local mutability.
+// Package vegoc loads the Vego JSON form into a typed IR for the target-language printers.
+// The checker in check.go gives every expression its Go type.
+// The printers need those types for decisions the JSON leaves implicit: literal widths, signedness of division, shift operand casts, and local mutability.
 package vegoc
 
 import (
@@ -30,8 +28,7 @@ const (
 	KPtr
 	// KTuple is the synthetic type of a two-result call.
 	KTuple
-	// KNil is the type of the untyped nil constant before context
-	// gives it a slice type.
+	// KNil is the type of the untyped nil constant, before context gives it a slice type.
 	KNil
 )
 
@@ -88,9 +85,9 @@ func (t *Type) Width() int {
 	}
 }
 
-// Same reports structural type identity. KInt and KI64 stay
-// distinct kinds, but compare equal: they are the same 64-bit
-// signed type in every target.
+// Same reports structural type identity.
+// KInt and KI64 stay distinct kinds, but they compare equal.
+// They are the same 64-bit signed type in every target.
 func Same(a, b *Type) bool {
 	if a == nil || b == nil {
 		return a == b
@@ -116,9 +113,8 @@ func Same(a, b *Type) bool {
 	return true
 }
 
-// sameLen compares array length types by the value the checker
-// resolved, falling back to structural identity for lengths it
-// could not fold.
+// sameLen compares array length types by the value the checker resolved.
+// A length the checker could not fold falls back to structural identity.
 func sameLen(a, b *Type) bool {
 	if a.ALenSet && b.ALenSet {
 		return a.ALenVal == b.ALenVal
@@ -240,8 +236,7 @@ type Stmt struct {
 	IdxName string  // range
 	ValName string  // range
 
-	// Filled by the checker: the type of each name a define
-	// declares, aligned with Names.
+	// Filled by the checker: the type of each name a define declares, aligned with Names.
 	DeclaredTypes []*Type
 }
 
@@ -276,13 +271,12 @@ type FuncDecl struct {
 	Results []*Type
 	Body    []*Stmt
 
-	// Filled by the checker, keyed by post-rename local or
-	// parameter name. Names are unique per function.
+	// Filled by the checker, keyed by post-rename local or parameter name.
+	// The names are unique per function.
 	Info map[string]*LocalInfo
 
-	// Filled by the checker: the function allocates, directly or
-	// through a callee. Printers give it the synthetic memory
-	// context parameter "mem".
+	// Filled by the checker: the function allocates, directly or through a callee.
+	// The printers give it the synthetic memory context parameter "mem".
 	Allocates bool
 }
 
@@ -319,8 +313,8 @@ func WalkExpr(e *Expr, fn func(*Expr)) {
 	}
 }
 
-// WalkStmt calls fs on s and every statement below it, and fe on
-// every expression they hold. Either callback may be nil.
+// WalkStmt calls fs on s and every statement below it, and fe on every expression they hold.
+// Either callback may be nil.
 func WalkStmt(s *Stmt, fe func(*Expr), fs func(*Stmt)) {
 	if s == nil {
 		return
@@ -362,10 +356,10 @@ func WalkBody(body []*Stmt, fe func(*Expr), fs func(*Stmt)) {
 	}
 }
 
-// Impure reports whether evaluating e can have a side effect or
-// observe one: a function call, or an allocating or writing
-// builtin. Printers use it to decide when a target language's
-// evaluation order needs pinning to match Go's left-to-right rule.
+// Impure reports whether the evaluation of e can have a side effect, or see one.
+// The forms are a function call, and a builtin that allocates or writes.
+// The printers use it to decide when the evaluation order of a target language needs pinning.
+// The pinned order matches the left-to-right rule of Go.
 func Impure(e *Expr) bool {
 	found := false
 	WalkExpr(e, func(x *Expr) {
@@ -382,8 +376,8 @@ func Impure(e *Expr) bool {
 	return found
 }
 
-// LoadFile reads a Vego JSON file, loads it, and checks it: the
-// full front end every printer runs.
+// LoadFile reads a Vego JSON file, loads it, and checks it.
+// This is the full front end that every printer runs.
 func LoadFile(path string) (*Program, error) {
 	blob, err := os.ReadFile(path)
 	if err != nil {
@@ -399,9 +393,9 @@ func LoadFile(path string) (*Program, error) {
 	return p, nil
 }
 
-// Mangle folds a type into an identifier fragment. The Zig and C++
-// printers name their shared two-result tuple structs with it; the
-// fragments are target-neutral.
+// Mangle folds a type into an identifier fragment.
+// The Zig and C++ printers name their shared two-result tuple structs with it.
+// The fragments are target-neutral.
 func Mangle(t *Type) string {
 	switch t.K {
 	case KBool:
@@ -566,8 +560,8 @@ func loadStmt(o object) *Stmt {
 		s.Lhs = []*Expr{loadExpr(o["lhs"])}
 		s.Value = loadExpr(o["value"])
 	case "incdec":
-		// Normalize x++ / x-- into x += 1 / x -= 1. The operand
-		// is a place expression, so the rewrite is exact.
+		// x++ and x-- become x += 1 and x -= 1.
+		// The operand is a place expression, so the rewrite is exact.
 		s.K = "op_assign"
 		if o["op"].(string) == "++" {
 			s.Op = "+="

@@ -1,10 +1,9 @@
 package revera
 
-// Bracket expressions. A compiled bracket lives in the bracket arena
-// of the Regexp; nodes reference it by index. The flags that shape
-// matching are bound at compile time, so every matcher tests
-// membership with the same context. The locale travels alongside as
-// a borrowed parameter.
+// Bracket expressions.
+// A compiled bracket lives in the bracket arena of the Regexp, and nodes reference it by index.
+// The flags that shape matching are fixed at compile time, so every matcher tests membership in the same context.
+// The locale travels alongside as a borrowed parameter.
 
 type runeRange struct {
 	lo int32
@@ -24,8 +23,8 @@ type bracketSet struct {
 	elems [][]int32
 	// equivs holds named equivalence-class elements.
 	equivs [][]int32
-	// multiLens has bit L set when a multi-character match of length
-	// L is possible, so the executor only probes those lengths.
+	// multiLens has bit L set when a multi-character match of length L is possible.
+	// The executor therefore probes only those lengths.
 	multiLens uint16
 }
 
@@ -44,9 +43,8 @@ type bracketItem struct {
 	class uint8
 }
 
-// parseBracket parses a complete bracket expression starting at '['.
-// It appends the compiled set to the bracket arena and returns the
-// new opBracket node.
+// parseBracket parses a complete bracket expression that starts at '['.
+// It appends the compiled set to the bracket arena and returns the new opBracket node.
 func parseBracket(p *parser, loc *Locale) int32 {
 	start := p.pos
 	p.pos++
@@ -87,13 +85,11 @@ func parseBracket(p *parser, loc *Locale) int32 {
 				return fail(p, ErrERange, rangeStart)
 			}
 			if !localeSupportsRanges(loc) {
-				// Non-POSIX-locale ranges use the permitted reject
-				// policy.
+				// Ranges in a non-POSIX locale use the permitted reject policy.
 				return fail(p, ErrERange, rangeStart)
 			}
 			if item.r > end.r {
-				// An empty range set uses the permitted invalid
-				// outcome.
+				// An empty range set uses the permitted invalid outcome.
 				return fail(p, ErrERange, rangeStart)
 			}
 			var rr runeRange
@@ -101,8 +97,7 @@ func parseBracket(p *parser, loc *Locale) int32 {
 			rr.hi = end.r
 			b.ranges = append(b.ranges, rr)
 			if peekByte(p) == '-' && peekByteAt(p, 1) != ']' {
-				// A shared range endpoint, as in [a-m-o], is
-				// undefined.
+				// A shared range endpoint, as in [a-m-o], is undefined.
 				return fail(p, ErrERange, p.pos)
 			}
 			continue
@@ -128,10 +123,9 @@ func parseBracket(p *parser, loc *Locale) int32 {
 	}
 }
 
-// parseBracketItem parses one list member: an ordinary character, a
-// literal leading ']', a collating symbol, an equivalence class, or
-// a character class. A single-character collating symbol becomes an
-// ordinary character item, so it stays usable as a range endpoint.
+// parseBracketItem parses one list member.
+// A member is an ordinary character, a literal leading ']', a collating symbol, an equivalence class, or a character class.
+// A single-character collating symbol becomes an ordinary character item, so it stays usable as a range endpoint.
 func parseBracketItem(p *parser, loc *Locale, bracketStart int) (bracketItem, bool) {
 	var item bracketItem
 	c := peekByte(p)
@@ -143,8 +137,8 @@ func parseBracketItem(p *parser, loc *Locale, bracketStart int) (bracketItem, bo
 				return item, false
 			}
 			if !localeIsCollatingElement(loc, seq) {
-				// This case is invalid, not undefined: the RE must
-				// be rejected when the element does not exist.
+				// This case is invalid, not undefined.
+				// The RE must fail when the element does not exist.
 				fail(p, ErrECollate, bracketStart)
 				return item, false
 			}
@@ -194,9 +188,9 @@ func parseBracketItem(p *parser, loc *Locale, bracketStart int) (bracketItem, bo
 	return item, true
 }
 
-// runesToString encodes a scalar sequence back to UTF-8 text. Class
-// names are ASCII, so the simple path is enough; non-ASCII input
-// still round-trips correctly.
+// runesToString encodes a scalar sequence back to UTF-8 text.
+// Class names are ASCII, so the simple path is enough.
+// Non-ASCII input still makes the round trip correctly.
 func runesToString(seq []int32) string {
 	out := make([]uint8, 0, len(seq))
 	for i := 0; i < len(seq); i++ {
@@ -216,8 +210,8 @@ func runesToString(seq []int32) string {
 	return string(out)
 }
 
-// scanInner consumes "[X content X]" where X is '.', '=', or ':' and
-// returns the content characters. emptyCode reports empty content.
+// scanInner consumes "[X content X]", where X is '.', '=', or ':', and returns the content characters.
+// emptyCode reports empty content.
 func scanInner(p *parser, closer string, emptyCode int32) ([]int32, bool) {
 	start := p.pos
 	p.pos += 2
@@ -251,8 +245,8 @@ func scanInner(p *parser, closer string, emptyCode int32) ([]int32, bool) {
 	return content, true
 }
 
-// sortRanges orders ranges by (lo, hi) with a bottom-up merge sort,
-// so a large bracket still compiles in n log n.
+// sortRanges orders ranges by (lo, hi) with a bottom-up merge sort.
+// A large bracket therefore still compiles in n log n.
 func sortRanges(rr []runeRange) {
 	n := len(rr)
 	if n < 2 {
@@ -293,16 +287,15 @@ func sortRanges(rr []runeRange) {
 	}
 }
 
-// finalizeBracket sorts and merges the single-character ranges, and
-// records the lengths a multi-character match can take.
+// finalizeBracket sorts and merges the single-character ranges.
+// It also records the lengths a multi-character match can take.
 func finalizeBracket(b *bracketSet, loc *Locale) {
 	if !b.negated && (len(b.elems) > 0 || len(b.equivs) > 0) {
 		for i := 0; i < len(b.elems); i++ {
 			b.multiLens |= 1 << len(b.elems[i])
 		}
 		if len(b.equivs) > 0 {
-			// An equivalence class can match any collating element
-			// with an equal primary weight, whatever its length.
+			// An equivalence class can match any collating element with an equal primary weight, whatever its length.
 			for length := 2; length <= localeMaxElementLength(loc); length++ {
 				b.multiLens |= 1 << length
 			}
@@ -326,7 +319,6 @@ func finalizeBracket(b *bracketSet, loc *Locale) {
 	b.ranges = b.ranges[:w+1]
 }
 
-// bracketInRanges tests range membership with a binary search.
 func bracketInRanges(brs []bracketSet, bi int32, c int32) bool {
 	low := 0
 	high := len(brs[bi].ranges)
@@ -343,8 +335,8 @@ func bracketInRanges(brs []bracketSet, bi int32, c int32) bool {
 	return false
 }
 
-// bracketPositiveSingle tests case-sensitive membership of one
-// character in the positive list, ignoring multi-character elements.
+// bracketPositiveSingle tests case-sensitive membership of one character in the positive list.
+// It ignores multi-character elements.
 func bracketPositiveSingle(brs []bracketSet, bi int32, loc *Locale, c int32) bool {
 	if bracketInRanges(brs, bi, c) {
 		return true
@@ -362,15 +354,12 @@ func bracketPositiveSingle(brs []bracketSet, bi int32, loc *Locale, c int32) boo
 	return false
 }
 
-// bracketMatchesOne tests whether the bracket accepts the single
-// character c. Under ICase the closure applies after inversion for a
-// negated list, exactly as section 10.2 requires: the character
-// matches when some case variant of it lands on the accepted side of
-// the positive list.
+// bracketMatchesOne tests whether the bracket accepts the single character c.
+// Under ICase, the closure applies after inversion for a negated list, exactly as section 10.2 requires.
+// The character matches when some case variant of it lands on the accepted side of the positive list.
 func bracketMatchesOne(brs []bracketSet, bi int32, loc *Locale, c int32) bool {
 	if c < 0 {
-		// The invalid-byte sentinel matches nothing, not even a
-		// negated list.
+		// The invalid-byte sentinel matches nothing, not even a negated list.
 		return false
 	}
 	if brs[bi].negated && brs[bi].nlMode && c == '\n' {
@@ -393,8 +382,7 @@ func bracketMatchesOne(brs []bracketSet, bi int32, loc *Locale, c int32) bool {
 	return false
 }
 
-// counterpartMatch tests one subject character against one element
-// character under the ICase replacement rule.
+// counterpartMatch tests one subject character against one element character, under the ICase replacement rule.
 func counterpartMatch(brs []bracketSet, bi int32, loc *Locale, t int32, e int32) bool {
 	if t == e {
 		return true
@@ -405,22 +393,19 @@ func counterpartMatch(brs []bracketSet, bi int32, loc *Locale, t int32, e int32)
 	return t == localeToUpper(loc, e) || t == localeToLower(loc, e)
 }
 
-// bracketHasMultiMembers reports whether the bracket can consume more
-// than one character. Only a positive list with explicit collating
-// symbols or equivalence classes can.
+// bracketHasMultiMembers reports whether the bracket can consume more than one character.
+// Only a positive list with explicit collating symbols or equivalence classes can do that.
 func bracketHasMultiMembers(brs []bracketSet, bi int32) bool {
 	return !brs[bi].negated &&
 		(len(brs[bi].elems) > 0 || len(brs[bi].equivs) > 0)
 }
 
-// elemBuf holds one candidate collating element while the
-// equivalence search enumerates case preimages.
+// elemBuf holds one candidate collating element while the equivalence search enumerates case preimages.
 type elemBuf struct {
 	r [maxElemAhead]int32
 }
 
-// bracketMatchesMulti tests a multi-character candidate against the
-// explicit elements and equivalence classes of a positive list.
+// bracketMatchesMulti tests a multi-character candidate against the explicit elements and equivalence classes of a positive list.
 func bracketMatchesMulti(brs []bracketSet, bi int32, loc *Locale, t []int32) bool {
 	if len(t) > localeMaxElementLength(loc) {
 		// No collating element is longer than the data's limit.
@@ -448,9 +433,9 @@ func bracketMatchesMulti(brs []bracketSet, bi int32, loc *Locale, t []int32) boo
 	return equivCandidate(brs, bi, loc, t, &candidate, 0)
 }
 
-// equivCandidate enumerates case preimages per position and tests
-// each candidate sequence for membership in some equivalence class.
-// Without ICase the only candidate is the subject sequence itself.
+// equivCandidate enumerates the case preimages of each position.
+// It tests every candidate sequence for membership in some equivalence class.
+// Without ICase, the only candidate is the subject sequence itself.
 func equivCandidate(brs []bracketSet, bi int32, loc *Locale, t []int32, candidate *elemBuf, at int) bool {
 	if at == len(t) {
 		if !localeIsCollatingElement(loc, candidate.r[:len(t)]) {
@@ -481,8 +466,8 @@ func equivCandidate(brs []bracketSet, bi int32, loc *Locale, t []int32, candidat
 	return false
 }
 
-// bracketMatchesSpan tests whether the bracket accepts exactly the
-// character span [i, j). The capture solver uses it.
+// bracketMatchesSpan tests whether the bracket accepts exactly the character span [i, j).
+// The capture solver uses it.
 func bracketMatchesSpan(brs []bracketSet, bi int32, loc *Locale, runes []int32, i int, j int) bool {
 	k := j - i
 	if k < 1 {
@@ -497,12 +482,10 @@ func bracketMatchesSpan(brs []bracketSet, bi int32, loc *Locale, runes []int32, 
 	return bracketMatchesMulti(brs, bi, loc, runes[i:j])
 }
 
-// bracketMinChars returns the smallest character count one bracket
-// match can consume. Only a positive list made of nothing but
-// multi-character collating symbols and equivalence classes can need
-// more than one character. An equivalence class contributes the
-// length of the shortest element in its class; ICase never changes
-// match lengths.
+// bracketMinChars returns the smallest character count one bracket match can consume.
+// Only a positive list of nothing but multi-character collating symbols and equivalence classes can need more than one character.
+// An equivalence class contributes the length of the shortest element in its class.
+// ICase never changes match lengths.
 func bracketMinChars(brs []bracketSet, bi int32, loc *Locale) int {
 	if brs[bi].negated || len(brs[bi].ranges) > 0 ||
 		brs[bi].classMask != 0 ||

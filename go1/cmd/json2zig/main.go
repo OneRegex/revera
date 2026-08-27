@@ -1,9 +1,8 @@
-// Command json2zig converts the Vego JSON form into one Zig source
-// file. The output imports the hand-written runtime vg.zig, which
-// supplies the Slice and Str value types and the Go conversion and
-// comparison helpers. Every function that allocates receives an
-// explicit allocator as its first parameter, "mem"; the output
-// holds no global state.
+// Command json2zig converts the Vego JSON form into one Zig source file.
+// The output imports the hand-written runtime vg.zig.
+// That runtime supplies the Slice and Str value types, and the Go conversion and comparison helpers.
+// Every function that allocates receives an explicit allocator as its first parameter, "mem".
+// The output holds no global state.
 //
 // Usage:
 //
@@ -382,11 +381,10 @@ func (g *gen) stmt(s *vegoc.Stmt, depth int) {
 	}
 }
 
-// emitRange lowers a range statement to an index loop. The Vego
-// engine has none, but the form stays supported for completeness.
-// The operand evaluates once, and a hidden counter drives the
-// loop, so body writes to the user variables cannot change the
-// iteration.
+// emitRange lowers a range statement to an index loop.
+// The Vego engine has no range statement, but the form stays supported for completeness.
+// The operand evaluates once, and a hidden counter drives the loop.
+// A write to the user variables in the body therefore cannot change the iteration.
 func (g *gen) emitRange(s *vegoc.Stmt, depth int) {
 	over := g.newTmp()
 	counter := g.newTmp()
@@ -426,8 +424,7 @@ func (g *gen) newTmp() string {
 	return fmt.Sprintf("_t%d", g.tmp)
 }
 
-// inlineStmt renders a loop post statement as a Zig continue
-// expression.
+// inlineStmt renders a loop post statement as a Zig continue expression.
 func (g *gen) inlineStmt(s *vegoc.Stmt) string {
 	switch s.K {
 	case "assign":
@@ -466,9 +463,9 @@ func (g *gen) opAssign(s *vegoc.Stmt) string {
 	return ""
 }
 
-// idx renders an index or bound expression. Unsigned 64-bit values
-// cannot coerce to the i64 the runtime takes; @intCast keeps the
-// abort-on-huge behavior Go's bounds check gives.
+// idx renders an index or bound expression.
+// An unsigned 64-bit value cannot coerce to the i64 that the runtime takes.
+// @intCast keeps the abort-on-huge behavior that the bounds check of Go gives.
 func (g *gen) idx(e *vegoc.Expr) string {
 	if e.Typ.K == vegoc.KU64 {
 		return "@intCast(" + g.expr(e) + ")"
@@ -654,9 +651,9 @@ func (g *gen) binary(e *vegoc.Expr) string {
 		}
 	}
 	x, y := g.expr(e.X), g.expr(e.Y)
-	// A constant left operand would reach a division helper as
-	// comptime_int, or make a shift's @intCast lose its result
-	// type; give it its concrete type.
+	// A constant left operand would reach a division helper as comptime_int.
+	// It could also make the @intCast of a shift lose its result type.
+	// The operand therefore takes its concrete type here.
 	switch e.Op {
 	case "/", "%", "<<", ">>":
 		if e.X.IsConst && !e.Y.IsConst {

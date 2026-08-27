@@ -1,5 +1,5 @@
 package revera
 
-// raceEnabled is set by race_test.go under the race detector, whose
-// instrumentation adds allocations that the allocation test must ignore.
+// race_test.go sets raceEnabled under the race detector.
+// That instrumentation adds allocations, and the allocation test must ignore them.
 var raceEnabled bool

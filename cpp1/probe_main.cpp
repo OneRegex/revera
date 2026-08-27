@@ -1,5 +1,5 @@
-// Probe runner for the C++ instantiation. It prints the same
-// lines as go1/cmd/proberef; go1/cmd/probecheck diffs them.
+// Probe runner for the C++ instantiation.
+// It prints the same lines as go1/cmd/proberef, and go1/cmd/probecheck diffs them.
 
 #include <cinttypes>
 #include <cstdio>

@@ -1,15 +1,16 @@
 package revera
 
-// This file holds the phase B capture solver. Phase A fixed the match
-// span; this solver finds the best parse of that span under the selection
-// order, then reads the group spans from the winning parse.
+// This file holds the phase B capture solver.
+// Phase A fixed the match span.
+// This solver finds the best parse of that span under the selection order.
+// It then reads the group spans from the winning parse.
 //
-// Sibling segments of the comparison vector are independent, so the best
-// parse of a node over a span does not depend on its context, and
-// memoization per (node, span) is valid.
+// Sibling segments of the comparison vector are independent.
+// The best parse of a node over a span therefore does not depend on its context.
+// Memoization per (node, span) is valid.
 
-// mapEntryBytes in the resource contract must cover the largest memo
-// record below; a size test anchors that relation.
+// mapEntryBytes in the resource contract must cover the largest memo record below.
+// A size test anchors that relation.
 type concatKey struct {
 	n    *node
 	idx  int
@@ -23,8 +24,8 @@ type repKey struct {
 	hasEmpty bool
 }
 
-// repResult memoizes one bestRep outcome. ok distinguishes "no parse"
-// from a found parse with zero instances, whose kids list is nil too.
+// repResult memoizes one bestRep outcome.
+// ok tells "no parse" apart from a found parse with zero instances, whose kids list is also nil.
 type repResult struct {
 	kids []*ptree
 	ok   bool
@@ -42,8 +43,8 @@ type capSolver struct {
 	work   int
 	failed bool
 
-	// Bump arenas for parse-tree nodes and child lists. Chunks survive
-	// pooled reuse; the cleared maps make stale entries unreachable.
+	// These are bump arenas for parse-tree nodes and child lists.
+	// The chunks survive pooled reuse, and the cleared maps make stale entries unreachable.
 	treeChunks [][]ptree
 	treeChunk  int
 	kidChunks  [][]*ptree
@@ -95,8 +96,8 @@ func (s *capSolver) resetArenas() {
 	s.kidChunk = 0
 }
 
-// capWorkLimit bounds the polynomial parse search. Reaching it reports
-// ESpace instead of looping for a very long time.
+// capWorkLimit bounds the polynomial parse search.
+// A search that reaches it reports ESpace instead of looping for a very long time.
 const capWorkLimit = 50_000_000
 
 func (s *capSolver) step() bool {
@@ -107,9 +108,9 @@ func (s *capSolver) step() bool {
 	return !s.failed
 }
 
-// cmpCand compares two parses of the same pattern node over the same
-// span: minimal repetition counters first, then structure. A negative
-// result means a wins.
+// cmpCand compares two parses of the same pattern node over the same span.
+// It compares the minimal repetition counters first, then the structure.
+// A negative result means a wins.
 func (s *capSolver) cmpCand(a, b *ptree) int {
 	if s.re.minSlots > 0 {
 		ca := s.ctrA[:s.re.minSlots]
@@ -189,8 +190,8 @@ func (s *capSolver) bestParse(n *node, i, j int) *ptree {
 		}
 	case opRepeat:
 		if i == j && n.min == 0 {
-			// Mirror the oracle: one null occurrence when the operand
-			// has a null match and the maximum is not zero.
+			// This mirrors the oracle.
+			// It takes one null occurrence when the operand has a null match and the maximum is not zero.
 			var sub *ptree
 			if n.max != 0 {
 				sub = s.bestParse(n.ch[0], i, i)
@@ -213,8 +214,8 @@ func (s *capSolver) bestParse(n *node, i, j int) *ptree {
 	return best
 }
 
-// bestConcat returns the best child parses of n.ch[idx:] covering [i, j),
-// or nil when none exists.
+// bestConcat returns the best child parses of n.ch[idx:] that cover [i, j).
+// It returns nil when no such parse exists.
 func (s *capSolver) bestConcat(n *node, idx, i, j int) []*ptree {
 	if idx == len(n.ch)-1 {
 		sub := s.bestParse(n.ch[idx], i, j)
@@ -268,14 +269,12 @@ func (s *capSolver) bestConcat(n *node, idx, i, j int) []*ptree {
 	return best
 }
 
-// bestRep returns the best remaining instance list of repetition n over
-// [i, j) after done instances, or ok == false when none exists.
-// The section 8.5 rule holds: a null instance is allowed only while the
-// final count stays at the minimum.
+// bestRep returns the best remaining instance list of repetition n over [i, j), after done instances.
+// ok is false when no such list exists.
+// It keeps the section 8.5 rule: a null instance is allowed only while the final count stays at the minimum.
 func (s *capSolver) bestRep(n *node, i, j, done int, hasEmpty bool) ([]*ptree, bool) {
-	// With no upper bound, behavior only depends on done through the
-	// comparison with the minimum. Folding larger values onto the
-	// minimum keeps the memoized state space quadratic in the span.
+	// With no upper bound, done only changes behavior through its comparison with the minimum.
+	// Folding larger values onto the minimum keeps the memoized state space quadratic in the span.
 	if n.max == infinite && done > n.min {
 		done = n.min
 	}
@@ -344,8 +343,8 @@ func (s *capSolver) bestRep(n *node, i, j, done int, hasEmpty bool) ([]*ptree, b
 	return best, found
 }
 
-// getSolver reuses a pooled solver; the maps keep their buckets across
-// executions and only need clearing.
+// getSolver reuses a pooled solver.
+// The maps keep their buckets across executions, so they only need clearing.
 func (re *Regexp) getSolver() *capSolver {
 	if s, ok := re.capPool.Get().(*capSolver); ok {
 		clear(s.memo)
@@ -364,7 +363,7 @@ func (re *Regexp) getSolver() *capSolver {
 	}
 }
 
-// solveCaptures fills caps (character spans) for the fixed span [so, eo).
+// solveCaptures fills caps with the character spans of the fixed span [so, eo).
 func (re *Regexp) solveCaptures(d *decoded, so, eo int, eflags ExecFlags, caps []Match) *Error {
 	if re.onePass {
 		for idx := range caps {
@@ -374,8 +373,8 @@ func (re *Regexp) solveCaptures(d *decoded, so, eo int, eflags ExecFlags, caps [
 		if re.onePassCaps(d, re.root, so, eo, eflags, caps) {
 			return nil
 		}
-		// The walk hit an inconsistency; the solver below re-derives
-		// everything, so a failure here only costs speed.
+		// The walk hit an inconsistency.
+		// The solver below derives everything again, so a failure here only costs speed.
 	}
 	s := re.getSolver()
 	s.re, s.d, s.eflags = re, d, eflags
@@ -388,7 +387,7 @@ func (re *Regexp) solveCaptures(d *decoded, so, eo int, eflags ExecFlags, caps [
 		return compileError(ESpace, -1)
 	}
 	if best == nil {
-		// Phase A guarantees a parse exists; reaching this is a bug.
+		// Phase A guarantees that a parse exists, so this branch is a bug.
 		return compileError(ESpace, -1)
 	}
 	for idx := range caps {
@@ -399,10 +398,10 @@ func (re *Regexp) solveCaptures(d *decoded, so, eo int, eflags ExecFlags, caps [
 	return nil
 }
 
-// assignCaps records group spans from the winning parse. Entering a
-// group clears every group nested inside it, which implements the
-// recursive last-participation rule of section 12.7. The oracle uses it
-// too.
+// assignCaps records group spans from the winning parse.
+// Entry into a group clears every group nested inside it.
+// That is the recursive last-participation rule of section 12.7.
+// The oracle uses it too.
 func assignCaps(re *Regexp, t *ptree, caps []Match) {
 	if t.n.op == opGroup {
 		for _, inner := range re.nested[t.n.index] {

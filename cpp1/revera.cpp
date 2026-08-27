@@ -16,8 +16,8 @@ const char locale_blob[] = {
 #embed "data.bin"
 };
 
-// The engine counts in int64_t. A size_t past that range cannot be
-// a real bound, so it clamps instead of wrapping.
+// The engine counts in int64_t.
+// A size_t past that range cannot be a real bound, so clamp saturates it instead of wrapping.
 int64_t clamp(size_t n) {
     return int64_t(std::min<size_t>(n, size_t(INT64_MAX)));
 }
@@ -107,8 +107,8 @@ struct Locale::Data {
 };
 
 Locale::Locale() {
-    // The POSIX locale needs no data and never changes, so every
-    // default-built Locale shares one instance.
+    // The POSIX locale needs no data and never changes.
+    // Every default-built Locale therefore shares one instance.
     static const std::shared_ptr<const Data> posix =
         std::make_shared<const Data>(Data{engine::LocalePOSIX()});
     data_ = posix;
@@ -142,15 +142,16 @@ std::vector<std::string> Locale::names() {
 }
 
 struct Regex::Impl {
-    // The arena owns the compiled program. The constructor writes
-    // it once and every search only reads it.
+    // The arena owns the compiled program.
+    // The constructor writes it once, and every search only reads it.
     vg::Arena mem;
     engine::Regexp re;
     size_t groups = 0;
 
-    // exec runs one search in an arena of its own. want is the
-    // number of offsets to fill; zero asks for existence only. On a
-    // match it calls take before the arena goes.
+    // exec runs one search in an arena of its own.
+    // want is the number of offsets to fill.
+    // Zero asks for existence only.
+    // On a match, exec calls take before the arena goes.
     template <typename F>
     bool exec(std::string_view subject, int64_t want, F&& take) const {
         vg::Arena scratch;
@@ -174,9 +175,8 @@ struct Regex::Impl {
         }
     }
 
-    // scan calls visit once per non-overlapping match, left to
-    // right. The slice it passes lives in the scratch arena and is
-    // rewritten by the next step.
+    // scan calls visit once per non-overlapping match, left to right.
+    // The slice it passes lives in the scratch arena, and the next step rewrites it.
     template <typename F>
     void scan(std::string_view subject, F&& visit) const {
         vg::Arena hold;
@@ -186,9 +186,8 @@ struct Regex::Impl {
         engine::MatchIter it = init.r0;
         vg::Slice<engine::Match> pmatch = vg::make<engine::Match>(hold, int64_t(groups));
         while (true) {
-            // Each step frees the workspace of its own search. One
-            // arena for the whole scan would hold every match's
-            // workspace until the scan ended.
+            // Each step frees the workspace of its own search.
+            // One arena for the whole scan would hold every match's workspace until the scan ended.
             vg::Arena step;
             auto res = engine::MatchIterNext(step, copy, it, vg::str(subject), 0, pmatch);
             check(res.r1);
@@ -223,8 +222,7 @@ Regex::Regex(std::string_view pattern, const Options& options) : impl_(new Impl)
     if (options.shortest_match) {
         flags |= engine::FlagMinimal;
     }
-    // The pattern goes into the arena first, so the caller may
-    // compile from a temporary and drop it.
+    // The pattern goes into the arena first, so the caller may compile from a temporary and drop it.
     vg::Str source = vg::str_dup(impl_->mem, vg::str(pattern));
     auto res = engine::Compile(impl_->mem, source, options.locale.data_->loc, flags);
     check(res.r1);

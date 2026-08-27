@@ -1,18 +1,17 @@
 package revera
 
-// Host file, outside the Vego subset. It holds the differential
-// test corpus: the random pattern generator and the fixed tables.
-// Both revera's differential tests and cmd/crosscheck consume it,
-// so the Go-differential and the cross-language runs cover the
-// same shapes.
+// Host file, outside the Vego subset.
+// It holds the differential test corpus: the random pattern generator and the fixed tables.
+// The differential tests of revera and cmd/crosscheck both read it.
+// The Go-differential run and the cross-language runs therefore cover the same shapes.
 
 import (
 	"math/rand"
 	"strings"
 )
 
-// GenPattern builds a random valid ERE over a small alphabet, the
-// same shape the go0 differential uses.
+// GenPattern builds a random valid ERE over a small alphabet.
+// It has the same shape the go0 differential uses.
 func GenPattern(rng *rand.Rand, depth int) string {
 	if depth <= 0 {
 		return GenAtom(rng)
@@ -87,8 +86,8 @@ func GenSubject(rng *rand.Rand, alphabet string, maxLen int) string {
 	return out.String()
 }
 
-// FixedPatterns drives a corpus of interesting patterns, including
-// the spec section 16 shapes and the capacity fallbacks.
+// FixedPatterns drives a corpus of interesting patterns.
+// It includes the spec section 16 shapes and the capacity fallbacks.
 var FixedPatterns = []string{
 	"(a|ab)(c|bcd)(d*)",
 	"(a*)(a*?)c",
@@ -107,9 +106,8 @@ var FixedPatterns = []string{
 	"(|a)b",
 	"a{251}{250}{250}",
 	"(a{200}){200}{200}",
-	// The full ((a*){250}){250} over a long subject needs tens
-	// of gigabytes in both engines before ESpace, so the corpus
-	// keeps the nesting but blocks the match with a final b.
+	// The full ((a*){250}){250} over a long subject needs tens of gigabytes in both engines before ESpace.
+	// The corpus therefore keeps the nesting, but blocks the match with a final b.
 	"((a*){250}){250}b",
 	"((a*){4}){4}",
 	"[]a]b",
@@ -139,8 +137,7 @@ var FixedSubjects = []string{
 var FixedFlagSets = []uint32{0, FlagICase, FlagNewline, FlagMinimal,
 	FlagICase | FlagNewline, FlagNoSub}
 
-// MultiElementPatterns exercise the cs locale's ch collating
-// element.
+// MultiElementPatterns exercise the ch collating element of the cs locale.
 var MultiElementPatterns = []string{
 	"[[.ch.]]", "([[.ch.]]|c)h?", "[[.ch.]]*x?", "a?[[.ch.]]+",
 	"([[.ch.]]?)(h*)", "[[=ch=]]", "([[.ch.]]|[ch])*",

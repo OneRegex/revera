@@ -1,17 +1,15 @@
-// Minimal runtime for the generated Vego engine. It supplies what
-// the Go runtime supplied implicitly: growable buffers, immutable
-// string views, and memory.
+// Minimal runtime for the generated Vego engine.
+// It supplies what the Go runtime supplied implicitly: growable buffers, immutable string views, and memory.
 //
-// Memory is explicit. Every generated function that allocates
-// takes an Arena reference as its first parameter, so the runtime
-// holds no state at all. The host owns the arenas and decides
-// which one backs each engine call.
+// Memory is explicit.
+// Every generated function that allocates takes an Arena reference as its first parameter.
+// The runtime therefore holds no state at all.
+// The host owns the arenas and decides which one backs each engine call.
 //
-// Generated code passes the arena through nested calls, so the
-// reference is shared and the mutable block list sits behind an
-// UnsafeCell. That cell also keeps Arena !Sync: the compiler
-// rejects sharing one arena between threads, and each thread with
-// its own arenas is thread safe by construction.
+// Generated code passes the arena through nested calls.
+// The reference is therefore shared, and the mutable block list sits behind an UnsafeCell.
+// That cell also keeps Arena !Sync: the compiler rejects sharing one arena between threads.
+// A thread with its own arenas is thread safe by construction.
 
 #![allow(dead_code)]
 
@@ -57,7 +55,7 @@ fn alloc_elems<T>(mem: &Arena, n: i64) -> *mut T {
 }
 
 // Str is an immutable byte view, the translation of a Go string.
-// The zero value is the empty string.
+// Its zero value is the empty string.
 pub struct Str {
     pub p: *const u8,
     pub len: i64,
@@ -71,8 +69,8 @@ impl Clone for Str {
 
 impl Copy for Str {}
 
-// The generated engine holds static Str tables, so Str must be
-// Sync. That is sound: a Str never changes after construction.
+// The generated engine holds static Str tables, so Str must be Sync.
+// That is sound, because a Str never changes after construction.
 unsafe impl Sync for Str {}
 
 impl Str {
@@ -108,8 +106,8 @@ impl Str {
     }
 }
 
-// view wraps runtime bytes as a Str without copying. The caller
-// keeps the bytes alive.
+// view wraps runtime bytes as a Str without copying.
+// The caller keeps the bytes alive.
 pub fn view(s: &[u8]) -> Str {
     Str {
         p: s.as_ptr(),
@@ -117,8 +115,7 @@ pub fn view(s: &[u8]) -> Str {
     }
 }
 
-// str_dup copies a string into the arena, so the result outlives
-// the buffer it came from.
+// str_dup copies a string into the arena, so the result outlives the buffer it came from.
 pub fn str_dup(mem: &Arena, s: Str) -> Str {
     let b = bytes_from_str(mem, s);
     Str { p: b.p, len: b.len }
@@ -144,9 +141,9 @@ pub fn strcmp3(a: Str, b: Str) -> i32 {
 }
 
 // Slice is a Go slice header: pointer, length, capacity.
-// Assignment copies the header and shares the buffer, exactly like
-// Go. A null pointer is the nil slice; every allocation, even a
-// zero-length one, produces a non-null pointer.
+// Assignment copies the header and shares the buffer, exactly like Go.
+// A null pointer is the nil slice.
+// Every allocation, even a zero-length one, produces a non-null pointer.
 pub struct Slice<T> {
     pub p: *mut T,
     pub len: i64,
@@ -162,8 +159,8 @@ impl<T> Clone for Slice<T> {
 impl<T> Copy for Slice<T> {}
 
 impl<T> Slice<T> {
-    // ptr addresses one element for writing. Bounds are checked
-    // here, so generated writes stay as safe as Go's.
+    // ptr addresses one element for writing.
+    // The bounds check happens here, so generated writes stay as safe as Go's.
     pub fn ptr(self, i: i64) -> *mut T {
         assert!(i >= 0 && i < self.len);
         unsafe { self.p.add(i as usize) }
@@ -234,8 +231,8 @@ pub fn append_slice<T>(mem: &Arena, s: Slice<T>, more: Slice<T>) -> Slice<T> {
         out = grow(mem, out, out.len + more.len);
     }
     if more.len > 0 {
-        // The source may alias the old buffer; the old buffer is
-        // still intact after a grow, so a plain copy is right.
+        // The source may alias the old buffer.
+        // The old buffer stays intact after a grow, so a plain copy is right.
         unsafe { std::ptr::copy(more.p, out.p.add(out.len as usize), more.len as usize) };
     }
     out.len += more.len;
@@ -270,8 +267,7 @@ pub fn vcopy_str(dst: Slice<u8>, src: Str) -> i64 {
     n
 }
 
-// bytes_from_str copies a string into a fresh mutable byte
-// buffer, the []uint8(s) conversion.
+// bytes_from_str copies a string into a fresh mutable byte buffer, the []uint8(s) conversion.
 pub fn bytes_from_str(mem: &Arena, s: Str) -> Slice<u8> {
     let out = make::<u8>(mem, s.len);
     if s.len > 0 {
@@ -290,8 +286,8 @@ pub fn str_from_bytes(mem: &Arena, b: Slice<u8>) -> Str {
     Str { p, len: b.len }
 }
 
-// arr_slice views a stack or struct array as a slice, sharing its
-// storage, like Go's array slicing.
+// arr_slice views a stack or struct array as a slice, like Go's array slicing.
+// The view shares the storage of the array.
 pub fn arr_slice<T, const N: usize>(p: *mut [T; N], lo: i64, hi: i64) -> Slice<T> {
     let n = N as i64;
     assert!(0 <= lo && lo <= hi && hi <= n);
@@ -310,9 +306,9 @@ pub fn slice_of<T: Copy>(mem: &Arena, src: &[T]) -> Slice<T> {
     out
 }
 
-// zero builds the Go zero value. Every generated type is plain
-// data whose zero value is all zero bytes; a Slice or Str becomes
-// nil, which is exactly Go's zero slice and empty string.
+// zero builds the Go zero value.
+// Every generated type is plain data whose zero value is all zero bytes.
+// A Slice or Str becomes nil, which is exactly Go's zero slice and empty string.
 pub fn zero<T>() -> T {
     unsafe { std::mem::zeroed() }
 }

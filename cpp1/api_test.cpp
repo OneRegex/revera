@@ -1,5 +1,5 @@
-// Tests for the public API in revera.hpp. It builds and runs from
-// "make test".
+// Tests for the public API in revera.hpp.
+// It builds and runs from "make test".
 
 #include "revera.hpp"
 
@@ -12,8 +12,8 @@
 // The thread test calls check() from several threads at once.
 static std::atomic<int> failures{0};
 
-// check returns what it checked, so a caller can stop before it
-// reads a result the failed check says is not there.
+// check returns what it checked.
+// A caller can then stop before it reads a result that the failed check says is not there.
 static bool check(bool ok, const char* what) {
     if (!ok) {
         std::fprintf(stderr, "FAIL: %s\n", what);
@@ -77,8 +77,8 @@ static void find_all_walks_every_match() {
         return;
     }
     check(rows[0][1]->str() == "aa" && rows[0][2]->str() == "b", "capture_all groups");
-    // (b*) takes part in the match of "a": it captures the null
-    // string, which is not the same as taking no part.
+    // (b*) takes part in the match of "a".
+    // It captures the null string, which is not the same as taking no part.
     check(rows[1][2]->str().empty(), "capture_all empty group");
 }
 

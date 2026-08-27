@@ -1,12 +1,11 @@
-// Minimal runtime for the generated Vego engine. It supplies what
-// the Go runtime supplied implicitly: growable buffers, immutable
-// string views, comparison helpers, and memory.
+// Minimal runtime for the generated Vego engine.
+// It supplies what the Go runtime supplied implicitly: growable buffers, immutable string views, comparison helpers, and memory.
 //
-// Memory is explicit. Every generated function that allocates
-// takes an Arena reference as its first parameter, so the runtime
-// holds no state at all. The host owns the arenas and decides
-// which one backs each engine call; two threads with separate
-// arenas never share anything mutable.
+// Memory is explicit.
+// Every generated function that allocates takes an Arena reference as its first parameter.
+// The runtime therefore holds no state at all.
+// The host owns the arenas and decides which one backs each engine call.
+// Two threads with separate arenas never share anything mutable.
 
 #pragma once
 
@@ -60,8 +59,8 @@ T* alloc_elems(Arena& mem, int64_t n) {
 }
 
 // Str is an immutable byte view, the translation of a Go string.
-// The zero value is the empty string. The pointer is const char* so
-// string literals construct it at compile time.
+// Its zero value is the empty string.
+// The pointer is const char*, so string literals construct it at compile time.
 struct Str {
     const char* p = nullptr;
     int64_t len = 0;
@@ -82,8 +81,8 @@ struct Str {
     Str tail(int64_t lo) const { return sub(lo, len); }
     Str head(int64_t hi) const { return sub(0, hi); }
 
-    // Strings compare by content, like Go, so defaulted equality
-    // on structs holding Str fields stays correct.
+    // Strings compare by content, like Go.
+    // Defaulted equality on structs that hold Str fields therefore stays correct.
     bool operator==(const Str& o) const {
         if (len != o.len) {
             return false;
@@ -97,8 +96,8 @@ constexpr Str lit(const char (&s)[N]) {
     return Str{s, int64_t(N - 1)};
 }
 
-// str wraps runtime bytes as a Str without copying. The caller
-// keeps the bytes alive.
+// str wraps runtime bytes as a Str without copying.
+// The caller keeps the bytes alive.
 inline Str str(std::string_view s) {
     return Str{s.data(), int64_t(s.size())};
 }
@@ -120,9 +119,9 @@ inline int32_t strcmp3(Str a, Str b) {
 }
 
 // Slice is a Go slice header: pointer, length, capacity.
-// Assignment copies the header and shares the buffer, exactly like
-// Go. A null pointer is the nil slice; every allocation, even a
-// zero-length one, produces a non-null pointer.
+// Assignment copies the header and shares the buffer, exactly like Go.
+// A null pointer is the nil slice.
+// Every allocation, even a zero-length one, produces a non-null pointer.
 template <typename T>
 struct Slice {
     T* p = nullptr;
@@ -160,8 +159,8 @@ int64_t len(const std::array<T, N>&) {
 
 template <typename T>
 Slice<T> make_cap(Arena& mem, int64_t n, int64_t c) {
-    // Value initialization of every generated type is all zero
-    // bytes, so one memset replaces per-element construction.
+    // Value initialization of every generated type is all zero bytes.
+    // One memset therefore replaces per-element construction.
     static_assert(std::is_trivially_copyable_v<T>);
     assert(0 <= n && n <= c);
     T* p = alloc_elems<T>(mem, c);
@@ -180,9 +179,9 @@ Slice<T> grow(Arena& mem, Slice<T> s, int64_t need) {
     if (newcap < need) {
         newcap = need;
     }
-    // The spare region must read as zero: Go allocates zeroed
-    // memory, and extending a slice inside its capacity exposes
-    // that memory. The prefix gets the live elements instead.
+    // The spare region must read as zero.
+    // Go allocates zeroed memory, and a slice extended inside its capacity shows that memory.
+    // The prefix gets the live elements instead.
     T* p = alloc_elems<T>(mem, newcap);
     std::memset(p + s.len, 0, size_t(newcap - s.len) * sizeof(T));
     if (s.p != nullptr && s.len > 0) {
@@ -201,8 +200,8 @@ Slice<T> append(Arena& mem, Slice<T> s, T v) {
     return s;
 }
 
-// The source of a spread append may alias the old buffer; the old
-// buffer stays intact after a grow, so a plain copy is right.
+// The source of a spread append may alias the old buffer.
+// The old buffer stays intact after a grow, so a plain copy is right.
 template <typename T>
 Slice<T> append_slice(Arena& mem, Slice<T> s, Slice<T> more) {
     if (s.len + more.len > s.cap) {
@@ -243,8 +242,8 @@ inline int64_t vcopy_str(Slice<uint8_t> dst, Str src) {
     return n;
 }
 
-// sdiv and srem are Go's truncating division and remainder. Go
-// defines MinInt / -1 as MinInt (wrapping) and MinInt % -1 as 0;
+// sdiv and srem are Go's truncating division and remainder.
+// Go defines MinInt / -1 as MinInt, which wraps, and MinInt % -1 as 0.
 // C++ leaves that pair undefined even with -fwrapv.
 template <typename T>
 T sdiv(T a, T b) {
@@ -262,8 +261,7 @@ T srem(T a, T b) {
     return T(a % b);
 }
 
-// bytes_from_str copies a string into a fresh mutable byte buffer,
-// the []uint8(s) conversion.
+// bytes_from_str copies a string into a fresh mutable byte buffer, the []uint8(s) conversion.
 inline Slice<uint8_t> bytes_from_str(Arena& mem, Str s) {
     Slice<uint8_t> out = make<uint8_t>(mem, s.len);
     if (s.len > 0) {
@@ -272,8 +270,7 @@ inline Slice<uint8_t> bytes_from_str(Arena& mem, Str s) {
     return out;
 }
 
-// str_dup copies a string into the arena, so the result outlives
-// the buffer it came from.
+// str_dup copies a string into the arena, so the result outlives the buffer it came from.
 inline Str str_dup(Arena& mem, Str s) {
     char* p = alloc_elems<char>(mem, s.len);
     if (s.len > 0) {
@@ -294,10 +291,9 @@ template <typename T, size_t N>
 Slice<T> arr_slice(std::array<T, N>& a, int64_t lo, int64_t hi) {
     assert(0 <= lo && lo <= hi && hi <= int64_t(N));
     if (N == 0) {
-        // std::array<T, 0>::data() may be null, but a Go slice of
-        // a zero-length array is non-nil. Point at the array object
-        // itself: it has real storage, and with cap 0 the pointer
-        // is never dereferenced.
+        // std::array<T, 0>::data() may be null, but a Go slice of a zero-length array is non-nil.
+        // The pointer therefore addresses the array object itself, which has real storage.
+        // With cap 0, nothing ever dereferences it.
         return Slice<T>{reinterpret_cast<T*>(&a), 0, 0};
     }
     return Slice<T>{a.data() + lo, hi - lo, int64_t(N) - lo};

@@ -1,17 +1,19 @@
 /-
 Abstract syntax of Vego, the mechanically translatable Go subset.
 
-The shapes here mirror section 8 of go1/VEGO-SPECIFICATION.md one
-to one. The JSON file is the portable artifact; this AST is its
-Lean image. Integer and character literals arrive as decimal
-strings in the JSON and are parsed into `Int` during decoding.
+The shapes here mirror section 8 of go1/VEGO-SPECIFICATION.md one to one.
+The JSON file is the portable artifact, and this AST is its Lean image.
+Integer and character literals arrive as decimal strings in the JSON and are parsed into `Int` during decoding.
 -/
 
 deriving instance Repr for ByteArray
 
 namespace Vego
 
-/-- Scalar integer widths of the subset. `int` is 64-bit signed. -/
+/--
+Scalar integer widths of the subset.
+`int` is 64-bit signed.
+-/
 inductive IW where
   | u8 | u16 | u32 | u64 | i32 | i64
   deriving Repr, BEq, DecidableEq
@@ -24,8 +26,7 @@ inductive BinOp where
   | eq | ne | lt | le | gt | ge
   deriving Repr, BEq, DecidableEq
 
-/-- Unary operators: arithmetic negation, bit complement, logical
-not, and address-of (legal only on direct call arguments). -/
+/-- Unary operators: arithmetic negation, bit complement, logical not, and address-of (legal only on direct call arguments). -/
 inductive UnOp where
   | neg | bnot | lnot | addr
   deriving Repr, BEq, DecidableEq
@@ -37,7 +38,10 @@ inductive BFn where
 
 mutual
 
-/-- Type references. Array lengths are constant expressions. -/
+/--
+Type references.
+Array lengths are constant expressions.
+-/
 inductive Ty where
   | named (name : String)
   | slice (elem : Ty)
@@ -46,9 +50,11 @@ inductive Ty where
   | ptr (name : String)
   deriving Repr, BEq
 
-/-- Expressions. String literal bytes are the UTF-8 encoding of the
-JSON string value; the checker keeps the program ASCII-clean where
-byte identity matters. -/
+/--
+Expressions.
+String literal bytes are the UTF-8 encoding of the JSON string value.
+The checker keeps the program ASCII-clean where byte identity matters.
+-/
 inductive Expr where
   | intLit (v : Int)
   | strLit (bytes : ByteArray)

@@ -20,9 +20,9 @@ func TestPmatchTruncation(t *testing.T) {
 }
 
 func TestHugeExpansionFallback(t *testing.T) {
-	// 20 bytes of pattern, 255^3 characters of minimum match length.
-	// Section 3.4 requires compilation to succeed; execution answers
-	// correctly for every subject shorter than the minimum length.
+	// 20 bytes of pattern give 255^3 characters of minimum match length.
+	// Section 3.4 requires compilation to succeed.
+	// Execution answers correctly for every subject shorter than the minimum length.
 	re, err := Compile("((a{255}){255}){255}", locale.POSIX(), 0)
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
@@ -75,8 +75,8 @@ func TestHugeExpansionMultiElementFallback(t *testing.T) {
 	if !ok {
 		t.Fatal("cs locale missing")
 	}
-	// The minimum match length counts two characters per [[.ch.]], so a
-	// shorter subject answers no-match instead of ESpace.
+	// The minimum match length counts two characters per [[.ch.]].
+	// A shorter subject therefore answers no-match instead of ESpace.
 	re, err := Compile("(([[.ch.]]{255}){255}){255}", cs, 0)
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
@@ -114,9 +114,9 @@ func TestHugeNullableExistence(t *testing.T) {
 }
 
 func TestPrunedBranchStillMatches(t *testing.T) {
-	// One oversized branch must not break the reachable branch. The
-	// program prunes the huge subtree and stays exact for any subject
-	// shorter than that subtree's minimum match length.
+	// One oversized branch must not break the reachable branch.
+	// The program prunes the huge subtree.
+	// It stays exact for any subject shorter than the minimum match length of that subtree.
 	re, err := Compile("(x|((a{255}){255}){255})", locale.POSIX(), 0)
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
@@ -135,9 +135,9 @@ func TestPrunedBranchStillMatches(t *testing.T) {
 }
 
 func TestPrunedBranchExistencePastFailMin(t *testing.T) {
-	// The huge branch is pruned with a minimum match length of two.
-	// A subject at least that long may reach the pruned subtree, but
-	// a match through the surviving branch still proves existence.
+	// The huge branch prunes with a minimum match length of two.
+	// A subject at least that long may reach the pruned subtree.
+	// A match through the surviving branch still proves existence.
 	re, err := Compile("x|(a((b{0,255}){255}){255}){2}", locale.POSIX(), 0)
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
@@ -150,21 +150,21 @@ func TestPrunedBranchExistencePastFailMin(t *testing.T) {
 		t.Fatalf("existence: %v %v", matched, err)
 	}
 
-	// A miss proves nothing: the pruned subtree could have matched.
+	// A miss proves nothing, because the pruned subtree could have matched.
 	if _, err = re.Exec("zz", nil, 0); err == nil ||
 		err.(*Error).Code != ESpace {
 		t.Fatalf("miss past failMin: err = %v, want ESpace", err)
 	}
 
-	// Offsets would need the full program; the spans the pruned
-	// program selects could be wrong.
+	// Offsets would need the full program.
+	// The spans that the pruned program selects could be wrong.
 	pmatch := make([]Match, 1)
 	if _, err = re.Exec("xx", pmatch, 0); err == nil ||
 		err.(*Error).Code != ESpace {
 		t.Fatalf("offset request past failMin: err = %v, want ESpace", err)
 	}
 
-	// Below the pruned subtree's minimum length the program is exact.
+	// Below the minimum length of the pruned subtree, the program is exact.
 	matched, err = re.Exec("x", pmatch, 0)
 	if err != nil || !matched || pmatch[0] != (Match{0, 1}) {
 		t.Fatalf("exact case: %v %v %v", matched, err, pmatch)
@@ -176,9 +176,9 @@ func TestHugeExpansionEquivMinLength(t *testing.T) {
 	if !ok {
 		t.Fatal("cs locale missing")
 	}
-	// No single character is primary equal to Czech ch, so the minimum
-	// match length counts two characters per [[=ch=]]. A subject below
-	// that bound answers no-match instead of ESpace.
+	// No single character is primary equal to Czech ch.
+	// The minimum match length therefore counts two characters per [[=ch=]].
+	// A subject below that bound answers no-match instead of ESpace.
 	re, err := Compile("(([[=ch=]]{255}){255}){255}", cs, 0)
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
@@ -198,8 +198,8 @@ func TestHugeExpansionEquivMinLength(t *testing.T) {
 }
 
 func TestCaptureLongAmbiguousSubject(t *testing.T) {
-	// A plain ambiguous pattern with captures must handle long
-	// subjects; the split ranges are clamped by node length bounds.
+	// A plain ambiguous pattern with captures must handle long subjects.
+	// The node length bounds clamp the split ranges.
 	re := compileOK(t, "((a|aa)*)", 0)
 	subject := strings.Repeat("a", 5000)
 	pmatch := make([]Match, 3)
@@ -222,8 +222,8 @@ func TestICaseKelvinSign(t *testing.T) {
 	}
 	kelvin := "\u212a"
 
-	// The closure of the literal k is {k, K}; the Kelvin sign maps to
-	// k but nothing maps to it, so it stays outside.
+	// The closure of the literal k is {k, K}.
+	// The Kelvin sign maps to k, but nothing maps to the sign, so it stays outside.
 	re, err := Compile("k", en, ICase)
 	if err != nil {
 		t.Fatal(err)
@@ -241,8 +241,8 @@ func TestICaseKelvinSign(t *testing.T) {
 		t.Fatal("literal Kelvin sign missed k")
 	}
 
-	// Bracket membership uses preimages: k has the sources K and the
-	// Kelvin sign, so [K] accepts k, and [k] rejects the sign.
+	// Bracket membership uses preimages.
+	// k has the sources K and the Kelvin sign, so [K] accepts k, and [k] rejects the sign.
 	re, err = Compile("["+kelvin+"]", en, ICase)
 	if err != nil {
 		t.Fatal(err)
@@ -260,9 +260,9 @@ func TestICaseKelvinSign(t *testing.T) {
 }
 
 func TestCounterSlotsBeyond65535(t *testing.T) {
-	// Overflow counter slots must not wrap at 65,536. The dead block
-	// holds 65,535 shortest-preferring repetitions inside a {0} group,
-	// pushing the last live repetition past the uint16 range.
+	// Overflow counter slots must not wrap at 65,536.
+	// The dead block holds 65,535 shortest-preferring repetitions inside a {0} group.
+	// That pushes the last live repetition past the uint16 range.
 	dead := strings.Repeat("a{0}?", 65_535)
 	pattern := "[ab]*?(" + dead + "){0}([ab]*?c|b)"
 	re, err := Compile(pattern, locale.POSIX(), 0)
@@ -356,7 +356,7 @@ func TestMoreErrorSpellings(t *testing.T) {
 		{"a|*", BadRpt},
 		{"(*a)", BadRpt},
 		{"a{1,2,3}", BadBR},
-		{"[a-\\]", ERange}, // backslash is ordinary; \ < a, empty range
+		{"[a-\\]", ERange}, // backslash is ordinary, and \ < a gives an empty range
 		{"[[.nonsuch.]]", ECollate},
 		{"[[:upper:]", EBrack},
 		{"x[[:alpha]]", EBrack},

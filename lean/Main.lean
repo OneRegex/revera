@@ -1,18 +1,18 @@
 /-
-Command-line checker: replays a corpus of driver commands with
-expected outputs (the tab-separated dump of crosscheck) against
-the interpreted revera engine, and reports progress and the first
-divergence. The theorems cover the embedded corpus under a fuel
-budget; this executable scales the same check to any dump and any
-budget.
+Command-line checker.
+It replays a corpus of driver commands with expected outputs against the interpreted revera engine.
+That corpus is the tab-separated dump of crosscheck.
+It reports progress and the first divergence.
+The theorems cover the embedded corpus under a fuel budget.
+This executable scales the same check to any dump and any budget.
 
-With --contracts the replay measures every Exec against the
-pattern's resource contract instead of failing on the first
-excess, and reports the tightest margins as it goes. This is the
-calibration mode: it shows how close the real executions come to
-the contract figures. A few corpus patterns run for hours in the
-interpreter, so the margins print during the replay and not only
-at the end.
+With --contracts the replay measures every Exec against the resource contract of its pattern.
+It does not fail on the first excess.
+It reports the tightest margins as it goes.
+This is the calibration mode.
+It shows how close the real executions come to the contract figures.
+A few corpus patterns run for hours in the interpreter.
+The margins therefore print during the replay, and not only at the end.
 
 Usage: vegocheck [--contracts] [corpus.tsv] [fuel] [limit]
 -/
@@ -21,14 +21,15 @@ import Vego.Driver
 
 open Vego
 
-/-- used/bound in permille, for integer-only reporting. A
-non-positive bound with any use is reported as far over. -/
+/--
+used/bound in permille, for integer-only reporting.
+A non-positive bound with any use is reported as far over.
+-/
 def permille (used : Nat) (bound : Int) : Nat :=
   if bound ≤ 0 then (if used == 0 then 0 else 1000000)
   else (used * 1000) / bound.toNat
 
-/-- The worst margin seen for one meter, with the command that
-produced it. -/
+/-- The worst margin seen for one meter, with the command that produced it. -/
 structure Worst where
   ratio : Nat := 0
   over : Nat := 0
@@ -47,12 +48,13 @@ def statLine (cmd : String) (st : MeterStat) : String :=
   s!"steps {st.stepsUsed}/{st.stepsBound} " ++
   s!"loops {st.loopsUsed}/{st.stepsBound} : {cmd.take 60}"
 
-/-- The meters, each with the ratio it reports and whether the
-session enforces it. The step counter is reported but not
-enforced: it counts one unit per executed statement, which is
-finer than the contract's abstract operations, so Exec's fixed
-setup takes it over the figure on tiny subjects. The loop counter
-is the enforced one. -/
+/--
+The meters, each with the ratio it reports and whether the session enforces it.
+The step counter is reported, but not enforced.
+It counts one unit per executed statement, which is finer than the abstract operations of the contract.
+The fixed setup of Exec therefore takes it over the figure on tiny subjects.
+The loop counter is the enforced one.
+-/
 def meterRatio : List (String × Bool × (MeterStat → Nat)) :=
   [("heap", true, fun st => permille st.heapUsed st.heapBound),
    ("stack", true,
@@ -112,9 +114,8 @@ def main (args : List String) : IO UInt32 := do
         | (.failed msg, _, _) =>
           IO.println s!"FAIL at {idx} '{cmd}': {msg}"
           return 1
-        -- Fold every measurement this command produced into the
-        -- running worsts, then drop it: a long replay must not
-        -- accumulate one record per Exec.
+        -- Fold every measurement this command produced into the running worsts, then drop it.
+        -- A long replay must not accumulate one record per Exec.
         for st in s.stats do
           measured := measured + 1
           worsts := (meterRatio.zip worsts).map

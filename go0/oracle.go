@@ -1,43 +1,39 @@
 package revera
 
-// This file holds the reference matcher. It enumerates every parse of the
-// pattern and applies the selection order of section 4.3 directly, so it
-// is correct by construction. It is exponential in the worst case and
-// exists as the semantic baseline; the fast engine must agree with it.
+// This file holds the reference matcher.
+// It enumerates every parse of the pattern and applies the selection order of section 4.3 directly.
+// It is therefore correct by construction.
+// It is exponential in the worst case.
+// It exists as the semantic baseline, and the fast engine must agree with it.
 
 import (
 	"slices"
 	"unicode/utf8"
 )
 
-// decoded is a subject window decoded into characters with byte
-// boundaries. The edge flags carry the anchor context of the text
-// around the window.
+// decoded is a subject window decoded into characters with byte boundaries.
+// The edge flags carry the anchor context of the text around the window.
 type decoded struct {
 	runes []rune
 	// byteAt[i] is the absolute byte offset of character boundary i.
 	// Its length is len(runes)+1.
-	byteAt []int
-	// atSubjectStart is true when the window begins the subject.
+	byteAt         []int
 	atSubjectStart bool
-	// atSubjectEnd is true when the window ends the subject.
-	atSubjectEnd bool
-	// prevIsNewline is true when a newline precedes the window.
-	prevIsNewline bool
-	// nextIsNewline is true when a newline follows the window.
-	nextIsNewline bool
+	atSubjectEnd   bool
+	prevIsNewline  bool
+	nextIsNewline  bool
 }
 
-// invalidRune marks a byte that is not valid UTF-8. It matches nothing.
+// invalidRune marks a byte that is not valid UTF-8, and it matches nothing.
 const invalidRune rune = -1
 
 func decodeSubject(s string) decoded {
 	return decodeWindow(s, 0, len(s))
 }
 
-// decodeWindow decodes s[so:eo]. Both offsets sit on character
-// boundaries. captureHeap in the resource contract counts these
-// allocations.
+// decodeWindow decodes s[so:eo].
+// Both offsets sit on character boundaries.
+// captureHeap in the resource contract counts these allocations.
 func decodeWindow(s string, so, eo int) decoded {
 	d := decoded{
 		runes:          make([]rune, 0, eo-so),
@@ -57,9 +53,9 @@ func decodeWindow(s string, so, eo int) decoded {
 	return d
 }
 
-// decodeRune decodes one UTF-8 character, mapping encoding errors to the
-// invalid-byte sentinel one byte at a time. An encoded U+FFFD comes back
-// from the stdlib decoder with size 3, so it stays distinguishable.
+// decodeRune decodes one UTF-8 character.
+// An encoding error maps to the invalid-byte sentinel, one byte at a time.
+// An encoded U+FFFD comes back from the stdlib decoder with size 3, so it stays different.
 func decodeRune(s string) (rune, int) {
 	r, size := utf8.DecodeRuneInString(s)
 	if r == utf8.RuneError && size <= 1 {
@@ -134,8 +130,7 @@ type oracle struct {
 	failed bool
 }
 
-// oracleWorkLimit caps enumeration so a pathological test fails loudly
-// instead of hanging.
+// oracleWorkLimit caps the enumeration, so a pathological test fails loudly instead of hanging.
 const oracleWorkLimit = 50_000_000
 
 func (o *oracle) step() bool {
@@ -194,11 +189,10 @@ func (o *oracle) parses(n *node, i, j int) []*ptree {
 		}
 	case opRepeat:
 		if i == j && n.min == 0 {
-			// A null repetition match takes one null occurrence when
-			// its operand has one: a null match is its only available
-			// match, and null beats nonparticipation (sections 8.5 and
-			// 4.3). With no null operand match, or a zero maximum, the
-			// repetition selects zero occurrences.
+			// A null repetition match takes one null occurrence when its operand has one.
+			// A null match is then its only available match, and null beats nonparticipation.
+			// Sections 8.5 and 4.3 give that rule.
+			// Without a null operand match, or with a zero maximum, the repetition selects zero occurrences.
 			var subs []*ptree
 			if n.max != 0 {
 				subs = o.parses(n.ch[0], i, i)
@@ -252,9 +246,8 @@ func (o *oracle) concatParses(children []*node, i, j int) [][]*ptree {
 }
 
 // repeatParses enumerates instance lists for a repetition over [i, j).
-// done counts instances already taken. hasEmpty tracks whether some
-// instance was a null match. The empty-occurrence rule of section 8.5
-// allows a null instance only when the final count stays at the minimum.
+// done counts the instances already taken, and hasEmpty tracks whether some instance was a null match.
+// The empty-occurrence rule of section 8.5 allows a null instance only when the final count stays at the minimum.
 func (o *oracle) repeatParses(n *node, i, j, done int, hasEmpty bool) [][]*ptree {
 	if !o.step() {
 		return nil
@@ -291,8 +284,7 @@ func (o *oracle) repeatParses(n *node, i, j, done int, hasEmpty bool) [][]*ptree
 	return out
 }
 
-// addCounters accumulates the consumed totals of every shortest-preferring
-// repetition, by counter slot.
+// addCounters accumulates the consumed totals of every shortest-preferring repetition, by counter slot.
 func addCounters(t *ptree, out []int) {
 	if t.n.op == opRepeat && t.n.minimal {
 		out[t.n.index] += t.j - t.i
@@ -303,7 +295,7 @@ func addCounters(t *ptree, out []int) {
 }
 
 // structCmp compares two parses of the same pattern node in pre-order.
-// It returns a negative value when a wins, positive when b wins.
+// It returns a negative value when a wins, and a positive value when b wins.
 func structCmp(a, b *ptree) int {
 	spanA, spanB := a.j-a.i, b.j-b.i
 	if spanA != spanB {
@@ -315,8 +307,8 @@ func structCmp(a, b *ptree) int {
 	switch a.n.op {
 	case opAlt:
 		if a.branch != b.branch {
-			// Equal outer results: the earlier branch participates at
-			// an earlier pre-order position, so it wins.
+			// The outer results are equal.
+			// The earlier branch takes part at an earlier pre-order position, so it wins.
 			return a.branch - b.branch
 		}
 		return structCmp(a.kids[0], b.kids[0])
@@ -350,8 +342,8 @@ func structCmp(a, b *ptree) int {
 	return 0
 }
 
-// betterCandidate applies the full selection order at one start position:
-// minimal counters, then whole length, then structure.
+// betterCandidate applies the full selection order at one start position.
+// It compares the minimal counters first, then the whole length, then the structure.
 func (o *oracle) betterCandidate(a, b *ptree, ca, cb []int) bool {
 	for idx := range ca {
 		if ca[idx] != cb[idx] {
@@ -364,8 +356,8 @@ func (o *oracle) betterCandidate(a, b *ptree, ca, cb []int) bool {
 	return structCmp(a, b) < 0
 }
 
-// oracleExec runs the reference matcher. Capture offsets come back in
-// character positions; the caller converts them to bytes.
+// oracleExec runs the reference matcher.
+// Capture offsets come back in character positions, and the caller converts them to bytes.
 func (re *Regexp) oracleExec(d *decoded, eflags ExecFlags) (bool, []Match, error) {
 	o := &oracle{re: re, d: d, eflags: eflags, memo: make(map[memoKey][]*ptree)}
 	n := len(d.runes)
@@ -399,8 +391,8 @@ func (re *Regexp) oracleExec(d *decoded, eflags ExecFlags) (bool, []Match, error
 	return false, nil, nil
 }
 
-// oracleFullExec runs the reference matcher end to end, including the
-// pmatch conversion. The differential tests compare it with exec.
+// oracleFullExec runs the reference matcher end to end, with the pmatch conversion.
+// The differential tests compare it with exec.
 func (re *Regexp) oracleFullExec(subject string, pmatch []Match, eflags ExecFlags) (bool, error) {
 	d := decodeSubject(subject)
 	ok, caps, err := re.oracleExec(&d, eflags)
@@ -411,8 +403,7 @@ func (re *Regexp) oracleFullExec(subject string, pmatch []Match, eflags ExecFlag
 	return true, nil
 }
 
-// fillMatches converts character spans to byte offsets and fills pmatch
-// per section 12.5.
+// fillMatches converts character spans to byte offsets, and fills pmatch under section 12.5.
 func (re *Regexp) fillMatches(d *decoded, caps []Match, pmatch []Match) {
 	if re.flags&NoSub != 0 || len(pmatch) == 0 {
 		return
