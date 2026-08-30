@@ -56,6 +56,7 @@ type gen struct {
 	b     strings.Builder
 	fn    *vegoc.FuncDecl
 	tmp   int
+	used  map[string]bool
 	loops []loopCtx
 	eqs   map[string]bool
 }
@@ -71,16 +72,26 @@ var rustKeywords = map[string]bool{
 	"return": true, "static": true, "struct": true, "trait": true,
 	"true": true, "type": true, "unsafe": true, "use": true,
 	"where": true, "while": true, "async": true, "await": true,
-	"box": true, "do": true, "final": true, "macro": true,
+	"abstract": true, "become": true, "box": true, "do": true,
+	"final": true, "macro": true,
 	"override": true, "priv": true, "typeof": true, "unsized": true,
 	"virtual": true, "yield": true, "gen": true, "try": true,
 }
 
+const rustInternalPrefix = "vego_"
+
 func ident(name string) string {
+	if strings.HasPrefix(name, rustInternalPrefix) {
+		return rustInternalPrefix + name
+	}
 	if rustKeywords[name] {
 		return "r#" + name
 	}
 	return name
+}
+
+func structEqName(name string) string {
+	return rustInternalPrefix + "eq_" + name
 }
 
 func (g *gen) file() string {
@@ -237,14 +248,14 @@ func (g *gen) emitStructEqs() {
 			case vegoc.KStr:
 				parts = append(parts, fmt.Sprintf("vg::streq(%s, %s)", fx, fy))
 			case vegoc.KStruct:
-				parts = append(parts, fmt.Sprintf("vg_eq_%s(%s, %s)", f.Type.Name, fx, fy))
+				parts = append(parts, fmt.Sprintf("%s(%s, %s)", structEqName(f.Type.Name), fx, fy))
 			case vegoc.KArray:
 				elemCmp := ""
 				switch f.Type.Elem.K {
 				case vegoc.KStr:
 					elemCmp = "vg::streq(*x, *y)"
 				case vegoc.KStruct:
-					elemCmp = fmt.Sprintf("vg_eq_%s(*x, *y)", f.Type.Elem.Name)
+					elemCmp = fmt.Sprintf("%s(*x, *y)", structEqName(f.Type.Elem.Name))
 				case vegoc.KSlice, vegoc.KArray, vegoc.KPtr:
 					fatal("struct compared with == has a non-comparable field:", n, f.Name)
 				default:
@@ -257,8 +268,8 @@ func (g *gen) emitStructEqs() {
 				parts = append(parts, fmt.Sprintf("%s == %s", fx, fy))
 			}
 		}
-		g.wf("pub fn vg_eq_%s(a: %s, b: %s) -> bool {\n    %s\n}\n\n",
-			n, ident(n), ident(n), strings.Join(parts, " && "))
+		g.wf("pub fn %s(a: %s, b: %s) -> bool {\n    %s\n}\n\n",
+			structEqName(n), ident(n), ident(n), strings.Join(parts, " && "))
 	}
 }
 
@@ -279,7 +290,7 @@ func (g *gen) needEq(name string) {
 
 func (g *gen) emitFunc(f *vegoc.FuncDecl) {
 	g.fn = f
-	g.tmp = 0
+	g.resetNames(f)
 	g.loops = nil
 	var params []string
 	if f.Allocates {
@@ -320,8 +331,40 @@ func (g *gen) body(body []*vegoc.Stmt, depth int) {
 }
 
 func (g *gen) newTmp() string {
-	g.tmp++
-	return fmt.Sprintf("_t%d", g.tmp)
+	if g.used == nil {
+		g.resetNames(g.fn)
+	}
+	for {
+		g.tmp++
+		name := fmt.Sprintf("_t%d", g.tmp)
+		if !g.used[name] {
+			g.used[name] = true
+			return name
+		}
+	}
+}
+
+func (g *gen) resetNames(f *vegoc.FuncDecl) {
+	g.tmp = 0
+	g.used = map[string]bool{}
+	reserve := func(name string) { g.used[ident(name)] = true }
+	for _, d := range g.p.Consts {
+		reserve(d.Name)
+	}
+	for _, d := range g.p.Vars {
+		reserve(d.Name)
+	}
+	for _, d := range g.p.Types {
+		reserve(d.Name)
+	}
+	for _, d := range g.p.Funcs {
+		reserve(d.Name)
+	}
+	if f != nil {
+		for name := range f.Info {
+			reserve(name)
+		}
+	}
 }
 
 // newLabels mints the break and continue labels of one lowered loop.
@@ -380,7 +423,8 @@ func (g *gen) assignLine(depth int, lhs *vegoc.Expr, rhs string) {
 	g.indent(depth)
 	if vegoc.Impure(lhs) {
 		// The place must be fixed before the value runs, to keep the left-to-right evaluation order of Go.
-		g.wf("{ let _p = unsafe { std::ptr::addr_of_mut!(%s) }; let _v = %s; unsafe { *_p = _v; } }\n", pl, rhs)
+		place, value := g.newTmp(), g.newTmp()
+		g.wf("{ let %s = unsafe { std::ptr::addr_of_mut!(%s) }; let %s = %s; unsafe { *%s = %s; } }\n", place, pl, value, rhs, place, value)
 		return
 	}
 	if unsafeNeeded {
@@ -447,7 +491,8 @@ func (g *gen) stmt(s *vegoc.Stmt, depth int) {
 		g.indent(depth)
 		if vegoc.Impure(lhs) {
 			// Rust evaluates the value before the place, but Go pins the place first.
-			g.wf("{ let _p = unsafe { std::ptr::addr_of_mut!(%s) }; let _v = %s; unsafe { *_p %s _v; } }\n", pl, val, op)
+			place, value := g.newTmp(), g.newTmp()
+			g.wf("{ let %s = unsafe { std::ptr::addr_of_mut!(%s) }; let %s = %s; unsafe { *%s %s %s; } }\n", place, pl, value, val, place, op, value)
 			return
 		}
 		if unsafeNeeded {
@@ -858,9 +903,9 @@ func (g *gen) binary(e *vegoc.Expr) string {
 		x, y := g.expr(e.X), g.expr(e.Y)
 		switch e.Op {
 		case "==":
-			return fmt.Sprintf("vg_eq_%s(%s, %s)", e.X.Typ.Name, x, y)
+			return fmt.Sprintf("%s(%s, %s)", structEqName(e.X.Typ.Name), x, y)
 		case "!=":
-			return fmt.Sprintf("(!vg_eq_%s(%s, %s))", e.X.Typ.Name, x, y)
+			return fmt.Sprintf("(!%s(%s, %s))", structEqName(e.X.Typ.Name), x, y)
 		}
 	}
 	x, y := g.expr(e.X), g.expr(e.Y)

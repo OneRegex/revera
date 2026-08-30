@@ -29,8 +29,7 @@ assert_eq!(&caps[1], "abc");
   The default is POSIX.
 - `re.contract(max_input)` reports what one search can cost, before it runs.
 
-The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not on this surface.
-A caller who needs them uses the hidden `revera::engine` module.
+The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not exposed by this crate.
 
 ## Layout
 
@@ -40,7 +39,9 @@ A caller who needs them uses the hidden `revera::engine` module.
   Regenerate it with:
 
   ```sh
-  cd ../go1 && go run ./cmd/json2rust -o ../rust1/src/engine.rs revera.vego.json
+  cd ../go1
+  go run ./cmd/json2rust -o ../rust1/src/engine.rs revera.vego.json
+  go run ./cmd/json2rust -o ../rust1/src/probe_engine.rs probe.vego.json
   ```
 
 - `src/vg.rs` is the runtime.

@@ -147,10 +147,10 @@ pub const Locale = struct {
     ///
     /// The allocator backs the lookup only.
     /// The locale it returns reads the embedded data and owns nothing.
-    pub fn open(gpa: Allocator, name: []const u8, collation_type: []const u8) ?Locale {
+    pub fn open(gpa: Allocator, name: []const u8, collation_type: []const u8) Allocator.Error!?Locale {
         var arena = std.heap.ArenaAllocator.init(gpa);
         defer arena.deinit();
-        const res = engine.LocaleOpen(
+        const res = try engine.LocaleOpen(
             arena.allocator(),
             vg.str(embedded_locale_data),
             vg.str(name),
@@ -223,15 +223,15 @@ pub const Regex = struct {
 
     /// Compiles a pattern.
     /// The Regex owns memory until deinit.
-    pub fn compile(gpa: Allocator, pattern: []const u8, opts: Options) Error!Regex {
+    pub fn compile(gpa: Allocator, pattern: []const u8, opts: Options) (Error || Allocator.Error)!Regex {
         var arena = std.heap.ArenaAllocator.init(gpa);
         errdefer arena.deinit();
         const mem = arena.allocator();
 
         // The pattern goes into the arena first, so the caller may compile from a temporary and drop it.
-        const owned = vg.bytesFromStr(mem, vg.str(pattern));
+        const owned = try vg.bytesFromStr(mem, vg.str(pattern));
         const loc = opts.locale orelse Locale.posix();
-        var res = engine.Compile(mem, vg.str(owned.items()), loc.inner, opts.flags());
+        var res = try engine.Compile(mem, vg.str(owned.items()), loc.inner, opts.flags());
         if (res[1].Code != engine.ErrNone) {
             if (opts.error_position) |slot| {
                 if (res[1].Pos >= 0) {
@@ -265,18 +265,18 @@ pub const Regex = struct {
     }
 
     /// Reports whether the expression matches anywhere in subject.
-    pub fn isMatch(self: *const Regex, subject: []const u8) Error!bool {
+    pub fn isMatch(self: *const Regex, subject: []const u8) (Error || Allocator.Error)!bool {
         var scratch = std.heap.ArenaAllocator.init(self.backing());
         defer scratch.deinit();
         return try self.exec(scratch.allocator(), subject, .{});
     }
 
     /// Returns the leftmost-longest match, or null when there is none.
-    pub fn find(self: *const Regex, subject: []const u8) Error!?Match {
+    pub fn find(self: *const Regex, subject: []const u8) (Error || Allocator.Error)!?Match {
         try self.refuseWithoutCaptures();
         var scratch = std.heap.ArenaAllocator.init(self.backing());
         defer scratch.deinit();
-        const pmatch = vg.make(scratch.allocator(), engine.Match, 1);
+        const pmatch = try vg.make(scratch.allocator(), engine.Match, 1);
         if (!try self.exec(scratch.allocator(), subject, pmatch)) {
             return null;
         }
@@ -292,7 +292,7 @@ pub const Regex = struct {
         try self.refuseWithoutCaptures();
         var scratch = std.heap.ArenaAllocator.init(self.backing());
         defer scratch.deinit();
-        const pmatch = vg.make(scratch.allocator(), engine.Match, @intCast(self.groups));
+        const pmatch = try vg.make(scratch.allocator(), engine.Match, @intCast(self.groups));
         if (!try self.exec(scratch.allocator(), subject, pmatch)) {
             return null;
         }
@@ -364,9 +364,9 @@ pub const Regex = struct {
         mem: Allocator,
         subject: []const u8,
         pmatch: vg.Slice(engine.Match),
-    ) Error!bool {
+    ) (Error || Allocator.Error)!bool {
         var re = self.inner;
-        const res = engine.Exec(mem, &re, vg.str(subject), pmatch, 0);
+        const res = try engine.Exec(mem, &re, vg.str(subject), pmatch, 0);
         if (res[1].Code != engine.ErrNone) {
             return errorOf(res[1].Code);
         }
@@ -394,7 +394,7 @@ pub const Regex = struct {
         var scratch = std.heap.ArenaAllocator.init(self.backing());
         defer scratch.deinit();
         var re = self.inner;
-        const res = engine.ReplaceAll(
+        const res = try engine.ReplaceAll(
             scratch.allocator(),
             &re,
             vg.str(subject),
@@ -414,7 +414,7 @@ pub const MatchIterator = struct {
     scan: Scan,
 
     /// Returns the next match, or null at the end of the subject.
-    pub fn next(self: *MatchIterator) Error!?Match {
+    pub fn next(self: *MatchIterator) (Error || Allocator.Error)!?Match {
         var scratch = std.heap.ArenaAllocator.init(self.scan.re.backing());
         defer scratch.deinit();
         const pmatch = (try self.scan.step(scratch.allocator())) orelse return null;
@@ -457,12 +457,12 @@ const Scan = struct {
         return .{ .re = re, .subject = subject, .walk = walk, .iter = res[0], .done = false };
     }
 
-    fn step(self: *Scan, mem: Allocator) Error!?vg.Slice(engine.Match) {
+    fn step(self: *Scan, mem: Allocator) (Error || Allocator.Error)!?vg.Slice(engine.Match) {
         if (self.done) {
             return null;
         }
-        const pmatch = vg.make(mem, engine.Match, @intCast(self.re.groups));
-        const res = engine.MatchIterNext(mem, &self.walk, &self.iter, vg.str(self.subject), 0, pmatch);
+        const pmatch = try vg.make(mem, engine.Match, @intCast(self.re.groups));
+        const res = try engine.MatchIterNext(mem, &self.walk, &self.iter, vg.str(self.subject), 0, pmatch);
         if (res[1].Code != engine.ErrNone) {
             self.done = true;
             return errorOf(res[1].Code);

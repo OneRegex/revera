@@ -21,13 +21,13 @@ func TestOpenPOSIXAliases(t *testing.T) {
 }
 
 func TestOpenNames(t *testing.T) {
-	for _, name := range []string{"en", "en-US", "en_US", "en_US.UTF-8", "fr-FR", "cs", "tr"} {
+	for _, name := range []string{"en", "en-US", "en_US", "en_US.UTF-8", "en_US.UTF8", "fr-FR", "cs", "tr"} {
 		l, ok := Open(name, "")
 		if !ok || l.IsPOSIX() {
 			t.Fatalf("Open(%q) = %v, %v", name, l, ok)
 		}
 	}
-	for _, name := range []string{"", "zz-ZZ", "en_US.ISO8859-1", "en@x=y", "en@collation="} {
+	for _, name := range []string{"", "zz-ZZ", "en_US.ISO8859-1", "en.u-t-f-8", "en.UTF--8", "en.UTF-8-", "en@x=y", "en@collation="} {
 		if _, ok := Open(name, ""); ok {
 			t.Fatalf("Open(%q) unexpectedly succeeded", name)
 		}

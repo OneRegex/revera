@@ -98,7 +98,7 @@ impl Str {
         self.sub(0, hi)
     }
 
-    pub fn bytes<'a>(self) -> &'a [u8] {
+    pub fn bytes(&self) -> &[u8] {
         if self.p.is_null() || self.len == 0 {
             return &[];
         }
@@ -169,7 +169,11 @@ impl<T> Slice<T> {
     pub fn sub(self, lo: i64, hi: i64) -> Slice<T> {
         assert!(0 <= lo && lo <= hi && hi <= self.cap);
         if self.p.is_null() {
-            return Slice { p: std::ptr::null_mut(), len: 0, cap: 0 };
+            return Slice {
+                p: std::ptr::null_mut(),
+                len: 0,
+                cap: 0,
+            };
         }
         Slice {
             p: unsafe { self.p.add(lo as usize) },
@@ -200,7 +204,11 @@ pub fn make<T>(mem: &Arena, n: i64) -> Slice<T> {
 
 pub fn make_cap<T>(mem: &Arena, n: i64, c: i64) -> Slice<T> {
     assert!(0 <= n && n <= c);
-    Slice { p: alloc_elems(mem, c), len: n, cap: c }
+    Slice {
+        p: alloc_elems(mem, c),
+        len: n,
+        cap: c,
+    }
 }
 
 fn grow<T>(mem: &Arena, s: Slice<T>, need: i64) -> Slice<T> {
@@ -212,7 +220,11 @@ fn grow<T>(mem: &Arena, s: Slice<T>, need: i64) -> Slice<T> {
     if !s.p.is_null() && s.len > 0 {
         unsafe { std::ptr::copy_nonoverlapping(s.p, p, s.len as usize) };
     }
-    Slice { p, len: s.len, cap: newcap }
+    Slice {
+        p,
+        len: s.len,
+        cap: newcap,
+    }
 }
 
 pub fn append<T>(mem: &Arena, s: Slice<T>, v: T) -> Slice<T> {

@@ -27,11 +27,11 @@ const Host = struct {
     valid: bool = false,
 };
 
-fn decode(gpa: vg.Allocator, tok: []const u8) vg.Str {
+fn decode(gpa: vg.Allocator, tok: []const u8) vg.Allocator.Error!vg.Str {
     if (tok.len == 1 and tok[0] == '-') {
         return .{};
     }
-    const s = vg.make(gpa, u8, @intCast(tok.len / 2));
+    const s = try vg.make(gpa, u8, @intCast(tok.len / 2));
     _ = std.fmt.hexToBytes(s.items(), tok) catch @panic("bad hex");
     return vg.str(s.items());
 }
@@ -65,9 +65,9 @@ fn handle(h: *Host, w: *Io.Writer, line: []const u8) !void {
             try w.writeAll("P 1\n");
         },
         'L' => {
-            const name = decode(h.persistent, next(&it));
-            const coll = decode(h.persistent, next(&it));
-            const res = engine.LocaleSelect(h.persistent, &h.base, name, coll);
+            const name = try decode(h.persistent, next(&it));
+            const coll = try decode(h.persistent, next(&it));
+            const res = try engine.LocaleSelect(h.persistent, &h.base, name, coll);
             if (res[1]) {
                 h.cur = res[0];
             }
@@ -81,8 +81,8 @@ fn handle(h: *Host, w: *Io.Writer, line: []const u8) !void {
             _ = h.pattern.reset(.retain_capacity);
             _ = h.scratch.reset(.retain_capacity);
             const gpa = h.pattern.allocator();
-            const pat = decode(gpa, patTok);
-            const res = engine.Compile(gpa, pat, h.cur, flags);
+            const pat = try decode(gpa, patTok);
+            const res = try engine.Compile(gpa, pat, h.cur, flags);
             if (res[1].Code != 0) {
                 try w.print("C {d} {d} 0\n", .{ res[1].Code, res[1].Pos });
                 return;
@@ -99,9 +99,9 @@ fn handle(h: *Host, w: *Io.Writer, line: []const u8) !void {
             _ = h.scratch.reset(.retain_capacity);
             const gpa = h.scratch.allocator();
             const eflags = parseU32(next(&it));
-            const subject = decode(gpa, next(&it));
-            const pmatch = vg.make(gpa, engine.Match, engine.NumSub(&h.re) + 1);
-            const res = engine.Exec(gpa, &h.re, subject, pmatch, eflags);
+            const subject = try decode(gpa, next(&it));
+            const pmatch = try vg.make(gpa, engine.Match, engine.NumSub(&h.re) + 1);
+            const res = try engine.Exec(gpa, &h.re, subject, pmatch, eflags);
             if (res[1].Code != 0) {
                 try w.print("X {d} 0\n", .{res[1].Code});
                 return;
@@ -125,9 +125,9 @@ fn handle(h: *Host, w: *Io.Writer, line: []const u8) !void {
             const gpa = h.scratch.allocator();
             const limit = parseI64(next(&it));
             const eflags = parseU32(next(&it));
-            const repl = decode(gpa, next(&it));
-            const subject = decode(gpa, next(&it));
-            const res = engine.ReplaceAll(gpa, &h.re, subject, repl, limit, eflags);
+            const repl = try decode(gpa, next(&it));
+            const subject = try decode(gpa, next(&it));
+            const res = try engine.ReplaceAll(gpa, &h.re, subject, repl, limit, eflags);
             if (res[1].Code != 0) {
                 try w.print("R {d} {d} -\n", .{ res[1].Code, res[1].Pos });
                 return;
@@ -145,19 +145,19 @@ fn handle(h: *Host, w: *Io.Writer, line: []const u8) !void {
             const gpa = h.scratch.allocator();
             const limit = parseI64(next(&it));
             const eflags = parseU32(next(&it));
-            const subject = decode(gpa, next(&it));
+            const subject = try decode(gpa, next(&it));
             const ires = engine.MatchIterInit(&h.re, limit);
             if (ires[1].Code != 0) {
                 try w.print("I {d} 0\n", .{ires[1].Code});
                 return;
             }
             var iter = ires[0];
-            const pmatch = vg.make(gpa, engine.Match, engine.NumSub(&h.re) + 1);
+            const pmatch = try vg.make(gpa, engine.Match, engine.NumSub(&h.re) + 1);
             const rows = try gpa.alloc(u8, 1 << 22);
             var rw = Io.Writer.fixed(rows);
             var count: i64 = 0;
             while (true) {
-                const res = engine.MatchIterNext(gpa, &h.re, &iter, subject, eflags, pmatch);
+                const res = try engine.MatchIterNext(gpa, &h.re, &iter, subject, eflags, pmatch);
                 if (res[1].Code != 0) {
                     try w.print("I {d} 0\n", .{res[1].Code});
                     return;

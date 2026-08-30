@@ -46,10 +46,11 @@ func main() {
 }
 
 type gen struct {
-	p   *vegoc.Program
-	b   strings.Builder
-	fn  *vegoc.FuncDecl
-	tmp int
+	p    *vegoc.Program
+	b    strings.Builder
+	fn   *vegoc.FuncDecl
+	tmp  int
+	used map[string]bool
 }
 
 var zigKeywords = map[string]bool{
@@ -172,7 +173,7 @@ func (g *gen) zero(t *vegoc.Type) string {
 
 func (g *gen) emitFunc(f *vegoc.FuncDecl) {
 	g.fn = f
-	g.tmp = 0
+	g.resetNames(f)
 	var params []string
 	if f.Allocates {
 		params = append(params, "mem: vg.Allocator")
@@ -186,6 +187,9 @@ func (g *gen) emitFunc(f *vegoc.FuncDecl) {
 		ret = g.typ(f.Results[0])
 	case 2:
 		ret = vegoc.TupName([2]*vegoc.Type{f.Results[0], f.Results[1]})
+	}
+	if f.Allocates {
+		ret = "vg.Allocator.Error!" + ret
 	}
 	g.wf("pub fn %s(%s) %s {\n", ident(f.Name), strings.Join(params, ", "), ret)
 	for _, pa := range f.Params {
@@ -274,6 +278,18 @@ func (g *gen) stmt(s *vegoc.Stmt, depth int) {
 		}
 		g.wf("%s = %s;\n", g.expr(l), g.expr(s.Value))
 	case "op_assign":
+		if g.pinOpAssign(s) {
+			place := g.newTmp()
+			g.indent(depth)
+			g.wf("{\n")
+			g.indent(depth + 1)
+			g.wf("const %s = &%s;\n", place, g.expr(s.Lhs[0]))
+			g.indent(depth + 1)
+			g.wf("%s;\n", g.opAssignPlace(s, place+".*"))
+			g.indent(depth)
+			g.wf("}\n")
+			return
+		}
 		g.indent(depth)
 		g.wf("%s;\n", g.opAssign(s))
 	case "if":
@@ -420,8 +436,40 @@ func (g *gen) emitRange(s *vegoc.Stmt, depth int) {
 }
 
 func (g *gen) newTmp() string {
-	g.tmp++
-	return fmt.Sprintf("_t%d", g.tmp)
+	if g.used == nil {
+		g.resetNames(g.fn)
+	}
+	for {
+		g.tmp++
+		name := fmt.Sprintf("_t%d", g.tmp)
+		if !g.used[name] {
+			g.used[name] = true
+			return name
+		}
+	}
+}
+
+func (g *gen) resetNames(f *vegoc.FuncDecl) {
+	g.tmp = 0
+	g.used = map[string]bool{}
+	reserve := func(name string) { g.used[ident(name)] = true }
+	for _, d := range g.p.Consts {
+		reserve(d.Name)
+	}
+	for _, d := range g.p.Vars {
+		reserve(d.Name)
+	}
+	for _, d := range g.p.Types {
+		reserve(d.Name)
+	}
+	for _, d := range g.p.Funcs {
+		reserve(d.Name)
+	}
+	if f != nil {
+		for name := range f.Info {
+			reserve(name)
+		}
+	}
 }
 
 // inlineStmt renders a loop post statement as a Zig continue expression.
@@ -433,14 +481,28 @@ func (g *gen) inlineStmt(s *vegoc.Stmt) string {
 		}
 		return g.expr(s.Lhs[0]) + " = " + g.expr(s.Value)
 	case "op_assign":
+		if g.pinOpAssign(s) {
+			place := g.newTmp()
+			return fmt.Sprintf("{ const %s = &%s; %s; }",
+				place, g.expr(s.Lhs[0]), g.opAssignPlace(s, place+".*"))
+		}
 		return g.opAssign(s)
+	case "expr_stmt":
+		return g.expr(s.Value)
 	}
 	fatal("unsupported loop post statement", s.K)
 	return ""
 }
 
 func (g *gen) opAssign(s *vegoc.Stmt) string {
-	lhs := g.expr(s.Lhs[0])
+	return g.opAssignPlace(s, g.expr(s.Lhs[0]))
+}
+
+func (g *gen) pinOpAssign(s *vegoc.Stmt) bool {
+	return (s.Op == "/=" || s.Op == "%=") && vegoc.Impure(s.Lhs[0])
+}
+
+func (g *gen) opAssignPlace(s *vegoc.Stmt, lhs string) string {
 	val := g.expr(s.Value)
 	switch s.Op {
 	case "+=", "-=", "*=":
@@ -532,21 +594,23 @@ func (g *gen) expr(e *vegoc.Expr) string {
 		fatal("slice of", e.X.Typ)
 	case "call":
 		var args []string
+		prefix := ""
 		if g.p.CalleeAllocates(e.Name) {
 			args = append(args, "mem")
+			prefix = "try "
 		}
 		for _, a := range e.Args {
 			args = append(args, g.expr(a))
 		}
-		return ident(e.Name) + "(" + strings.Join(args, ", ") + ")"
+		return prefix + ident(e.Name) + "(" + strings.Join(args, ", ") + ")"
 	case "builtin":
 		return g.builtin(e)
 	case "conv":
 		if e.TypeRef.K == vegoc.KStr {
-			return "vg.strFromBytes(mem, " + g.expr(e.X) + ")"
+			return "try vg.strFromBytes(mem, " + g.expr(e.X) + ")"
 		}
 		if e.TypeRef.K == vegoc.KSlice {
-			return "vg.bytesFromStr(mem, " + g.expr(e.X) + ")"
+			return "try vg.bytesFromStr(mem, " + g.expr(e.X) + ")"
 		}
 		return fmt.Sprintf("vg.cv(%s, %s)", g.typ(e.TypeRef), g.expr(e.X))
 	case "unary":
@@ -585,21 +649,21 @@ func (g *gen) builtin(e *vegoc.Expr) string {
 	case "make":
 		elem := g.typ(e.TypeRef.Elem)
 		if len(e.Args) == 2 {
-			return fmt.Sprintf("vg.makeCap(mem, %s, %s, %s)", elem, g.idx(e.Args[0]), g.idx(e.Args[1]))
+			return fmt.Sprintf("try vg.makeCap(mem, %s, %s, %s)", elem, g.idx(e.Args[0]), g.idx(e.Args[1]))
 		}
-		return fmt.Sprintf("vg.make(mem, %s, %s)", elem, g.idx(e.Args[0]))
+		return fmt.Sprintf("try vg.make(mem, %s, %s)", elem, g.idx(e.Args[0]))
 	case "append":
 		st := e.Args[0].Typ
 		elem := g.typ(st.Elem)
 		if e.Spread {
 			if e.Args[1].Typ.K == vegoc.KStr {
-				return fmt.Sprintf("vg.appendStr(mem, %s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
+				return fmt.Sprintf("try vg.appendStr(mem, %s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
 			}
-			return fmt.Sprintf("vg.appendSlice(mem, %s, %s, %s)", elem, g.expr(e.Args[0]), g.expr(e.Args[1]))
+			return fmt.Sprintf("try vg.appendSlice(mem, %s, %s, %s)", elem, g.expr(e.Args[0]), g.expr(e.Args[1]))
 		}
 		out := g.expr(e.Args[0])
 		for _, a := range e.Args[1:] {
-			out = fmt.Sprintf("vg.append(mem, %s, %s, %s)", elem, out, g.expr(a))
+			out = fmt.Sprintf("try vg.append(mem, %s, %s, %s)", elem, out, g.expr(a))
 		}
 		return out
 	case "copy":
@@ -703,7 +767,7 @@ func (g *gen) composite(e *vegoc.Expr) string {
 			parts = append(parts, g.expr(el))
 		}
 		elem := g.typ(t.Elem)
-		return fmt.Sprintf("vg.sliceOf(mem, %s, &[_]%s{ %s })", elem, elem, strings.Join(parts, ", "))
+		return fmt.Sprintf("try vg.sliceOf(mem, %s, &[_]%s{ %s })", elem, elem, strings.Join(parts, ", "))
 	case vegoc.KArray:
 		var parts []string
 		for _, el := range e.Elems {

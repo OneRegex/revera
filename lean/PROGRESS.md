@@ -63,7 +63,7 @@
   An earlier note claimed that they reach the cap, and that note was wrong.
   No threshold on ContractSteps separates the intractable blocks from the tractable ones, so the exclusion list names patterns instead.
 - The corpus is not uniformly cheap to replay, and the old promise of "tens of minutes" for the corpus theorem was wrong by orders of magnitude.
-  Twelve compile blocks, six of `((a*){250}){250}b` and six of `((a*){4}){4}`, would take days between them, while the other 85635 commands replay in about five minutes.
+  Twelve compile blocks, six of `((a*){250}){250}b` and six of `((a*){4}){4}`, would take days between them, while the other 85648 commands replay in about five minutes.
   The cost comes from the nesting, not from the subject.
   Each block holds four 120 byte subjects, and one of them measured 107 minutes.
   `((a*){4}){4}` needs minutes even on the empty subject.
@@ -93,7 +93,7 @@
   They cover the layout well-formedness.
   They cover the exactness of the allocation meter on append, make, a slice literal, and both string conversions.
   They cover the saturation algebra of the contract arithmetic.
-- [x] `Vego/Corpus.lean` derives the replay set from the embedded corpus: everything except the 1056 executions of the two intractable patterns, so all 9779 compiles and every contract query stay in.
+- [x] `Vego/Corpus.lean` derives the replay set from the embedded corpus: everything except the 1056 executions of the two intractable patterns, so all 9780 compiles and every contract query stay in.
   The proposition re-checks its own coverage
 - [x] `lake build` finishes in about five minutes and checks all four theorems, the corpus contract theorem among them
 - [x] Meter soundness for the whole interpreter, in Vego/MeterSound.lean.

@@ -15,12 +15,16 @@ test_lookup(void)
     assert(locale.is_posix);
     assert(rv_locale_open("fr_CA.UTF-8", NULL, &locale));
     assert(!locale.is_posix);
+    assert(rv_locale_open("fr_CA.UTF8", NULL, &locale));
     assert(rv_locale_open("de-CH", "phonebk", &locale));
     assert(rv_locale_open("es_MX@collation=traditional", NULL, &locale));
     assert(rv_locale_open("es-MX", "trad", &locale));
     assert(!rv_locale_open("not-a-cldr-locale", NULL, &locale));
     assert(!rv_locale_open("fr", "not-a-collation", &locale));
     assert(!rv_locale_open("fr.ISO-8859-1", NULL, &locale));
+    assert(!rv_locale_open("fr.u-t-f-8", NULL, &locale));
+    assert(!rv_locale_open("fr.UTF--8", NULL, &locale));
+    assert(!rv_locale_open("fr.UTF-8-", NULL, &locale));
     assert(!rv_locale_open("fr@calendar=gregorian", NULL, &locale));
     assert(!rv_locale_open("fr@collation=", NULL, &locale));
     assert(!rv_locale_open("fr@collation=standard", "standard", &locale));

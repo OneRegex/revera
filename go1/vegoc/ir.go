@@ -4,10 +4,12 @@
 package vegoc
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
+	"strconv"
 )
 
 type TypeKind int
@@ -395,7 +397,7 @@ func LoadFile(path string) (*Program, error) {
 
 // Mangle folds a type into an identifier fragment.
 // The Zig and C++ printers name their shared two-result tuple structs with it.
-// The fragments are target-neutral.
+// The fragments are target-neutral and prefix-free across checked result types.
 func Mangle(t *Type) string {
 	switch t.K {
 	case KBool:
@@ -416,42 +418,82 @@ func Mangle(t *Type) string {
 		return "Str"
 	case KSlice:
 		return "s" + Mangle(t.Elem)
+	case KArray:
+		if !t.ALenSet {
+			panic("cannot mangle an unresolved array length")
+		}
+		return "a" + strconv.FormatInt(t.ALenVal, 10) + "x" + Mangle(t.Elem)
 	case KStruct:
-		return t.Name
+		return "t" + hex.EncodeToString([]byte(t.Name)) + "x"
 	}
 	panic("cannot mangle type " + t.String())
 }
 
+const tupleNamePrefix = "Tup_"
+
 // TupName names the struct type holding a two-result pair.
 func TupName(pair [2]*Type) string {
-	return "Tup_" + Mangle(pair[0]) + "_" + Mangle(pair[1])
+	return tupleNamePrefix + Mangle(pair[0]) + "_" + Mangle(pair[1])
 }
 
 type object = map[string]any
 
-func Load(blob []byte) (*Program, error) {
+func Load(blob []byte) (p *Program, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			p = nil
+			err = fmt.Errorf("invalid Vego JSON: %v", r)
+		}
+	}()
 	var doc object
 	if err := json.Unmarshal(blob, &doc); err != nil {
 		return nil, err
 	}
-	p := &Program{
-		Package:   doc["package"].(string),
+	version, ok := doc["vego"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("invalid Vego JSON version")
+	}
+	if version != 1 {
+		return nil, fmt.Errorf("unsupported Vego JSON version %v", version)
+	}
+	packageName, ok := doc["package"].(string)
+	if !ok || packageName == "" {
+		return nil, fmt.Errorf("invalid Vego JSON package")
+	}
+	consts, err := topLevelList(doc, "consts")
+	if err != nil {
+		return nil, err
+	}
+	vars, err := topLevelList(doc, "vars")
+	if err != nil {
+		return nil, err
+	}
+	types, err := topLevelList(doc, "types")
+	if err != nil {
+		return nil, err
+	}
+	funcs, err := topLevelList(doc, "funcs")
+	if err != nil {
+		return nil, err
+	}
+	p = &Program{
+		Package:   packageName,
 		ConstMap:  map[string]*ValueDecl{},
 		VarMap:    map[string]*ValueDecl{},
 		StructMap: map[string]*StructDecl{},
 		FuncMap:   map[string]*FuncDecl{},
 	}
-	for _, d := range doc["consts"].([]any) {
+	for _, d := range consts {
 		v := loadValueDecl(d.(object))
 		p.Consts = append(p.Consts, v)
 		p.ConstMap[v.Name] = v
 	}
-	for _, d := range doc["vars"].([]any) {
+	for _, d := range vars {
 		v := loadValueDecl(d.(object))
 		p.Vars = append(p.Vars, v)
 		p.VarMap[v.Name] = v
 	}
-	for _, d := range doc["types"].([]any) {
+	for _, d := range types {
 		o := d.(object)
 		s := &StructDecl{Name: o["name"].(string)}
 		for _, f := range o["fields"].([]any) {
@@ -461,7 +503,7 @@ func Load(blob []byte) (*Program, error) {
 		p.Types = append(p.Types, s)
 		p.StructMap[s.Name] = s
 	}
-	for _, d := range doc["funcs"].([]any) {
+	for _, d := range funcs {
 		o := d.(object)
 		f := &FuncDecl{Name: o["name"].(string), Info: map[string]*LocalInfo{}}
 		for _, pr := range o["params"].([]any) {
@@ -476,6 +518,14 @@ func Load(blob []byte) (*Program, error) {
 		p.FuncMap[f.Name] = f
 	}
 	return p, nil
+}
+
+func topLevelList(doc object, name string) ([]any, error) {
+	values, ok := doc[name].([]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid Vego JSON %s list", name)
+	}
+	return values, nil
 }
 
 func loadValueDecl(o object) *ValueDecl {

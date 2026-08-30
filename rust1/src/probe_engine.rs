@@ -21,7 +21,7 @@ pub struct Tagged {
     pub N: i32,
 }
 
-pub fn vg_eq_Tagged(a: Tagged, b: Tagged) -> bool {
+pub fn vego_eq_Tagged(a: Tagged, b: Tagged) -> bool {
     a.Tags.iter().zip(b.Tags.iter()).all(|(x, y)| vg::streq(*x, *y)) && a.N == b.N
 }
 
@@ -163,7 +163,7 @@ pub fn PartialArray() -> i64 {
 }
 
 pub fn TaggedEq(a: Tagged, b: Tagged) -> bool {
-    return vg_eq_Tagged(a, b);
+    return vego_eq_Tagged(a, b);
 }
 
 pub fn three(a: i64, b: i64, x: i64) -> i64 {
@@ -281,7 +281,7 @@ pub fn SubWrite(mem: &vg::Arena, n: i64) -> i64 {
 pub fn AndNotOrder(mem: &vg::Arena, c: &mut Counter) -> i64 {
     let s: vg::Slice<u64> = vg::make::<u64>(mem, 8i64);
     unsafe { (*s.ptr(3i64)) = 255u64; }
-    { let _p = unsafe { std::ptr::addr_of_mut!((*s.ptr(({ let _t1 = 1i32; bump(mem, c, _t1) } + 2i64)))) }; let _v = !(((({ let _t2 = 2i32; bump(mem, c, _t2) }) as u64) + 15u64)); unsafe { *_p &= _v; } }
+    { let _t3 = unsafe { std::ptr::addr_of_mut!((*s.ptr(({ let _t1 = 1i32; bump(mem, c, _t1) } + 2i64)))) }; let _t4 = !(((({ let _t2 = 2i32; bump(mem, c, _t2) }) as u64) + 15u64)); unsafe { *_t3 &= _t4; } }
     return ((((s.get(3i64)) as i64) * 100000i64) + logCode(c));
 }
 

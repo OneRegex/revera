@@ -123,14 +123,15 @@ func (re *Regexp) replaceAll(subject string, limit int, eflags ExecFlags,
 	last := 0
 	any := false
 	err := re.MatchAll(subject, limit, eflags, func(pmatch []Match) bool {
+		match := pmatch[0]
 		if !any {
 			// One reservation covers the common case, where the result stays near the subject size.
 			out.Grow(len(subject) + len(subject)/8)
 			any = true
 		}
-		out.WriteString(subject[last:pmatch[0].So])
+		out.WriteString(subject[last:match.So])
 		write(&out, pmatch)
-		last = pmatch[0].Eo
+		last = match.Eo
 		return true
 	})
 	if err != nil {
@@ -152,6 +153,9 @@ func (re *Regexp) replaceAll(subject string, limit int, eflags ExecFlags,
 //
 // An expression compiled with NoSub reports ENoSub.
 func (re *Regexp) ReplaceAll(subject, replacement string, limit int, eflags ExecFlags) (string, error) {
+	if re.flags&NoSub != 0 {
+		return "", &Error{Code: ENoSub, Pos: -1}
+	}
 	parts, perr := parseReplacement(replacement, re.nsub)
 	if perr != nil {
 		return "", perr

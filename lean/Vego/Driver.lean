@@ -56,6 +56,11 @@ A long driver session allocates buffers that nothing references once a command f
 This moves the session roots into a fresh heap and drops the rest.
 Sharing between headers is kept through the memo table.
 -/
+private def migratedGeneration (old : Array Cell) (obj gen : Nat) : Nat :=
+  match old[obj]? with
+  | some (oldGen, _) => if oldGen == gen then 0 else 1
+  | none => 1
+
 mutual
 
 partial def migrateVal (old : Array Cell) (memo : Array (Option Nat))
@@ -63,12 +68,13 @@ partial def migrateVal (old : Array Cell) (memo : Array (Option Nat))
   match v with
   | .i _ | .b _ | .s _ => (v, memo, nh)
   | .slice none _ _ _ => (v, memo, nh)
-  | .slice (some (obj, _, path)) off len cap =>
+  | .slice (some (obj, gen, path)) off len cap =>
     let (obj', memo, nh) := migrateCell old memo nh obj
-    (.slice (some (obj', 0, path)) off len cap, memo, nh)
-  | .ptr obj _ path =>
+    (.slice (some (obj', migratedGeneration old obj gen, path)) off len cap,
+     memo, nh)
+  | .ptr obj gen path =>
     let (obj', memo, nh) := migrateCell old memo nh obj
-    (.ptr obj' 0 path, memo, nh)
+    (.ptr obj' (migratedGeneration old obj gen) path, memo, nh)
   | .arr es =>
     let (es', memo, nh) := migrateAll old memo nh es
     (.arr es', memo, nh)
@@ -516,12 +522,20 @@ def eval (s : Session) (line : String) : SR (String × Session) := do
 
 end Session
 
-/-- Parse a corpus dump: one command and its expected output per line, tab separated. -/
-def parseCorpus (txt : String) : List (String × String) :=
-  (txt.trim.splitOn "\n").filterMap fun line =>
-    match line.splitOn "\t" with
-    | [cmd, want] => some (cmd, want)
-    | _ => none
+/--
+Parse a corpus dump: one command and its expected output per line, tab separated.
+Blank lines are ignored, and malformed nonempty rows fail with their line number.
+-/
+def parseCorpus (txt : String) : Except String (List (String × String)) := do
+  let mut rows : Array (String × String) := #[]
+  let mut lineNo := 0
+  for line in txt.splitOn "\n" do
+    lineNo := lineNo + 1
+    if !line.isEmpty then
+      match line.splitOn "\t" with
+      | [cmd, want] => rows := rows.push (cmd, want)
+      | _ => throw s!"malformed corpus row {lineNo}"
+  pure rows.toList
 
 structure CorpusResult where
   checked : Nat

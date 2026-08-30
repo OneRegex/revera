@@ -200,15 +200,12 @@ func normalizeName(input string) (string, bool) {
 		for i < len(input) && input[i] != '@' {
 			c := asciiLower(input[i])
 			i++
-			if c == '-' {
-				continue
-			}
 			if len(codeset) == 5 || c >= 0x80 {
 				return "", false
 			}
 			codeset = append(codeset, c)
 		}
-		if string(codeset) != "utf8" {
+		if string(codeset) != "utf8" && string(codeset) != "utf-8" {
 			return "", false
 		}
 	}

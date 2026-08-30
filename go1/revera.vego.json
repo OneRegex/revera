@@ -37730,27 +37730,6 @@
         {
          "cond": {
           "k": "binary",
-          "op": "==",
-          "x": {
-           "k": "ident",
-           "name": "c"
-          },
-          "y": {
-           "k": "char",
-           "value": "45"
-          }
-         },
-         "else": null,
-         "k": "if",
-         "then": [
-          {
-           "k": "continue"
-          }
-         ]
-        },
-        {
-         "cond": {
-          "k": "binary",
           "op": "||",
           "x": {
            "k": "binary",
@@ -37879,21 +37858,44 @@
       {
        "cond": {
         "k": "binary",
-        "op": "!=",
+        "op": "\u0026\u0026",
         "x": {
-         "k": "conv",
-         "type": {
-          "k": "named",
-          "name": "string"
-         },
+         "k": "binary",
+         "op": "!=",
          "x": {
-          "k": "ident",
-          "name": "codeset"
+          "k": "conv",
+          "type": {
+           "k": "named",
+           "name": "string"
+          },
+          "x": {
+           "k": "ident",
+           "name": "codeset"
+          }
+         },
+         "y": {
+          "k": "str",
+          "value": "utf8"
          }
         },
         "y": {
-         "k": "str",
-         "value": "utf8"
+         "k": "binary",
+         "op": "!=",
+         "x": {
+          "k": "conv",
+          "type": {
+           "k": "named",
+           "name": "string"
+          },
+          "x": {
+           "k": "ident",
+           "name": "codeset"
+          }
+         },
+         "y": {
+          "k": "str",
+          "value": "utf-8"
+         }
         }
        },
        "else": null,
@@ -66262,6 +66264,63 @@
   },
   {
    "body": [
+    {
+     "cond": {
+      "k": "binary",
+      "op": "!=",
+      "x": {
+       "k": "binary",
+       "op": "\u0026",
+       "x": {
+        "k": "field",
+        "name": "flags",
+        "x": {
+         "k": "ident",
+         "name": "re"
+        }
+       },
+       "y": {
+        "k": "ident",
+        "name": "FlagNoSub"
+       }
+      },
+      "y": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "str",
+         "value": ""
+        },
+        {
+         "args": [
+          {
+           "k": "ident",
+           "name": "ErrENoSub"
+          },
+          {
+           "k": "unary",
+           "op": "-",
+           "x": {
+            "k": "int",
+            "value": "1"
+           }
+          }
+         ],
+         "fn": "compileError",
+         "k": "call"
+        }
+       ]
+      }
+     ]
+    },
     {
      "k": "define",
      "names": [

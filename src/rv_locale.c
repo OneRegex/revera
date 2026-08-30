@@ -86,12 +86,12 @@ rv_normalize_name(const char *input, char output[RV_NORMALIZED_NAME_MAX + 1])
         cursor++;
         while (*cursor != '\0' && *cursor != '@') {
             unsigned char character = rv_ascii_lower(*cursor++);
-            if (character == '-') continue;
             if (codeset_length == sizeof(codeset) - 1 || character >= 0x80) return false;
             codeset[codeset_length++] = (char) character;
         }
         codeset[codeset_length] = '\0';
-        if (strcmp(codeset, "utf8") != 0) return false;
+        if (strcmp(codeset, "utf8") != 0 &&
+                strcmp(codeset, "utf-8") != 0) return false;
     }
     return *cursor == '\0' || *cursor == '@';
 }

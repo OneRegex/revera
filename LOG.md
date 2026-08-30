@@ -755,3 +755,151 @@ That check caught a real defect which predates this pass.
 An unescaped `|` inside a code span, in the benchmark table of `go0/NOTES.md`, split one row and dropped a cell.
 Every relative link in all nineteen files resolves.
 A word-multiset comparison against the previous revision shows the reflow of the untouched-prose files lost nothing.
+
+## Contributor guide
+
+The user asked for a concise `AGENTS.md` contributor guide that reflects this repository.
+
+I first checked the repository root and confirmed that `AGENTS.md` did not exist.
+I searched the project memory index for prior re-vera2 guidance and found no matching entry.
+I assigned focused read-only reviews of the project layout, development conventions and Git history.
+I then inventoried the tracked files, existing worktree changes, root README, Makefile and recent commit subjects.
+The repository is a multi-language POSIX ERE implementation with C, Go, Rust, Zig, C++ and LEAN4 components.
+The existing `LOG.md`, `MISTAKES.md` and `api-faq.md` already satisfy the project's progress and correction records.
+I read each component README and sampled source and tests to confirm commands, generated-file boundaries, naming and test conventions.
+The focused reviews confirmed that the repository has no project-owned PR template, coverage threshold or remote GitHub configuration.
+I wrote the contributor guide, checked its headings and commands, and found that the first draft exceeded the requested optimal word range.
+I recorded that mistake and tightened the guide below 400 words.
+I placed longer documentation sentences on separate source lines, then reran word-count, prose, whitespace and diff checks.
+
+## Repository-wide correctness audit
+
+The user asked me to review every project component and fix only actual, provable bugs, with correctness taking priority over speed.
+I classified the preceding contributor-guide turn as no progress toward this new audit objective.
+I created an evidence-first plan that requires a reproducer or violated invariant before any patch.
+I checked the current worktree and preserved the existing modified and untracked files.
+My first broad contributor-guide lookup used the wrong search command and stalled in the parent directory.
+I recorded the mistake, repeated the lookup with `rg`, and confirmed that only the root `AGENTS.md` applies.
+The memory index has no prior entry for this repository, so current files and test results remain the only evidence base.
+I assigned read-only specialist audits to the C and go0 components, the go1 pipeline, and the Rust, Zig, C++ and Lean components.
+I ran every documented component test in parallel.
+The C locale tests, both Go suites, the Rust tests, the Zig tests and the C++ API test passed.
+The Lean build remained live after building its executable and had emitted only deprecation and unused-simplifier warnings.
+I regenerated both Vego JSON programs and every checked-in Rust, Zig and C++ generated engine into `tmp/audit-main/`.
+Every regenerated artifact matched its checked-in counterpart byte for byte.
+The first go0 race command returned cached results, so I recorded the mistake and scheduled an uncached rerun.
+I inspected the target runtimes and found a concrete Zig OOM candidate: the low-level allocator panics even where public methods advertise allocator errors.
+I checked the installed Zig 0.17 standard library for its failing allocator before writing a reproducer.
+The failing-allocator reproducer aborted in `zig1/src/vg.zig` on the first allocation instead of returning `error.OutOfMemory`.
+An independent target-runtime review confirmed that this violates the public Zig error contract.
+The sound boundary is transitive: allocating runtime helpers, generated functions and public wrappers must all propagate allocator errors.
+Fresh go0 race tests, C and C++ address and undefined-behavior sanitizer runs, a 45-second Go differential fuzz run, and every target probe check passed.
+The complete Lean build passed all 44 jobs, including `Vego.Theorems`, in 502 seconds.
+I changed the Zig printer so every function that receives an allocator returns `Allocator.Error` and every allocating expression uses `try`.
+I changed the Zig runtime allocation helpers and the hand-written public API and drivers to propagate `error.OutOfMemory`.
+I mistakenly formatted generated files directly, recorded the error, and restored the generator as the sole source of their layout.
+I added an allocation-failure workflow that checks locale opening, compilation, matching, captures, iteration and replacement at every allocation index.
+The first workflow baseline used a range invalid in the selected Czech locale, so I recorded and corrected the test input.
+The initial go1 race suite exceeded the default ten-minute timeout in its fixed differential test.
+I recorded the incomplete run and prepared a fresh rerun with a longer explicit timeout.
+Before the Zig patch, all three release drivers agreed with the Go reference on 86,691 commands.
+I added a focused json2zig regression for direct and transitive allocating functions.
+The first synthetic JSON fixture missed one closing brace, so I recorded and corrected it before rerunning the generator test.
+The target audit found that Rust publicly exposed its generated raw-pointer runtime.
+I reproduced a safe downstream function that forged a static slice from temporary bytes.
+I made the engine and runtime crate-private, tied `Str.bytes` to its receiver, removed the unsafe documentation promise, and added a compile-fail doctest for the boundary.
+I mistakenly included generated Rust files in a rustfmt check, recorded the error, and retained byte-for-byte regeneration as their formatting gate.
+The locale audit proved that C, go0 and go1 silently deleted every hyphen in codeset suffixes.
+That accepted malformed spellings such as `.u-t-f-8`, `.UTF--8` and `.UTF-8-`, outside the documented `.UTF8` and `.UTF-8` forms.
+I preserved the codeset spelling during lowercase normalization and added accepted and rejected cases to all three test surfaces.
+The focused C locale tests, go0 locale tests, Rust unit and doctests, and the Zig allocation sweep passed after their fixes.
+I regenerated `revera.vego.json` and the Rust, Zig and C++ engines from the corrected go1 source.
+My first external Rust privacy check linked a stale pre-fix rlib.
+I recorded the validation error and rebuilt the exact library artifact before retrying.
+The post-fix cross-language run matched all 86,691 corpus commands in Zig, C++ and Rust.
+The pipeline audit proved that call statements accepted in a three-clause loop post caused the C++ and Zig printers to abort.
+I added the missing expression-statement lowering and focused generator regressions.
+My first focused formatting command used paths inconsistent with its working directory.
+It failed before making changes, and I recorded the mistake before retrying with correct relative paths.
+My first end-to-end source fixture put the call in the body rather than the loop post.
+I recorded and corrected it before using the fixture for validation.
+The first retry still had one repository-relative inspection path under the `go1` working directory.
+The command stopped before generation, and I recorded that path error before retrying.
+I then passed a source file where `vego2json` requires a package directory.
+I recorded the invocation error and reorganized the fixture as a temporary package before continuing.
+The corrected loop-post package exported to an `expr_stmt` post, both printers completed, and the generated C++ and Zig translation units compiled cleanly.
+The C and go0 specialist proved that a `ReplaceAllFunc` callback could mutate the reused match slice and make the wrapper panic after the callback returned.
+The go0 implementation now snapshots the current match before invoking user code, and the focused, full, race and vet checks pass.
+The first combined synthetic-name patch used stale C++ context and was rejected without changing files.
+I recorded the failed edit and split the work by generator after rereading the exact source.
+The focused generator unit tests passed after every printer began avoiding program-owned temporary names and C++ identifier escaping became injective.
+An end-to-end fixture generated distinct `_t2` temporaries and distinct C++ names for `class`, `class_` and `vego_class`.
+I unnecessarily promoted a harmless unused runtime import in that minimal Rust fixture to an error.
+I recorded the validation mistake and reran with the repository's normal generated-code policy.
+The go1 validation specialist completed matching source and JSON boundary checks for pointer operations, string operations and switches, integer ranges, bodyless declarations, keyed constant values, malformed schema and unsupported versions.
+The specialist also made `json2go` return errors rather than panic on malformed input.
+Its first formatter command used the wrong path base, and its first keyed-constant fixture included an independently forbidden array key.
+I recorded both mistakes after the specialist corrected them and passed the focused and full go1 suites.
+The extended go1 race suite completed successfully in 539 seconds.
+I mirrored the go0 `NoSub` error-precedence fix into the Vego source, added a differential regression, and extended the cross-language corpus with malformed replacement cases under `FlagNoSub`.
+The C and go0 specialist completed its remaining source audit with no additional proved defects after full tests, race tests, vet, sanitizers, shell checks and differential fuzzing.
+Direct compiler probes found incomplete target keyword tables.
+The Rust printer did not escape the reserved words `abstract` and `become`, and the C++ printer missed `char8_t`, `char16_t`, `char32_t` and `const_cast`.
+I added the missing mappings and regressions, checked the Rust list against the current Rust Reference in a real browser, and passed both printer suites.
+The C++ namespace mapping now escapes each qualified namespace segment without corrupting the repository's `revera::engine` override.
+The Rust keyword probe accidentally left its default rlib in the repository root.
+I recorded the mistake and removed the disposable compiler artifact immediately.
+I replaced Zig's removable debug-only runtime assertions with always-on panic guards.
+A standalone ReleaseFast binary now aborts on an out-of-range string index with the intended runtime-check message.
+The following suite command ran from the repository root instead of `zig1`, so I recorded the path mistake and reran it in the correct component directory.
+That retry used an obsolete Zig optimize-option spelling and failed during configuration.
+I initially recorded the replacement with one dash after reading only the short error.
+The full build help showed that explicit modes use the general `--release=fast` option, so I corrected the record before retrying.
+The second go1 boundary patch now avoids package-name collisions when shadowing mutated parameters, rejects oversized defaulted constants at the correct semantic boundary, and makes tuple mangling total and collision-resistant for all supported result types.
+The IR reserves the `Tup_` namespace so user declarations and locals cannot shadow generated pair types.
+The specialist corrected three implementation mistakes while producing that patch: an integer conversion before a kind check, one rejected duplicate-target patch, and representability checks placed too early in recursive retyping.
+I recorded all three corrections after the focused and full go1 suites passed.
+The corrected Zig ReleaseFast suite passed with the always-on runtime guards.
+I repeated a component-working-directory path error while inspecting the active Zig printer patch.
+The inspection failed before the chained tests began, so I recorded it and retried with component-relative paths.
+The printer specialist fixed four additional proved lowering defects.
+Rust equality helpers now occupy a name prefix disjoint from source functions, C++ loop-header assignments pin impure places before their values, C++ package namespaces cannot merge into `vg` or `std`, and Zig division or remainder assignments evaluate impure places once.
+Compiler-backed and behavioral regressions reproduce the original failures and now pass, as do the full go1 suite, vet and focused race tests.
+I recorded the specialist's five corrected audit mistakes: one stale tuple candidate, one mixed-language Go test target, one zero divisor in an oracle, one rejected stale-context patch, and one unused Zig block label.
+The authoritative JSON and six target engine artifacts regenerated deterministically, and independent second-generation copies matched byte for byte.
+All C, Go, Rust, Zig and C++ component suites passed after regeneration, including both Rust profiles and the Zig release build.
+All three probe drivers matched the 29-line oracle.
+My first full crosscheck orchestration dropped a live session identifier after printing only its initial corpus count, so I recorded the incomplete evidence and reran it with explicit session handling.
+The final command-tool audit proved five more integration defects involving reserved-name drift, json2go borrow rendering, oversized protocol lines, zero-target verification and ignored trailing output.
+My first reserved-name patch used the wrong package-variable context and was rejected without changing files.
+I recorded the edit mistake and reread the declaration handlers before continuing.
+The Lean specialist fixed three proved soundness gaps.
+Heap compaction no longer resurrects stale references, slice reads now validate cell generations, and corpus parsing now fails malformed nonempty rows instead of silently dropping theorem cases.
+Native regressions reproduce each invariant, the checked-in corpus parses strictly to 86,691 rows, the focused theorem build passed in 312 seconds, and the full 44-job Lean build passed.
+The final command audit corrected four temporary-fixture mistakes while proving its findings: a mixed-package Go directory, over-escaped protocol newlines, an assumed utility path, and an overly broad cleanup command.
+I recorded each correction in `MISTAKES.md`.
+After the corpus grew to 86,704 rows, the next full Lean build failed the `corpusAgrees` theorem.
+I am isolating the first new command whose generated expected result disagrees with the formal driver before making another semantic change.
+The filtered replay found the first divergence at a new malformed replacement under `FlagNoSub`.
+The JSON already contained the corrected error precedence, but Lake had reused a `Vego.Data` object compiled before that external JSON changed.
+I declared all five `include_str` inputs as Lake input targets and made the Vego library depend on them, preventing stale formal artifacts.
+I also documented the exact Vego constant ranges, reserved package names, all host files, and both engine and probe regeneration commands.
+A repository-wide count search found two additional stale figures in the Lean documentation.
+I updated the replay total to 85,648 and the compile count to 9,780, matching the checked-in corpus.
+Historical entries in this log retain the corpus size they verified at the time.
+The current API FAQ now uses the 86,704-command total as well.
+The first Lake dependency probe made no byte change because the input already ended in a newline.
+I recorded that mistake, used a visible temporary whitespace line, and observed `Vego.Data` rebuild on both the change and its exact restoration.
+The restored 49-job Lake build passed, including `Vego.Theorems` and the 86,704-command corpus agreement theorem.
+All focused command tests, the full go1 suite, vet, focused race tests, all three 29-line target probes, and the full three-target 86,704-command crosscheck pass after the final command fixes.
+The rebuilt `vego2json` executable exports JSON byte-identical to both checked-in artifacts, and `json2go` emits gofmt-clean source.
+The safety wrapper rejected my repeated `rm -rf` cleanup attempt without changing the audit directory.
+I recorded the mistake and used a non-forcing removal for that exact temporary path.
+The final component matrix passed: C locale tests, all go0 tests and vet, Rust debug and release all-target tests, Zig normal and ReleaseFast tests, and the C++ build and API tests.
+I removed the 16 MB `tmp/audit-main` directory containing only disposable reproducers, generated comparisons, sanitizer binaries, and logs.
+All pre-existing temporary and untracked workspace files remain untouched.
+The crate-wide Rust and source-wide Zig formatter checks reported existing differences in printer-owned generated artifacts and made no changes.
+I recorded the overly broad validation and narrowed the formatter checks to changed hand-written files.
+The narrowed Rust and Zig formatter checks passed, as did `gofmt`, `git diff --check`, and the em-dash scan.
+The user asked me to commit the completed audit changes.
+I prepared one local commit containing the fixes, generated artifacts, regressions, documentation, and `AGENTS.md`, while excluding every pre-existing untracked file and the dirty `ref/tre` submodule state.

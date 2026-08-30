@@ -249,6 +249,20 @@ func TestReplaceAllFunc(t *testing.T) {
 	}
 }
 
+func TestReplaceAllFuncCallbackMutation(t *testing.T) {
+	re := compileOK(t, "a", 0)
+	got, err := re.ReplaceAllFunc("a", -1, 0, func(pmatch []Match) string {
+		pmatch[0] = Match{So: 2, Eo: 2}
+		return "x"
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "x" {
+		t.Fatalf("ReplaceAllFunc = %q", got)
+	}
+}
+
 func TestReplaceAllErrors(t *testing.T) {
 	re := compileOK(t, "(a)", 0)
 	if _, err := re.ReplaceAll("a", `\2`, -1, 0); err == nil {
@@ -265,7 +279,10 @@ func TestReplaceAllErrors(t *testing.T) {
 		t.Fatalf("trailing backslash error = %v", err)
 	}
 	re = compileOK(t, "a", NoSub)
-	if _, err := re.ReplaceAll("a", "-", -1, 0); err == nil {
-		t.Fatal("ReplaceAll accepted a NoSub expression")
+	for _, replacement := range []string{"-", `\`, `\1`} {
+		_, err := re.ReplaceAll("a", replacement, -1, 0)
+		if e, ok := err.(*Error); !ok || e.Code != ENoSub {
+			t.Fatalf("NoSub replacement %q error = %v", replacement, err)
+		}
 	}
 }

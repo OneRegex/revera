@@ -13,6 +13,10 @@ pub const Allocator = std.mem.Allocator;
 
 const zeroOf = std.mem.zeroes;
 
+fn check(ok: bool) void {
+    if (!ok) @panic("Vego runtime check failed");
+}
+
 // Str is an immutable byte view, the translation of a Go string.
 // Its zero value is the empty string.
 pub const Str = struct {
@@ -20,12 +24,12 @@ pub const Str = struct {
     len: i64 = 0,
 
     pub fn byte(self: Str, i: i64) u8 {
-        std.debug.assert(i >= 0 and i < self.len);
+        check(i >= 0 and i < self.len);
         return self.p.?[@intCast(i)];
     }
 
     pub fn sub(self: Str, lo: i64, hi: i64) Str {
-        std.debug.assert(0 <= lo and lo <= hi and hi <= self.len);
+        check(0 <= lo and lo <= hi and hi <= self.len);
         if (self.p) |p| {
             return .{ .p = p + @as(usize, @intCast(lo)), .len = hi - lo };
         }
@@ -83,12 +87,12 @@ pub fn Slice(comptime T: type) type {
         const Self = @This();
 
         pub fn at(self: Self, i: i64) *T {
-            std.debug.assert(i >= 0 and i < self.len);
+            check(i >= 0 and i < self.len);
             return &self.p.?[@intCast(i)];
         }
 
         pub fn sub(self: Self, lo: i64, hi: i64) Self {
-            std.debug.assert(0 <= lo and lo <= hi and hi <= self.cap);
+            check(0 <= lo and lo <= hi and hi <= self.cap);
             if (self.p) |p| {
                 return .{
                     .p = p + @as(usize, @intCast(lo)),
@@ -116,24 +120,24 @@ pub fn Slice(comptime T: type) type {
     };
 }
 
-fn allocElems(gpa: Allocator, comptime T: type, n: i64) [*]T {
+fn allocElems(gpa: Allocator, comptime T: type, n: i64) Allocator.Error![*]T {
     const count: usize = @intCast(@max(n, 1));
-    const buf = gpa.alloc(T, count) catch @panic("out of memory");
+    const buf = try gpa.alloc(T, count);
     return buf.ptr;
 }
 
-pub fn make(gpa: Allocator, comptime T: type, n: i64) Slice(T) {
+pub fn make(gpa: Allocator, comptime T: type, n: i64) Allocator.Error!Slice(T) {
     return makeCap(gpa, T, n, n);
 }
 
-pub fn makeCap(gpa: Allocator, comptime T: type, n: i64, c: i64) Slice(T) {
-    std.debug.assert(0 <= n and n <= c);
-    const p = allocElems(gpa, T, c);
+pub fn makeCap(gpa: Allocator, comptime T: type, n: i64, c: i64) Allocator.Error!Slice(T) {
+    check(0 <= n and n <= c);
+    const p = try allocElems(gpa, T, c);
     @memset(p[0..@intCast(c)], zeroOf(T));
     return .{ .p = p, .len = n, .cap = c };
 }
 
-fn grow(gpa: Allocator, comptime T: type, s: Slice(T), need: i64) Slice(T) {
+fn grow(gpa: Allocator, comptime T: type, s: Slice(T), need: i64) Allocator.Error!Slice(T) {
     var newcap: i64 = @max(s.cap * 2, 8);
     if (newcap < need) {
         newcap = need;
@@ -141,7 +145,7 @@ fn grow(gpa: Allocator, comptime T: type, s: Slice(T), need: i64) Slice(T) {
     // The spare region must read as zero.
     // Go allocates zeroed memory, and a slice extended inside its capacity shows that memory.
     // The prefix gets the live elements instead.
-    const p = allocElems(gpa, T, newcap);
+    const p = try allocElems(gpa, T, newcap);
     const n: usize = @intCast(s.len);
     @memset(p[n..@intCast(newcap)], zeroOf(T));
     if (s.p) |old| {
@@ -150,20 +154,20 @@ fn grow(gpa: Allocator, comptime T: type, s: Slice(T), need: i64) Slice(T) {
     return .{ .p = p, .len = s.len, .cap = newcap };
 }
 
-pub fn append(gpa: Allocator, comptime T: type, s: Slice(T), v: T) Slice(T) {
+pub fn append(gpa: Allocator, comptime T: type, s: Slice(T), v: T) Allocator.Error!Slice(T) {
     var out = s;
     if (out.len == out.cap) {
-        out = grow(gpa, T, out, out.len + 1);
+        out = try grow(gpa, T, out, out.len + 1);
     }
     out.p.?[@intCast(out.len)] = v;
     out.len += 1;
     return out;
 }
 
-pub fn appendSlice(gpa: Allocator, comptime T: type, s: Slice(T), more: Slice(T)) Slice(T) {
+pub fn appendSlice(gpa: Allocator, comptime T: type, s: Slice(T), more: Slice(T)) Allocator.Error!Slice(T) {
     var out = s;
     if (out.len + more.len > out.cap) {
-        out = grow(gpa, T, out, out.len + more.len);
+        out = try grow(gpa, T, out, out.len + more.len);
     }
     const n: usize = @intCast(more.len);
     if (n > 0) {
@@ -175,10 +179,10 @@ pub fn appendSlice(gpa: Allocator, comptime T: type, s: Slice(T), more: Slice(T)
     return out;
 }
 
-pub fn appendStr(gpa: Allocator, s: Slice(u8), more: Str) Slice(u8) {
+pub fn appendStr(gpa: Allocator, s: Slice(u8), more: Str) Allocator.Error!Slice(u8) {
     var out = s;
     if (out.len + more.len > out.cap) {
-        out = grow(gpa, u8, out, out.len + more.len);
+        out = try grow(gpa, u8, out, out.len + more.len);
     }
     const n: usize = @intCast(more.len);
     if (n > 0) {
@@ -206,9 +210,9 @@ pub fn copyStr(dst: Slice(u8), src: Str) i64 {
     return n;
 }
 
-pub fn strFromBytes(gpa: Allocator, b: Slice(u8)) Str {
+pub fn strFromBytes(gpa: Allocator, b: Slice(u8)) Allocator.Error!Str {
     const n: usize = @intCast(b.len);
-    const p = allocElems(gpa, u8, b.len);
+    const p = try allocElems(gpa, u8, b.len);
     if (n > 0) {
         @memcpy(p[0..n], b.p.?[0..n]);
     }
@@ -217,7 +221,7 @@ pub fn strFromBytes(gpa: Allocator, b: Slice(u8)) Str {
 
 pub fn arrSlice(comptime T: type, arr: anytype, lo: i64, hi: i64) Slice(T) {
     const n: i64 = @intCast(arr.len);
-    std.debug.assert(0 <= lo and lo <= hi and hi <= n);
+    check(0 <= lo and lo <= hi and hi <= n);
     return .{
         .p = @as([*]T, @ptrCast(arr)) + @as(usize, @intCast(lo)),
         .len = hi - lo,
@@ -225,8 +229,8 @@ pub fn arrSlice(comptime T: type, arr: anytype, lo: i64, hi: i64) Slice(T) {
     };
 }
 
-pub fn sliceOf(gpa: Allocator, comptime T: type, src: anytype) Slice(T) {
-    const out = make(gpa, T, @intCast(src.len));
+pub fn sliceOf(gpa: Allocator, comptime T: type, src: anytype) Allocator.Error!Slice(T) {
+    const out = try make(gpa, T, @intCast(src.len));
     @memcpy(out.p.?[0..src.len], src);
     return out;
 }
@@ -283,8 +287,8 @@ pub fn remT(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
 }
 
 // bytesFromStr copies a string into a fresh mutable byte buffer, the []uint8(s) conversion.
-pub fn bytesFromStr(gpa: Allocator, s: Str) Slice(u8) {
-    const out = make(gpa, u8, s.len);
+pub fn bytesFromStr(gpa: Allocator, s: Str) Allocator.Error!Slice(u8) {
+    const out = try make(gpa, u8, s.len);
     _ = copyStr(out, s);
     return out;
 }

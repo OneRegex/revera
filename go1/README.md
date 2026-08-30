@@ -7,7 +7,7 @@ This directory rewrites the go0 ERE engine in Vego, a strict Go subset built for
 ## Layout
 
 - `revera/` is the engine, in one flat package.
-  Every file is in the subset except `revera_host.go` and the tests.
+  Every file is in the subset except `revera_host.go`, `corpus_host.go`, `driver_host.go`, and the tests.
   The former locale package is merged in.
   The CLDR data blob travels as a string parameter, and the host file embeds `data.bin` for Go builds.
 - `cmd/vego2json` checks subset conformance and translates the package into one JSON object.
@@ -81,6 +81,7 @@ The JSON pipeline closes the first loop:
 
 ```sh
 go run ./cmd/vego2json -o revera.vego.json ./revera
+go run ./cmd/vego2json -o probe.vego.json ./probe
 go run ./cmd/json2go -o /tmp/engine_gen.go revera.vego.json
 ```
 

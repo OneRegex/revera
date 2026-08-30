@@ -468,7 +468,7 @@ pub struct interval {
     pub hi: i64,
 }
 
-pub fn vg_eq_memoKey(a: memoKey, b: memoKey) -> bool {
+pub fn vego_eq_memoKey(a: memoKey, b: memoKey) -> bool {
     a.a == b.a && a.b == b.b && a.c == b.c && a.d == b.d
 }
 
@@ -2106,15 +2106,15 @@ pub fn paArrive(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mu
             let mut m: u64 = mask;
             '_b1: while (m != 0u64) {
                 '_c1: {
-                    { let _p = unsafe { std::ptr::addr_of_mut!((*buffer.ptr(trailingZeros64(m)))) }; let _v = ((delta) as u32); unsafe { *_p += _v; } }
+                    { let _t2 = unsafe { std::ptr::addr_of_mut!((*buffer.ptr(trailingZeros64(m)))) }; let _t3 = ((delta) as u32); unsafe { *_t2 += _t3; } }
                 }
                 m &= (m - 1u64);
             }
         }
         {
             let mut i: i64 = 0i64;
-            '_b2: while (i < re.prog.ins.get(((pc) as i64)).extra.len) {
-                '_c2: {
+            '_b4: while (i < re.prog.ins.get(((pc) as i64)).extra.len) {
+                '_c4: {
                     unsafe { (*buffer.ptr(((re.prog.ins.get(((pc) as i64)).extra.get(i)) as i64))) += ((delta) as u32); }
                 }
                 i += 1i64;
@@ -2122,7 +2122,7 @@ pub fn paArrive(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mu
         }
         newCtr = buffer;
     }
-    let _ = { let _t3 = fi; let _t4 = re.prog.ins.get(((pc) as i64)).next; let _t5 = start; let _t6 = newCtr; paStore(mem, e, ws, _t3, _t4, _t5, _t6) };
+    let _ = { let _t5 = fi; let _t6 = re.prog.ins.get(((pc) as i64)).next; let _t7 = start; let _t8 = newCtr; paStore(mem, e, ws, _t5, _t6, _t7, _t8) };
 }
 
 pub fn paConsume(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i64) {
@@ -2387,7 +2387,7 @@ pub fn memoGet(t: &mut memoTab, k: memoKey) -> (memoVal, bool) {
     let mask: u64 = (((t.keys.len - 1i64)) as u64);
     let mut at: u64 = (memoHash(k) & mask);
     while (t.used.get(((at) as i64)) != 0u8) {
-        if vg_eq_memoKey(t.keys.get(((at) as i64)), k) {
+        if vego_eq_memoKey(t.keys.get(((at) as i64)), k) {
             return (t.vals.get(((at) as i64)), true);
         }
         at = ((at + 1u64) & mask);
@@ -2399,7 +2399,7 @@ pub fn memoInsert(t: &mut memoTab, k: memoKey, v: memoVal) {
     let mask: u64 = (((t.keys.len - 1i64)) as u64);
     let mut at: u64 = (memoHash(k) & mask);
     while (t.used.get(((at) as i64)) != 0u8) {
-        if vg_eq_memoKey(t.keys.get(((at) as i64)), k) {
+        if vego_eq_memoKey(t.keys.get(((at) as i64)), k) {
             unsafe { (*t.vals.ptr(((at) as i64))) = v; }
             return;
         }
@@ -2712,15 +2712,12 @@ pub fn normalizeName(mem: &vg::Arena, input: vg::Str) -> (vg::Str, bool) {
         while ((i < input.len) && (input.byte(i) != 64u8)) {
             let c_2: u8 = asciiLower(input.byte(i));
             i += 1i64;
-            if (c_2 == 45u8) {
-                continue;
-            }
             if ((codeset.len == 5i64) || (c_2 >= 128u8)) {
                 return (vg::lit(b""), false);
             }
             codeset = vg::append(mem, codeset, c_2);
         }
-        if (!vg::streq(vg::str_from_bytes(mem, codeset), vg::lit(b"utf8"))) {
+        if ((!vg::streq(vg::str_from_bytes(mem, codeset), vg::lit(b"utf8"))) && (!vg::streq(vg::str_from_bytes(mem, codeset), vg::lit(b"utf-8")))) {
             return (vg::lit(b""), false);
         }
     }
@@ -3962,14 +3959,14 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) {
                 matchReachable = true;
             } else if _t1 == iFail {
             } else if _t1 == iRune {
-                { let _p = unsafe { std::ptr::addr_of_mut!(pr.scan.stop[(utf8LeadByte(((pr.ins.get(((pc) as i64)).arg) as i32))) as usize]) }; let _v = true; unsafe { *_p = _v; } }
+                { let _t2 = unsafe { std::ptr::addr_of_mut!(pr.scan.stop[(utf8LeadByte(((pr.ins.get(((pc) as i64)).arg) as i32))) as usize]) }; let _t3 = true; unsafe { *_t2 = _t3; } }
             } else if _t1 == iRuneFold {
                 let set: u32 = pr.ins.get(((pc) as i64)).arg;
                 {
                     let mut i: i64 = 0i64;
-                    '_b2: while (i < pr.foldSets.get(((set) as i64)).len) {
-                        '_c2: {
-                            { let _p = unsafe { std::ptr::addr_of_mut!(pr.scan.stop[(utf8LeadByte(pr.foldSets.get(((set) as i64)).get(i))) as usize]) }; let _v = true; unsafe { *_p = _v; } }
+                    '_b4: while (i < pr.foldSets.get(((set) as i64)).len) {
+                        '_c4: {
+                            { let _t5 = unsafe { std::ptr::addr_of_mut!(pr.scan.stop[(utf8LeadByte(pr.foldSets.get(((set) as i64)).get(i))) as usize]) }; let _t6 = true; unsafe { *_t5 = _t6; } }
                         }
                         i += 1i64;
                     }
@@ -3991,8 +3988,8 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) {
     let mut count: i64 = 0i64;
     {
         let mut b: i64 = 0i64;
-        '_b3: while (b < 256i64) {
-            '_c3: {
+        '_b7: while (b < 256i64) {
+            '_c7: {
                 if pr.scan.stop[(b) as usize] {
                     count += 1i64;
                     pr.scan.b = ((b) as u8);
@@ -4710,6 +4707,9 @@ pub fn parseReplacement(mem: &vg::Arena, replacement: vg::Str, nsub: i64) -> (vg
 }
 
 pub fn ReplaceAll(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, replacement: vg::Str, limit: i64, eflags: u32) -> (vg::Str, Error) {
+    if ((re.flags & FlagNoSub) != 0u32) {
+        return (vg::lit(b""), compileError(ErrENoSub, (1i64).wrapping_neg()));
+    }
     let _t1 = parseReplacement(mem, replacement, re.nsub);
     let parts: vg::Slice<replPart> = _t1.0;
     let perr: Error = _t1.1;

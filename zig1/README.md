@@ -27,7 +27,8 @@ std.debug.print("{s}\n", .{caps.get(1).?.text()});
 - `find` and `captures` return an optional.
   A subject that does not match gives null, and only a real failure gives an error.
 - `matches` and `captureMatches` return iterators with the usual `next` method.
-- Failures are a plain error set, such as `error.InvalidPattern` and `error.OutOfCapacity`.
+- Engine failures use a plain error set, such as `error.InvalidPattern` and `error.OutOfCapacity`.
+  Allocator exhaustion returns `error.OutOfMemory` instead of aborting.
   `Options.error_position` receives the byte offset in the pattern.
 - `Locale.open(gpa, "cs", "")` selects a CLDR locale for bracket expressions.
   The default is POSIX.
@@ -44,7 +45,9 @@ A caller who needs them imports `engine.zig`.
   Regenerate it with:
 
   ```sh
-  cd ../go1 && go run ./cmd/json2zig -o ../zig1/src/engine.zig revera.vego.json
+  cd ../go1
+  go run ./cmd/json2zig -o ../zig1/src/engine.zig revera.vego.json
+  go run ./cmd/json2zig -o ../zig1/src/probe_engine.zig probe.vego.json
   ```
 
 - `src/vg.zig` is the runtime.

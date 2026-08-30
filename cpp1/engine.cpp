@@ -78,14 +78,14 @@ int32_t parseBracket(vg::Arena& mem, parser& p, Locale& loc) {
             b.equivs = vg::append(mem, b.equivs, item.seq);
         } break;
         case itemClass: {
-            b.classMask |= uint16_t(1 << item.class_);
+            b.classMask |= uint16_t(1 << item.vego_class);
         } break;
         default: break;
         }
     }
 }
 
-Tup_bracketItem_bool parseBracketItem(vg::Arena& mem, parser& p, Locale& loc, int64_t bracketStart) {
+Tup_t627261636b65744974656dx_bool parseBracketItem(vg::Arena& mem, parser& p, Locale& loc, int64_t bracketStart) {
     bracketItem item{};
     uint8_t c = peekByte(p);
     if ((c == 91)) {
@@ -95,62 +95,62 @@ Tup_bracketItem_bool parseBracketItem(vg::Arena& mem, parser& p, Locale& loc, in
             vg::Slice<int32_t> seq = _t1.r0;
             bool ok = _t1.r1;
             if ((!ok)) {
-                return Tup_bracketItem_bool{item, false};
+                return Tup_t627261636b65744974656dx_bool{item, false};
             }
             if ((!localeIsCollatingElement(loc, seq))) {
                 (void)(fail(p, ErrECollate, bracketStart));
-                return Tup_bracketItem_bool{item, false};
+                return Tup_t627261636b65744974656dx_bool{item, false};
             }
             if ((vg::len(seq) == 1LL)) {
                 item.kind = itemChar;
                 item.r = seq[0LL];
-                return Tup_bracketItem_bool{item, true};
+                return Tup_t627261636b65744974656dx_bool{item, true};
             }
             item.kind = itemElem;
             item.seq = seq;
-            return Tup_bracketItem_bool{item, true};
+            return Tup_t627261636b65744974656dx_bool{item, true};
         }
         if ((inner == 61)) {
             auto _t2 = scanInner(mem, p, vg::lit("=]"), ErrECollate);
             vg::Slice<int32_t> seq_2 = _t2.r0;
             bool ok_2 = _t2.r1;
             if ((!ok_2)) {
-                return Tup_bracketItem_bool{item, false};
+                return Tup_t627261636b65744974656dx_bool{item, false};
             }
             if ((!localeIsCollatingElement(loc, seq_2))) {
                 (void)(fail(p, ErrECollate, bracketStart));
-                return Tup_bracketItem_bool{item, false};
+                return Tup_t627261636b65744974656dx_bool{item, false};
             }
             item.kind = itemEquiv;
             item.seq = seq_2;
-            return Tup_bracketItem_bool{item, true};
+            return Tup_t627261636b65744974656dx_bool{item, true};
         }
         if ((inner == 58)) {
             auto _t3 = scanInner(mem, p, vg::lit(":]"), ErrECType);
             vg::Slice<int32_t> seq_3 = _t3.r0;
             bool ok_3 = _t3.r1;
             if ((!ok_3)) {
-                return Tup_bracketItem_bool{item, false};
+                return Tup_t627261636b65744974656dx_bool{item, false};
             }
             auto _t4 = classByName(runesToString(mem, seq_3));
-            uint8_t class_ = _t4.r0;
+            uint8_t vego_class = _t4.r0;
             bool ok2 = _t4.r1;
             if ((!ok2)) {
                 (void)(fail(p, ErrECType, bracketStart));
-                return Tup_bracketItem_bool{item, false};
+                return Tup_t627261636b65744974656dx_bool{item, false};
             }
             item.kind = itemClass;
-            item.class_ = class_;
-            return Tup_bracketItem_bool{item, true};
+            item.vego_class = vego_class;
+            return Tup_t627261636b65744974656dx_bool{item, true};
         }
     }
     int32_t r = nextRune(p);
     if ((r < 0)) {
-        return Tup_bracketItem_bool{item, false};
+        return Tup_t627261636b65744974656dx_bool{item, false};
     }
     item.kind = itemChar;
     item.r = r;
-    return Tup_bracketItem_bool{item, true};
+    return Tup_t627261636b65744974656dx_bool{item, true};
 }
 
 vg::Str runesToString(vg::Arena& mem, vg::Slice<int32_t> seq) {
@@ -498,7 +498,7 @@ void setMatch(vg::Slice<Match> caps, int64_t idx, int64_t so, int64_t eo) {
 void addCounters(capSolver& s, Regexp& re, int32_t t, vg::Slice<int64_t> out) {
     int32_t ni = s.trees[t].n;
     if (((re.nodes[ni].op == opRepeat) && re.nodes[ni].minimal)) {
-        out[re.nodes[ni].index_] += int64_t(int32_t(s.trees[t].j - s.trees[t].i));
+        out[re.nodes[ni].vego_index] += int64_t(int32_t(s.trees[t].j - s.trees[t].i));
     }
     int64_t off = int64_t(s.trees[t].kidsOff);
     int64_t count = int64_t(s.trees[t].kidsLen);
@@ -604,34 +604,34 @@ int32_t bestParse(vg::Arena& mem, capSolver& s, Regexp& re, decoded& d, int32_t 
     switch (re.nodes[ni].op) {
     case opChar: {
         if (((j == (i + 1LL)) && charMatches(re, ni, d.runes[i]))) {
-            best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); return _c; }()));
+            best = newTree(mem, s, ([&]{ ptree _t2{}; _t2.n = ni; _t2.i = int32_t(i); _t2.j = int32_t(j); return _t2; }()));
         }
     } break;
     case opAny: {
         if (((j == (i + 1LL)) && anyMatches(re, d.runes[i]))) {
-            best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); return _c; }()));
+            best = newTree(mem, s, ([&]{ ptree _t3{}; _t3.n = ni; _t3.i = int32_t(i); _t3.j = int32_t(j); return _t3; }()));
         }
     } break;
     case opBracket: {
         if (bracketMatchesSpan(re.brackets, re.nodes[ni].br, re.loc, d.runes, i, j)) {
-            best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); return _c; }()));
+            best = newTree(mem, s, ([&]{ ptree _t4{}; _t4.n = ni; _t4.i = int32_t(i); _t4.j = int32_t(j); return _t4; }()));
         }
     } break;
     case opBOL: {
         if (((j == i) && atBOL(re, d, i, s.eflags))) {
-            best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); return _c; }()));
+            best = newTree(mem, s, ([&]{ ptree _t5{}; _t5.n = ni; _t5.i = int32_t(i); _t5.j = int32_t(j); return _t5; }()));
         }
     } break;
     case opEOL: {
         if (((j == i) && atEOL(re, d, i, s.eflags))) {
-            best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); return _c; }()));
+            best = newTree(mem, s, ([&]{ ptree _t6{}; _t6.n = ni; _t6.i = int32_t(i); _t6.j = int32_t(j); return _t6; }()));
         }
     } break;
     case opGroup: {
         int32_t sub = bestParse(mem, s, re, d, re.nodes[ni].ch[0LL], i, j);
         if ((sub >= 0)) {
             int64_t off = kidAlloc1(mem, s, sub);
-            best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); _c.kidsOff = int32_t(off); _c.kidsLen = 1; return _c; }()));
+            best = newTree(mem, s, ([&]{ ptree _t7{}; _t7.n = ni; _t7.i = int32_t(i); _t7.j = int32_t(j); _t7.kidsOff = int32_t(off); _t7.kidsLen = 1; return _t7; }()));
         }
     } break;
     case opAlt: {
@@ -641,18 +641,18 @@ int32_t bestParse(vg::Arena& mem, capSolver& s, Regexp& re, decoded& d, int32_t 
                 continue;
             }
             int64_t off_2 = kidAlloc1(mem, s, sub_2);
-            int32_t candidate = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); _c.branch = int32_t(bi); _c.kidsOff = int32_t(off_2); _c.kidsLen = 1; return _c; }()));
+            int32_t candidate = newTree(mem, s, ([&]{ ptree _t8{}; _t8.n = ni; _t8.i = int32_t(i); _t8.j = int32_t(j); _t8.branch = int32_t(bi); _t8.kidsOff = int32_t(off_2); _t8.kidsLen = 1; return _t8; }()));
             if (((best < 0) || (cmpCand(s, re, candidate, best) < 0LL))) {
                 best = candidate;
             }
         }
     } break;
     case opConcat: {
-        auto _t2 = bestConcat(mem, s, re, d, ni, 0LL, i, j);
-        int64_t off_3 = _t2.r0;
-        int64_t count = _t2.r1;
+        auto _t9 = bestConcat(mem, s, re, d, ni, 0LL, i, j);
+        int64_t off_3 = _t9.r0;
+        int64_t count = _t9.r1;
         if ((off_3 >= 0LL)) {
-            best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); _c.kidsOff = int32_t(off_3); _c.kidsLen = int32_t(count); return _c; }()));
+            best = newTree(mem, s, ([&]{ ptree _t10{}; _t10.n = ni; _t10.i = int32_t(i); _t10.j = int32_t(j); _t10.kidsOff = int32_t(off_3); _t10.kidsLen = int32_t(count); return _t10; }()));
         }
     } break;
     case opRepeat: {
@@ -663,14 +663,14 @@ int32_t bestParse(vg::Arena& mem, capSolver& s, Regexp& re, decoded& d, int32_t 
             }
             if ((sub_3 >= 0)) {
                 int64_t off_4 = kidAlloc1(mem, s, sub_3);
-                best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); _c.kidsOff = int32_t(off_4); _c.kidsLen = 1; return _c; }()));
+                best = newTree(mem, s, ([&]{ ptree _t11{}; _t11.n = ni; _t11.i = int32_t(i); _t11.j = int32_t(j); _t11.kidsOff = int32_t(off_4); _t11.kidsLen = 1; return _t11; }()));
             } else {
-                best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); return _c; }()));
+                best = newTree(mem, s, ([&]{ ptree _t12{}; _t12.n = ni; _t12.i = int32_t(i); _t12.j = int32_t(j); return _t12; }()));
             }
         } else {
             repWin win = bestRep(mem, s, re, d, ni, i, j, 0LL, false);
             if (win.ok) {
-                best = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); _c.kidsOff = int32_t(win.off); _c.kidsLen = int32_t(win.length); return _c; }()));
+                best = newTree(mem, s, ([&]{ ptree _t13{}; _t13.n = ni; _t13.i = int32_t(i); _t13.j = int32_t(j); _t13.kidsOff = int32_t(win.off); _t13.kidsLen = int32_t(win.length); return _t13; }()));
             }
         }
     } break;
@@ -731,7 +731,7 @@ Tup_i64_i64 bestConcat(vg::Arena& mem, capSolver& s, Regexp& re, decoded& d, int
             continue;
         }
         int64_t off = kidPrepend(mem, s, head, tailOff, tailLen);
-        int32_t candidate = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); _c.kidsOff = int32_t(off); _c.kidsLen = int32_t((tailLen + 1LL)); return _c; }()));
+        int32_t candidate = newTree(mem, s, ([&]{ ptree _t3{}; _t3.n = ni; _t3.i = int32_t(i); _t3.j = int32_t(j); _t3.kidsOff = int32_t(off); _t3.kidsLen = int32_t((tailLen + 1LL)); return _t3; }()));
         if (((bestTree < 0) || (cmpCand(s, re, candidate, bestTree) < 0LL))) {
             bestTree = candidate;
             bestOff = off;
@@ -746,7 +746,7 @@ Tup_i64_i64 bestConcat(vg::Arena& mem, capSolver& s, Regexp& re, decoded& d, int
 }
 
 void repTry(vg::Arena& mem, capSolver& s, Regexp& re, int32_t ni, int64_t i, int64_t j, int64_t off, int64_t length, repBest& best) {
-    int32_t candidate = newTree(mem, s, ([&]{ ptree _c{}; _c.n = ni; _c.i = int32_t(i); _c.j = int32_t(j); _c.kidsOff = int32_t(off); _c.kidsLen = int32_t(length); return _c; }()));
+    int32_t candidate = newTree(mem, s, ([&]{ ptree _t1{}; _t1.n = ni; _t1.i = int32_t(i); _t1.j = int32_t(j); _t1.kidsOff = int32_t(off); _t1.kidsLen = int32_t(length); return _t1; }()));
     if (((!best.found) || (cmpCand(s, re, candidate, best.tree) < 0LL))) {
         best.off = off;
         best.length = length;
@@ -874,7 +874,7 @@ Error solveCaptures(vg::Arena& mem, Regexp& re, decoded& d, int64_t so, int64_t 
 void assignCaps(Regexp& re, capSolver& s, int32_t t, vg::Slice<Match> caps) {
     int32_t ni = s.trees[t].n;
     if ((re.nodes[ni].op == opGroup)) {
-        int64_t gi = re.nodes[ni].index_;
+        int64_t gi = re.nodes[ni].vego_index;
         for (int64_t k = 0LL; (k < vg::len(re.nested[gi])); k += 1LL) {
             setMatch(caps, int64_t(re.nested[gi][k]), int64_t(0ULL - uint64_t(1LL)), int64_t(0ULL - uint64_t(1LL)));
         }
@@ -1400,7 +1400,7 @@ void paArrive(vg::Arena& mem, phaseAState& e, engineWS& ws, Regexp& re, uint32_t
         vg::Slice<uint32_t> buffer = ws.ctrBuf.head(e.k);
         (void)(vg::vcopy(buffer, ctr));
         for (uint64_t m = mask; (m != 0ULL); m &= (m - 1ULL)) {
-            { auto&& _p = ([&]() -> decltype(auto) { auto&& _t1 = buffer; auto _t2 = trailingZeros64(m); return _t1[_t2]; }()); _p += uint32_t(delta); }
+            { auto&& _t1 = ([&]() -> decltype(auto) { auto&& _t2 = buffer; auto _t3 = trailingZeros64(m); return _t2[_t3]; }()); _t1 += uint32_t(delta); }
         }
         for (int64_t i = 0LL; (i < vg::len(re.prog.ins[pc].extra)); i += 1LL) {
             buffer[re.prog.ins[pc].extra[i]] += uint32_t(delta);
@@ -1650,20 +1650,20 @@ uint64_t memoHash(memoKey k) {
     return h;
 }
 
-Tup_memoVal_bool memoGet(memoTab& t, memoKey k) {
+Tup_t6d656d6f56616cx_bool memoGet(memoTab& t, memoKey k) {
     memoVal none{};
     if ((vg::len(t.keys) == 0LL)) {
-        return Tup_memoVal_bool{none, false};
+        return Tup_t6d656d6f56616cx_bool{none, false};
     }
     uint64_t mask = uint64_t((vg::len(t.keys) - 1LL));
     uint64_t at = ([&]{ auto _t1 = memoHash(k); auto _t2 = mask; return (_t1 & _t2); }());
     while ((t.used[at] != 0)) {
         if ((t.keys[at] == k)) {
-            return Tup_memoVal_bool{t.vals[at], true};
+            return Tup_t6d656d6f56616cx_bool{t.vals[at], true};
         }
         at = ((at + 1ULL) & mask);
     }
-    return Tup_memoVal_bool{none, false};
+    return Tup_t6d656d6f56616cx_bool{none, false};
 }
 
 void memoInsert(memoTab& t, memoKey k, memoVal v) {
@@ -1724,13 +1724,13 @@ uint32_t u32Raw(vg::Str blob, int64_t off) {
     return uint32_t(uint32_t(uint32_t(uint32_t(blob[off]) | uint32_t(uint32_t(blob[(off + 1LL)]) << 8LL)) | uint32_t(uint32_t(blob[(off + 2LL)]) << 16LL)) | uint32_t(uint32_t(blob[(off + 3LL)]) << 24LL));
 }
 
-uint16_t u16At(Locale& l, int64_t sec, int64_t index_) {
-    int64_t off = (l.sec[size_t(sec)].Off + (2LL * index_));
+uint16_t u16At(Locale& l, int64_t sec, int64_t vego_index) {
+    int64_t off = (l.sec[size_t(sec)].Off + (2LL * vego_index));
     return uint16_t(uint16_t(l.blob[off]) | uint16_t(uint16_t(l.blob[(off + 1LL)]) << 8LL));
 }
 
-uint32_t u32At(Locale& l, int64_t sec, int64_t index_) {
-    return u32Raw(l.blob, (l.sec[size_t(sec)].Off + (4LL * index_)));
+uint32_t u32At(Locale& l, int64_t sec, int64_t vego_index) {
+    return u32Raw(l.blob, (l.sec[size_t(sec)].Off + (4LL * vego_index)));
 }
 
 int64_t sectionLen(Locale& l, int64_t sec) {
@@ -1923,15 +1923,12 @@ Tup_Str_bool normalizeName(vg::Arena& mem, vg::Str input) {
         while (((i < vg::len(input)) && (input[i] != 64))) {
             uint8_t c_2 = asciiLower(input[i]);
             i += 1LL;
-            if ((c_2 == 45)) {
-                continue;
-            }
             if (((vg::len(codeset) == 5LL) || (c_2 >= 128))) {
                 return Tup_Str_bool{vg::lit(""), false};
             }
             codeset = vg::append(mem, codeset, c_2);
         }
-        if ((!vg::streq(vg::str_from_bytes(mem, codeset), vg::lit("utf8")))) {
+        if (((!vg::streq(vg::str_from_bytes(mem, codeset), vg::lit("utf8"))) && (!vg::streq(vg::str_from_bytes(mem, codeset), vg::lit("utf-8"))))) {
             return Tup_Str_bool{vg::lit(""), false};
         }
     }
@@ -2006,8 +2003,8 @@ int64_t localesCount(Locale& l) {
     return vg::sdiv<int64_t>(sectionLen(l, secLocales), 20LL);
 }
 
-LocaleRow localeRowAt(Locale& l, int64_t index_) {
-    int64_t base = (5LL * index_);
+LocaleRow localeRowAt(Locale& l, int64_t vego_index) {
+    int64_t base = (5LL * vego_index);
     LocaleRow row{};
     row.TypeFirst = int64_t(u32At(l, secLocales, (base + 1LL)));
     row.TypeCount = int64_t(u32At(l, secLocales, (base + 2LL)));
@@ -2016,23 +2013,23 @@ LocaleRow localeRowAt(Locale& l, int64_t index_) {
     return row;
 }
 
-Tup_localeRequest_bool normalizeRequest(vg::Arena& mem, vg::Str name, vg::Str collationType) {
+Tup_t6c6f63616c6552657175657374x_bool normalizeRequest(vg::Arena& mem, vg::Str name, vg::Str collationType) {
     vg::Str collationType_v = collationType;
     localeRequest req{};
     auto _t1 = normalizeName(mem, name);
     vg::Str normalized = _t1.r0;
     bool ok = _t1.r1;
     if ((!ok)) {
-        return Tup_localeRequest_bool{req, false};
+        return Tup_t6c6f63616c6552657175657374x_bool{req, false};
     }
     auto _t2 = embeddedModifier(name);
     vg::Str modifier = _t2.r0;
     bool hasModifier = _t2.r1;
     if (((indexOfByte(name, 64) >= 0LL) && (!hasModifier))) {
-        return Tup_localeRequest_bool{req, false};
+        return Tup_t6c6f63616c6552657175657374x_bool{req, false};
     }
     if ((hasModifier && (vg::len(collationType_v) != 0LL))) {
-        return Tup_localeRequest_bool{req, false};
+        return Tup_t6c6f63616c6552657175657374x_bool{req, false};
     }
     if (hasModifier) {
         collationType_v = modifier;
@@ -2041,52 +2038,52 @@ Tup_localeRequest_bool normalizeRequest(vg::Arena& mem, vg::Str name, vg::Str co
     vg::Str normalizedType = _t3.r0;
     bool ok2 = _t3.r1;
     if ((!ok2)) {
-        return Tup_localeRequest_bool{req, false};
+        return Tup_t6c6f63616c6552657175657374x_bool{req, false};
     }
     req.name = normalized;
     req.ctype = normalizedType;
     req.posix = (vg::streq(normalized, vg::lit("c")) || vg::streq(normalized, vg::lit("posix")));
-    return Tup_localeRequest_bool{req, true};
+    return Tup_t6c6f63616c6552657175657374x_bool{req, true};
 }
 
-Tup_Locale_bool posixSelect(vg::Str ctype) {
+Tup_t4c6f63616c65x_bool posixSelect(vg::Str ctype) {
     if (((vg::len(ctype) != 0LL) && (!vg::streq(ctype, vg::lit("standard"))))) {
         Locale invalid{};
-        return Tup_Locale_bool{invalid, false};
+        return Tup_t4c6f63616c65x_bool{invalid, false};
     }
-    return Tup_Locale_bool{LocalePOSIX(), true};
+    return Tup_t4c6f63616c65x_bool{LocalePOSIX(), true};
 }
 
-Tup_Locale_bool LocaleLoad(vg::Str blob) {
+Tup_t4c6f63616c65x_bool LocaleLoad(vg::Str blob) {
     Locale data{};
     if ((!localeLoad(data, blob))) {
         Locale invalid{};
-        return Tup_Locale_bool{invalid, false};
+        return Tup_t4c6f63616c65x_bool{invalid, false};
     }
-    return Tup_Locale_bool{data, true};
+    return Tup_t4c6f63616c65x_bool{data, true};
 }
 
-Tup_Locale_bool resolveLocale(Locale& data, localeRequest req) {
+Tup_t4c6f63616c65x_bool resolveLocale(Locale& data, localeRequest req) {
     Locale invalid{};
     Locale result{};
     result.blob = data.blob;
     result.sec = data.sec;
     result.maxSeq = data.maxSeq;
-    int64_t index_ = ([&]{ auto _t1 = req.name; auto _t2 = localesCount(result); return findName(result, _t1, secLocaleNames, secLocaleNameOffsets, _t2); }());
-    if ((index_ < 0LL)) {
-        return Tup_Locale_bool{invalid, false};
+    int64_t vego_index = ([&]{ auto _t1 = req.name; auto _t2 = localesCount(result); return findName(result, _t1, secLocaleNames, secLocaleNameOffsets, _t2); }());
+    if ((vego_index < 0LL)) {
+        return Tup_t4c6f63616c65x_bool{invalid, false};
     }
-    LocaleRow row = localeRowAt(result, index_);
+    LocaleRow row = localeRowAt(result, vego_index);
     result.caseProfile = row.CaseProfile;
     result.valid = true;
     if ((vg::len(req.ctype) == 0LL)) {
         result.collationProfile = row.DefaultCollation;
-        return Tup_Locale_bool{result, true};
+        return Tup_t4c6f63616c65x_bool{result, true};
     }
     int64_t typeNameCount = vg::sdiv<int64_t>(sectionLen(result, secTypeNameOffsets), 4LL);
     int64_t typeID = findName(result, req.ctype, secTypeNames, secTypeNameOffsets, typeNameCount);
     if ((typeID < 0LL)) {
-        return Tup_Locale_bool{invalid, false};
+        return Tup_t4c6f63616c65x_bool{invalid, false};
     }
     int64_t low = row.TypeFirst;
     int64_t high = (row.TypeFirst + row.TypeCount);
@@ -2095,7 +2092,7 @@ Tup_Locale_bool resolveLocale(Locale& data, localeRequest req) {
         int64_t rowTypeID = int64_t(u16At(result, secLocaleTypes, (2LL * middle)));
         if ((rowTypeID == typeID)) {
             result.collationProfile = u16At(result, secLocaleTypes, ((2LL * middle) + 1LL));
-            return Tup_Locale_bool{result, true};
+            return Tup_t4c6f63616c65x_bool{result, true};
         }
         if ((rowTypeID > typeID)) {
             high = middle;
@@ -2103,16 +2100,16 @@ Tup_Locale_bool resolveLocale(Locale& data, localeRequest req) {
             low = (middle + 1LL);
         }
     }
-    return Tup_Locale_bool{invalid, false};
+    return Tup_t4c6f63616c65x_bool{invalid, false};
 }
 
-Tup_Locale_bool LocaleSelect(vg::Arena& mem, Locale& data, vg::Str name, vg::Str collationType) {
+Tup_t4c6f63616c65x_bool LocaleSelect(vg::Arena& mem, Locale& data, vg::Str name, vg::Str collationType) {
     auto _t1 = normalizeRequest(mem, name, collationType);
     localeRequest req = _t1.r0;
     bool ok = _t1.r1;
     if ((!ok)) {
         Locale invalid{};
-        return Tup_Locale_bool{invalid, false};
+        return Tup_t4c6f63616c65x_bool{invalid, false};
     }
     if (req.posix) {
         return posixSelect(req.ctype);
@@ -2120,13 +2117,13 @@ Tup_Locale_bool LocaleSelect(vg::Arena& mem, Locale& data, vg::Str name, vg::Str
     return resolveLocale(data, req);
 }
 
-Tup_Locale_bool LocaleOpen(vg::Arena& mem, vg::Str blob, vg::Str name, vg::Str collationType) {
+Tup_t4c6f63616c65x_bool LocaleOpen(vg::Arena& mem, vg::Str blob, vg::Str name, vg::Str collationType) {
     Locale invalid{};
     auto _t1 = normalizeRequest(mem, name, collationType);
     localeRequest req = _t1.r0;
     bool ok = _t1.r1;
     if ((!ok)) {
-        return Tup_Locale_bool{invalid, false};
+        return Tup_t4c6f63616c65x_bool{invalid, false};
     }
     if (req.posix) {
         return posixSelect(req.ctype);
@@ -2135,7 +2132,7 @@ Tup_Locale_bool LocaleOpen(vg::Arena& mem, vg::Str blob, vg::Str name, vg::Str c
     Locale data = _t2.r0;
     bool ok2 = _t2.r1;
     if ((!ok2)) {
-        return Tup_Locale_bool{invalid, false};
+        return Tup_t4c6f63616c65x_bool{invalid, false};
     }
     return resolveLocale(data, req);
 }
@@ -2213,7 +2210,7 @@ uint16_t localeClassMask(Locale& l, int32_t r) {
     return u16At(l, secCtypeBlocks, ((block * 256LL) + int64_t(int32_t(r & 255))));
 }
 
-Tup_CasePair_bool findCase(Locale& l, int64_t sec, int32_t r) {
+Tup_t4361736550616972x_bool findCase(Locale& l, int64_t sec, int32_t r) {
     CasePair pair{};
     int64_t count = vg::sdiv<int64_t>(sectionLen(l, sec), 12LL);
     int64_t low = 0LL;
@@ -2224,7 +2221,7 @@ Tup_CasePair_bool findCase(Locale& l, int64_t sec, int32_t r) {
         if ((cp == r)) {
             pair.Upper = int32_t(u32At(l, sec, ((3LL * middle) + 1LL)));
             pair.Lower = int32_t(u32At(l, sec, ((3LL * middle) + 2LL)));
-            return Tup_CasePair_bool{pair, true};
+            return Tup_t4361736550616972x_bool{pair, true};
         }
         if ((cp > r)) {
             high = middle;
@@ -2232,7 +2229,7 @@ Tup_CasePair_bool findCase(Locale& l, int64_t sec, int32_t r) {
             low = (middle + 1LL);
         }
     }
-    return Tup_CasePair_bool{pair, false};
+    return Tup_t4361736550616972x_bool{pair, false};
 }
 
 int32_t caseConvert(Locale& l, int32_t r, bool toUpper) {
@@ -2360,9 +2357,9 @@ int32_t localeToLower(Locale& l, int32_t r) {
     return caseConvert(l, r, false);
 }
 
-int64_t compareSequence(Locale& l, vg::Slice<int32_t> seq, int64_t index_) {
-    int64_t off = int64_t(u32At(l, secSequences, (2LL * index_)));
-    int64_t length = int64_t(u32At(l, secSequences, ((2LL * index_) + 1LL)));
+int64_t compareSequence(Locale& l, vg::Slice<int32_t> seq, int64_t vego_index) {
+    int64_t off = int64_t(u32At(l, secSequences, (2LL * vego_index)));
+    int64_t length = int64_t(u32At(l, secSequences, ((2LL * vego_index) + 1LL)));
     int64_t common = std::min<int64_t>(length, vg::len(seq));
     for (int64_t i = 0LL; (i < common); i += 1LL) {
         int32_t stored = int32_t(u32At(l, secSeqCodepoints, (off + i)));
@@ -2430,8 +2427,8 @@ bool u32Contains(Locale& l, int64_t sec, int64_t first, int64_t count, uint32_t 
     return false;
 }
 
-CollProfile collationProfileRow(Locale& l, int64_t index_) {
-    int64_t base = (6LL * index_);
+CollProfile collationProfileRow(Locale& l, int64_t vego_index) {
+    int64_t base = (6LL * vego_index);
     CollProfile row{};
     row.OverrideFirst = int64_t(u32At(l, secCollationProfiles, base));
     row.OverrideCount = int64_t(u32At(l, secCollationProfiles, (base + 1LL)));
@@ -2598,8 +2595,8 @@ int64_t minTokenLength(Locale& l, int64_t sec, int64_t first, int64_t count, uin
         if ((!isContraction(l, candidate))) {
             continue;
         }
-        int64_t index_ = int64_t(uint32_t(candidate - firstSequenceID));
-        best_v = ([&]{ auto _t3 = best_v; auto _t4 = int64_t(u32At(l, secSequences, ((2LL * index_) + 1LL))); return std::min<int64_t>(_t3, _t4); }());
+        int64_t vego_index = int64_t(uint32_t(candidate - firstSequenceID));
+        best_v = ([&]{ auto _t3 = best_v; auto _t4 = int64_t(u32At(l, secSequences, ((2LL * vego_index) + 1LL))); return std::min<int64_t>(_t3, _t4); }());
     }
     return best_v;
 }
@@ -2612,11 +2609,11 @@ int64_t LocaleCount(Locale& l) {
     return localesCount(l);
 }
 
-vg::Str LocaleName(Locale& l, int64_t index_) {
-    if (((index_ < 0LL) || ([&]{ auto _t1 = index_; auto _t2 = localesCount(l); return (_t1 >= _t2); }()))) {
+vg::Str LocaleName(Locale& l, int64_t vego_index) {
+    if (((vego_index < 0LL) || ([&]{ auto _t1 = vego_index; auto _t2 = localesCount(l); return (_t1 >= _t2); }()))) {
         return vg::lit("");
     }
-    return byteString(l, secLocaleNames, int64_t(u32At(l, secLocaleNameOffsets, index_)));
+    return byteString(l, secLocaleNames, int64_t(u32At(l, secLocaleNameOffsets, vego_index)));
 }
 
 decoded decodeWindow(vg::Arena& mem, vg::Str s, int64_t so, int64_t eo) {
@@ -2895,7 +2892,7 @@ bool onePassCaps(Regexp& re, decoded& d, int32_t ni, int64_t i, int64_t j, uint3
         return atEOL(re, d, i, eflags);
     } break;
     case opGroup: {
-        int64_t gi = re.nodes[ni].index_;
+        int64_t gi = re.nodes[ni].vego_index;
         for (int64_t k = 0LL; (k < vg::len(re.nested[gi])); k += 1LL) {
             setMatch(caps, int64_t(re.nested[gi][k]), int64_t(0ULL - uint64_t(1LL)), int64_t(0ULL - uint64_t(1LL)));
         }
@@ -3010,12 +3007,12 @@ void buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
         case iFail: {
         } break;
         case iRune: {
-            { auto&& _p = ([&]() -> decltype(auto) { auto&& _t1 = pr.scan.stop; auto _t2 = utf8LeadByte(int32_t(pr.ins[pc].arg)); return _t1[size_t(_t2)]; }()); _p = true; }
+            { auto&& _t1 = ([&]() -> decltype(auto) { auto&& _t2 = pr.scan.stop; auto _t3 = utf8LeadByte(int32_t(pr.ins[pc].arg)); return _t2[size_t(_t3)]; }()); _t1 = true; }
         } break;
         case iRuneFold: {
             uint32_t set = pr.ins[pc].arg;
             for (int64_t i = 0LL; (i < vg::len(pr.foldSets[set])); i += 1LL) {
-                { auto&& _p = ([&]() -> decltype(auto) { auto&& _t3 = pr.scan.stop; auto _t4 = utf8LeadByte(pr.foldSets[set][i]); return _t3[size_t(_t4)]; }()); _p = true; }
+                { auto&& _t4 = ([&]() -> decltype(auto) { auto&& _t5 = pr.scan.stop; auto _t6 = utf8LeadByte(pr.foldSets[set][i]); return _t5[size_t(_t6)]; }()); _t4 = true; }
             }
         } break;
         default: {
@@ -3281,7 +3278,7 @@ frag emitRepeat(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t n
         return f;
     }
     if (nodes[ni].minimal) {
-        int64_t slot = nodes[ni].index_;
+        int64_t slot = nodes[ni].vego_index;
         if ((slot < maskWidth)) {
             mask_v |= (uint64_t(1ULL) << slot);
         } else {
@@ -3380,7 +3377,7 @@ void compileScan(Regexp& re, int32_t ni) {
     switch (re.nodes[ni].op) {
     case opRepeat: {
         if (re.nodes[ni].minimal) {
-            re.nodes[ni].index_ = re.minSlots;
+            re.nodes[ni].vego_index = re.minSlots;
             re.minSlots += 1LL;
         }
     } break;
@@ -3402,7 +3399,7 @@ void compileScan(Regexp& re, int32_t ni) {
 void collectNested(vg::Arena& mem, Regexp& re, int32_t ni, groupStack& stack) {
     bool isGroup = (re.nodes[ni].op == opGroup);
     if (isGroup) {
-        int32_t gi = int32_t(re.nodes[ni].index_);
+        int32_t gi = int32_t(re.nodes[ni].vego_index);
         for (int64_t k = 0LL; (k < vg::len(stack.g)); k += 1LL) {
             int32_t outer = stack.g[k];
             re.nested[outer] = vg::append(mem, re.nested[outer], gi);
@@ -3460,16 +3457,16 @@ int64_t minMatchChars(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, Locale& 
     return 0LL;
 }
 
-Tup_Regexp_Error Compile(vg::Arena& mem, vg::Str pattern, Locale loc, uint32_t flags) {
+Tup_t526567657870x_t4572726f72x Compile(vg::Arena& mem, vg::Str pattern, Locale loc, uint32_t flags) {
     Locale loc_v = loc;
     Regexp re{};
     if ((!LocaleValid(loc_v))) {
-        return Tup_Regexp_Error{re, compileError(ErrBadPat, int64_t(0ULL - uint64_t(1LL)))};
+        return Tup_t526567657870x_t4572726f72x{re, compileError(ErrBadPat, int64_t(0ULL - uint64_t(1LL)))};
     }
     parser p{};
     int32_t root = parse(mem, p, loc_v, pattern, flags);
     if ((root < 0)) {
-        return Tup_Regexp_Error{re, p.err};
+        return Tup_t526567657870x_t4572726f72x{re, p.err};
     }
     re.nsub = p.groups;
     re.nodes = p.nodes;
@@ -3487,7 +3484,7 @@ Tup_Regexp_Error Compile(vg::Arena& mem, vg::Str pattern, Locale loc, uint32_t f
     b.icase = (uint32_t(flags & FlagICase) != 0);
     compileProgram(mem, b, re.nodes, root, re.multi, (uint32_t(flags & FlagNewline) != 0));
     if ((b.errCode != ErrNone)) {
-        return Tup_Regexp_Error{re, compileError(b.errCode, int64_t(0ULL - uint64_t(1LL)))};
+        return Tup_t526567657870x_t4572726f72x{re, compileError(b.errCode, int64_t(0ULL - uint64_t(1LL)))};
     }
     if (b.tooBig) {
         re.minLen = minMatchChars(re.nodes, re.brackets, re.loc, root);
@@ -3495,7 +3492,7 @@ Tup_Regexp_Error Compile(vg::Arena& mem, vg::Str pattern, Locale loc, uint32_t f
         re.progOK = true;
         re.prog = b.prog;
     }
-    return Tup_Regexp_Error{re, noError()};
+    return Tup_t526567657870x_t4572726f72x{re, noError()};
 }
 
 int64_t NumSub(Regexp& re) {
@@ -3506,79 +3503,79 @@ bool trivialNullMatch(Regexp& re, vg::Slice<Match> pmatch) {
     return (((re.nodes[re.root].minL == 0LL) && (!re.anchors)) && ((uint32_t(re.flags & FlagNoSub) != 0) || (vg::len(pmatch) == 0LL)));
 }
 
-Tup_bool_Error Exec(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Slice<Match> pmatch, uint32_t eflags) {
+Tup_bool_t4572726f72x Exec(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Slice<Match> pmatch, uint32_t eflags) {
     if ((vg::len(subject) > subjectLimit)) {
-        return Tup_bool_Error{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
+        return Tup_bool_t4572726f72x{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
     }
     if ((!re.progOK)) {
         if ((vg::len(subject) < re.minLen)) {
-            return Tup_bool_Error{false, noError()};
+            return Tup_bool_t4572726f72x{false, noError()};
         }
         if (([&]{ auto _t1 = runeCount(subject); auto _t2 = re.minLen; return (_t1 < _t2); }())) {
-            return Tup_bool_Error{false, noError()};
+            return Tup_bool_t4572726f72x{false, noError()};
         }
         if (trivialNullMatch(re, pmatch)) {
-            return Tup_bool_Error{true, noError()};
+            return Tup_bool_t4572726f72x{true, noError()};
         }
-        return Tup_bool_Error{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
+        return Tup_bool_t4572726f72x{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
     }
     if ((((re.prog.failMin != failMinNone) && (vg::len(subject) >= re.prog.failMin)) && ([&]{ auto _t3 = runeCount(subject); auto _t4 = re.prog.failMin; return (_t3 >= _t4); }()))) {
         if (trivialNullMatch(re, pmatch)) {
-            return Tup_bool_Error{true, noError()};
+            return Tup_bool_t4572726f72x{true, noError()};
         }
         if (((uint32_t(re.flags & FlagNoSub) != 0) || (vg::len(pmatch) == 0LL))) {
             engineResult probe = runPhaseA(mem, re, subject, eflags);
             if (probe.matched) {
-                return Tup_bool_Error{true, noError()};
+                return Tup_bool_t4572726f72x{true, noError()};
             }
         }
-        return Tup_bool_Error{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
+        return Tup_bool_t4572726f72x{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
     }
     engineResult result = runPhaseA(mem, re, subject, eflags);
     if ((!result.matched)) {
-        return Tup_bool_Error{false, noError()};
+        return Tup_bool_t4572726f72x{false, noError()};
     }
     if (((uint32_t(re.flags & FlagNoSub) != 0) || (vg::len(pmatch) == 0LL))) {
-        return Tup_bool_Error{true, noError()};
+        return Tup_bool_t4572726f72x{true, noError()};
     }
     setMatch(pmatch, 0LL, result.so, result.eo);
     for (int64_t idx = 1LL; (idx < vg::len(pmatch)); idx += 1LL) {
         setMatch(pmatch, idx, int64_t(0ULL - uint64_t(1LL)), int64_t(0ULL - uint64_t(1LL)));
     }
     if (((vg::len(pmatch) == 1LL) || (re.nsub == 0LL))) {
-        return Tup_bool_Error{true, noError()};
+        return Tup_bool_t4572726f72x{true, noError()};
     }
     decoded d = decodeWindow(mem, subject, result.so, result.eo);
     vg::Slice<Match> caps = vg::make<Match>(mem, (re.nsub + 1LL));
     Error serr = solveCaptures(mem, re, d, 0LL, vg::len(d.runes), eflags, caps);
     if ((serr.Code != ErrNone)) {
-        return Tup_bool_Error{false, serr};
+        return Tup_bool_t4572726f72x{false, serr};
     }
     fillMatches(re, d, caps, pmatch);
-    return Tup_bool_Error{true, noError()};
+    return Tup_bool_t4572726f72x{true, noError()};
 }
 
-Tup_MatchIter_Error MatchIterInit(Regexp& re, int64_t limit) {
+Tup_t4d6174636849746572x_t4572726f72x MatchIterInit(Regexp& re, int64_t limit) {
     MatchIter it{};
     it.lastEnd = int64_t(0ULL - uint64_t(1LL));
     it.limit = limit;
     if ((uint32_t(re.flags & FlagNoSub) != 0)) {
         it.done = true;
-        return Tup_MatchIter_Error{it, compileError(ErrENoSub, int64_t(0ULL - uint64_t(1LL)))};
+        return Tup_t4d6174636849746572x_t4572726f72x{it, compileError(ErrENoSub, int64_t(0ULL - uint64_t(1LL)))};
     }
     if ((limit == 0LL)) {
         it.done = true;
     }
-    return Tup_MatchIter_Error{it, noError()};
+    return Tup_t4d6174636849746572x_t4572726f72x{it, noError()};
 }
 
-Tup_bool_Error MatchIterNext(vg::Arena& mem, Regexp& re, MatchIter& it, vg::Str subject, uint32_t eflags, vg::Slice<Match> pmatch) {
+Tup_bool_t4572726f72x MatchIterNext(vg::Arena& mem, Regexp& re, MatchIter& it, vg::Str subject, uint32_t eflags, vg::Slice<Match> pmatch) {
     if (it.done) {
-        return Tup_bool_Error{false, noError()};
+        return Tup_bool_t4572726f72x{false, noError()};
     }
     if ((vg::len(pmatch) < (re.nsub + 1LL))) {
         it.done = true;
-        return Tup_bool_Error{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
+        return Tup_bool_t4572726f72x{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
     }
     while ((it.pos <= vg::len(subject))) {
         uint32_t flags = continuationFlags(re, subject, it.pos, eflags);
@@ -3587,11 +3584,11 @@ Tup_bool_Error MatchIterNext(vg::Arena& mem, Regexp& re, MatchIter& it, vg::Str 
         Error err = _t1.r1;
         if ((err.Code != ErrNone)) {
             it.done = true;
-            return Tup_bool_Error{false, err};
+            return Tup_bool_t4572726f72x{false, err};
         }
         if ((!matched)) {
             it.done = true;
-            return Tup_bool_Error{false, noError()};
+            return Tup_bool_t4572726f72x{false, noError()};
         }
         for (int64_t idx = 0LL; (idx < vg::len(pmatch)); idx += 1LL) {
             if ((pmatch[idx].So >= 0LL)) {
@@ -3608,7 +3605,7 @@ Tup_bool_Error MatchIterNext(vg::Arena& mem, Regexp& re, MatchIter& it, vg::Str 
             if ((so >= vg::len(subject))) {
                 it.done = true;
                 if ((!report)) {
-                    return Tup_bool_Error{false, noError()};
+                    return Tup_bool_t4572726f72x{false, noError()};
                 }
             } else {
                 auto _t2 = decodeRuneAt(subject, so);
@@ -3622,14 +3619,14 @@ Tup_bool_Error MatchIterNext(vg::Arena& mem, Regexp& re, MatchIter& it, vg::Str 
             if ((it.limit == 0LL)) {
                 it.done = true;
             }
-            return Tup_bool_Error{true, noError()};
+            return Tup_bool_t4572726f72x{true, noError()};
         }
     }
     it.done = true;
-    return Tup_bool_Error{false, noError()};
+    return Tup_bool_t4572726f72x{false, noError()};
 }
 
-Tup_sreplPart_Error parseReplacement(vg::Arena& mem, vg::Str replacement, int64_t nsub) {
+Tup_st7265706c50617274x_t4572726f72x parseReplacement(vg::Arena& mem, vg::Str replacement, int64_t nsub) {
     vg::Slice<replPart> parts = vg::make_cap<replPart>(mem, 0LL, 4LL);
     int64_t start = 0LL;
     for (int64_t idx = 0LL; (idx < vg::len(replacement)); idx += 1LL) {
@@ -3649,13 +3646,13 @@ Tup_sreplPart_Error parseReplacement(vg::Arena& mem, vg::Str replacement, int64_
             continue;
         }
         if (((idx + 1LL) == vg::len(replacement))) {
-            return Tup_sreplPart_Error{vg::Slice<replPart>{}, compileError(ErrEEscape, idx)};
+            return Tup_st7265706c50617274x_t4572726f72x{vg::Slice<replPart>{}, compileError(ErrEEscape, idx)};
         }
         uint8_t next = replacement[(idx + 1LL)];
         if (((next >= 48) && (next <= 57))) {
             int64_t group = int64_t(uint8_t(next - 48));
             if (((group == 0LL) || (group > nsub))) {
-                return Tup_sreplPart_Error{vg::Slice<replPart>{}, compileError(ErrESubReg, idx)};
+                return Tup_st7265706c50617274x_t4572726f72x{vg::Slice<replPart>{}, compileError(ErrESubReg, idx)};
             }
             replPart ref{};
             ref.group = group;
@@ -3673,21 +3670,24 @@ Tup_sreplPart_Error parseReplacement(vg::Arena& mem, vg::Str replacement, int64_
         tail.lit = replacement.tail(start);
         parts = vg::append(mem, parts, tail);
     }
-    return Tup_sreplPart_Error{parts, noError()};
+    return Tup_st7265706c50617274x_t4572726f72x{parts, noError()};
 }
 
-Tup_Str_Error ReplaceAll(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Str replacement, int64_t limit, uint32_t eflags) {
+Tup_Str_t4572726f72x ReplaceAll(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Str replacement, int64_t limit, uint32_t eflags) {
+    if ((uint32_t(re.flags & FlagNoSub) != 0)) {
+        return Tup_Str_t4572726f72x{vg::lit(""), compileError(ErrENoSub, int64_t(0ULL - uint64_t(1LL)))};
+    }
     auto _t1 = parseReplacement(mem, replacement, re.nsub);
     vg::Slice<replPart> parts = _t1.r0;
     Error perr = _t1.r1;
     if ((perr.Code != ErrNone)) {
-        return Tup_Str_Error{vg::lit(""), perr};
+        return Tup_Str_t4572726f72x{vg::lit(""), perr};
     }
     auto _t2 = MatchIterInit(re, limit);
     MatchIter it = _t2.r0;
     Error ierr = _t2.r1;
     if ((ierr.Code != ErrNone)) {
-        return Tup_Str_Error{vg::lit(""), ierr};
+        return Tup_Str_t4572726f72x{vg::lit(""), ierr};
     }
     vg::Slice<Match> pmatch = vg::make<Match>(mem, (re.nsub + 1LL));
     vg::Slice<uint8_t> out{};
@@ -3698,7 +3698,7 @@ Tup_Str_Error ReplaceAll(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Str re
         bool ok = _t3.r0;
         Error err = _t3.r1;
         if ((err.Code != ErrNone)) {
-            return Tup_Str_Error{vg::lit(""), err};
+            return Tup_Str_t4572726f72x{vg::lit(""), err};
         }
         if ((!ok)) {
             break;
@@ -3721,10 +3721,10 @@ Tup_Str_Error ReplaceAll(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Str re
         last = pmatch[0LL].Eo;
     }
     if ((!any)) {
-        return Tup_Str_Error{subject, noError()};
+        return Tup_Str_t4572726f72x{subject, noError()};
     }
     out = vg::append_str(mem, out, subject.tail(last));
-    return Tup_Str_Error{vg::str_from_bytes(mem, out), noError()};
+    return Tup_Str_t4572726f72x{vg::str_from_bytes(mem, out), noError()};
 }
 
 int32_t fail(parser& p, int32_t code, int64_t pos) {
@@ -3860,7 +3860,7 @@ int32_t parseExpr(vg::Arena& mem, parser& p, Locale& loc) {
     case 40: {
         p.pos += 1LL;
         p.groups += 1LL;
-        int64_t index_ = p.groups;
+        int64_t vego_index = p.groups;
         int32_t sub = parseAlt(mem, p, loc, true);
         if ((sub < 0)) {
             return int32_t(0ULL - uint64_t(1));
@@ -3871,7 +3871,7 @@ int32_t parseExpr(vg::Arena& mem, parser& p, Locale& loc) {
         p.pos += 1LL;
         primary = addNode(mem, p, opGroup);
         p.nodes[primary].ch = vg::append(mem, p.nodes[primary].ch, sub);
-        p.nodes[primary].index_ = index_;
+        p.nodes[primary].vego_index = vego_index;
     } break;
     case 91: {
         primary = parseBracket(mem, p, loc);
@@ -3981,7 +3981,7 @@ int32_t parseDup(vg::Arena& mem, parser& p, int32_t operand) {
     return rep;
 }
 
-Tup_interval_bool parseInterval(parser& p) {
+Tup_t696e74657276616cx_bool parseInterval(parser& p) {
     interval iv{};
     int64_t start = p.pos;
     p.pos += 1LL;
@@ -3990,41 +3990,41 @@ Tup_interval_bool parseInterval(parser& p) {
     bool ok = _t1.r1;
     if ((!ok)) {
         intervalError(p, start);
-        return Tup_interval_bool{iv, false};
+        return Tup_t696e74657276616cx_bool{iv, false};
     }
     uint8_t c = peekByte(p);
     if ((c == 125)) {
         p.pos += 1LL;
         iv.lo = lo;
         iv.hi = lo;
-        return Tup_interval_bool{iv, true};
+        return Tup_t696e74657276616cx_bool{iv, true};
     }
     if ((c != 44)) {
         intervalError(p, start);
-        return Tup_interval_bool{iv, false};
+        return Tup_t696e74657276616cx_bool{iv, false};
     }
     p.pos += 1LL;
     if ((peekByte(p) == 125)) {
         p.pos += 1LL;
         iv.lo = lo;
         iv.hi = infinite;
-        return Tup_interval_bool{iv, true};
+        return Tup_t696e74657276616cx_bool{iv, true};
     }
     auto _t2 = parseCount(p);
     int64_t hi = _t2.r0;
     bool ok2 = _t2.r1;
     if (((!ok2) || (peekByte(p) != 125))) {
         intervalError(p, start);
-        return Tup_interval_bool{iv, false};
+        return Tup_t696e74657276616cx_bool{iv, false};
     }
     p.pos += 1LL;
     if ((hi < lo)) {
         (void)(fail(p, ErrBadBR, start));
-        return Tup_interval_bool{iv, false};
+        return Tup_t696e74657276616cx_bool{iv, false};
     }
     iv.lo = lo;
     iv.hi = hi;
-    return Tup_interval_bool{iv, true};
+    return Tup_t696e74657276616cx_bool{iv, true};
 }
 
 void intervalError(parser& p, int64_t start) {

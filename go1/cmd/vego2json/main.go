@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/parser"
 	"go/token"
 	"go/types"
@@ -23,6 +24,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"revera1/vegoc"
 )
 
 var scalarTypes = map[string]bool{
@@ -84,6 +87,12 @@ type checker struct {
 func (c *checker) errorf(pos token.Pos, format string, args ...any) {
 	where := c.fset.Position(pos)
 	c.errs = append(c.errs, fmt.Sprintf("%s: %s", where, fmt.Sprintf(format, args...)))
+}
+
+func (c *checker) checkPackageName(name *ast.Ident) {
+	if vegoc.ReservedPackageName(name.Name) {
+		c.errorf(name.Pos(), "package declaration name %s is reserved for generated code", name.Name)
+	}
 }
 
 func isHostFile(name string) bool {
@@ -282,7 +291,11 @@ func (c *checker) constDecls(decl *ast.GenDecl) []any {
 			continue
 		}
 		for i, name := range vs.Names {
+			c.checkPackageName(name)
 			c.forbidIota(vs.Values[i])
+			if vs.Type == nil {
+				c.checkInferredInteger(vs.Values[i])
+			}
 			entry := map[string]any{"k": "const", "name": name.Name,
 				"value": c.expr(vs.Values[i])}
 			if vs.Type != nil {
@@ -294,6 +307,29 @@ func (c *checker) constDecls(decl *ast.GenDecl) []any {
 		}
 	}
 	return out
+}
+
+func (c *checker) checkInferredInteger(e ast.Expr) {
+	tv, ok := c.info.Types[e]
+	if !ok || tv.Value == nil {
+		return
+	}
+	b, ok := tv.Type.(*types.Basic)
+	if !ok {
+		return
+	}
+	switch b.Kind() {
+	case types.UntypedInt:
+		_, exact := constant.Int64Val(tv.Value)
+		if !exact {
+			c.errorf(e.Pos(), "untyped integer constant does not fit the Vego int default")
+		}
+	case types.UntypedRune:
+		v, exact := constant.Int64Val(tv.Value)
+		if !exact || v < -(1<<31) || v > 1<<31-1 {
+			c.errorf(e.Pos(), "untyped rune constant does not fit the Vego int32 default")
+		}
+	}
 }
 
 func (c *checker) forbidIota(e ast.Expr) {
@@ -315,6 +351,7 @@ func (c *checker) varDecls(decl *ast.GenDecl) []any {
 			continue
 		}
 		for i, name := range vs.Names {
+			c.checkPackageName(name)
 			c.checkConstInitializer(vs.Values[i])
 			if obj := c.info.Defs[name]; obj != nil {
 				if typeContainsSlice(obj.Type()) {
@@ -358,10 +395,14 @@ func (c *checker) checkConstInitializer(e ast.Expr) {
 	if tv, ok := c.info.Types[e]; ok && tv.Value != nil {
 		return
 	}
-	if lit, ok := e.(*ast.CompositeLit); ok {
-		for _, el := range lit.Elts {
+	switch x := e.(type) {
+	case *ast.CompositeLit:
+		for _, el := range x.Elts {
 			c.checkConstInitializer(el)
 		}
+		return
+	case *ast.KeyValueExpr:
+		c.checkConstInitializer(x.Value)
 		return
 	}
 	c.errorf(e.Pos(), "package variable initializer must be constant data")
@@ -371,6 +412,7 @@ func (c *checker) typeDecls(decl *ast.GenDecl) []any {
 	var out []any
 	for _, s := range decl.Specs {
 		ts := s.(*ast.TypeSpec)
+		c.checkPackageName(ts.Name)
 		if ts.Assign.IsValid() {
 			c.errorf(ts.Pos(), "type aliases are not in the subset")
 			continue
@@ -406,6 +448,7 @@ func (c *checker) typeDecls(decl *ast.GenDecl) []any {
 }
 
 func (c *checker) funcDecl(decl *ast.FuncDecl) any {
+	c.checkPackageName(decl.Name)
 	if decl.Recv != nil {
 		c.errorf(decl.Pos(), "methods are not in the subset")
 	}
@@ -442,7 +485,13 @@ func (c *checker) funcDecl(decl *ast.FuncDecl) any {
 		}
 	}
 	c.breakable = c.breakable[:0]
-	body := c.block(decl.Body)
+	var body []any
+	if decl.Body == nil {
+		c.errorf(decl.Pos(), "function declarations without a body are not in the subset")
+		body = []any{}
+	} else {
+		body = c.block(decl.Body)
+	}
 	return map[string]any{"k": "func", "name": decl.Name.Name,
 		"params": orEmpty(params), "results": orEmpty(results),
 		"body": body}
@@ -670,11 +719,11 @@ func (c *checker) rangeStmt(st *ast.RangeStmt) any {
 		switch under := overType.Underlying().(type) {
 		case *types.Slice, *types.Array:
 		case *types.Basic:
-			if under.Info()&types.IsInteger == 0 {
-				c.errorf(st.X.Pos(), "range is only over slices, arrays, and integer counts")
+			if under.Kind() != types.Int && under.Kind() != types.UntypedInt {
+				c.errorf(st.X.Pos(), "range is only over slices, arrays, and int counts")
 			}
 		default:
-			c.errorf(st.X.Pos(), "range is only over slices, arrays, and integer counts")
+			c.errorf(st.X.Pos(), "range is only over slices, arrays, and int counts")
 		}
 	}
 	entry := map[string]any{"k": "range", "over": c.expr(st.X)}
@@ -721,6 +770,38 @@ func containsSlice(t types.Type) bool {
 	return false
 }
 
+func isSwitchScalar(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	b, ok := t.Underlying().(*types.Basic)
+	return ok && b.Info()&(types.IsBoolean|types.IsInteger) != 0
+}
+
+func isPointerType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	_, ok := t.Underlying().(*types.Pointer)
+	return ok
+}
+
+func isStringType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	b, ok := t.Underlying().(*types.Basic)
+	return ok && b.Info()&types.IsString != 0
+}
+
+func isComparison(op token.Token) bool {
+	switch op {
+	case token.EQL, token.NEQ, token.LSS, token.LEQ, token.GTR, token.GEQ:
+		return true
+	}
+	return false
+}
+
 func (c *checker) switchStmt(st *ast.SwitchStmt) any {
 	if st.Init != nil {
 		c.errorf(st.Pos(), "switch with an init statement is not in the subset")
@@ -728,6 +809,9 @@ func (c *checker) switchStmt(st *ast.SwitchStmt) any {
 	if st.Tag == nil {
 		c.errorf(st.Pos(), "switch needs a scalar tag")
 		return map[string]any{"k": "block", "body": []any{}}
+	}
+	if tagType := c.info.Types[st.Tag].Type; !isSwitchScalar(tagType) {
+		c.errorf(st.Tag.Pos(), "switch tag must have bool or integer type")
 	}
 	entry := map[string]any{"k": "switch", "tag": c.expr(st.Tag)}
 	var cases []any
@@ -843,6 +927,14 @@ func (c *checker) expr(e ast.Expr) any {
 		if !ok {
 			c.errorf(x.Pos(), "operator %s is not in the subset", x.Op)
 			op = "?"
+		}
+		leftType := c.info.Types[x.X].Type
+		rightType := c.info.Types[x.Y].Type
+		if isPointerType(leftType) || isPointerType(rightType) {
+			c.errorf(x.Pos(), "pointer comparisons are not in the subset")
+		}
+		if (isStringType(leftType) || isStringType(rightType)) && !isComparison(x.Op) {
+			c.errorf(x.Pos(), "string operators are limited to comparisons")
 		}
 		return map[string]any{"k": "binary", "op": op,
 			"x": c.expr(x.X), "y": c.expr(x.Y)}

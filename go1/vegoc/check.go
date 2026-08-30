@@ -3,6 +3,7 @@ package vegoc
 import (
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 // Check resolves the type of every expression and folds the constant values.
@@ -83,7 +84,7 @@ func (c *checker) run() {
 // A package-level name reaches every target word for word, so it must stay clear.
 func (c *checker) checkReservedPackageNames() {
 	check := func(kind, name string) {
-		if reserved[name] {
+		if ReservedPackageName(name) {
 			panic(fmt.Sprintf("%s %s: the name is reserved for the target runtimes", kind, name))
 		}
 	}
@@ -102,7 +103,7 @@ func (c *checker) checkReservedPackageNames() {
 }
 
 func (c *checker) packageName(name string) bool {
-	if reserved[name] {
+	if ReservedPackageName(name) {
 		return true
 	}
 	if _, ok := c.p.ConstMap[name]; ok {
@@ -118,6 +119,11 @@ func (c *checker) packageName(name string) bool {
 		return true
 	}
 	return false
+}
+
+// ReservedPackageName reports whether a package declaration would collide with generated runtime names.
+func ReservedPackageName(name string) bool {
+	return reserved[name] || strings.HasPrefix(name, tupleNamePrefix)
 }
 
 // ensureConst checks a constant declaration on demand.
@@ -396,7 +402,7 @@ func (c *checker) checkStmt(s *Stmt) {
 		switch t.K {
 		case KSlice, KArray:
 			elem = t.Elem
-		case KInt, KI64:
+		case KInt:
 		default:
 			panic("range over unsupported type " + t.String())
 		}
@@ -419,6 +425,9 @@ func (c *checker) checkStmt(s *Stmt) {
 		c.checkExpr(s.Tag)
 		c.defaultType(s.Tag)
 		tt := s.Tag.Typ
+		if tt.K != KBool && !tt.IsInteger() {
+			panic("switch tag must have bool or integer type")
+		}
 		for _, cs := range s.Cases {
 			for _, v := range cs.Values {
 				c.checkExpr(v)
@@ -785,6 +794,9 @@ func (c *checker) checkBinary(e *Expr) {
 		e.Untyped = e.X.Untyped && e.Y.Untyped
 	case "==", "!=", "<", "<=", ">", ">=":
 		c.unifyOperands(e)
+		if e.X.Typ.K == KPtr || e.Y.Typ.K == KPtr {
+			panic("pointer comparisons are not in the subset")
+		}
 		e.Untyped = e.X.Untyped && e.Y.Untyped
 		// Operands never take a type from above a comparison.
 		// A constant operand therefore freezes at its unified default here.
@@ -792,6 +804,12 @@ func (c *checker) checkBinary(e *Expr) {
 		c.defaultType(e.Y)
 		e.Typ = TBool
 	case "<<", ">>":
+		if e.X.Typ.K == KStr {
+			panic("string operators are limited to comparisons")
+		}
+		if !e.X.Typ.IsInteger() {
+			panic("shift of non-integer value")
+		}
 		if e.Y.Untyped {
 			c.retype(e.Y, TInt)
 		}
@@ -802,6 +820,12 @@ func (c *checker) checkBinary(e *Expr) {
 		e.Untyped = e.X.Untyped
 	case "+", "-", "*", "/", "%", "&", "|", "^", "&^":
 		c.unifyOperands(e)
+		if e.X.Typ.K == KStr {
+			panic("string operators are limited to comparisons")
+		}
+		if !e.X.Typ.IsInteger() {
+			panic("arithmetic operator requires integer operands")
+		}
 		e.Typ = e.X.Typ
 		e.Untyped = e.X.Untyped && e.Y.Untyped
 	default:
@@ -876,7 +900,24 @@ func (c *checker) defaultType(e *Expr) {
 		// A rune-defaulted constant stays int32.
 		t = TI32
 	}
+	if t.IsInteger() {
+		v := c.fold(e)
+		if !integerFits(v, t) {
+			panic(fmt.Sprintf("integer constant %s does not fit %s", v, t))
+		}
+	}
 	c.retype(e, t)
+}
+
+func integerFits(v *big.Int, t *Type) bool {
+	w := uint(t.Width())
+	if !t.Signed() {
+		return v.Sign() >= 0 && v.BitLen() <= int(w)
+	}
+	limit := new(big.Int).Lsh(big.NewInt(1), w-1)
+	min := new(big.Int).Neg(new(big.Int).Set(limit))
+	max := new(big.Int).Sub(limit, big.NewInt(1))
+	return v.Cmp(min) >= 0 && v.Cmp(max) <= 0
 }
 
 // fold evaluates an integer constant expression.
@@ -977,7 +1018,7 @@ func (c *checker) rewriteMutatedParams(f *FuncDecl) {
 			continue
 		}
 		shadow := pa.Name + "_v"
-		for f.Info[shadow] != nil {
+		for f.Info[shadow] != nil || c.packageName(shadow) {
 			shadow += "v"
 		}
 		old := pa.Name

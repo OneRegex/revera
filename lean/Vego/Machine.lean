@@ -67,12 +67,17 @@ def mkSlice (m : Machine) (elems : Array Val) : Machine × Val :=
 def sliceElems (m : Machine) (v : Val) : Option (Array Val) :=
   match v with
   | .slice none _ _ _ => some #[]
-  | .slice (some (obj, _, path)) off len _ =>
-    match (m.readCell obj).proj path with
-    | .ok (.arr es) =>
-      if off + len ≤ es.size then some (es.extract off (off + len))
-      else none
-    | _ => none
+  | .slice (some (obj, gen, path)) off len _ =>
+    match m.heap.cells[obj]? with
+    | some (currentGen, value) =>
+      if currentGen != gen then none
+      else
+        match value.proj path with
+        | .ok (.arr es) =>
+          if off + len ≤ es.size then some (es.extract off (off + len))
+          else none
+        | _ => none
+    | none => none
   | _ => none
 
 /-- Clear the resource meter, so the next call is measured on its own. -/

@@ -46,7 +46,8 @@ func sampleRunes() []int32 {
 
 func TestLocaleOpenDifferential(t *testing.T) {
 	names := []string{"C", "POSIX", "c.UTF-8", "en", "EN_us", "xx-not-there",
-		"de@collation=phonebook", "de@bad", "cs.utf8", "cs.latin2", "",
+		"de@collation=phonebook", "de@bad", "cs.utf8", "cs.UTF8", "cs.u-t-f-8",
+		"cs.UTF--8", "cs.UTF-8-", "cs.latin2", "",
 		"tr", "sv", "de@collation=dictionary"}
 	for _, name := range names {
 		_, ok0 := g0loc.Open(name, "")
@@ -54,6 +55,9 @@ func TestLocaleOpenDifferential(t *testing.T) {
 		ok1 := err1 == nil
 		if ok0 != ok1 {
 			t.Fatalf("OpenLocale(%q): go0 ok=%v, go1 ok=%v", name, ok0, ok1)
+		}
+		if (name == "cs.u-t-f-8" || name == "cs.UTF--8" || name == "cs.UTF-8-") && ok1 {
+			t.Fatalf("OpenLocale(%q) accepted a malformed UTF-8 suffix", name)
 		}
 	}
 	if g0loc.Count() != LocaleCountEmbedded(t) {

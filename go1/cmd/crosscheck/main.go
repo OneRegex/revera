@@ -5,7 +5,7 @@
 //
 // Usage:
 //
-//	crosscheck [-quick] [-dump corpus.txt] driver-binary...
+//	crosscheck [-quick] [-extra rounds] [-dump corpus.txt] [-dumpexpected corpus.tsv] driver-binary...
 package main
 
 import (
@@ -105,6 +105,12 @@ func (c *corpus) replace() {
 			c.add("R %d %d %s %s", cc.Limit, eflags, enc(cc.Replacement), enc(cc.Subject))
 		}
 	}
+	c.compile(revera.FlagNoSub, "a")
+	for _, replacement := range []string{"-", `\`, `\1`} {
+		for eflags := uint32(0); eflags < 4; eflags++ {
+			c.add("R -1 %d %s %s", eflags, enc(replacement), enc("a"))
+		}
+	}
 }
 
 func (c *corpus) iter() {
@@ -188,6 +194,10 @@ func main() {
 		"write command and expected output pairs, tab separated")
 	extra := flag.Int64("extra", 0, "additional random rounds, 500 patterns each")
 	flag.Parse()
+	if !hasVerificationTarget(flag.NArg(), *dump, *dumpExpected) {
+		fmt.Fprintln(os.Stderr, "usage: crosscheck [-quick] [-extra rounds] [-dump corpus.txt] [-dumpexpected corpus.tsv] driver-binary...")
+		os.Exit(2)
+	}
 	c := build(*extra)
 	input := strings.Join(c.lines, "\n") + "\n"
 
@@ -242,6 +252,10 @@ func main() {
 	}
 }
 
+func hasVerificationTarget(drivers int, dump, dumpExpected string) bool {
+	return drivers > 0 || dump != "" || dumpExpected != ""
+}
+
 // runDriver feeds one driver the corpus and diffs its output.
 // It returns the report text and whether the driver failed.
 func runDriver(driver, input string, cmds, expected []string) (string, bool) {
@@ -255,7 +269,7 @@ func runDriver(driver, input string, cmds, expected []string) (string, bool) {
 		fmt.Fprintf(&b, "%s: FAILED to run: %v\n", driver, err)
 		return b.String(), true
 	}
-	got := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	got := protocolLines(out.String())
 	bad := 0
 	for i := range expected {
 		if i >= len(got) {
@@ -281,4 +295,8 @@ func runDriver(driver, input string, cmds, expected []string) (string, bool) {
 	}
 	fmt.Fprintf(&b, "%s: OK (%d lines)\n", driver, len(expected))
 	return b.String(), false
+}
+
+func protocolLines(output string) []string {
+	return strings.Split(strings.TrimSuffix(output, "\n"), "\n")
 }

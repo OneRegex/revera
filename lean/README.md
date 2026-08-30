@@ -10,6 +10,7 @@ The theorems in `Vego/Theorems.lean` are machine checked.
 
 The theorems of `Vego/Theorems.lean` are about the embedded copies of `go1/probe.vego.json` and `go1/revera.vego.json`, byte for byte.
 Native evaluation checks them.
+The Lake configuration tracks every embedded JSON, corpus, locale, and probe input, so changing one rebuilds the modules that contain it.
 The theorems of `Vego/CostLemmas.lean` and `Vego/MeterSound.lean` quantify over all inputs and are proved by induction, with no native evaluation.
 
 ### 1. The artifacts are well formed
@@ -64,7 +65,7 @@ The runtimes round a zero-length request up to one element, and malloc adds its 
 It folds a constant factor of slack into its per-record sizes to cover it.
 
 Two corpus patterns cannot run under the interpreter in any reasonable time, and the theorem leaves their executions out.
-That is 1056 X commands of the 86691, so the theorem covers 85635.
+That is 1056 X commands of the 86704, so the theorem covers 85648.
 Both nest a star inside counted repetitions, `((a*){250}){250}b` in six blocks and `((a*){4}){4}` in six more.
 The parse search then explores a very large number of ways to split a subject among nullable instances.
 The cost comes from the nesting, not from the subject.
@@ -73,7 +74,7 @@ The second needs minutes on the empty subject.
 Replaying all twelve blocks would take days.
 
 What stays is chosen so that nothing escapes the check that matters.
-Every compile command of the corpus stays, all 9779 of them, so no pattern goes uncompiled and unchecked.
+Every compile command of the corpus stays, all 9780 of them, so no pattern goes uncompiled and unchecked.
 The T commands of those blocks stay too, so the contract figures of the two extreme patterns still compare against the Go reference.
 Those are the largest figures in the corpus, which makes them the ones worth keeping.
 Only the executions go, and dropping them is sound for the session state.

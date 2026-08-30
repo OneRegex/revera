@@ -198,3 +198,163 @@
 - My first pass at the Zig doc comments left a stray blank line inside a `///` block.
   `zig fmt` removed it on the next save, so the mistake cost nothing, but I only noticed because the harness reported that the file had changed under me.
   Lesson: read the formatter's result rather than assuming the edit landed as written.
+
+## 2026-08-30, contributor guide
+
+- My first `AGENTS.md` draft was 415 words, above the requested optimal range.
+  I tightened repeated descriptions and brought the guide below 400 words.
+  Lesson: check explicit size guidance as part of the first draft review.
+
+## 2026-08-30, correctness audit
+
+- I first used `find ..` to locate contributor guides even though the repository workflow requires `rg` for file searches.
+  The parent traversal did not finish promptly and produced no useful result.
+  I replaced it with `rg --files -g AGENTS.md`, which found the root guide immediately.
+  Lesson: use the repository's required search tool before a broad filesystem traversal.
+- My first Go race command allowed the test cache, so go0 reported cached results instead of a fresh execution.
+  I repeated the race suite with `-count=1` before treating it as evidence.
+  Lesson: force a fresh run when the point of a diagnostic is current runtime behavior.
+- I looked for Zig's failing allocator in `std/testing/failing_allocator.zig`, but Zig 0.17 names that file `std/testing/FailingAllocator.zig`.
+  The standard library export in `std/testing.zig` gave the correct path and API.
+  Lesson: resolve standard library helpers from their public export before assuming a source filename.
+- I ran `zig fmt` on generated engine files after regeneration, which broke the repository's byte-for-byte reproduction invariant.
+  The formatter changed generated switch layout and trailing blank lines even though the generator output was authoritative.
+  I restored the artifacts by regenerating them and limited direct formatting to hand-written Zig files.
+  Lesson: never format a generated artifact separately from its generator.
+- My first Zig allocation-failure workflow compiled an ASCII range under the Czech locale.
+  That locale intentionally rejects ranges, so the unlimited baseline failed before the test reached allocator injection.
+  I kept the locale lookup but changed the expression to one with literal repetitions.
+  Lesson: an allocation harness must use inputs that are semantically valid under every option it combines.
+- I started the full go1 race suite with Go's default ten-minute timeout.
+  Race instrumentation made the fixed differential test exceed that limit, so the run ended without correctness evidence.
+  I repeated it with an explicit longer timeout and a fresh test count.
+  Lesson: set a measured timeout for known heavy suites before using instrumentation that multiplies their cost.
+- My first json2zig regression fixture omitted the closing brace of a builtin expression.
+  The JSON decoder rejected the fixture before the generator test could run.
+  I corrected the fixture and reran the focused package test.
+  Lesson: validate synthetic IR fixtures before using their failures to assess generated code.
+- I ran `cargo fmt --check` over generated Rust engines even though their checked-in form comes directly from json2rust and was already not rustfmt-clean.
+  The check produced a large irrelevant diff but changed no files.
+  I limited formatting checks to hand-written Rust sources and kept regeneration identity authoritative for generated files.
+  Lesson: exclude generated artifacts from source-formatter gates unless the generator itself promises formatter-stable output.
+- My first downstream Rust privacy recheck linked `target/debug/librevera.rlib`, which cargo test had not refreshed after the fix.
+  The stale pre-fix library still exposed `vg`, so the unsafe reproducer compiled and produced misleading output.
+  I rebuilt the library target explicitly before repeating the compile-fail check.
+  Lesson: verify the timestamp or rebuild the exact artifact passed through `--extern` in downstream compiler tests.
+- I ran a focused Go formatter and test command from `go1` while still prefixing its file paths with `go1/`.
+  The formatter failed before changing any files because those paths resolved one directory too deep.
+  I repeated the command with paths relative to its working directory.
+  Lesson: align command paths with the selected working directory before running a multi-file formatter.
+- My first end-to-end loop-post fixture placed the call in the loop body instead of the three-clause loop's post position.
+  That source could not exercise the printer branch under repair.
+  I moved the call into the post clause before generating any evidence from the fixture.
+  Lesson: inspect a regression fixture against the exact syntax node named by the defect before running it.
+- I repeated the working-directory path error when inspecting the corrected loop-post fixture from `go1`.
+  The leading `sed` path was repository-relative, so the chained command stopped before generation.
+  I changed every path in the command to be relative to `go1` before retrying.
+  Lesson: validate all paths in a chained command, not only the paths passed to the principal tool.
+- I passed one Go source file to `vego2json`, but its documented input is a package directory.
+  The exporter rejected the path before producing JSON.
+  I moved the fixture into its own temporary package directory and used that directory as input.
+  Lesson: reread a command's usage contract before turning a unit regression into an end-to-end check.
+- I tried to apply the synthetic-name fix as one large multi-file patch using an inaccurate C++ composite-expression context.
+  Patch validation rejected the whole change, so no source file was modified.
+  I split the change into smaller patches after reading the exact current regions.
+  Lesson: use narrow patches when several generators need similar but structurally different edits.
+- I compiled a minimal generated Rust fixture with `-D warnings`, although the generator unconditionally imports its runtime and the fixture did not use it.
+  The expected unused-import warning became an unrelated hard error after the C++ and Zig fixtures had already compiled.
+  I repeated the Rust compile without promoting warnings, matching the repository's generated-code build policy.
+  Lesson: do not impose a stricter warning policy on a synthetic generated file than the project applies to generated artifacts.
+- The validation specialist first ran `gofmt` from `go1` with paths that still began with `go1/`.
+  It failed before modifying files, and the specialist repeated it with working-directory-relative paths.
+  Lesson: pass formatter paths in the same coordinate system as the command's working directory.
+- The first keyed-constant regression also used an array index key, which the Vego subset intentionally excludes.
+  That unrelated rejection obscured the struct-value traversal bug under test.
+  The specialist narrowed the fixture to an unkeyed array containing a keyed struct literal.
+  Lesson: make a boundary fixture contain only the one construct whose acceptance is being tested.
+- My Rust keyword probe read source from standard input without selecting an output path.
+  `rustc` left its default `librust_out.rlib` in the repository root, outside the required temporary directory.
+  I removed that disposable artifact immediately and kept subsequent outputs under `tmp`.
+  Lesson: even syntax-only-looking compiler probes need an explicit no-output mode or a path in `tmp`.
+- I appended `zig build test -Doptimize=ReleaseFast` to a root-level bounds probe without changing into `zig1`.
+  The ReleaseFast probe itself correctly panicked, but the suite command could not find `build.zig`.
+  I reran the suite from the Zig component directory.
+  Lesson: give each command in a multi-stage validation the working directory of the component it builds.
+- My corrected-directory Zig command still used the older `-Doptimize=ReleaseFast` build option spelling.
+  Zig 0.17 rejected that project option during configuration.
+  I initially misread the short error and wrote `-Drelease=fast` as the replacement.
+  The full help distinguishes the Boolean project option `-Drelease` from the general `--release=fast` option, which is the correct spelling for an explicit mode.
+  Lesson: read the full active Zig build help instead of inferring an option's form from the short error list.
+- The go1 specialist initially called `constant.Int64Val` before checking whether a source constant was actually an integer.
+  String and Boolean constants could reach that path and panic.
+  The specialist checked the `go/types` constant kind first, then added integer-specific validation.
+  Lesson: arbitrary-precision conversion helpers still require a type-kind guard at an untyped source boundary.
+- The go1 specialist submitted one duplicate-target patch while assembling its second change set.
+  Patch validation rejected it without modifying files.
+  The duplicate target was removed before applying the intended edit.
+  Lesson: inspect a multi-file patch for repeated update headers before submitting it.
+- The first arbitrary-precision validation ran recursively inside `retype`.
+  It rejected the valid intermediate `1 << 63` in `(1 << 63) - 1` and tried to fold nonconstant engine expressions.
+  Moving representability validation to `defaultType`, where the complete untyped constant freezes, fixed both cases.
+  Lesson: validate a constant's bounds only at the semantic point where its final default type is chosen.
+- I again inspected a repository-relative `go1/...` path while running the command from inside `go1`.
+  The leading `sed` failed, and the chained focused tests did not start.
+  I repeated both operations with paths relative to the selected working directory.
+  Lesson: avoid switching a long-running audit between root-relative and component-relative path conventions.
+- The printer specialist began a tuple-name collision reproducer from a stale view while the checker specialist was concurrently reserving the `Tup_` namespace.
+  Rereading the shared diff showed that the current checker already rejected the fixture.
+  Lesson: revalidate a candidate against the shared worktree before investing in a reproducer during concurrent edits.
+- The printer specialist ran `go test` on a fixture directory after generated C++ files had been placed beside its Go oracle.
+  Go rejected the unrelated generated files before running the intended test.
+  The specialist reran the oracle by naming only its Go source and test files.
+  Lesson: keep mixed-language fixture outputs out of a package-level Go test target.
+- The first compound-assignment oracle made the shared marker return zero for the divisor.
+  The Go program panicked before it could measure evaluation order.
+  Returning `value - 1` kept the index at zero while making the divisor nonzero.
+  Lesson: validate all arithmetic preconditions in a side-effect-order oracle.
+- A combined three-printer test patch used C++ context that had changed under concurrent keyword work.
+  Patch validation rejected it without modifying files.
+  The specialist reread each test file and applied smaller independent patches.
+  Lesson: split concurrent shared-file changes into narrow patches with current context.
+- The first Zig loop-post pin used a named block whose label was never referenced.
+  Zig rejected the unused label in the compile-backed regression.
+  The specialist retained the block expression but removed the unnecessary label.
+  Lesson: add a Zig block label only when a `break` expression targets it.
+- I launched the full crosscheck inside a parallel orchestration call but printed only each command's text output.
+  The crosscheck crossed the initial yield boundary, and I discarded its returned session identifier before the final driver reports arrived.
+  I reran it in a dedicated command that preserved and polled any live session.
+  Lesson: print or store the complete result object for any command that can outlive an orchestration call.
+- My first patch mirroring reserved package names into `vego2json` assumed the package-variable loop built its JSON entry before its validation checks.
+  The current function performs constant-data and slice checks first, so the context did not match and the whole patch was rejected.
+  I reread each declaration handler and applied the shared name check at its actual entry point.
+  Lesson: patch structurally similar declaration loops independently when their validation order differs.
+- The final command audit initially put two Go packages in one temporary round-trip fixture.
+  Go rejected the mixed package directory, so the specialist split the fixture by package.
+  Lesson: keep every temporary Go package in its own directory.
+- A Python wrapper in the final command audit over-escaped newline characters and wrote literal backslash sequences.
+  The specialist corrected the fixture to write actual protocol lines.
+  Lesson: inspect generated fixture bytes when testing line-oriented protocols.
+- The final command audit used an incorrect absolute path for the macOS `true` utility.
+  The specialist resolved the installed command before retrying.
+  Lesson: discover utility paths instead of assuming a platform layout.
+- The final command audit attempted a broad recursive removal for temporary cleanup, which the safety policy rejected.
+  The specialist removed only the explicit temporary fixture targets.
+  Lesson: clean temporary artifacts with narrow, resolved paths.
+- I regenerated the Lean corpus after adding differential cases and updated its count, but I did not rerun the formal agreement theorem before describing the corpus as current in the progress log.
+  The subsequent full Lean build found that `corpusAgrees = true` was false.
+  Lesson: a regenerated corpus is not validated until the theorem checks every new row against the formal model.
+- When I updated the Lean corpus totals, I searched for the old total and coverage figures but missed the old compile count and a replay total in `lean/PROGRESS.md`.
+  A repository-wide count search found and corrected both stale values.
+  Lesson: after changing a generated corpus, search every documentation file for all derived counts, not only the headline total.
+- My first Lake dependency probe tried to append an empty line to a file that already ended with a newline.
+  The patch produced no byte change, so it could not test the dependency trace.
+  I repeated the probe with a visible trailing-space line, verified the rebuild, then restored the file exactly.
+  Lesson: confirm a temporary input mutation with `git diff` before interpreting a build-cache result.
+- I repeated an already-recorded cleanup mistake by invoking `rm -rf` on the resolved audit directory.
+  The safety wrapper rejected it without removing anything.
+  I switched to a non-forcing recursive removal of that one verified directory.
+  Lesson: use the narrow non-forcing cleanup form even when the recursive target has already been resolved.
+- My final hygiene sweep ran crate-wide Rust and source-wide Zig formatter checks even though the target printers, not those formatters, own the generated engine files.
+  Both checks reported existing style differences and changed nothing.
+  I narrowed the checks to the hand-written files changed by this audit.
+  Lesson: exclude authoritative generated artifacts from formatter checks unless the generator promises canonical formatter output.

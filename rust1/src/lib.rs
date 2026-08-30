@@ -21,14 +21,17 @@
 //!
 //! Every search returns a [`Result`], because a subject can exceed what the engine has capacity for.
 //! [`Regex::contract`] reports that capacity ahead of time.
+//!
+//! The generated engine and raw-pointer runtime are private implementation details.
+//!
+//! ```compile_fail
+//! let _ = revera::vg::Arena::new();
+//! ```
 
 // The generated engine and its runtime.
 // They are the low level: explicit arenas, raw pointers, and numeric flags.
-// Nothing here needs them, but a caller who wants the execution flags of regexec() can reach them.
-#[doc(hidden)]
-pub mod engine;
-#[doc(hidden)]
-pub mod vg;
+mod engine;
+mod vg;
 
 use std::fmt;
 use std::ops::{Index, Range};
@@ -120,7 +123,11 @@ impl Error {
     fn new(e: engine::Error) -> Error {
         Error {
             code: e.Code,
-            offset: if e.Pos < 0 { None } else { Some(e.Pos as usize) },
+            offset: if e.Pos < 0 {
+                None
+            } else {
+                Some(e.Pos as usize)
+            },
         }
     }
 
@@ -135,8 +142,24 @@ impl Error {
     }
 
     fn message(&self) -> &'static str {
-        // The engine returns a static literal, so the bytes outlive any borrow of self.
-        std::str::from_utf8(engine::ErrorText(self.code).bytes()).unwrap_or("unknown error")
+        match self.code {
+            engine::ErrNone => "success",
+            engine::ErrNoMatch => "no match",
+            engine::ErrBadPat => "invalid regular expression",
+            engine::ErrECollate => "invalid collating element",
+            engine::ErrECType => "invalid character class",
+            engine::ErrEEscape => "invalid or trailing backslash",
+            engine::ErrESubReg => "invalid backreference",
+            engine::ErrEBrack => "unbalanced bracket",
+            engine::ErrEParen => "unbalanced parenthesis",
+            engine::ErrEBrace => "unbalanced brace",
+            engine::ErrBadBR => "invalid interval",
+            engine::ErrERange => "invalid range endpoint",
+            engine::ErrESpace => "capacity limit reached",
+            engine::ErrBadRpt => "repetition without an operand",
+            engine::ErrENoSub => "offsets requested from a NoSub expression",
+            _ => "unknown error",
+        }
     }
 }
 

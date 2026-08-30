@@ -200,8 +200,8 @@ int64_t SubWrite(vg::Arena& mem, int64_t n) {
 int64_t AndNotOrder(vg::Arena& mem, Counter& c) {
     vg::Slice<uint64_t> s = vg::make<uint64_t>(mem, 8LL);
     s[3LL] = 255ULL;
-    { auto&& _p = ([&]() -> decltype(auto) { auto&& _t1 = s; auto _t2 = (bump(mem, c, 1) + 2LL); return _t1[_t2]; }()); _p &= ~((uint64_t(bump(mem, c, 2)) + 15ULL)); }
-    return ([&]{ auto _t3 = (int64_t(s[3LL]) * 100000LL); auto _t4 = logCode(c); return (_t3 + _t4); }());
+    { auto&& _t1 = ([&]() -> decltype(auto) { auto&& _t2 = s; auto _t3 = (bump(mem, c, 1) + 2LL); return _t2[_t3]; }()); _t1 &= ~((uint64_t(bump(mem, c, 2)) + 15ULL)); }
+    return ([&]{ auto _t4 = (int64_t(s[3LL]) * 100000LL); auto _t5 = logCode(c); return (_t4 + _t5); }());
 }
 
 int64_t ZeroArray() {

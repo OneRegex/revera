@@ -14,7 +14,7 @@ It needs over an hour on a 120 byte one.
 `((a*){4}){4}` needs minutes on the empty subject.
 Replaying all twelve blocks would take days.
 
-What the theorem drops is exactly the X commands of those blocks, 1056 of 86691.
+What the theorem drops is exactly the X commands of those blocks, 1056 of 86704.
 It keeps their compile commands, so every pattern in the corpus is still compiled and checked.
 It keeps their T commands, so the contract figures of those patterns are still compared against the Go reference.
 That matters most for these patterns, because their figures are the largest the corpus produces.
@@ -32,7 +32,7 @@ namespace Vego
 /-- The corpus with the expected output of the Go engine, tab separated. -/
 def corpusText : String := include_str "../data/corpus.tsv"
 
-def corpusPairs : List (String × String) := parseCorpus corpusText
+def corpusPairs : Except String (List (String × String)) := parseCorpus corpusText
 
 /--
 The patterns whose executions the theorem leaves out, as the hex the protocol carries:
@@ -88,8 +88,8 @@ def dropSlowExecs (pats : List String) (inSlow : Bool)
     | .other => dropSlowExecs pats inSlow ((cmd, want) :: acc) rest
 
 /-- The corpus without those executions. -/
-def sensiblePairs : List (String × String) :=
-  dropSlowExecs intractablePatterns false [] corpusPairs
+def sensiblePairs (pairs : List (String × String)) : List (String × String) :=
+  dropSlowExecs intractablePatterns false [] pairs
 
 def countCompiles (pairs : List (String × String)) : Nat :=
   pairs.countP (fun p => isCompile p.1)
@@ -116,9 +116,13 @@ It must also keep more than 98 percent of the corpus while it drops something.
 A filter that stopped matching, or that matched everything, would fail the theorem rather than weaken it.
 -/
 def corpusAgrees : Bool :=
-  countCompiles sensiblePairs == countCompiles corpusPairs &&
-  sensiblePairs.length * 100 > corpusPairs.length * 98 &&
-  sensiblePairs.length < corpusPairs.length &&
-  replayAgrees sensiblePairs
+  match corpusPairs with
+  | .error _ => false
+  | .ok pairs =>
+    let sensible := sensiblePairs pairs
+    countCompiles sensible == countCompiles pairs &&
+    sensible.length * 100 > pairs.length * 98 &&
+    sensible.length < pairs.length &&
+    replayAgrees sensible
 
 end Vego

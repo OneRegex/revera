@@ -30,7 +30,8 @@ Notes on standard-library behavior that differed from first expectations.
 
 - Context: building a release binary with `zig build`.
 - Expectation: `zig build -Doptimize=ReleaseSafe`.
-- Reality: the flag is now `-Drelease`, and the build script's `standardOptimizeOption(.{ .preferred_optimize_mode = ... })` picks which release mode that flag selects.
+- Reality: the project option is now the Boolean `-Drelease`, and the build script's `standardOptimizeOption(.{ .preferred_optimize_mode = ... })` picks which release mode that flag selects.
+  To request a different mode explicitly, use the general option, for example `zig build --release=fast`.
 
 ## C++ (Apple clang 21)
 
@@ -131,7 +132,7 @@ Notes on standard-library behavior that differed from first expectations.
 
 ### Lean 4: native_decide interprets user modules without precompileModules
 
-- Context: the corpus theorem evaluates an 86691-command replay inside `native_decide`.
+- Context: the corpus theorem evaluates an 86704-command replay inside `native_decide`.
 - Expectation: `native_decide` runs compiled native code, so the proof check costs about what the compiled executable costs.
 - Reality: without `precompileModules = true` on the library, the evaluator falls back to the IR interpreter of Lean for user modules.
   sample(1) shows `lean::ir::interpreter::eval_body`, and that path is well over an order of magnitude slower.

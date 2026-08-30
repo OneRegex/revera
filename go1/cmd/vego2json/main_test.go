@@ -74,6 +74,41 @@ func sum(p *Pair, extra []int32) (int, bool) {
 	}
 }
 
+func TestAcceptsKeyedConstantComposite(t *testing.T) {
+	src := `package p
+
+type item struct {
+	Value int
+}
+
+var items = [1]item{item{Value: 7}}
+
+func first() int {
+	for range 1 {
+	}
+	return items[0].Value
+}
+`
+	if _, violations := check(t, src); len(violations) != 0 {
+		t.Fatalf("expected no violations, got %v", violations)
+	}
+}
+
+func TestAcceptsRepresentableIntegerDefaults(t *testing.T) {
+	src := `package p
+
+const maxInt = 1<<63 - 1
+const highBit uint64 = 1 << 63
+
+func values() (int, uint64) {
+	return maxInt, highBit
+}
+`
+	if _, violations := check(t, src); len(violations) != 0 {
+		t.Fatalf("expected no violations, got %v", violations)
+	}
+}
+
 func TestRejections(t *testing.T) {
 	cases := []struct {
 		name string
@@ -122,6 +157,22 @@ func TestRejections(t *testing.T) {
 			"field keys"},
 		{"string range", "package p\n\nfunc f(s string) int {\n\tn := 0\n\tfor range s {\n\t\tn++\n\t}\n\treturn n\n}\n",
 			"range is only over"},
+		{"non-int count range", "package p\n\nfunc f(n int64) {\n\tfor range n {\n\t}\n}\n",
+			"range is only over"},
+		{"pointer comparison", "package p\n\ntype S struct{ X int }\n\nfunc f(a, b *S) bool { return a == b }\n",
+			"pointer comparisons"},
+		{"string addition", "package p\n\nfunc f(a, b string) string { return a + b }\n",
+			"string operators"},
+		{"string switch", "package p\n\nfunc f(s string) int {\n\tswitch s {\n\tcase \"x\":\n\t\treturn 1\n\t}\n\treturn 0\n}\n",
+			"switch tag"},
+		{"bodyless declaration", "package p\n\nfunc f()\n",
+			"without a body"},
+		{"oversized untyped integer", "package p\n\nconst huge = 1 << 63\n",
+			"does not fit the Vego int default"},
+		{"tuple namespace", "package p\n\ntype Tup_i64_i64 struct{ Value int }\n",
+			"reserved for generated code"},
+		{"runtime name", "package p\n\nfunc mem() {}\n",
+			"reserved for generated code"},
 		{"labels", "package p\n\nfunc f() {\nouter:\n\tfor {\n\t\tbreak outer\n\t}\n}\n",
 			"outside the subset"},
 		{"pointer result", "package p\n\ntype S struct{ X int }\n\nfunc f(s S) *S { return &s }\n",

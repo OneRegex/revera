@@ -17,6 +17,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 1 {
+		fmt.Fprintln(os.Stderr, "usage: probecheck probe-binary...")
+		os.Exit(2)
+	}
 	expected := probe.ReportLines()
 	failed := false
 	for _, bin := range os.Args[1:] {
@@ -29,7 +33,7 @@ func main() {
 			failed = true
 			continue
 		}
-		got := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+		got := protocolLines(out.String())
 		bad := 0
 		for i := range expected {
 			if i >= len(got) || got[i] != expected[i] {
@@ -55,4 +59,8 @@ func main() {
 	if failed {
 		os.Exit(1)
 	}
+}
+
+func protocolLines(output string) []string {
+	return strings.Split(strings.TrimSuffix(output, "\n"), "\n")
 }

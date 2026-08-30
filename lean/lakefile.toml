@@ -1,9 +1,35 @@
 name = "vego"
 defaultTargets = ["Vego", "vegocheck", "Proofs"]
 
+[[input_file]]
+name = "probeJson"
+path = "../go1/probe.vego.json"
+text = true
+
+[[input_file]]
+name = "reveraJson"
+path = "../go1/revera.vego.json"
+text = true
+
+[[input_file]]
+name = "localeData"
+path = "data/localedata.hex"
+text = true
+
+[[input_file]]
+name = "probeExpected"
+path = "data/probe.expected"
+text = true
+
+[[input_file]]
+name = "corpusData"
+path = "data/corpus.tsv"
+text = true
+
 [[lean_lib]]
 name = "Vego"
 precompileModules = true
+needs = ["probeJson", "reveraJson", "localeData", "probeExpected", "corpusData"]
 
 [[lean_lib]]
 name = "Proofs"

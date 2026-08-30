@@ -158,6 +158,9 @@ func parseReplacement(replacement string, nsub int) ([]replPart, Error) {
 //
 // An expression compiled with FlagNoSub reports ENoSub.
 func ReplaceAll(re *Regexp, subject string, replacement string, limit int, eflags uint32) (string, Error) {
+	if re.flags&FlagNoSub != 0 {
+		return "", compileError(ErrENoSub, -1)
+	}
 	parts, perr := parseReplacement(replacement, re.nsub)
 	if perr.Code != ErrNone {
 		return "", perr

@@ -79,7 +79,12 @@ def main (args : List String) : IO UInt32 := do
   let fuel := ((args[1]?).bind (·.toNat?)).getD Machine.defaultFuel
   let limit := ((args[2]?).bind (·.toNat?)).getD 1000000000
   let txt ← IO.FS.readFile path
-  let pairs := (parseCorpus txt).take limit
+  let parsed := parseCorpus txt
+  let .ok pairs := parsed | do
+    let .error msg := parsed | return 1
+    IO.println s!"invalid corpus: {msg}"
+    return 1
+  let pairs := pairs.take limit
   IO.println s!"corpus: {pairs.length} commands, fuel {fuel}"
   match reveraChecked with
   | .error e =>

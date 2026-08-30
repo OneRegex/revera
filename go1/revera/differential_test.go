@@ -176,6 +176,21 @@ func TestDifferentialReplace(t *testing.T) {
 	}
 }
 
+func TestDifferentialReplaceNoSubErrorPrecedence(t *testing.T) {
+	re0, re1, ok := compileBoth(t, "a", FlagNoSub)
+	if !ok {
+		t.Fatal("NoSub pattern failed to compile")
+	}
+	for _, replacement := range []string{"-", `\`, `\1`} {
+		_, err0 := re0.ReplaceAll("a", replacement, -1, 0)
+		_, err1 := ReplaceAll(&re1, "a", replacement, -1, 0)
+		if g0Code(err0) != ErrENoSub || err1.Code != ErrENoSub {
+			t.Fatalf("NoSub replacement %q: go0 code=%d, go1 code=%d",
+				replacement, g0Code(err0), err1.Code)
+		}
+	}
+}
+
 func TestDifferentialMatchIter(t *testing.T) {
 	for _, pattern := range IterPatterns {
 		if pattern == "" {

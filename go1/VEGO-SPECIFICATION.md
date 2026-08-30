@@ -39,6 +39,8 @@ Top-level declarations allowed in subset files:
 
 Nothing else is allowed at the top level.
 In particular there are no methods, no interfaces, no type aliases, no named scalar types, and no generic declarations.
+Package declarations must not use target-runtime names: `vg`, `std`, `Str`, `Slice`, `self`, `Self`, `crate`, `super`, `mem`, or any name starting with `Tup_`.
+Locals with a conflicting name are renamed during translation.
 
 ## 2. Types
 
@@ -128,6 +130,9 @@ A constant is a scalar or string literal expression, possibly built from other c
 Every constant is written out.
 Grouped `const (...)` blocks are allowed.
 Each entry needs an explicit value.
+An untyped integer constant defaults to `int` and must fit signed 64-bit range.
+An untyped character constant defaults to `int32` and must fit signed 32-bit range.
+An explicitly typed constant is checked against its declared scalar type instead.
 
 ### 3.2 Package-level variables
 
