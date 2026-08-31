@@ -1,10 +1,11 @@
 CC ?= cc
 CFLAGS ?= -O2
 CPPFLAGS ?=
+GENERATION_TARGETS ?= all
 
 WARNINGS = -Wall -Wextra -Wpedantic -Werror
 
-.PHONY: all clean test
+.PHONY: all clean test generate check-generated
 
 all: build/test_locale build/test_locale_internal
 
@@ -24,6 +25,12 @@ build/test_locale_internal: src/rv_locale.c src/rv_locale.h \
 test: build/test_locale build/test_locale_internal
 	./build/test_locale
 	./build/test_locale_internal
+
+generate:
+	cd go1 && go run ./cmd/revera generate -target $(GENERATION_TARGETS)
+
+check-generated:
+	cd go1 && go run ./cmd/revera check-generated -target $(GENERATION_TARGETS)
 
 clean:
 	rm -f build/test_locale build/test_locale_internal

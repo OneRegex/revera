@@ -11,6 +11,7 @@ This directory rewrites the go0 ERE engine in Vego, a strict Go subset built for
   The former locale package is merged in.
   The CLDR data blob travels as a string parameter, and the host file embeds `data.bin` for Go builds.
 - `cmd/vego2json` checks subset conformance and translates the package into one JSON object.
+- `cmd/revera` regenerates or checks all JSON and target source artifacts in one transaction.
 - `revera.vego.json` is that JSON form of the engine.
 - `cmd/json2go` is the reference converter, which turns the JSON back into a compilable Go file.
   The same recipe with a different printer produces the C++, Rust or Zig instantiation.
@@ -80,10 +81,15 @@ Agreement with go0 therefore carries that assurance over.
 The JSON pipeline closes the first loop:
 
 ```sh
-go run ./cmd/vego2json -o revera.vego.json ./revera
-go run ./cmd/vego2json -o probe.vego.json ./probe
+go run ./cmd/revera generate
+go run ./cmd/revera check-generated
 go run ./cmd/json2go -o /tmp/engine_gen.go revera.vego.json
 ```
+
+Use `-target rust`, `-target zig`, `-target cpp`, or a comma-separated selection for a partial target regeneration.
+Both JSON files remain shared prerequisites and are always regenerated.
+The command stages every selected output below `../tmp/` and changes checked-in files only after all producers succeed.
+`check-generated` compares bytes and never repairs stale files.
 
 The regenerated engine passes the same test suite.
 The JSON therefore carries the whole program, which is what the Rust, C++, Zig and LEAN4 consumers need.

@@ -10,9 +10,8 @@ Lean proofs are under `lean/Vego/`, with fixtures in `lean/data/`.
 Design notes live in `docs/`.
 Change pinned projects in `ref/` only when updating a reference revision.
 
-Locale blobs such as `*/data.bin` are embedded assets.
-Do not hand-edit generated files, including `src/rv_locale_data.inc`, `go1/*.vego.json`, `rust1/src/engine.rs`, `zig1/src/engine.zig`, and `cpp1/engine.{hpp,cpp}`.
-Use the regeneration commands in the component READMEs.
+Do not hand-edit locale blobs or generated files such as `src/rv_locale_data.inc`, `go1/*.vego.json`, and target engine sources.
+Use the component regeneration commands.
 
 ## Build, Test, and Development Commands
 
@@ -23,8 +22,10 @@ Use the regeneration commands in the component READMEs.
 - `cd zig1 && zig build test`: run the Zig API tests.
 - `cd cpp1 && make test`: build and run the C++20 API test.
 - `cd lean && lake build`: check the Lean model and proofs; expect several minutes.
+- `make generate`: regenerate the two Vego JSON files and every target source transactionally.
+- `make check-generated`: fail if any Vego JSON or generated target source is stale or missing.
 
-For generated-target changes, build release drivers and run `go run ./cmd/crosscheck ...` and `go run ./cmd/probecheck ...` from `go1/`.
+For generated-target changes, build release drivers and run `crosscheck` and `probecheck` from `go1/`.
 
 ## Coding Style & Naming Conventions
 
@@ -36,7 +37,7 @@ Keep comments concise and useful.
 
 ## Testing Guidelines
 
-Add tests beside the affected component using its native convention: `test_*` in C, `*_test.go` with `TestXxx` in Go, `#[test]` in Rust, descriptive `test "..."` blocks in Zig, and focused helpers in C++.
+Add tests beside the affected component: `test_*` in C, `*_test.go` in Go, `#[test]` in Rust, `test "..."` in Zig, and focused helpers in C++.
 There is no numeric coverage threshold.
 Conformance, differential behavior, resource bounds, overflow semantics, and thread safety are the important evidence.
 

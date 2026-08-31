@@ -70,6 +70,17 @@ cd go0 && go test ./...
 cd go1 && go test ./...
 ```
 
+Regenerate every Vego JSON and Rust, Zig, and C++ source artifact with one command:
+
+```sh
+make generate
+make check-generated
+```
+
+`check-generated` renders into an isolated directory under `tmp/`, compares file contents, and exits nonzero without modifying the repository when an artifact is stale or missing.
+Set `GENERATION_TARGETS=rust`, `zig`, `cpp`, or a comma-separated selection to limit the target sources.
+The two shared JSON files are always included.
+
 The Rust, Zig and C++ engines each build and verify from their own directory.
 Their READMEs give the commands, including the differential run against the Go engine.
 

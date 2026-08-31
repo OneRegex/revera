@@ -46,8 +46,7 @@ A caller who needs them imports `engine.zig`.
 
   ```sh
   cd ../go1
-  go run ./cmd/json2zig -o ../zig1/src/engine.zig revera.vego.json
-  go run ./cmd/json2zig -o ../zig1/src/probe_engine.zig probe.vego.json
+  go run ./cmd/revera generate -target zig
   ```
 
 - `src/vg.zig` is the runtime.

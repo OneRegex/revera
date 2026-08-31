@@ -903,3 +903,29 @@ I recorded the overly broad validation and narrowed the formatter checks to chan
 The narrowed Rust and Zig formatter checks passed, as did `gofmt`, `git diff --check`, and the em-dash scan.
 The user asked me to commit the completed audit changes.
 I prepared one local commit containing the fixes, generated artifacts, regressions, documentation, and `AGENTS.md`, while excluding every pre-existing untracked file and the dirty `ref/tre` submodule state.
+The user asked me to preserve the proposed generator improvements in a new Markdown file.
+I added `GENERATOR-ROADMAP.md` with the project assessment, unified-tooling plan, shared validation, frozen-pattern mode, generated APIs, C11 backend, profiling, and conformance priorities.
+The user asked me to fully implement the unified generation and stale-check workflow.
+I inventoried the ten portable artifacts and began a `cmd/revera` CLI with target selection, repository discovery, isolated staging, content comparison, and transactional installation.
+I misread overlapping source excerpts as a duplicated return, and patch validation rejected the resulting no-op correction.
+I recorded that inspection mistake, corrected a real ignored rollback error, and recorded the specialist's zsh multios mistake from the independent artifact audit.
+My next focused command used repository-relative paths while already inside `go1`, so its inspection and formatting steps failed without modifying files.
+I recorded the path error and repeated the command with component-relative paths and early-exit behavior.
+The independent audit confirmed that all ten portable artifacts are current and that the tracked `go1/vego2json` binary embeds one macOS architecture, an old revision, and dirty VCS metadata.
+I removed that nonportable binary so the unified stale check can be deterministic across platforms and kept the source command as the only generator executable.
+The first CLI test run found that two negative root fixtures still lived below the real repository and therefore correctly resolved it.
+It also reported all ten live artifacts stale after the binary removal, so I paused regeneration to compare exact outputs and identify the shared cause.
+The comparison showed that the negative-root test had invoked the fake generator against the real repository and replaced all ten artifacts with sentinel content.
+I recorded the isolation failure, changed the negative cases to start above the actual repository, and prepared to restore the artifacts with the real unified command.
+The real `revera generate -target all` command restored all ten files, and direct JSON comparison plus `check-generated` confirmed byte equality.
+I added focused tests for parsing, deterministic planning, root discovery, selected targets, transactional failures, missing producer output, preflight behavior, symlink replacement, stale detection, exit codes, live freshness, cleanup, and the no-binary policy.
+I added root Make targets and updated the root, Go, Rust, Zig, C++, contributor, and roadmap documentation to use the unified workflow.
+The adversarial CLI review found an ancestor-symlink escape, CRLF-sensitive root detection, a missing injected rollback-failure regression, and a test that did not actually observe Git tracking.
+I began hardening path validation and transactional failure coverage before the final component matrix.
+The hardened workflow now rejects symlinks in every artifact-parent component and in `tmp`, accepts CRLF Go module files, and rejects symlinked generator outputs.
+Injected rename failures prove that completed restoration removes staging while incomplete immediate or rollback restoration retains an original backup and reports its recovery path.
+The misleading filesystem-existence test for a tracked binary was removed, while the nonportable tracked binary remains deleted.
+The focused command suite, race test, vet, repeated specialist review, Linux build, and Windows build all passed.
+The unified Make entry points reported all ten artifacts current, including the four-file Rust selection.
+The full C, go0, go1, Rust debug and release, Zig normal and release, C++, and 49-job Lean builds passed.
+All three probe drivers matched 29 lines, and all three target drivers matched the full 86,704-command differential corpus.

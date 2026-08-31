@@ -40,8 +40,7 @@ The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not expos
 
   ```sh
   cd ../go1
-  go run ./cmd/json2rust -o ../rust1/src/engine.rs revera.vego.json
-  go run ./cmd/json2rust -o ../rust1/src/probe_engine.rs probe.vego.json
+  go run ./cmd/revera generate -target rust
   ```
 
 - `src/vg.rs` is the runtime.

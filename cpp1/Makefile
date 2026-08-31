@@ -17,8 +17,7 @@ test: api_test
 	./api_test
 
 generate:
-	cd ../go1 && go run ./cmd/json2cpp -hpp ../cpp1/engine.hpp -cpp ../cpp1/engine.cpp -ns revera::engine revera.vego.json
-	cd ../go1 && go run ./cmd/json2cpp -hpp ../cpp1/probe_engine.hpp -cpp ../cpp1/probe_engine.cpp probe.vego.json
+	cd ../go1 && go run ./cmd/revera generate -target cpp
 
 clean:
 	rm -f driver probe api_test

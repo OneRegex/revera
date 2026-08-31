@@ -358,3 +358,49 @@
   Both checks reported existing style differences and changed nothing.
   I narrowed the checks to the hand-written files changed by this audit.
   Lesson: exclude authoritative generated artifacts from formatter checks unless the generator promises canonical formatter output.
+- I printed two overlapping ranges of the new generator source and mistook their shared boundary line for a duplicated unreachable return.
+  My attempted correction had impossible context, so patch validation rejected the entire edit without changing files.
+  I reread the exact line numbers and confirmed that the source contained only one return.
+  Lesson: account for overlap when concatenating adjacent source excerpts.
+- The first transactional installation path ignored an error while restoring the current artifact after a failed rename.
+  I changed the path to join the restoration error with the original installation failure.
+  Lesson: rollback failures are correctness evidence and must never be discarded.
+- The generation-audit specialist used a zsh redirection combination that enabled multios and mixed status output into hash pipelines.
+  Repeating the hash checks through a plain shell established that the artifacts and locale blobs matched.
+  Lesson: isolate redirected hash pipelines from shell-specific multios behavior.
+- I ran a generator inspection and formatting command from `go1` but gave those two steps repository-relative `go1/...` paths.
+  They failed before changing the file, while the following package test and vet still ran because the command did not stop on error.
+  I repeated the inspection and formatter with component-relative paths.
+  Lesson: use one path base consistently and stop compound validation commands when an early prerequisite fails.
+- Two root-discovery tests used directories under the real repository's `tmp/` tree as supposedly external paths.
+  Root discovery correctly walked through their ancestors and found the real repository, so both expectations were wrong.
+  I changed those cases to start above the actual repository root.
+  Lesson: a negative ancestor-search fixture must not be nested under the object it claims is absent.
+- The first live freshness test reported all ten artifacts stale after the tracked generator binary was removed.
+  I stopped before regenerating and compared exact output to determine whether Go VCS stamping or the new orchestration plan caused the difference.
+  Lesson: diagnose a repository-wide deterministic-output mismatch before accepting generated rewrites.
+- The faulty negative-root CLI test did more than assert the wrong exit code.
+  It ran `generate` with a fake producer against the real repository root discovered above its `tmp/` fixture, replacing all ten authoritative artifacts with sentinel text.
+  Direct comparison proved the mutation, and I fixed the test to start above the real repository before restoring every artifact through the real generator.
+  Lesson: never give a mutating fake-runner test a path whose ancestors include the live repository; assert the resolved root before execution.
+- The first unified-workflow implementation checked only artifact leaf symlinks.
+  A symlink in an artifact's parent path could redirect comparison and installation outside the repository.
+  Lesson: validate every repository-relative directory component with `Lstat` before reading or replacing generated artifacts.
+- Repository discovery matched only an LF byte sequence after the Go module declaration.
+  A valid CRLF checkout was therefore rejected.
+  Lesson: isolate and normalize the declaration line when a text format permits platform line endings.
+- The no-binary regression used filesystem existence as a substitute for Git tracking state.
+  An unrelated untracked local build would fail the test even though the repository policy was satisfied.
+  Lesson: do not claim to test version-control metadata through ordinary filesystem calls.
+- My first component-walk patch normalized repository paths only with `filepath.Clean`.
+  Forward-slash artifact paths would remain unsplit on Windows, allowing a parent symlink to evade the per-component check.
+  Lesson: convert slash-separated repository paths with `filepath.FromSlash` before walking native path components.
+- I launched the post-hardening cross-build from the repository root, which is not a Go module.
+  The command stopped before compiling either target.
+  Lesson: run Go builds from `go1` or select that module explicitly through an appropriate workspace configuration.
+- The first staged-output hardening patch redeclared `info` and `err` in a scope where both names already existed.
+  Go rejected the function before tests ran.
+  Lesson: after adding an earlier inspection in the same loop, reuse existing variables with assignment.
+- I prepended `zig build` to a conformance command running from `go1`.
+  Zig correctly stopped because that directory has no `build.zig`.
+  Lesson: build a target in its component directory before returning to `go1` for the shared conformance runners.
