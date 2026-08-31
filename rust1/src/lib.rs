@@ -30,6 +30,7 @@
 
 // The generated engine and its runtime.
 // They are the low level: explicit arenas, raw pointers, and numeric flags.
+#[allow(clippy::all)]
 mod engine;
 mod vg;
 

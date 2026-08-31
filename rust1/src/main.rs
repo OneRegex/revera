@@ -10,6 +10,7 @@
 
 #![allow(non_snake_case)]
 
+#[allow(clippy::all)]
 mod engine;
 mod vg;
 
@@ -22,7 +23,7 @@ fn unhex(mem: &vg::Arena, tok: &str) -> vg::Str {
         return vg::zero();
     }
     let t = tok.as_bytes();
-    assert!(t.len() % 2 == 0, "bad hex token");
+    assert!(t.len().is_multiple_of(2), "bad hex token");
     let s = vg::make::<u8>(mem, (t.len() / 2) as i64);
     for i in 0..t.len() / 2 {
         let hi = hexval(t[2 * i]);
@@ -136,7 +137,8 @@ fn main() {
                     let eflags: u32 = f[2].parse().unwrap();
                     let repl = unhex(&scratch, f[3]);
                     let subject = unhex(&scratch, f[4]);
-                    let (out, err) = engine::ReplaceAll(&scratch, &mut re, subject, repl, limit, eflags);
+                    let (out, err) =
+                        engine::ReplaceAll(&scratch, &mut re, subject, repl, limit, eflags);
                     if err.Code != 0 {
                         writeln!(w, "R {} {} -", err.Code, err.Pos).unwrap();
                     } else {
@@ -162,8 +164,9 @@ fn main() {
                         let mut count: i64 = 0;
                         let mut failed = 0i32;
                         loop {
-                            let (got, err) =
-                                engine::MatchIterNext(&scratch, &mut re, &mut iter, subject, eflags, pmatch);
+                            let (got, err) = engine::MatchIterNext(
+                                &scratch, &mut re, &mut iter, subject, eflags, pmatch,
+                            );
                             if err.Code != 0 {
                                 failed = err.Code;
                                 break;

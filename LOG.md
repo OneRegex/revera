@@ -929,3 +929,16 @@ The focused command suite, race test, vet, repeated specialist review, Linux bui
 The unified Make entry points reported all ten artifacts current, including the four-file Rust selection.
 The full C, go0, go1, Rust debug and release, Zig normal and release, C++, and 49-job Lean builds passed.
 All three probe drivers matched 29 lines, and all three target drivers matched the full 86,704-command differential corpus.
+
+## 2026-08-31, Claude Code setup
+
+The user ran `/init` and chose to let the assistant decide the setup, then asked for linting limited to hand-written code.
+I surveyed the repository and wrote `CLAUDE.md`, which imports `AGENTS.md` and adds only the traps that file does not cover: the ten generated artifacts, the formatter rule, the five `data.bin` copies, the Vego subset, release drivers for `crosscheck`, heavy test timeouts, the ASD-STE100 prose rule, and the `ref/` and `tmp/` directories.
+I added two skills under `.claude/skills/`: `verify-all` runs the full verification matrix in order, and `regen` is the user-invoked workflow after a Vego change.
+I added two hooks under `.claude/hooks/`: a `PreToolUse` guard that denies edits to generated files, locale blobs, and `ref/`, and a `PostToolUse` formatter that runs `gofmt`, `rustfmt`, or `zig fmt` on the edited file only.
+The formatter feeds `rustfmt` through stdin so that it does not follow `mod engine;` into the generated engine.
+Both hooks passed pipe tests and a live proof, and `make check-generated` still reports ten current files.
+For linting I rebuilt `golangci-lint` with Go 1.27, wrote a root `.golangci.yml` that excludes `probe/` from the dead-code checks and quick-fix suggestions, added `#[allow(clippy::all)]` on the generated module declarations in `lib.rs`, `main.rs`, and `probe_main.rs`, and added a root `make lint` target.
+Clippy is clean.
+`make lint` still reports two `ineffassign` findings in `go1/revera/program.go`, which are Vego code and need a regeneration to fix, so I left them for the user.
+`.claude/` is gitignored, so the hooks and skills stay local unless that rule changes.

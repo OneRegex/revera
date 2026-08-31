@@ -4,9 +4,10 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #![allow(unused_parens, unused_mut, unused_variables, dead_code)]
 
-mod vg;
 #[path = "probe_engine.rs"]
+#[allow(clippy::all)]
 mod probe_engine;
+mod vg;
 
 use probe_engine as p;
 

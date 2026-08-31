@@ -404,3 +404,12 @@
 - I prepended `zig build` to a conformance command running from `go1`.
   Zig correctly stopped because that directory has no `build.zig`.
   Lesson: build a target in its component directory before returning to `go1` for the shared conformance runners.
+
+## 2026-08-31, Claude Code setup
+
+- I ran the go1 lint baseline without a `cd go1`, so the shell was still in `go0` and I read the go0 results twice.
+  Lesson: use absolute paths or repeat the `cd` in every compound command; the working directory carries over between tool calls.
+- The first `.golangci.yml` exclusion used `^probe/`, but a root config reports paths relative to the repository, so `go1/probe/` never matched.
+  Lesson: check the paths in the lint output before writing a path rule.
+- I nearly configured the format hook with `rustfmt <file>`, which follows `mod engine;` and reformats the generated engine.
+  Lesson: run `rustfmt` on stdin, or only on files that declare no out-of-line modules.

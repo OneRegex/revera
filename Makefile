@@ -5,7 +5,7 @@ GENERATION_TARGETS ?= all
 
 WARNINGS = -Wall -Wextra -Wpedantic -Werror
 
-.PHONY: all clean test generate check-generated
+.PHONY: all clean test generate check-generated lint
 
 all: build/test_locale build/test_locale_internal
 
@@ -31,6 +31,11 @@ generate:
 
 check-generated:
 	cd go1 && go run ./cmd/revera check-generated -target $(GENERATION_TARGETS)
+
+lint:
+	cd go0 && golangci-lint run ./...
+	cd go1 && golangci-lint run ./...
+	cd rust1 && cargo clippy --all-targets
 
 clean:
 	rm -f build/test_locale build/test_locale_internal

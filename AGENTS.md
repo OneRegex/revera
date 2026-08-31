@@ -24,6 +24,7 @@ Use the component regeneration commands.
 - `cd lean && lake build`: check the Lean model and proofs; expect several minutes.
 - `make generate`: regenerate the two Vego JSON files and every target source transactionally.
 - `make check-generated`: fail if any Vego JSON or generated target source is stale or missing.
+- `make lint`: run golangci-lint on go0 and go1 and clippy on rust1, for hand-written code only.
 
 For generated-target changes, build release drivers and run `crosscheck` and `probecheck` from `go1/`.
 
