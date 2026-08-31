@@ -942,3 +942,9 @@ For linting I rebuilt `golangci-lint` with Go 1.27, wrote a root `.golangci.yml`
 Clippy is clean.
 `make lint` still reports two `ineffassign` findings in `go1/revera/program.go`, which are Vego code and need a regeneration to fix, so I left them for the user.
 `.claude/` is gitignored, so the hooks and skills stay local unless that rule changes.
+
+## 2026-08-31, scratch cleanup
+
+The user asked me to remove old temporary files that are unlikely to be reused.
+I deleted the eight verification logs and `checkall.lean` from `tmp/`, the `thread-safety-notes.md` planning file whose rework shipped in commit 2482ed0, the two empty clang analyzer plists at the root, and the empty `include/`, `go0/tmp/`, and `go1/tmp/` directories.
+I left the tracked scratch programs in `tmp/`, `goal2.txt`, `goal3.txt`, and `GENERATOR-ROADMAP.md` in place.
