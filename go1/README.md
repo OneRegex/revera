@@ -24,6 +24,11 @@ This directory rewrites the go0 ERE engine in Vego, a strict Go subset built for
 - `probe/` is a second Vego package, exported as `probe.vego.json`.
   It covers the subset constructs the engine never uses: range statements, division overflow, byte-slice conversion, comparable structs, evaluation order, and spare-capacity zeroing.
   `cmd/proberef` prints its results with the Go original, and `cmd/probecheck` diffs each target against them.
+- `conformance/` is the backend conformance kit: the corpus builder, the driver and probe runners, the fuzz seed pack, and the step pipeline that `revera conform` drives from a `backend.json` manifest.
+  [`../docs/CONFORMANCE-KIT.md`](../docs/CONFORMANCE-KIT.md) describes it.
+- `cmd/bench` runs the shared benchmark cases of `revera/bench_host.go` on the Go engine and on every backend bench binary, and `bench size` reports generated code sizes.
+  `cmd/godriver -bench` speaks the bench protocol with the Go engine, and `cmd/fuzzcase` runs a fuzz seed pack through it.
+  [`../docs/BENCHMARKS.md`](../docs/BENCHMARKS.md) describes the cases and records the figures.
 
 ## Using it
 
@@ -104,3 +109,17 @@ go run ./cmd/crosscheck ../zig1/zig-out/bin/driver \
 ```
 
 The corpus covers random patterns over every flag set, the fixed patterns, the cs locale with its multi-character collating element, replacement, iteration, resource contracts, and locale case-map sweeps.
+
+The conformance kit runs that corpus and everything around it in one command:
+
+```sh
+go run ./cmd/revera conform
+go run ./cmd/revera conform -backend ../rust1 -stress 50 -lean
+```
+
+It checks the generated artifacts, builds each backend, runs the probe, the corpus, extra stress rounds, the fuzz seed pack, and every checked build of the manifest, then verifies that the Lean data matches the corpus.
+`revera/fuzz_test.go` holds `FuzzEngine`, the Go fuzz entry point, which also compares go1 with go0 on every input:
+
+```sh
+go test ./revera -run '^$' -fuzz FuzzEngine -fuzztime 60s
+```

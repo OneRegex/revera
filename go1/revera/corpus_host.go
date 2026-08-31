@@ -86,6 +86,12 @@ func GenSubject(rng *rand.Rand, alphabet string, maxLen int) string {
 	return out.String()
 }
 
+// HeavyPattern is the fixed pattern whose executions cost the most.
+// The full ((a*){250}){250} over a long subject needs tens of gigabytes in both engines before ESpace.
+// The corpus therefore keeps the nesting, but blocks the match with a final b.
+// Each execution still costs tens of milliseconds, so the light corpus and the fuzz seeds leave them out.
+const HeavyPattern = "((a*){250}){250}b"
+
 // FixedPatterns drives a corpus of interesting patterns.
 // It includes the spec section 16 shapes and the capacity fallbacks.
 var FixedPatterns = []string{
@@ -106,9 +112,7 @@ var FixedPatterns = []string{
 	"(|a)b",
 	"a{251}{250}{250}",
 	"(a{200}){200}{200}",
-	// The full ((a*){250}){250} over a long subject needs tens of gigabytes in both engines before ESpace.
-	// The corpus therefore keeps the nesting, but blocks the match with a final b.
-	"((a*){250}){250}b",
+	HeavyPattern,
 	"((a*){4}){4}",
 	"[]a]b",
 	"[^]a]b",
@@ -163,5 +167,14 @@ var ReplaceCases = []ReplaceCase{
 }
 
 var IterPatterns = []string{"a*", "(a|b)+", "b", "", "a?"}
+
+// LocalePatterns and LocaleSubjects exercise case-insensitive matching under locales with distinct case behavior.
+// The subjects hold dotted and dotless i, sharp s, and final sigma.
+var LocalePatterns = []string{"i+", "k", "[[:alpha:]]+", "s(a|s)*", "(σ|i)+"}
+
+var LocaleSubjects = []string{
+	"IİıiIi", "KkK", "straße", "SS ss ſ", "ΣΟΦΟΣ σοφος τέλος ς",
+	"Iİıi", "ABC abc", "",
+}
 
 var IterSubjects = []string{"", "abba", "b\nab", "aaa", "xyz"}

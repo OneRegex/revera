@@ -446,3 +446,35 @@
   Lesson: read how the value is built (`resolveLocale` copies `sec` from the loaded data) before designing a transform over it.
 - I proposed carrying a trimmed blob as a `[]uint8` literal converted with `string(...)`, which allocates and would have undone the allocation-free construction of the static-table step.
   Lesson: check each later step against the invariants an earlier step promised.
+
+## 2026-08-31, benchmarks and conformance kit
+
+- I coalesced the phase A workspace into shared blocks and stored views of them in struct fields, and `vego2json` rejected all six assignments.
+  Rule 9 of the subset says a slice field takes a fresh buffer, a move, or a truncation of itself, never a view into another buffer.
+  Lesson: check the ownership rules of `VEGO-SPECIFICATION.md` before designing an allocation change; the checker enforces them, and the sub-slice trick that Go allows is not available for fields.
+- My first full benchmark run overlapped with three agent builds and a background test suite, and every figure came out 15 to 20 percent high.
+  Lesson: record a baseline on an idle machine, and compare two builds inside one run, with both binaries as separate backends, instead of across runs.
+- I ran `cd go1 && ...` in a shell whose working directory was already `go1`, and the command failed with "no such file or directory".
+  Lesson: the shell keeps its working directory between tool calls, so use absolute paths or `cd /abs/path`.
+- I named the corpus builder `Build` in the same package as the `Build` manifest struct and only noticed when `go vet` reported the redeclaration.
+  Lesson: grep the package for a name before adding an exported one.
+- I first wrote a `.md` table cell that claimed a cause I had not checked, a header-size difference, for the C++ compile bytes.
+  Reading the three struct definitions showed the real cause, field reordering in Rust and Zig against declaration order in C++.
+  Lesson: verify an explanation in the source before it goes into a document.
+- The `-quick` corpus still executes `((a*){250}){250}b` 528 times, so the first checked-build run of the kit took four minutes on the Zig Debug driver.
+  Lesson: measure the step durations of a new pipeline once before declaring it usable; the light corpus of the checked builds came from that measurement.
+- Two agents wrote test packs with the same names into the shared scratchpad root and overwrote each other's files mid-run, which produced contradictory counts.
+  Lesson: give every parallel agent its own subdirectory for scratch files, in the task description.
+- An agent ran `go run ./cmd/probecheck` from `cpp1` instead of `go1` and read the "cannot find main module" text as a probe failure.
+  Lesson: the Go commands only work from `go1`; a rerun from the right directory settles it before any debugging.
+
+## 2026-08-31, simplification pass
+
+- The first version of the kit reported a checked build as one merged step and honored `requires` only there, while the release build had its own step list.
+  Lesson: when a second variant of a pipeline appears, parameterize the first one instead of writing a second; the review caught the divergence within a day.
+- I wrote a repository root finder in `cmd/bench` although `cmd/revera` had a stricter one, and a table writer in `cmd/bench` although the kit had one.
+  Lesson: before adding a helper to a command, grep the sibling commands and the package they share; the shared package is where it belongs.
+- Eight review findings were about names spelled in several places: the heavy pattern, the locale sweep lists, the step names, the toolchain probes.
+  Lesson: a literal that appears twice wants an exported name in the file that owns the data, and a list that a command validates against wants to live next to the code that runs it.
+- The script that copies the bench tables into `docs/BENCHMARKS.md` split the output at every line that starts with a non-space character, which is every border and row of a table, so it found no rows.
+  Lesson: parse a plain-text table by walking lines after its title, not by splitting on paragraph shapes it does not have.

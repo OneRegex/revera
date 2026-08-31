@@ -5,13 +5,15 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"revera1/revera"
 )
 
 func TestRunAcceptsProtocolLinesAboveOneMiB(t *testing.T) {
 	subject := strings.Repeat("61", 524289)
 	input := "C 0 61\nX 0 " + subject + "\n"
 	var out bytes.Buffer
-	if err := run(strings.NewReader(input), &out); err != nil {
+	if err := run(revera.NewDriverSession(), strings.NewReader(input), &out); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := out.String(), "C 0 0 0\nX 0 1 0,1\n"; got != want {
@@ -26,7 +28,7 @@ func (failingReader) Read([]byte) (int, error) {
 }
 
 func TestRunReportsInputErrors(t *testing.T) {
-	if err := run(failingReader{}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "input failed") {
+	if err := run(revera.NewDriverSession(), failingReader{}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "input failed") {
 		t.Fatalf("run error = %v", err)
 	}
 }

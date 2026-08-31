@@ -1,9 +1,11 @@
 // Command revera regenerates and checks the Vego JSON and generated target sources.
+// It also runs the backend conformance kit.
 //
 // Usage:
 //
 //	revera generate [-repo path] [-target rust,zig,cpp|all]
 //	revera check-generated [-repo path] [-target rust,zig,cpp|all]
+//	revera conform [-repo path] [-backend dir]... [-stress rounds] [-seed n] [-quick] [-skip steps] [-lean] [-allow-skip]
 package main
 
 import (
@@ -17,13 +19,17 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"revera1/conformance"
 )
 
 const usageText = `usage:
   revera generate [-repo path] [-target rust,zig,cpp|all]
   revera check-generated [-repo path] [-target rust,zig,cpp|all]
+  revera conform [-repo path] [-backend dir]... [-stress rounds] [-seed n] [-quick] [-skip steps] [-lean] [-allow-skip]
 
-The -target flag may be repeated. Omitting it selects all targets.`
+The -target flag may be repeated. Omitting it selects all targets.
+Run "revera conform -h" for the conformance kit options.`
 
 var targetOrder = []string{"rust", "zig", "cpp"}
 
@@ -475,7 +481,7 @@ func executeWorkflowWithFiles(repo string, targets targetSet, check bool, runner
 	if err := os.Mkdir(tmpRoot, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
 		return result, fmt.Errorf("create repository temporary directory: %w", err)
 	}
-	if err := validateDirectoryComponents(repo, "tmp"); err != nil {
+	if err := conformance.ValidateDirectoryComponents(repo, "tmp"); err != nil {
 		return result, fmt.Errorf("validate repository temporary directory: %w", err)
 	}
 	stage, err := os.MkdirTemp(tmpRoot, "revera-generate-")
@@ -510,46 +516,6 @@ func executeWorkflowWithFiles(repo string, targets targetSet, check bool, runner
 	return result, err
 }
 
-func findRepositoryRoot(start string) (string, error) {
-	abs, err := filepath.Abs(start)
-	if err != nil {
-		return "", fmt.Errorf("resolve working directory: %w", err)
-	}
-	if resolved, resolveErr := filepath.EvalSymlinks(abs); resolveErr == nil {
-		abs = resolved
-	}
-	for candidate := abs; ; candidate = filepath.Dir(candidate) {
-		if isRepositoryRoot(candidate) {
-			return candidate, nil
-		}
-		parent := filepath.Dir(candidate)
-		if parent == candidate {
-			break
-		}
-	}
-	return "", fmt.Errorf("cannot find the re-vera2 repository from %s", start)
-}
-
-func isRepositoryRoot(root string) bool {
-	for _, rel := range []string{"go1", "go1/revera", "go1/probe", "rust1", "zig1", "cpp1"} {
-		if validateDirectoryComponents(root, rel) != nil {
-			return false
-		}
-	}
-	modPath := filepath.Join(root, "go1", "go.mod")
-	info, err := os.Lstat(modPath)
-	if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return false
-	}
-	mod, err := os.ReadFile(modPath)
-	if err != nil {
-		return false
-	}
-	line, _, _ := bytes.Cut(mod, []byte{'\n'})
-	line = bytes.TrimSuffix(line, []byte{'\r'})
-	return bytes.Equal(line, []byte("module revera1"))
-}
-
 func validateArtifactParents(repo string, artifacts []artifact) error {
 	seen := map[string]bool{}
 	for _, artifact := range artifacts {
@@ -558,53 +524,11 @@ func validateArtifactParents(repo string, artifacts []artifact) error {
 			continue
 		}
 		seen[dir] = true
-		if err := validateDirectoryComponents(repo, dir); err != nil {
+		if err := conformance.ValidateDirectoryComponents(repo, dir); err != nil {
 			return fmt.Errorf("validate parent of %s: %w", artifact.rel, err)
 		}
 	}
 	return nil
-}
-
-func validateDirectoryComponents(root, rel string) error {
-	rel = filepath.Clean(filepath.FromSlash(rel))
-	if !filepath.IsLocal(rel) {
-		return fmt.Errorf("path is not repository-relative: %s", filepath.ToSlash(rel))
-	}
-	current := root
-	for _, component := range strings.Split(filepath.Clean(rel), string(filepath.Separator)) {
-		current = filepath.Join(current, component)
-		info, err := os.Lstat(current)
-		if err != nil {
-			return fmt.Errorf("inspect directory %s: %w", filepath.ToSlash(rel), err)
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("directory path contains a symlink: %s", filepath.ToSlash(rel))
-		}
-		if !info.IsDir() {
-			return fmt.Errorf("directory path contains a non-directory: %s", filepath.ToSlash(rel))
-		}
-	}
-	return nil
-}
-
-func resolveRepositoryRoot(value, cwd string) (string, error) {
-	if value == "" {
-		return findRepositoryRoot(cwd)
-	}
-	if !filepath.IsAbs(value) {
-		value = filepath.Join(cwd, value)
-	}
-	abs, err := filepath.Abs(value)
-	if err != nil {
-		return "", fmt.Errorf("resolve repository path: %w", err)
-	}
-	if resolved, resolveErr := filepath.EvalSymlinks(abs); resolveErr == nil {
-		abs = resolved
-	}
-	if !isRepositoryRoot(abs) {
-		return "", fmt.Errorf("not a re-vera2 repository: %s", value)
-	}
-	return abs, nil
 }
 
 func run(args []string, cwd string, stdout, stderr io.Writer, runner stepRunner) int {
@@ -613,6 +537,9 @@ func run(args []string, cwd string, stdout, stderr io.Writer, runner stepRunner)
 		return 2
 	}
 	command := args[0]
+	if command == "conform" {
+		return runConform(args[1:], cwd, stdout, stderr)
+	}
 	if command != "generate" && command != "check-generated" {
 		fmt.Fprintf(stderr, "unknown command %q\n\n%s\n", command, usageText)
 		return 2
@@ -639,7 +566,7 @@ func run(args []string, cwd string, stdout, stderr io.Writer, runner stepRunner)
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	repo, err := resolveRepositoryRoot(repoValue, cwd)
+	repo, err := conformance.ResolveRepositoryRoot(repoValue, cwd)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1

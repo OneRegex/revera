@@ -12,35 +12,10 @@
 
 #[allow(clippy::all)]
 mod engine;
+mod host;
 mod vg;
 
 use std::io::{BufRead, Write};
-
-static DATA: &[u8] = include_bytes!("data.bin");
-
-fn unhex(mem: &vg::Arena, tok: &str) -> vg::Str {
-    if tok == "-" {
-        return vg::zero();
-    }
-    let t = tok.as_bytes();
-    assert!(t.len().is_multiple_of(2), "bad hex token");
-    let s = vg::make::<u8>(mem, (t.len() / 2) as i64);
-    for i in 0..t.len() / 2 {
-        let hi = hexval(t[2 * i]);
-        let lo = hexval(t[2 * i + 1]);
-        unsafe { *s.p.add(i) = hi << 4 | lo };
-    }
-    vg::Str { p: s.p, len: s.len }
-}
-
-fn hexval(c: u8) -> u8 {
-    match c {
-        b'0'..=b'9' => c - b'0',
-        b'a'..=b'f' => c - b'a' + 10,
-        b'A'..=b'F' => c - b'A' + 10,
-        _ => panic!("bad hex digit"),
-    }
-}
 
 fn hex_out(s: vg::Str) -> String {
     if s.len == 0 {
@@ -62,8 +37,7 @@ fn main() {
     let pattern = vg::Arena::new();
     let scratch = vg::Arena::new();
 
-    let (mut base, ok) = engine::LocaleLoad(vg::lit(DATA));
-    assert!(ok, "embedded locale data failed to load");
+    let mut base = host::load_base();
     let mut cur = engine::LocalePOSIX();
     let mut re: engine::Regexp = vg::zero();
     let mut valid = false;
@@ -80,8 +54,8 @@ fn main() {
                 writeln!(w, "P 1").unwrap();
             }
             "L" => {
-                let name = unhex(&persistent, f[1]);
-                let coll = unhex(&persistent, f[2]);
+                let name = host::unhex(&persistent, f[1]);
+                let coll = host::unhex(&persistent, f[2]);
                 let (loc, ok) = engine::LocaleSelect(&persistent, &mut base, name, coll);
                 if ok {
                     cur = loc;
@@ -94,7 +68,7 @@ fn main() {
                 re = vg::zero();
                 pattern.reset();
                 scratch.reset();
-                let pat = unhex(&pattern, f[2]);
+                let pat = host::unhex(&pattern, f[2]);
                 let (compiled, err) = engine::Compile(&pattern, pat, cur, flags);
                 if err.Code != 0 {
                     writeln!(w, "C {} {} 0", err.Code, err.Pos).unwrap();
@@ -110,7 +84,7 @@ fn main() {
                 } else {
                     scratch.reset();
                     let eflags: u32 = f[1].parse().unwrap();
-                    let subject = unhex(&scratch, f[2]);
+                    let subject = host::unhex(&scratch, f[2]);
                     let n = engine::NumSub(&mut re);
                     let pmatch = vg::make::<engine::Match>(&scratch, n + 1);
                     let (matched, err) = engine::Exec(&scratch, &mut re, subject, pmatch, eflags);
@@ -135,8 +109,8 @@ fn main() {
                     scratch.reset();
                     let limit: i64 = f[1].parse().unwrap();
                     let eflags: u32 = f[2].parse().unwrap();
-                    let repl = unhex(&scratch, f[3]);
-                    let subject = unhex(&scratch, f[4]);
+                    let repl = host::unhex(&scratch, f[3]);
+                    let subject = host::unhex(&scratch, f[4]);
                     let (out, err) =
                         engine::ReplaceAll(&scratch, &mut re, subject, repl, limit, eflags);
                     if err.Code != 0 {
@@ -153,7 +127,7 @@ fn main() {
                     scratch.reset();
                     let limit: i64 = f[1].parse().unwrap();
                     let eflags: u32 = f[2].parse().unwrap();
-                    let subject = unhex(&scratch, f[3]);
+                    let subject = host::unhex(&scratch, f[3]);
                     let (mut iter, ierr) = engine::MatchIterInit(&mut re, limit);
                     if ierr.Code != 0 {
                         writeln!(w, "I {} 0", ierr.Code).unwrap();

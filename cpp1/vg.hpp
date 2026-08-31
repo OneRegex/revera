@@ -31,6 +31,8 @@ class Arena {
     ~Arena() { reset(); }
 
     void* alloc(size_t n) {
+        alloc_count_++;
+        alloc_bytes_ += n;
         void* p = std::malloc(n ? n : 1);
         if (p == nullptr) {
             std::abort();
@@ -46,8 +48,15 @@ class Arena {
         blocks_.clear();
     }
 
+    // The counters are cumulative over the life of the arena and survive reset().
+    // They record the sizes the engine asks for, not what malloc rounds them up to.
+    uint64_t alloc_count() const { return alloc_count_; }
+    uint64_t alloc_bytes() const { return alloc_bytes_; }
+
   private:
     std::vector<void*> blocks_;
+    uint64_t alloc_count_ = 0;
+    uint64_t alloc_bytes_ = 0;
 };
 
 template <typename T>

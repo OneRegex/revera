@@ -10,36 +10,13 @@
 
 #include <cinttypes>
 #include <cstdio>
-#include <cstring>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
-#include "engine.hpp"
-
-static const char data_bin[] = {
-#embed "data.bin"
-};
+#include "host.hpp"
 
 using namespace revera::engine;
-
-static uint8_t hexval(char c) {
-    if (c >= '0' && c <= '9') {
-        return uint8_t(c - '0');
-    }
-    return uint8_t(c - 'a' + 10);
-}
-
-static vg::Str decode(vg::Arena& mem, const std::string& tok) {
-    if (tok == "-") {
-        return vg::Str{};
-    }
-    int64_t n = int64_t(tok.size() / 2);
-    vg::Slice<uint8_t> buf = vg::make<uint8_t>(mem, n);
-    for (int64_t i = 0; i < n; i++) {
-        buf.p[i] = uint8_t(hexval(tok[2 * i]) << 4 | hexval(tok[2 * i + 1]));
-    }
-    return vg::Str{reinterpret_cast<const char*>(buf.p), n};
-}
 
 static void print_hex(vg::Str s) {
     if (s.len == 0) {
@@ -51,31 +28,15 @@ static void print_hex(vg::Str s) {
     }
 }
 
-// Tokens of the current line, split on single spaces.
-// The first call hands strtok the line, and later calls continue it.
-static char* tok_next(char** cursor) {
-    char* t = std::strtok(*cursor, " \n");
-    *cursor = nullptr;
-    return t;
-}
-
 int main() {
     vg::Arena persistent;
     vg::Arena pattern;
     vg::Arena scratch;
 
-    Locale base_loc;
-    Locale cur_loc;
+    Locale base_loc = base_locale();
+    Locale cur_loc = LocalePOSIX();
     Regexp cur_re;
     bool re_valid = false;
-
-    auto loaded = LocaleLoad(vg::Str{data_bin, int64_t(sizeof(data_bin))});
-    if (!loaded.r1) {
-        std::fputs("embedded locale data failed to load\n", stderr);
-        return 1;
-    }
-    base_loc = loaded.r0;
-    cur_loc = LocalePOSIX();
 
     std::vector<char> line(1 << 20);
     while (std::fgets(line.data(), int(line.size()), stdin) != nullptr) {

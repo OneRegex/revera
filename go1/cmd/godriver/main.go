@@ -1,8 +1,10 @@
 // Command godriver runs the driver protocol with the Go engine, to help debug the cross-language drivers.
+// With -bench it runs the bench protocol instead, which is what a target bench binary answers.
 package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -10,15 +12,24 @@ import (
 	"revera1/revera"
 )
 
+type session interface {
+	Eval(line string) string
+}
+
 func main() {
-	if err := run(os.Stdin, os.Stdout); err != nil {
+	bench := flag.Bool("bench", false, "speak the bench protocol instead of the driver protocol")
+	flag.Parse()
+	var s session = revera.NewDriverSession()
+	if *bench {
+		s = revera.NewBenchSession()
+	}
+	if err := run(s, os.Stdin, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(in io.Reader, out io.Writer) error {
-	s := revera.NewDriverSession()
+func run(s session, in io.Reader, out io.Writer) error {
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 1<<20), maxProtocolLine())
 	w := bufio.NewWriter(out)

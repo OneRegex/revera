@@ -1,0 +1,31 @@
+[package]
+name = "revera-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "engine"
+path = "fuzz_targets/engine.rs"
+test = false
+doc = false
+bench = false
+
+# The engine needs Go's wrapping arithmetic, exactly like the parent crate.
+# cargo fuzz passes -Cdebug-assertions on its own, and an explicit profile
+# setting keeps overflow checks off under it.
+[profile.dev]
+overflow-checks = false
+
+[profile.release]
+overflow-checks = false
+debug-assertions = true
+debug = 1
+
+[workspace]

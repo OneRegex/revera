@@ -14,17 +14,27 @@
 #![allow(dead_code)]
 
 use std::alloc::Layout;
-use std::cell::UnsafeCell;
+use std::cell::{Cell, UnsafeCell};
 
 pub struct Arena {
     blocks: UnsafeCell<Vec<(*mut u8, Layout)>>,
+    allocs: Cell<u64>,
+    bytes: Cell<u64>,
 }
 
 impl Arena {
     pub fn new() -> Arena {
         Arena {
             blocks: UnsafeCell::new(Vec::new()),
+            allocs: Cell::new(0),
+            bytes: Cell::new(0),
         }
+    }
+
+    // stats returns the number of allocation requests and the bytes they asked for, over the life of the arena.
+    // reset does not clear them, so a caller measures one operation by taking the difference.
+    pub fn stats(&self) -> (u64, u64) {
+        (self.allocs.get(), self.bytes.get())
     }
 
     pub fn reset(&self) {
@@ -35,6 +45,8 @@ impl Arena {
     }
 
     fn alloc(&self, layout: Layout) -> *mut u8 {
+        self.allocs.set(self.allocs.get() + 1);
+        self.bytes.set(self.bytes.get() + layout.size() as u64);
         let p = unsafe { std::alloc::alloc_zeroed(layout) };
         assert!(!p.is_null(), "out of memory");
         unsafe { (*self.blocks.get()).push((p, layout)) };

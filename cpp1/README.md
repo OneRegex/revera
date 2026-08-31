@@ -46,6 +46,8 @@ A caller who needs them includes `engine.hpp` and works in `namespace revera::en
   It holds no state, so each thread can run its own engine instance.
 - `driver.cpp` is the differential driver.
   It speaks the line protocol that `go1/revera/driver_host.go` defines.
+- `host.hpp` is what `driver.cpp`, `bench.cpp` and `fuzz.cpp` share.
+  It embeds `data.bin`, loads the base locale once, and holds the hex and token helpers of the line protocols.
 - `api_test.cpp` covers the public API.
 
 ## Build and verify
@@ -64,3 +66,36 @@ The build uses `-std=c++20 -O2 -fwrapv` and keeps its asserts on.
 C++20 defines narrowing conversions to signed types as modular, and `-fwrapv` defines signed overflow.
 Integer arithmetic therefore matches Go exactly.
 The printer also casts every result narrower than 64 bits back to its Vego type, which defeats integer promotion.
+
+## Bench, fuzz and checked builds
+
+`make all` also builds `bench` and `fuzzcase`.
+
+`bench` speaks the line protocol that `go1/revera/bench_host.go` defines.
+A `B` command times one operation, compile, match or replace, and reports the bytes and allocations that the engine requests per operation.
+The allocation figures come from the cumulative counters of `vg::Arena`, so they count the sizes the engine asks for and not what malloc rounds them up to.
+The timings come from `std::chrono::steady_clock`.
+
+```sh
+printf 'P\nB m match 100 3 0 28617c62292b 616261626162 2d\n' | ./bench
+```
+
+`fuzz.cpp` holds `LLVMFuzzerTestOneInput`, the fuzz entry point that every target shares.
+One input selects the locale and the flags, then compiles, executes, replaces, iterates and asks for the contract.
+It ignores every result, because freedom from crashes is the property.
+`fuzzcase <packfile>` replays a pack of recorded inputs through the same entry point and prints the input count.
+A record is a 4-byte little-endian length followed by that many bytes.
+
+`make sanitize` builds `driver-asan`, `probe-asan` and `fuzzcase-asan` with AddressSanitizer and UndefinedBehaviorSanitizer at `-O1`.
+Every report is fatal.
+These binaries speak the same protocols as the plain ones, so `crosscheck` and `probecheck` accept them:
+
+```sh
+make sanitize
+cd ../go1 && go run ./cmd/crosscheck ../cpp1/driver-asan
+cd ../go1 && go run ./cmd/probecheck ../cpp1/probe-asan
+```
+
+`make libfuzzer` links `fuzz.cpp` with `-fsanitize=fuzzer,address,undefined`.
+Apple clang ships no libFuzzer runtime, so on macOS the link fails with `libclang_rt.fuzzer_osx.a` not found.
+The target is for clang on Linux, where `./libfuzzer corpus/` runs the fuzzer.

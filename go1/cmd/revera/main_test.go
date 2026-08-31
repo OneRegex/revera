@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"revera1/conformance"
 	"slices"
 	"strings"
 	"testing"
@@ -16,7 +17,7 @@ import (
 
 func testTempDir(t *testing.T) string {
 	t.Helper()
-	repo, err := findRepositoryRoot(".")
+	repo, err := conformance.FindRepositoryRoot(".")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +241,7 @@ func TestFindRepositoryRoot(t *testing.T) {
 	writeTestFile(t, filepath.Join(decoy, "go1", "go.mod"), []byte("module revera1\n"))
 
 	for _, start := range []string{repo, filepath.Join(repo, "go1"), deep} {
-		got, err := findRepositoryRoot(start)
+		got, err := conformance.FindRepositoryRoot(start)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -249,13 +250,13 @@ func TestFindRepositoryRoot(t *testing.T) {
 		}
 	}
 	writeTestFile(t, filepath.Join(repo, "go1", "go.mod"), []byte("module revera1\r\n\r\ngo 1.27.0\r\n"))
-	if got, err := findRepositoryRoot(deep); err != nil || got != repo {
+	if got, err := conformance.FindRepositoryRoot(deep); err != nil || got != repo {
 		t.Fatalf("root from CRLF go.mod = %s, %v; want %s", got, err, repo)
 	}
 
 	link := filepath.Join(parent, "repository-link")
 	if err := os.Symlink(repo, link); err == nil {
-		got, err := findRepositoryRoot(filepath.Join(link, "go1"))
+		got, err := conformance.FindRepositoryRoot(filepath.Join(link, "go1"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -264,12 +265,12 @@ func TestFindRepositoryRoot(t *testing.T) {
 		}
 	}
 
-	actualRepo, err := findRepositoryRoot(".")
+	actualRepo, err := conformance.FindRepositoryRoot(".")
 	if err != nil {
 		t.Fatal(err)
 	}
 	outside := filepath.Dir(actualRepo)
-	if _, err := findRepositoryRoot(outside); err == nil {
+	if _, err := conformance.FindRepositoryRoot(outside); err == nil {
 		t.Fatal("root discovery succeeded outside a repository")
 	}
 }
@@ -619,7 +620,7 @@ func TestRunExitCodesAndDiagnostics(t *testing.T) {
 	}
 	stdout.Reset()
 	stderr.Reset()
-	actualRepo, err := findRepositoryRoot(".")
+	actualRepo, err := conformance.FindRepositoryRoot(".")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -655,7 +656,7 @@ func TestRunExitCodesAndDiagnostics(t *testing.T) {
 }
 
 func TestRepositoryGeneratedArtifactsAreCurrent(t *testing.T) {
-	repo, err := findRepositoryRoot(".")
+	repo, err := conformance.FindRepositoryRoot(".")
 	if err != nil {
 		t.Fatal(err)
 	}

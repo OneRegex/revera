@@ -4,3 +4,15 @@ probe
 probe.dSYM/
 api_test
 api_test.dSYM/
+bench
+bench.dSYM/
+fuzzcase
+fuzzcase.dSYM/
+driver-asan
+driver-asan.dSYM/
+probe-asan
+probe-asan.dSYM/
+fuzzcase-asan
+fuzzcase-asan.dSYM/
+libfuzzer
+libfuzzer.dSYM/

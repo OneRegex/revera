@@ -15,6 +15,14 @@ path = "src/main.rs"
 name = "probe"
 path = "src/probe_main.rs"
 
+[[bin]]
+name = "bench"
+path = "src/bench_main.rs"
+
+[[bin]]
+name = "fuzzcase"
+path = "src/fuzzcase_main.rs"
+
 # The Vego specification gives integers Go's wrapping semantics, so
 # overflow checks stay off in every profile. The runtime's bounds
 # asserts use assert!, which debug-assertions does not control, but

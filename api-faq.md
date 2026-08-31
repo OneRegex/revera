@@ -33,6 +33,23 @@ Notes on standard-library behavior that differed from first expectations.
 - Reality: the project option is now the Boolean `-Drelease`, and the build script's `standardOptimizeOption(.{ .preferred_optimize_mode = ... })` picks which release mode that flag selects.
   To request a different mode explicitly, use the general option, for example `zig build --release=fast`.
 
+### Monotonic time
+
+- Context: timing benchmark passes in the bench binary.
+- Expectation: `std.time.Timer.start()` and `timer.read()`, or `std.time.nanoTimestamp()`.
+- Reality: `std.time` only keeps the unit constants, and the clocks moved to `std.Io`.
+  `std.Io.Timestamp.now(io, .awake)` reads the monotonic clock, `CLOCK_MONOTONIC` on Linux and `CLOCK_UPTIME_RAW` on macOS, and `start.durationTo(end).nanoseconds` is an `i96`.
+  `.boot` is the variant that keeps counting through suspend.
+
+### Fuzz corpus entries are Smith streams, not raw bytes
+
+- Context: giving `std.testing.fuzz` a few seed inputs for a test that calls `smith.slice(&buf)`.
+- Expectation: a corpus entry is the byte string the test receives.
+- Reality: outside fuzz mode the runner wraps each entry as `Smith{ .in = entry }`, and `slice` reads a little-endian `u32` length from it before the bytes.
+  A raw entry loses its first four bytes to that length field.
+  Prefix each seed with its length, as `Smith.zig` does in its own `constructInput` helper.
+  `std.testing.fuzz` also adds one empty entry as a smoke test, so a test must accept an empty slice.
+
 ## C++ (Apple clang 21)
 
 ### #embed in C++ mode

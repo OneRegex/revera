@@ -1,9 +1,6 @@
 package main
 
-import (
-	"reflect"
-	"testing"
-)
+import "testing"
 
 func TestHasVerificationTarget(t *testing.T) {
 	if hasVerificationTarget(0, "", "") {
@@ -17,11 +14,5 @@ func TestHasVerificationTarget(t *testing.T) {
 		if !ok {
 			t.Fatal("driver and dump invocations must be accepted")
 		}
-	}
-}
-
-func TestProtocolLinesKeepsExtraBlankLine(t *testing.T) {
-	if got, want := protocolLines("one\ntwo\n\n"), []string{"one", "two", ""}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("protocolLines = %#v, want %#v", got, want)
 	}
 }

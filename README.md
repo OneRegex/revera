@@ -16,6 +16,8 @@ A C locale runtime and its generated CLDR tables supply the character classes, c
 - [`docs/TRE-POSIX-ERE-DIVERGENCES.md`](docs/TRE-POSIX-ERE-DIVERGENCES.md) records where the pinned TRE tree differs from the contract, with the source lines that prove it.
 - [`docs/ERE-IMPLEMENTATION-TECHNIQUES.md`](docs/ERE-IMPLEMENTATION-TECHNIQUES.md) collects techniques from TRE, RE2 and MinRX, and marks the semantics each one assumes.
 - [`docs/LOCALE-TABLES.md`](docs/LOCALE-TABLES.md) documents the locale model, the data coverage, and how to reproduce the tables.
+- [`docs/CONFORMANCE-KIT.md`](docs/CONFORMANCE-KIT.md) describes the backend conformance kit and the manifest a new target provides.
+- [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) describes the cross-language benchmarks, the profiling workflow, and records the current figures.
 
 ### Locale runtime
 
@@ -83,6 +85,19 @@ The two shared JSON files are always included.
 
 The Rust, Zig and C++ engines each build and verify from their own directory.
 Their READMEs give the commands, including the differential run against the Go engine.
+
+One command decides whether a backend is conformant, and one command benchmarks every engine:
+
+```sh
+make conform
+make bench
+make size
+make profile
+```
+
+`conform` builds each backend from its `backend.json`, then runs the probe, the differential corpus, stress rounds, the fuzz seed pack, the sanitizer and debug builds, and checks that the Lean data matches the corpus.
+`bench` prints compile, match, replacement and difficult-pattern figures with allocation counts, side by side for Go, Rust, Zig and C++.
+`size` reports the generated code size per target, and `profile` writes CPU and allocation profiles of the Go engine.
 
 A rebuild of `src/rv_locale_data.inc` also needs JDK 17 or later and the pinned CLDR 48.2 artifacts.
 [`docs/LOCALE-TABLES.md`](docs/LOCALE-TABLES.md#reproduction) gives the exact inputs and command.

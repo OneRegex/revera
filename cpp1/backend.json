@@ -1,0 +1,22 @@
+{
+  "name": "cpp",
+  "generated": ["engine.hpp", "engine.cpp", "probe_engine.hpp", "probe_engine.cpp"],
+  "engine_symbols": "6revera6engine",
+  "toolchain": ["clang++", "--version"],
+  "release": {
+    "build": [["make", "all"]],
+    "driver": "driver",
+    "probe": "probe",
+    "bench": "bench",
+    "fuzzcase": "fuzzcase"
+  },
+  "checked": [
+    {
+      "name": "asan-ubsan",
+      "build": [["make", "sanitize"]],
+      "driver": "driver-asan",
+      "probe": "probe-asan",
+      "fuzzcase": "fuzzcase-asan"
+    }
+  ]
+}

@@ -37,7 +37,8 @@ func NewDriverSession() *DriverSession {
 	return s
 }
 
-func driverDecode(tok string) string {
+// DriverDecode reverses DriverEncode.
+func DriverDecode(tok string) string {
 	if tok == "-" {
 		return ""
 	}
@@ -73,14 +74,14 @@ func (s *DriverSession) Eval(line string) string {
 		s.cur = LocalePOSIX()
 		return "P 1"
 	case "L":
-		loc, ok := LocaleSelect(&s.base, driverDecode(f[1]), driverDecode(f[2]))
+		loc, ok := LocaleSelect(&s.base, DriverDecode(f[1]), DriverDecode(f[2]))
 		if ok {
 			s.cur = loc
 		}
 		return fmt.Sprintf("L %d", boolInt(ok))
 	case "C":
 		flags := uint32(driverInt(f[1]))
-		re, err := Compile(driverDecode(f[2]), s.cur, flags)
+		re, err := Compile(DriverDecode(f[2]), s.cur, flags)
 		if err.Code != ErrNone {
 			s.valid = false
 			return fmt.Sprintf("C %d %d 0", err.Code, err.Pos)
@@ -93,7 +94,7 @@ func (s *DriverSession) Eval(line string) string {
 			return "X ERR"
 		}
 		eflags := uint32(driverInt(f[1]))
-		subject := driverDecode(f[2])
+		subject := DriverDecode(f[2])
 		pmatch := make([]Match, NumSub(&s.re)+1)
 		ok, err := Exec(&s.re, subject, pmatch, eflags)
 		if err.Code != ErrNone {
@@ -114,8 +115,8 @@ func (s *DriverSession) Eval(line string) string {
 		}
 		limit := driverInt(f[1])
 		eflags := uint32(driverInt(f[2]))
-		repl := driverDecode(f[3])
-		subject := driverDecode(f[4])
+		repl := DriverDecode(f[3])
+		subject := DriverDecode(f[4])
 		out, err := ReplaceAll(&s.re, subject, repl, limit, eflags)
 		if err.Code != ErrNone {
 			return fmt.Sprintf("R %d %d -", err.Code, err.Pos)
@@ -127,7 +128,7 @@ func (s *DriverSession) Eval(line string) string {
 		}
 		limit := driverInt(f[1])
 		eflags := uint32(driverInt(f[2]))
-		subject := driverDecode(f[3])
+		subject := DriverDecode(f[3])
 		it, err := MatchIterInit(&s.re, limit)
 		if err.Code != ErrNone {
 			return fmt.Sprintf("I %d 0", err.Code)

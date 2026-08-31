@@ -993,3 +993,46 @@ The frozen driver lists the commands it honors, the metadata carries collation, 
 Section 10 of the plan records every change from the first draft.
 The user added one point after the revision: FNV-1a detects accidental blob mismatches but proves nothing against a crafted collision.
 I kept FNV-1a and made the plan say explicitly, in D6 and step 7, that the digest protects against stale or mismatched artifacts only, that the engine and the blob come from the same build so the check cannot be a security boundary, and that a cryptographic hash would have to be written in Vego because Rust `std` and C++ ship no SHA-256.
+
+## 2026-08-31, benchmarks and backend conformance kit
+
+The user asked for reproducible benchmarks of compilation time, match time, replacement, allocations, generated code size and difficult patterns, with profiles as the basis for optimization choices, and for the probe protocol, corpus generator, differential runner, fuzz entry points, sanitizer jobs and Lean replay packaged as a backend conformance kit with one documented command.
+I mapped the verification tooling and had an agent summarize the four public APIs, the three drivers and the runtimes, then fixed the cross-language contracts in one specification: a bench line protocol, a shared fuzz input format, a seed pack format, and allocation counters.
+Three agents implemented the Rust, Zig and C++ parts in parallel while I wrote the Go side.
+
+Benchmarks.
+`go1/revera/bench_host.go` holds 39 shared cases in four groups and the reference bench session; each target has a `bench` binary that speaks the protocol with the generated engine, and `go1/cmd/bench` runs them all with the Go engine in-process and go0 as an optional column.
+The Rust and C++ arenas count requests and bytes, the Zig bench wraps a counting allocator, and Go reads `runtime.MemStats`.
+`bench size` measures generated code from the symbol tables of the release drivers with `debug/macho` and `debug/elf`, subtracting the Go host functions, and `BenchmarkEngine` under `go test` feeds pprof for `make profile`.
+The three generated targets report the same allocation counts on every case, which cross-checks the counters.
+`docs/BENCHMARKS.md` records the method, the baseline on this machine, the code sizes, and the profile findings.
+
+One profile-guided experiment ran to completion.
+The allocation profile named the append growth of the `active` arrays and the per-Exec workspace as the top sites by count, so I pre-sized the arrays in `prepare`, regenerated, and compared old and new builds of every target inside one bench run.
+Requests per Exec fell by a third on larger programs, the time did not move within noise, and tiny programs got slightly slower, so I reverted the change and recorded the result and the next candidates in the document.
+A first version that shared blocks between ring slots was rejected by the Vego checker under rule 9.
+
+Conformance kit.
+`go1/conformance` now holds the corpus builder that `cmd/crosscheck` used, the driver and probe runners, the manifest loader, the fuzz seed pack, and the step pipeline; `crosscheck` and `probecheck` are thin wrappers and `-dumpexpected` still produces `lean/data/corpus.tsv` byte for byte.
+Each backend describes itself in `backend.json`: release build, binaries, and checked builds with an optional availability probe.
+`go run ./cmd/revera conform`, wrapped as `make conform`, runs generated-artifact freshness, the probe, the 86,704-command corpus, seeded stress rounds, the fuzz seed pack, every checked build on a light quick corpus, and the Lean data check, with `-lean` for the proofs and the replay.
+Fuzz entry points exist in all four languages over one input format: `FuzzEngine` in Go also compares go1 with go0, Rust has `fuzz_one` with a cargo-fuzz layout, Zig uses `std.testing.fuzz` and works with `zig build test --fuzz` here, and C++ has `LLVMFuzzerTestOneInput` with a standalone runner because Apple clang ships no libFuzzer.
+Checked builds are the C++ ASan and UBSan build, the Rust debug and nightly ASan builds, and the Zig Debug build.
+The full run reports cpp, rust and zig conformant in about three minutes with warm builds; the kit's own tests run the Go engine through it as a fake backend.
+`docs/CONFORMANCE-KIT.md` documents the manifest, the steps and how to add a backend, and the root README, `go1/README.md`, the target READMEs, `CLAUDE.md` and the roadmap point to both documents.
+
+A swival review of the Go side found eleven points and I fixed eight: a record limit on the fuzz pack so a corrupt header cannot ask for gigabytes, a length check in the pack writer, validation of `-reps`, `-scale`, `-stress` and `-seed`, a check that every bench answer names its command and carries the requested timings, a non-negative rotation of the stress seeds, tolerance of CRLF driver output, one size entry per address for Mach-O symbol aliases, and a rejection of stray arguments to `bench size`.
+The Windows executable suffix findings stay open because the build commands are `make` and `sh`, and the short-write finding follows the `io.Writer` contract.
+The go1 test suite, `make check-generated`, `make lint` on the new packages, and the full kit run pass after the fixes.
+
+## 2026-08-31, simplification pass
+
+The user ran the simplify workflow over the benchmark and conformance change set.
+Four review agents covered reuse, simplification, efficiency and altitude, and three more applied the target-language findings in parallel while I did the Go side.
+The go0 bench session now builds only its operation closure; `revera.ParseBenchCommand` and `revera.BenchAnswer` hold the protocol parsing, the allocation pass and the timed loop once, and every timed repetition starts after a garbage collection.
+Repository discovery, backend selection, the build runner, the child-process protocol runner and the table writer moved from `cmd/revera` and `cmd/bench` into `conformance`, so both commands and the kit share one definition of each.
+`cmd/benchdriver` went away in favor of `cmd/godriver -bench`.
+The corpus tables that the fuzz seeds and the kit repeated, the heavy pattern and the locale sweep lists, are exported once from `revera/corpus_host.go`, and `LocaleByName` and `MustEmbeddedLocale` replace five copies of the locale lookup.
+The kit runs the release build and every checked build through one pipeline, so a checked build reports build, probe, corpus and fuzz rows and honors `requires` like the release build; the backends run concurrently, the corpora are answered only when a step needs them, the Lean data check reuses the answered corpus, and the manifest carries the toolchain command that the bench header prints.
+The manifest loader compiles `engine_symbols` and validates the generated paths, `bench size` reports an expression that matches nothing as an error, and the Rust, Zig and C++ bench and fuzz hosts share one `host` file per language with their driver instead of copying the hex decoding and the locale load.
+Findings left as they were: folding the bench protocol into the driver, replacing the seed pack with a corpus directory, a Go `backend.json`, generating the Lean intractable list, and moving check-generated in-process, each a design change rather than a cleanup.
