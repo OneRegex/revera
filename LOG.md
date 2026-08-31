@@ -948,3 +948,48 @@ Clippy is clean.
 The user asked me to remove old temporary files that are unlikely to be reused.
 I deleted the eight verification logs and `checkall.lean` from `tmp/`, the `thread-safety-notes.md` planning file whose rework shipped in commit 2482ed0, the two empty clang analyzer plists at the root, and the empty `include/`, `go0/tmp/`, and `go1/tmp/` directories.
 I left the tracked scratch programs in `tmp/`, `goal2.txt`, `goal3.txt`, and `GENERATOR-ROADMAP.md` in place.
+
+## 2026-08-31, frozen-pattern plan
+
+The user asked me to read `GENERATOR-ROADMAP.md` and write a plan, in a Markdown file, for item 3 of its suggested order, frozen-pattern generation.
+I mapped the engine pipeline, the generator and printers, the wrappers, and the differential infrastructure with three parallel exploration agents, and I checked the facts that decide the design myself.
+The capture solver and the one-pass walk read the AST at match time, so a frozen pattern has to carry the whole `Regexp` value.
+`Regexp.loc` holds the CLDR blob by string, which is empty for POSIX and 1.8 MB for a CLDR locale.
+All three printers already lower slice composite literals to an arena allocation, and a package variable may not contain a slice, so the first frozen representation is a Vego constructor function built from nested composite literals, and static tables come later as a printer-level lowering.
+`onepass.go:254` tests `firsts != nil`, so the encoder must keep nil-ness.
+Lean resolves `Compile` by name from `revera.vego.json`, so the frozen program is a separate artifact and the plan avoids edits under `go1/revera/`.
+I wrote `FROZEN-PATTERN-PLAN.md` with the findings, seven decisions, the manifest format, ten ordered steps from measurement to documentation, the verification commands, and the open risks.
+
+## 2026-08-31, frozen-pattern plan review
+
+The user asked for feedback on `FROZEN-PATTERN-PLAN.md`.
+I reviewed the plan against the current Go engine, Vego checker and printers, differential protocol, generated-target wrappers, locale representation, and transactional generator.
+Three specialized reviews independently covered the Go and IR design, the Rust, Zig, and C++ targets, and the verification and packaging workflow.
+The representation and differential-testing direction are sound, but the plan is not ready to implement as written.
+The separate frozen modules produce nominal types that the existing wrappers cannot accept, the stress manifest includes patterns that intentionally fail compilation, and the pruning roots include a type while omitting generated lookup and driver entry points.
+The CLDR compatibility check does not prove blob identity, copying all 23 section ranges does not trim the shared locale blob, and converting trimmed bytes to a string restores constructor allocation after static lowering.
+I also found generated-name collisions, incomplete parserless wrapper gating, missing collation metadata, and verification commands that omit the stress, sanitizer, parserless, and standalone-package checks.
+Focused Go tests for the reviewed checker, engine, generator, and crosscheck packages passed.
+
+## 2026-08-31, frozen-pattern usefulness assessment
+
+The user asked whether frozen-pattern generation is genuinely useful and likely to be adopted by application developers.
+I compared the revised plan with current ahead-of-time regex facilities in .NET, Rust, C++, and Hyperscan, and asked a specialized reviewer to assess Revera's developer ergonomics and likely audience.
+The feature addresses real needs for fixed rule sets, runtime-only deployments, reproducible semantics, and systems with strict code or startup budgets.
+Ordinary application developers are unlikely to adopt an external manifest and generated runtime when compiling a few patterns once is simpler, especially because frozen builds cannot accept dynamic patterns and matching still allocates scratch memory.
+The strongest audience is systems, embedded, security, and infrastructure developers who specifically value POSIX leftmost-longest behavior, resource contracts, and identical Rust, Zig, and C++ semantics.
+I recommended completing the measurement pass, testing a minimal end-to-end consumer, and finding a real user before investing in CLDR, static tables, trimming, and contract constants.
+
+## 2026-08-31, frozen-pattern plan revision
+
+The user reviewed `FROZEN-PATTERN-PLAN.md` and listed seven blocking issues plus four corrections, and asked for a revision before implementation.
+I checked every point against the tree: `BackendContract` is a struct, every resolved `Locale` copies the same 23 section ranges from the loaded data, `Exec` answers `ErrESpace` for any subject of at least `minLen` characters when `progOK` is false, and all three wrappers use `LocaleOpen`, `LocaleLoad`, `LocaleCount`, and `LocaleName` besides `Compile`.
+I ran the fixed corpus through `revera.New` and found that eleven of the 34 patterns are rejected, including `(|a)b` and the stacked repetitions, while `ab)` compiles.
+I rewrote the plan around a POSIX-only, valid-pattern-only, one-engine-per-wrapper-build baseline.
+The wrappers now select one engine per build through a cargo feature, a Zig build option, and a C++ macro, and the public surface is a constructor by index, a constructor by name, and one generated typed constructor per entry.
+Pruning roots are functions only and every generated function is a root.
+CLDR support moved behind the baseline milestone with a digest of the complete blob, blob trimming became an optional single-profile blob writer with a go/no-go, and the trimmed blob is host-embedded instead of IR data.
+The frozen driver lists the commands it honors, the metadata carries collation, the generated symbol set is reserved as a whole, and the verification section lists the stress run, the sanitizer build, the three parserless wrapper suites, and clean builds of the standalone output.
+Section 10 of the plan records every change from the first draft.
+The user added one point after the revision: FNV-1a detects accidental blob mismatches but proves nothing against a crafted collision.
+I kept FNV-1a and made the plan say explicitly, in D6 and step 7, that the digest protects against stale or mismatched artifacts only, that the engine and the blob come from the same build so the check cannot be a security boundary, and that a cryptographic hash would have to be written in Vego because Rust `std` and C++ ship no SHA-256.

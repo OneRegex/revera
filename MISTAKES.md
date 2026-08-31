@@ -413,3 +413,36 @@
   Lesson: check the paths in the lint output before writing a path rule.
 - I nearly configured the format hook with `rustfmt <file>`, which follows `mod engine;` and reformats the generated engine.
   Lesson: run `rustfmt` on stdin, or only on files that declare no out-of-line modules.
+
+## 2026-08-31, frozen-pattern plan
+
+- I used `echo =====` as a separator between commands in a zsh compound command, twice.
+  zsh expands a word that starts with `=` as a command lookup, so the shell reported `==== not found` and the compound command stopped before its last step.
+  Lesson: use `echo ----` or quote the separator; a word that starts with `=` is not plain text in zsh.
+- Three printer line references in the first draft of the plan were off by one to two lines, because I took them from a `grep` of the function heads instead of the lines I cited.
+  Lesson: verify every `file:line` reference with a `grep -n` of the exact text before it goes into a document.
+
+## 2026-08-31, frozen-pattern plan review
+
+- I requested a one-second agent wait even though the collaboration tool documents a ten-second minimum.
+  The tool clamped the request and changed nothing.
+  Lesson: use the declared minimum timeout instead of relying on tool-side correction.
+- My first log patch used a `MISTAKES.md` heading as context in `LOG.md`.
+  Patch validation rejected the whole edit without changing either file.
+  Lesson: inspect each target file's exact tail before composing a multi-file append.
+- I printed only the output field of a long focused-test command and discarded its live session identifier after the first package completed.
+  The partial output was not completion evidence.
+  Lesson: preserve the complete command result whenever a validation run can outlive the first yield.
+
+## 2026-08-31, frozen-pattern plan revision
+
+- The first plan proposed wrapper factories that take a constructor from a second engine module, but a second module has a nominally different `Regexp` type in every target, so the existing wrappers could not store the value.
+  Lesson: when a generated type is duplicated into another module or namespace, treat it as a different type and design for one engine per build.
+- The stress manifest froze every `FixedPatterns` entry, but eleven of them are invalid on purpose and the generator rejects compile failures.
+  Lesson: run the corpus through the engine before building a plan on it; corpora that test error paths contain inputs that cannot be frozen.
+- I listed `BackendContract` as a pruning root, but it is a struct type, not a function.
+  Lesson: check each name against its declaration kind before putting it in a root list; `grep -n "^func Name"` takes seconds.
+- I described locale trimming as copying the 23 section ranges of a resolved locale, but every resolved locale carries the same ranges over the shared blob, so the copy is the whole blob.
+  Lesson: read how the value is built (`resolveLocale` copies `sec` from the loaded data) before designing a transform over it.
+- I proposed carrying a trimmed blob as a `[]uint8` literal converted with `string(...)`, which allocates and would have undone the allocation-free construction of the static-table step.
+  Lesson: check each later step against the invariants an earlier step promised.
