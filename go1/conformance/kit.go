@@ -33,7 +33,7 @@ type Options struct {
 	Quick bool
 	// Skip holds the steps to leave out, by name from StepNames.
 	Skip map[string]bool
-	// Lean also runs the Lean build and the corpus replay.
+	// Lean also runs the Lean build, the corpus replay, and the specification check.
 	Lean bool
 	// Progress receives one line per finished step.
 	Progress io.Writer
@@ -462,7 +462,13 @@ func (r *run) lean() Result {
 	if err != nil {
 		return r.record(repoScope, "lean", Failed, start, "vegocheck: "+tail(out, 12))
 	}
-	return r.record(repoScope, "lean", Passed, start, lastLine(out))
+	replay := lastLine(out)
+	// speccheck walks the same corpus under the model of the ERE specification and prints every mismatch.
+	out, err = command(leanDir, filepath.Join(".lake", "build", "bin", "speccheck"), filepath.Join("data", "corpus.tsv"))
+	if err != nil {
+		return r.record(repoScope, "lean", Failed, start, "speccheck: "+tail(out, 12))
+	}
+	return r.record(repoScope, "lean", Passed, start, replay+"; "+lastLine(out))
 }
 
 func tail(text string, n int) string {

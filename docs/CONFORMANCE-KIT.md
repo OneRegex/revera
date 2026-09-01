@@ -85,7 +85,7 @@ The kit runs these steps, in this order, and records each outcome with its durat
 | fuzz             | backend | The fuzzcase binary runs every seed of the pack and reports the count.                            |
 | checked/`name`/* | backend | Each checked build repeats build, probe, corpus and fuzz, on the quick and light corpus.          |
 | lean-data        | repo    | `lean/data/corpus.tsv` and `lean/data/probe.expected` equal the current corpus and probe report.  |
-| lean             | repo    | With `-lean`: `lake build`, then `vegocheck data/corpus.tsv` replays the corpus under the proofs. |
+| lean             | repo    | With `-lean`: `lake build`, then `vegocheck data/corpus.tsv` replays the corpus under the proofs, and `speccheck data/corpus.tsv` walks it under the model of the ERE specification. |
 
 `-skip` leaves steps out, by name; a name applies to the release build and to every checked build.
 The backends run concurrently, and the report keeps manifest order.
@@ -102,6 +102,7 @@ A later run with `-seed 120 -stress 30` therefore continues a first run with `-s
 
 The Lean steps tie the backend to the proofs.
 The theorems in `lean/Vego/Theorems.lean` replay the same corpus that the driver answered, so a backend that passes the corpus step agrees with the engine the proofs cover.
+The same theorems check that corpus against the Lean model of the ERE specification, so a backend that passes the corpus step also answers every covered command as the specification requires.
 The `lean-data` step fails when the corpus changed and the Lean data was not regenerated, which would silently split the two.
 
 ## The fuzz entry points

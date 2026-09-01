@@ -69,6 +69,17 @@
   `((a*){4}){4}` needs minutes even on the empty subject.
   The theorem now drops those 1056 executions and keeps everything else, compiles and contract queries included.
 
+- The model of the ERE specification is a separate library, `Ere/`, written from the text of the specification.
+  Its parser classifies patterns as defined, invalid or free, and the match semantics enumerates derivations and orders them by section 4.3.
+  The first complete run over the corpus agreed with every recorded output, and the section 16 examples all held at first check.
+  The corpus has 66 free spellings, and the engine rejects exactly those, so its reject policy for undefined spellings is confirmed on the corpus.
+  The 1512 executions the specification theorem leaves out are the fixed-pattern subjects with NUL bytes or invalid UTF-8; the C interface cannot represent them, so the specification says nothing about them.
+- The specification theorems compose with the corpus theorem through the recorded outputs, so the Go engine leaves the trust base of the composed statement.
+  A universally quantified statement over all patterns would need a verified model of the matcher; the finite statements here cover the corpus and an exhaustive small domain of 1.58 million interpreted executions.
+- Two cost lessons.
+  A closed top-level term is evaluated when its module loads, so an executable that imported `Vego.Corpus` took eight minutes to start; the replay now takes a `Unit` argument, and the corpus data lives in `Vego.CorpusData`.
+  A module that is not precompiled runs under the IR interpreter inside `native_decide`, which made the specification walk many times slower than the executable; the `Ere` library and the check modules are now precompiled through the `Vego` root.
+
 ## Status
 
 - [x] AST + total JSON decoder.
@@ -96,6 +107,11 @@
 - [x] `Vego/Corpus.lean` derives the replay set from the embedded corpus: everything except the 1056 executions of the two intractable patterns, so all 9780 compiles and every contract query stay in.
   The proposition re-checks its own coverage
 - [x] `lake build` finishes in about five minutes and checks all four theorems, the corpus contract theorem among them
+- [x] Model of the ERE specification in `Ere/`, with the section 16 examples as theorems and the section 10.2 closure rule proved for every predicate
+- [x] `spec_agrees_with_corpus`: the specification's verdict on 9653 compiles and 66576 executions of the corpus, at pinned coverage
+- [x] `engine_meets_spec_on_corpus`: the composition with the corpus theorem
+- [x] `engine_meets_spec_exhaustively`: 42128 compiles and 1576896 executions of the interpreted engine against the specification on an exhaustive small domain
+- [x] `speccheck` and `exhaustcheck` executables for diagnosis
 - [x] Meter soundness for the whole interpreter, in Vego/MeterSound.lean.
   One mutual induction on fuel proves that no counter ever decreases.
   It also proves that the call depth balances across every successful call, up to the harness corollary callIdx_meterOK.

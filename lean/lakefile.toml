@@ -1,5 +1,5 @@
 name = "vego"
-defaultTargets = ["Vego", "vegocheck", "Proofs"]
+defaultTargets = ["Ere", "Vego", "vegocheck", "speccheck", "exhaustcheck", "Proofs"]
 
 [[input_file]]
 name = "probeJson"
@@ -38,3 +38,15 @@ roots = ["Vego.Theorems"]
 [[lean_exe]]
 name = "vegocheck"
 root = "Main"
+
+[[lean_lib]]
+name = "Ere"
+precompileModules = true
+
+[[lean_exe]]
+name = "speccheck"
+root = "SpecMain"
+
+[[lean_exe]]
+name = "exhaustcheck"
+root = "ExhMain"

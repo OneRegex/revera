@@ -47,10 +47,18 @@ What the theorems say:
    It keeps their compiles and their contract queries, so no pattern escapes the check.
    The figures of the extreme cases still compare against the Go reference.
    `Vego.Corpus` records the measurements behind that choice, and the proposition re-checks its own coverage.
+
+5. `spec_agrees_with_corpus`, `engine_meets_spec_on_corpus` and `engine_meets_spec_exhaustively`.
+   The `Ere` library is a model of the ERE specification, written from its text.
+   The first theorem says that the recorded output of every corpus command the specification constrains meets the specification's verdict, at a pinned coverage.
+   The second composes it with the corpus theorem: on those commands, the interpreted engine meets the specification, with the Go engine out of the trust base.
+   The third compares the interpreted engine with the specification directly, on every pattern of a small token language and every short subject, at a pinned coverage of over a million executions.
 -/
 
 import Vego.Probe
 import Vego.Corpus
+import Vego.SpecCheck
+import Vego.Exhaustive
 
 namespace Vego
 
@@ -113,7 +121,73 @@ theorem corpus_parser_accepts_valid_rows :
      | .error _ => false) = true := by
   native_decide
 
-theorem revera_corpus_agrees_within_contract : corpusAgrees = true := by
+theorem revera_corpus_agrees_within_contract : corpusAgrees () = true := by
   native_decide
+
+/--
+The specification agrees with the reference output of every constrained corpus command, at the coverage
+`expectedCoverage` states: every compile of a defined pattern, and every execution of one on a subject in
+the interface domain that the enumeration could afford.
+-/
+theorem spec_agrees_with_corpus : specCorpusAgrees () = true := by
+  native_decide
+
+/--
+The interpreted engine meets the specification on an exhaustive small domain, directly and without any
+recorded output in between: every pattern of up to four tokens on every subject over `{a, b}` of up to
+three characters under two flag settings, and every pattern of up to three tokens under all sixteen
+compile flag combinations and all four execution flag combinations on subjects with newlines and
+uppercase letters. `coverageStructure` and `coverageFlags` pin the sizes.
+-/
+theorem engine_meets_spec_exhaustively : exhaustiveAgrees () = true := by
+  native_decide
+
+/--
+The two corpus theorems composed: on every corpus command the specification constrains, the interpreted
+revera engine produces an output that meets the specification's verdict.
+
+The Go engine is not in the trust base of this statement.
+Its recorded outputs are the bridge between the two native evaluations, and both sides are checked
+against them, so the equality holds whether or not the recording was right.
+-/
+theorem engine_meets_spec_on_corpus :
+    ∀ pairs tp, corpusPairs = .ok pairs → reveraChecked = .ok tp →
+      ∃ lines, replayLines tp (sensiblePairs pairs) = .ok lines ∧
+        ∀ (i : Nat) (v : Verdict),
+          (verdicts specBudget ((sensiblePairs pairs).map (·.1))).1[i]? = some (some v) →
+          ∃ l, lines[i]? = some l ∧ v.holds l = true := by
+  intro pairs tp hp ht
+  have hc := revera_corpus_agrees_within_contract
+  have hs := spec_agrees_with_corpus
+  unfold corpusAgrees at hc
+  unfold specCorpusAgrees at hs
+  rw [hp] at hc hs
+  simp only [Bool.and_eq_true] at hc hs
+  obtain ⟨-, hreplay⟩ := hc
+  obtain ⟨hhold, -⟩ := hs
+  unfold replayAgrees at hreplay
+  rw [ht] at hreplay
+  simp only at hreplay
+  revert hreplay
+  cases hl : replayLines tp (sensiblePairs pairs) with
+  | error e => intro h; simp at h
+  | ok lines =>
+    intro h
+    simp only [Bool.and_eq_true, beq_iff_eq] at h
+    refine ⟨lines, rfl, ?_⟩
+    intro i v hv
+    rw [h.1]
+    have hidx := verdictsHold_index _ _ hhold i v
+    simp only [List.getElem?_map]
+    cases hq : (sensiblePairs pairs)[i]? with
+    | none =>
+      exfalso
+      have hlen := verdicts_length specBudget ((sensiblePairs pairs).map (·.1))
+      have h1 := (List.getElem?_eq_some_iff.mp hv).1
+      have h2 := List.getElem?_eq_none_iff.mp hq
+      simp only [List.length_map] at hlen
+      omega
+    | some q =>
+      exact ⟨q.2, rfl, hidx q hv hq⟩
 
 end Vego

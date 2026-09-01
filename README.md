@@ -34,10 +34,11 @@ A C locale runtime and its generated CLDR tables supply the character classes, c
   A reference matcher that enumerates every parse checks its answers, and the host `regcomp()` checks them again.
 - [`go1/`](go1/) rewrites that engine in Vego, a Go subset built for mechanical translation, and exports it as `revera.vego.json`.
 - [`rust1/`](rust1/), [`zig1/`](zig1/), [`cpp1/`](cpp1/), and [`c1/`](c1/) are the engine printed into each target language, with a hand-written public API in the shape that language expects.
-- [`lean/`](lean/) is the Lean 4 model of Vego.
+- [`lean/`](lean/) is the Lean 4 model of Vego, and a formal model of the ERE specification.
   It gives the subset a formal semantics.
   It proves that the shipped JSON artifacts are well formed.
-  It also checks that the embedded probe and selected corpus executions reproduce the Go reference outputs and stay inside their resource contracts.
+  It checks that the embedded probe and selected corpus executions reproduce the Go reference outputs and stay inside their resource contracts.
+  It also states the specification itself as a Lean definition, and proves that the interpreted engine meets it on every covered corpus command and on an exhaustive small domain.
 
 Each directory has a README that states its own API and how to verify it.
 

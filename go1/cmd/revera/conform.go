@@ -28,7 +28,7 @@ func runConform(args []string, cwd string, stdout, stderr io.Writer) int {
 	stress := flags.Int64("stress", 20, "extra random rounds of 500 patterns for the release driver")
 	seed := flags.Int64("seed", conformance.DefaultExtraSeed, "seed of the first stress round")
 	quick := flags.Bool("quick", false, "shrink every random corpus block by ten")
-	lean := flags.Bool("lean", false, "also run the Lean build and the corpus replay")
+	lean := flags.Bool("lean", false, "also run the Lean build, the corpus replay, and the specification check")
 	allowSkip := flags.Bool("allow-skip", false, "exit 0 when steps were skipped but none failed")
 	timeout := flags.Duration("timeout", conformance.ProtocolTimeout, "time limit of one driver, probe, or fuzzcase run")
 	flags.StringVar(&repoValue, "repo", "", "repository root (default: discover from the working directory)")
