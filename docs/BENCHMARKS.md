@@ -13,12 +13,12 @@ The Go engine runs in-process, and `-go0` adds the go0 reference engine as a col
 
 The cases fall into four groups:
 
-| Group   | What one operation is                          | Cases |
-|---------|------------------------------------------------|-------|
-| compile | `Compile` of the pattern                       | 10    |
-| match   | `Exec` with captures over the subject          | 15    |
-| hard    | `Exec` on a pattern that stresses the engine   | 10    |
-| replace | `ReplaceAll` over the subject                  | 4     |
+| Group   | What one operation is                        | Cases |
+| ------- | -------------------------------------------- | ----- |
+| compile | `Compile` of the pattern                     | 10    |
+| match   | `Exec` with captures over the subject        | 15    |
+| hard    | `Exec` on a pattern that stresses the engine | 10    |
+| replace | `ReplaceAll` over the subject                | 4     |
 
 The subjects are deterministic: a fixed pseudo-English text of about 1,000 bytes, plus short constructed strings.
 The difficult patterns are the shapes that hurt a POSIX engine: nested stars, counted repetitions, ambiguous groups, many captures, five `.*` groups, the RE2 classic `[a-q][^u-z]{13}x`, and the capacity fallback of `((a*){250}){250}b`.
@@ -27,15 +27,15 @@ Each case runs a fixed number of iterations, chosen so one repetition takes a fe
 The Go sessions run a garbage collection before each repetition, as `testing.B` does, so garbage from the earlier passes does not land inside a timed one.
 The tables report the fastest repetition; `-tsv` also records the slowest, so the noise of a run is visible.
 An untimed pass counts allocations: the bytes and the number of requests that the operation makes to its allocator.
-In Go these are heap allocations; in Rust, Zig and C++ they are arena requests, counted by the runtime.
+In Go these are heap allocations; in Rust, Zig, C++, and C11 they are arena requests, counted by the runtime.
 A match operation allocates its match buffer, as every public API does.
-The three generated targets report the same counts and, up to struct padding, the same bytes, which is expected, since they run the same program through the same growth rule, and it is a useful cross-check of the counters.
+The four generated targets report the same counts and, up to struct padding, the same bytes, which is expected, since they run the same program through the same growth rule, and it is a useful cross-check of the counters.
 
 The contract column of the allocation table is `ContractHeapBytes` of the pattern for the length of the subject.
 It is a bound, not a prediction, and the table shows how far the bound sits above the measured figure.
 
 Compile in the targets resets the pattern arena before each iteration, and match and replace reset the scratch arena, which is the discipline of the drivers and of the public APIs.
-Zig resets with `retain_capacity`, so its arena keeps its pages between iterations; Rust and C++ free every block.
+Zig resets with `retain_capacity`, so its arena keeps its pages between iterations; Rust, C++, and C11 free every block.
 The bench binaries call the generated engine directly and leave the hand-written wrappers out, so the figures compare the generated code, not the API layers.
 
 ## Running
@@ -71,11 +71,11 @@ The text figure is the whole executable section of the driver, which includes th
 Reference machine, 2026-08-31:
 
 | engine | source bytes | source lines | code bytes | functions | driver text bytes |
-|--------|--------------|--------------|------------|-----------|-------------------|
-| go1    |       144554 |         5212 |      78944 |       117 |            800860 |
-| cpp    |       182579 |         5213 |      76436 |       215 |             84812 |
-| rust   |       202520 |         5572 |      85600 |       101 |            328392 |
-| zig    |       170335 |         5259 |      58652 |        72 |            376628 |
+| ------ | ------------ | ------------ | ---------- | --------- | ----------------- |
+| go1    | 144554       | 5212         | 78944      | 117       | 800860            |
+| cpp    | 182579       | 5213         | 76436      | 215       | 84812             |
+| rust   | 202520       | 5572         | 85600      | 101       | 328392            |
+| zig    | 170335       | 5259         | 58652      | 72        | 376628            |
 
 The engine is between 59 KB and 86 KB of machine code in every language.
 The C++ figure counts 215 functions because every template instantiation of the runtime gets its own symbol; Rust and Zig inline most of them.
@@ -90,7 +90,7 @@ The run is `make bench BENCH_FLAGS="-go0"` on an idle machine, 2026-08-31.
 Compile time, ns per Compile:
 
 | case           |     go1 |    go0 |    cpp |   rust |    zig |
-|----------------|--------:|-------:|-------:|-------:|-------:|
+| -------------- | ------: | -----: | -----: | -----: | -----: |
 | literal        |  726 ns | 596 ns | 392 ns | 490 ns | 392 ns |
 | groups         |  845 ns | 634 ns | 473 ns | 504 ns | 409 ns |
 | alternation    |  2.5 us | 2.1 us | 1.4 us | 1.5 us | 1.1 us |
@@ -105,7 +105,7 @@ Compile time, ns per Compile:
 Match time, ns per Exec with captures:
 
 | case         |      go1 |      go0 |      cpp |     rust |      zig |
-|--------------|---------:|---------:|---------:|---------:|---------:|
+| ------------ | -------: | -------: | -------: | -------: | -------: |
 | literal-hit  |   3.3 us |   3.1 us |   3.4 us |   3.8 us |   3.5 us |
 | literal-miss |   3.2 us |   3.0 us |   3.2 us |   3.6 us |   3.4 us |
 | groups-short |   1.5 us |   1.6 us |   1.2 us |   1.3 us |   1.2 us |
@@ -125,7 +125,7 @@ Match time, ns per Exec with captures:
 Difficult patterns, ns per Exec with captures:
 
 | case              |      go1 |      go0 |      cpp |     rust |      zig |
-|-------------------|---------:|---------:|---------:|---------:|---------:|
+| ----------------- | -------: | -------: | -------: | -------: | -------: |
 | nested-star       |   1.2 us |   1.0 us |   1.3 us |   1.5 us |   1.5 us |
 | double-plus       |   1.4 us |   1.2 us |   1.5 us |   1.7 us |   1.7 us |
 | nested-counted    | 174.0 us | 197.3 us | 139.9 us | 167.4 us | 185.5 us |
@@ -140,7 +140,7 @@ Difficult patterns, ns per Exec with captures:
 Replacement, ns per ReplaceAll:
 
 | case          |      go1 |      go0 |      cpp |     rust |      zig |
-|---------------|---------:|---------:|---------:|---------:|---------:|
+| ------------- | -------: | -------: | -------: | -------: | -------: |
 | literal       |   2.9 us |   2.0 us |   3.2 us |   3.4 us |   2.8 us |
 | groups        | 124.9 us | 132.6 us | 105.3 us | 115.1 us | 115.1 us |
 | empty-matches | 116.1 us |  45.1 us | 127.0 us | 127.9 us |  84.7 us |
@@ -149,7 +149,7 @@ Replacement, ns per ReplaceAll:
 Allocation per operation, bytes and requests; the generated targets share one column because they report the same figures:
 
 | case                   | go1 B/op | go1 allocs | go0 B/op | go0 allocs | targets B/op | targets allocs |   contract B |
-|------------------------|---------:|-----------:|---------:|-----------:|-------------:|---------------:|-------------:|
+| ---------------------- | -------: | ---------: | -------: | ---------: | -----------: | -------------: | -----------: |
 | compile/literal        |     4232 |         19 |     2944 |         26 |         2223 |             15 |              |
 | compile/groups         |     4536 |         27 |     3128 |         35 |         3245 |             22 |              |
 | compile/alternation    |    19857 |         58 |    10504 |         93 |        14614 |             54 |              |
@@ -206,13 +206,13 @@ The CPU profile of `BenchmarkEngine` on the Go engine puts 26 percent of the sam
 The largest single symbols after those are the Go runtime's scheduler and garbage collector, which are the cost of the 93 GB the benchmark run allocates in total.
 The allocation profile explains where those bytes come from:
 
-| site                          | share of bytes | what it is                                              |
-|-------------------------------|---------------:|---------------------------------------------------------|
-| `addNode`                     |            33% | the parser's node arena, grown by append                |
-| `addInstr`                    |            17% | the program builder, grown by append                    |
-| `memoGrow`                    |            16% | the memo tables of the capture solver, doubling from 64 |
-| `prepare`                     |            11% | the per-Exec workspace of phase A                       |
-| `newTree` and `kidAlloc`      |            14% | the parse trees of the capture solver                   |
+| site                     | share of bytes | what it is                                              |
+| ------------------------ | -------------: | ------------------------------------------------------- |
+| `addNode`                |            33% | the parser's node arena, grown by append                |
+| `addInstr`               |            17% | the program builder, grown by append                    |
+| `memoGrow`               |            16% | the memo tables of the capture solver, doubling from 64 |
+| `prepare`                |            11% | the per-Exec workspace of phase A                       |
+| `newTree` and `kidAlloc` |            14% | the parse trees of the capture solver                   |
 
 By count, `prepare` is 35 percent of the objects and the append growth of the `active` arrays in `paStore` another 15 percent.
 

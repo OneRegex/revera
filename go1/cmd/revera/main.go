@@ -3,8 +3,8 @@
 //
 // Usage:
 //
-//	revera generate [-repo path] [-target rust,zig,cpp|all]
-//	revera check-generated [-repo path] [-target rust,zig,cpp|all]
+//	revera generate [-repo path] [-target rust,zig,cpp,c|all]
+//	revera check-generated [-repo path] [-target rust,zig,cpp,c|all]
 //	revera conform [-repo path] [-backend dir]... [-stress rounds] [-seed n] [-quick] [-skip steps] [-lean] [-allow-skip]
 package main
 
@@ -24,14 +24,14 @@ import (
 )
 
 const usageText = `usage:
-  revera generate [-repo path] [-target rust,zig,cpp|all]
-  revera check-generated [-repo path] [-target rust,zig,cpp|all]
+  revera generate [-repo path] [-target rust,zig,cpp,c|all]
+  revera check-generated [-repo path] [-target rust,zig,cpp,c|all]
   revera conform [-repo path] [-backend dir]... [-stress rounds] [-seed n] [-quick] [-skip steps] [-lean] [-allow-skip]
 
 The -target flag may be repeated. Omitting it selects all targets.
 Run "revera conform -h" for the conformance kit options.`
 
-var targetOrder = []string{"rust", "zig", "cpp"}
+var targetOrder = []string{"rust", "zig", "cpp", "c"}
 
 type targetValues []string
 
@@ -48,7 +48,7 @@ type targetSet map[string]bool
 
 func parseTargets(values []string) (targetSet, error) {
 	if len(values) == 0 {
-		return targetSet{"rust": true, "zig": true, "cpp": true}, nil
+		return targetSet{"rust": true, "zig": true, "cpp": true, "c": true}, nil
 	}
 	selected := targetSet{}
 	sawAll := false
@@ -72,7 +72,7 @@ func parseTargets(values []string) (targetSet, error) {
 		if len(selected) != 0 || len(values) != 1 || strings.TrimSpace(values[0]) != "all" {
 			return nil, fmt.Errorf("target all cannot be combined with another target")
 		}
-		return targetSet{"rust": true, "zig": true, "cpp": true}, nil
+		return targetSet{"rust": true, "zig": true, "cpp": true, "c": true}, nil
 	}
 	return selected, nil
 }
@@ -130,6 +130,13 @@ func artifactsFor(targets targetSet) []artifact {
 			artifact{rel: "cpp1/engine.cpp"},
 			artifact{rel: "cpp1/probe_engine.hpp"},
 			artifact{rel: "cpp1/probe_engine.cpp"})
+	}
+	if targets["c"] {
+		artifacts = append(artifacts,
+			artifact{rel: "c1/engine.h"},
+			artifact{rel: "c1/engine.c"},
+			artifact{rel: "c1/probe_engine.h"},
+			artifact{rel: "c1/probe_engine.c"})
 	}
 	return artifacts
 }
@@ -220,6 +227,30 @@ func generationPlan(stage string, targets targetSet) []generationStep {
 				outputs: []plannedOutput{
 					{artifact: artifact{rel: "cpp1/probe_engine.hpp"}, path: staged("cpp1/probe_engine.hpp")},
 					{artifact: artifact{rel: "cpp1/probe_engine.cpp"}, path: staged("cpp1/probe_engine.cpp")},
+				},
+			})
+	}
+	if targets["c"] {
+		steps = append(steps,
+			generationStep{
+				name: "generate C engine",
+				args: []string{"run", "./cmd/json2c",
+					"-hdr", staged("c1/engine.h"),
+					"-src", staged("c1/engine.c"),
+					"-prefix", "revera_eng", reveraJSON},
+				outputs: []plannedOutput{
+					{artifact: artifact{rel: "c1/engine.h"}, path: staged("c1/engine.h")},
+					{artifact: artifact{rel: "c1/engine.c"}, path: staged("c1/engine.c")},
+				},
+			},
+			generationStep{
+				name: "generate C probe",
+				args: []string{"run", "./cmd/json2c",
+					"-hdr", staged("c1/probe_engine.h"),
+					"-src", staged("c1/probe_engine.c"), probeJSON},
+				outputs: []plannedOutput{
+					{artifact: artifact{rel: "c1/probe_engine.h"}, path: staged("c1/probe_engine.h")},
+					{artifact: artifact{rel: "c1/probe_engine.c"}, path: staged("c1/probe_engine.c")},
 				},
 			})
 	}

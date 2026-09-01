@@ -1036,3 +1036,16 @@ The corpus tables that the fuzz seeds and the kit repeated, the heavy pattern an
 The kit runs the release build and every checked build through one pipeline, so a checked build reports build, probe, corpus and fuzz rows and honors `requires` like the release build; the backends run concurrently, the corpora are answered only when a step needs them, the Lean data check reuses the answered corpus, and the manifest carries the toolchain command that the bench header prints.
 The manifest loader compiles `engine_symbols` and validates the generated paths, `bench size` reports an expression that matches nothing as an error, and the Rust, Zig and C++ bench and fuzz hosts share one `host` file per language with their driver instead of copying the hex decoding and the locale load.
 Findings left as they were: folding the bench protocol into the driver, replacing the seed pack with a corpus directory, a Go `backend.json`, generating the Lean intractable list, and moving check-generated in-process, each a design change rather than a cleanup.
+
+## 2026-09-01, C11 generator and backend
+
+The user asked for a C11 code generator like the Rust, Zig, and C++ generators.
+I added `go1/cmd/json2c`, which prints prefixed C11 headers and sources from the checked Vego IR.
+The printer monomorphizes slices and arrays, emits aggregate equality helpers, carries the explicit arena through allocating functions, and lowers Go evaluation order through statement preludes because standard C has no lambdas or statement expressions.
+It also defines Go-compatible wraparound, signed division overflow, shifts, nil slices, zero-length arrays, tuple returns, string comparisons, and left-to-right call and initializer evaluation.
+The unified generation command now accepts target `c` and checks fourteen artifacts.
+The new `c1/` component contains the generated engine and probe, the `vg.h` arena and string runtime, the differential driver, probe, benchmark, fuzz entry point, sanitizer builds, backend manifest, and a documented opaque public C API.
+The public API covers locales, compilation options, errors and offsets, matching, captures, iteration, replacement, and resource contracts.
+I copied the locale blob into its sixth byte-identical location and updated the repository instructions and overview documents.
+The json2c tests compile both real generated programs with warnings as errors.
+The C API test passes, the 29-line probe matches Go, the release driver matches all 86,704 corpus commands, and the C backend passes the full conformance pipeline and its ASan and UBSan checked pipeline.

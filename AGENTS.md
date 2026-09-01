@@ -5,7 +5,7 @@
 `src/` and `tests/` hold the C11 locale runtime and its tests.
 `go0/` is the reference POSIX ERE engine.
 `go1/` contains the Vego implementation, translators, and cross-language verification tools.
-`rust1/`, `zig1/`, and `cpp1/` combine generated engines with hand-written APIs.
+`rust1/`, `zig1/`, `cpp1/`, and `c1/` combine generated engines with hand-written APIs.
 Lean proofs are under `lean/Vego/`, with fixtures in `lean/data/`.
 Design notes live in `docs/`.
 Change pinned projects in `ref/` only when updating a reference revision.
@@ -21,6 +21,7 @@ Use the component regeneration commands.
 - `cd rust1 && cargo test`: test the Rust API.
 - `cd zig1 && zig build test`: run the Zig API tests.
 - `cd cpp1 && make test`: build and run the C++20 API test.
+- `cd c1 && make test`: build and run the C11 API test.
 - `cd lean && lake build`: check the Lean model and proofs; expect several minutes.
 - `make generate`: regenerate the two Vego JSON files and every target source transactionally.
 - `make check-generated`: fail if any Vego JSON or generated target source is stale or missing.
@@ -32,7 +33,8 @@ For generated-target changes, build release drivers and run `crosscheck` and `pr
 
 Use native formatters and existing language idioms.
 Go code must be clean under `gofmt` and `go vet`.
-C uses four-space indentation, `rv_` functions, and `RV_` constants.
+C uses four-space indentation.
+The locale runtime uses `rv_` functions and `RV_` constants, while the C11 engine API uses `revera_` functions and `REVERA_` constants.
 Rust uses `snake_case`, Zig methods use `camelCase`, and C++ methods use `snake_case`.
 Keep comments concise and useful.
 

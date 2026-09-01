@@ -1,0 +1,11 @@
+driver
+probe
+api_test
+bench
+fuzzcase
+driver-asan
+probe-asan
+fuzzcase-asan
+libfuzzer
+*.dSYM/
+*.o

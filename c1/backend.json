@@ -1,0 +1,22 @@
+{
+  "name": "c",
+  "generated": ["engine.h", "engine.c", "probe_engine.h", "probe_engine.c"],
+  "engine_symbols": "revera_eng_",
+  "toolchain": ["clang", "--version"],
+  "release": {
+    "build": [["make", "all"]],
+    "driver": "driver",
+    "probe": "probe",
+    "bench": "bench",
+    "fuzzcase": "fuzzcase"
+  },
+  "checked": [
+    {
+      "name": "asan-ubsan",
+      "build": [["make", "sanitize"]],
+      "driver": "driver-asan",
+      "probe": "probe-asan",
+      "fuzzcase": "fuzzcase-asan"
+    }
+  ]
+}

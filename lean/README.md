@@ -3,7 +3,7 @@
 This directory holds the Lean 4 formalization that the Vego specification promises.
 
 It gives the subset a formal semantics.
-It applies that semantics to the exact JSON artifacts that the Go, Rust, Zig and C++ printers consume.
+It applies that semantics to the exact JSON artifacts that the Go, Rust, Zig, C++, and C11 printers consume.
 The theorems in `Vego/Theorems.lean` are machine checked.
 
 ## What is proved
@@ -122,8 +122,8 @@ A fully universal contract theorem would need a verified model of the matcher, w
 
 ## What this means for the pipeline
 
-The generated Rust, Zig and C++ engines come from the same JSON the theorems talk about.
-`cmd/crosscheck` verifies all three against the Go engine on the same corpus.
+The generated Rust, Zig, C++, and C11 engines come from the same JSON the theorems talk about.
+`cmd/crosscheck` verifies all four against the Go engine on the same corpus.
 The Lean semantics therefore anchors the whole chain.
 One side runs JSON through the formal semantics to the reference outputs.
 The other side runs the same JSON through a printer into a target engine, and reaches the same outputs.

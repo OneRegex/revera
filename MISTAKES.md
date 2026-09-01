@@ -478,3 +478,11 @@
   Lesson: a literal that appears twice wants an exported name in the file that owns the data, and a list that a command validates against wants to live next to the code that runs it.
 - The script that copies the bench tables into `docs/BENCHMARKS.md` split the output at every line that starts with a non-space character, which is every border and row of a table, so it found no rows.
   Lesson: parse a plain-text table by walking lines after its title, not by splitting on paragraph shapes it does not have.
+
+## 2026-09-01, C11 backend
+
+- I counted `x[aab:b]yy` as nine bytes in the first C API test, although it has ten bytes.
+  The engine returned the correct text, and only the test expectation was wrong.
+  Lesson: use `sizeof(literal) - 1` for literal byte counts instead of counting them by hand.
+- I sent two snapshot summaries that exceeded the tool limit, and I sent parallel edits with the same checksum after the first edit changed the file.
+  Lesson: move large exploration notes into `tmp/`, and chain the checksum that each successful edit returns.

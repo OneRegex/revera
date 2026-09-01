@@ -46,7 +46,7 @@ func writeTestFile(t *testing.T, path string, content []byte) {
 func createFixtureRepository(t *testing.T, parent string) string {
 	t.Helper()
 	repo := filepath.Join(parent, "repository with spaces")
-	for _, rel := range []string{"go1/revera", "go1/probe", "rust1", "zig1", "cpp1", "tmp"} {
+	for _, rel := range []string{"go1/revera", "go1/probe", "rust1", "zig1", "cpp1", "c1", "tmp"} {
 		if err := os.MkdirAll(filepath.Join(repo, filepath.FromSlash(rel)), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -135,7 +135,7 @@ func generationTempEntries(t *testing.T, repo string) []string {
 }
 
 func TestParseTargets(t *testing.T) {
-	all := targetSet{"rust": true, "zig": true, "cpp": true}
+	all := targetSet{"rust": true, "zig": true, "cpp": true, "c": true}
 	cases := []struct {
 		name   string
 		values []string
@@ -143,8 +143,8 @@ func TestParseTargets(t *testing.T) {
 	}{
 		{name: "default", want: all},
 		{name: "all", values: []string{"all"}, want: all},
-		{name: "comma list", values: []string{"rust, zig,cpp"}, want: all},
-		{name: "repeated", values: []string{"cpp", "rust", "zig"}, want: all},
+		{name: "comma list", values: []string{"rust, zig,cpp,c"}, want: all},
+		{name: "repeated", values: []string{"cpp", "rust", "zig", "c"}, want: all},
 		{name: "deduplicated", values: []string{"rust,rust"}, want: targetSet{"rust": true}},
 		{name: "one", values: []string{" zig "}, want: targetSet{"zig": true}},
 	}
@@ -194,6 +194,8 @@ func TestArtifactsAndPlanAreDeterministic(t *testing.T) {
 		"zig1/src/engine.zig", "zig1/src/probe_engine.zig",
 		"cpp1/engine.hpp", "cpp1/engine.cpp",
 		"cpp1/probe_engine.hpp", "cpp1/probe_engine.cpp",
+		"c1/engine.h", "c1/engine.c",
+		"c1/probe_engine.h", "c1/probe_engine.c",
 	}
 	var gotArtifacts []string
 	for _, artifact := range artifacts {
@@ -209,6 +211,7 @@ func TestArtifactsAndPlanAreDeterministic(t *testing.T) {
 		"generate Rust engine", "generate Rust probe",
 		"generate Zig engine", "generate Zig probe",
 		"generate C++ engine", "generate C++ probe",
+		"generate C engine", "generate C probe",
 	}
 	var gotSteps []string
 	for _, step := range plan {
@@ -220,6 +223,10 @@ func TestArtifactsAndPlanAreDeterministic(t *testing.T) {
 	cpp := plan[6]
 	if !slices.Contains(cpp.args, "revera::engine") {
 		t.Fatalf("C++ engine arguments omit the namespace: %q", cpp.args)
+	}
+	c := plan[8]
+	if !slices.Contains(c.args, "revera_eng") {
+		t.Fatalf("C engine arguments omit the prefix: %q", c.args)
 	}
 	for _, step := range plan {
 		for _, output := range step.outputs {

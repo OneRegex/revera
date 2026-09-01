@@ -61,30 +61,30 @@ The kit discovers every `*/backend.json` below the repository root, or takes the
 
 The binaries speak three protocols, all defined on the Go side:
 
-| Binary   | Protocol                                     | Reference                        |
-|----------|----------------------------------------------|----------------------------------|
-| driver   | driver line protocol, one answer per command | `go1/revera/driver_host.go`      |
-| probe    | prints the probe report lines                | `go1/cmd/proberef`               |
-| fuzzcase | runs a seed pack, prints the count           | `go1/cmd/fuzzcase`               |
-| bench    | bench line protocol                          | `go1/revera/bench_host.go`       |
+| Binary   | Protocol                                     | Reference                   |
+| -------- | -------------------------------------------- | --------------------------- |
+| driver   | driver line protocol, one answer per command | `go1/revera/driver_host.go` |
+| probe    | prints the probe report lines                | `go1/cmd/proberef`          |
+| fuzzcase | runs a seed pack, prints the count           | `go1/cmd/fuzzcase`          |
+| bench    | bench line protocol                          | `go1/revera/bench_host.go`  |
 
-The existing drivers in `rust1/src/main.rs`, `zig1/src/main.zig` and `cpp1/driver.cpp` are the models for a new one.
+The existing drivers in `rust1/src/main.rs`, `zig1/src/main.zig`, `cpp1/driver.cpp`, and `c1/driver.c` are the models for a new one.
 
 ## The steps
 
 The kit runs these steps, in this order, and records each outcome with its duration.
 
-| Step             | Scope   | What it checks                                                                                  |
-|------------------|---------|-------------------------------------------------------------------------------------------------|
-| generated        | repo    | `revera check-generated`: every generated artifact is current.                                  |
+| Step             | Scope   | What it checks                                                                                    |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| generated        | repo    | `revera check-generated`: every generated artifact is current.                                    |
 | corpus           | repo    | Builds the corpus, the stress rounds and the fuzz seed pack, and answers them with the Go engine. |
-| build            | backend | The release build commands succeed and produce the named binaries.                              |
-| probe            | backend | The probe output equals the Go probe report, line by line.                                      |
-| corpus           | backend | The driver answers the 86,704 commands of the fixed corpus exactly like the Go engine.          |
-| stress           | backend | The driver answers `-stress` extra random rounds of 500 patterns, from seed `-seed`.            |
-| fuzz             | backend | The fuzzcase binary runs every seed of the pack and reports the count.                          |
-| checked/`name`/* | backend | Each checked build repeats build, probe, corpus and fuzz, on the quick and light corpus.        |
-| lean-data        | repo    | `lean/data/corpus.tsv` and `lean/data/probe.expected` equal the current corpus and probe report. |
+| build            | backend | The release build commands succeed and produce the named binaries.                                |
+| probe            | backend | The probe output equals the Go probe report, line by line.                                        |
+| corpus           | backend | The driver answers the 86,704 commands of the fixed corpus exactly like the Go engine.            |
+| stress           | backend | The driver answers `-stress` extra random rounds of 500 patterns, from seed `-seed`.              |
+| fuzz             | backend | The fuzzcase binary runs every seed of the pack and reports the count.                            |
+| checked/`name`/* | backend | Each checked build repeats build, probe, corpus and fuzz, on the quick and light corpus.          |
+| lean-data        | repo    | `lean/data/corpus.tsv` and `lean/data/probe.expected` equal the current corpus and probe report.  |
 | lean             | repo    | With `-lean`: `lake build`, then `vegocheck data/corpus.tsv` replays the corpus under the proofs. |
 
 `-skip` leaves steps out, by name; a name applies to the release build and to every checked build.
@@ -122,12 +122,13 @@ rest        the subject
 The procedure is the same everywhere: select the locale, compile, exec with captures, replace, iterate three matches, compute the contract.
 Every result is ignored; a crash, an assertion, or a sanitizer report is the signal.
 
-| Backend | Entry point                                   | Coverage-guided run                                              |
-|---------|-----------------------------------------------|------------------------------------------------------------------|
-| go1     | `FuzzEngine` in `go1/revera/fuzz_test.go`     | `cd go1 && go test ./revera -run '^$' -fuzz FuzzEngine`         |
-| rust1   | `fuzz_one` in `rust1/src/fuzz.rs`             | `cd rust1/fuzz && cargo +nightly fuzz run engine` (needs cargo-fuzz) |
-| zig1    | `fuzzOne` in `zig1/src/fuzz.zig`              | `cd zig1 && zig build test --fuzz`                               |
-| cpp1    | `LLVMFuzzerTestOneInput` in `cpp1/fuzz.cpp`   | `cd cpp1 && make libfuzzer && ./libfuzzer corpus/` (Linux clang) |
+| Backend | Entry point                                 | Coverage-guided run                                                  |
+| ------- | ------------------------------------------- | -------------------------------------------------------------------- |
+| go1     | `FuzzEngine` in `go1/revera/fuzz_test.go`   | `cd go1 && go test ./revera -run '^$' -fuzz FuzzEngine`              |
+| rust1   | `fuzz_one` in `rust1/src/fuzz.rs`           | `cd rust1/fuzz && cargo +nightly fuzz run engine` (needs cargo-fuzz) |
+| zig1    | `fuzzOne` in `zig1/src/fuzz.zig`            | `cd zig1 && zig build test --fuzz`                                   |
+| cpp1    | `LLVMFuzzerTestOneInput` in `cpp1/fuzz.cpp` | `cd cpp1 && make libfuzzer && ./libfuzzer corpus/` (Linux clang)     |
+| c1      | `LLVMFuzzerTestOneInput` in `c1/fuzz.c`     | `cd c1 && make libfuzzer && ./libfuzzer corpus/` (Linux clang)       |
 
 The Go entry point does more than the others: it also compares go1 with go0 on compile, exec and replace, so it is a differential fuzzer for the engine logic that every backend inherits.
 The `fuzzcase` binaries are the deterministic form: they run a seed pack with no coverage feedback, which is what the kit needs for a bounded, repeatable verdict.
@@ -135,12 +136,13 @@ The seed pack is `tmp/conformance/fuzz-seeds.pack`, written by the corpus step f
 
 ## The checked builds
 
-| Backend | Build                              | What it catches                                             |
-|---------|------------------------------------|-------------------------------------------------------------|
-| rust1   | `cargo build`                      | The runtime's `assert!` bounds checks, in the debug profile. |
-| rust1   | `sh asan-build.sh`, nightly ASan   | Out-of-bounds and use-after-free through raw pointers.       |
-| zig1    | `zig build -p zig-out/debug`       | Every Zig safety check of Debug mode.                        |
-| cpp1    | `make sanitize`                    | AddressSanitizer and UndefinedBehaviorSanitizer, fatal on the first report. |
+| Backend | Build                            | What it catches                                                             |
+| ------- | -------------------------------- | --------------------------------------------------------------------------- |
+| rust1   | `cargo build`                    | The runtime's `assert!` bounds checks, in the debug profile.                |
+| rust1   | `sh asan-build.sh`, nightly ASan | Out-of-bounds and use-after-free through raw pointers.                      |
+| zig1    | `zig build -p zig-out/debug`     | Every Zig safety check of Debug mode.                                       |
+| cpp1    | `make sanitize`                  | AddressSanitizer and UndefinedBehaviorSanitizer, fatal on the first report. |
+| c1      | `make sanitize`                  | AddressSanitizer and UndefinedBehaviorSanitizer, fatal on the first report. |
 
 The Rust sanitizer build needs the nightly toolchain and is skipped without it.
 A skipped step keeps the verdict from being complete, so the exit status stays 1 unless `-allow-skip` is given.

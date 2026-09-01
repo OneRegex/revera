@@ -2,8 +2,8 @@
 
 This repository is a clean-room implementation of the POSIX.1-2024 Extended Regular Expression language.
 
-It holds one written contract, one reference engine in Go, and the same engine in Rust, Zig and C++.
-The four engines come from a single source, through a mechanical pipeline.
+It holds one written contract, one reference engine in Go, and the same engine in Rust, Zig, C++, and C11.
+The five engines come from a single source, through a mechanical pipeline.
 A LEAN4 model proves what that pipeline preserves.
 A C locale runtime and its generated CLDR tables supply the character classes, case mappings and collating data underneath.
 
@@ -33,7 +33,7 @@ A C locale runtime and its generated CLDR tables supply the character classes, c
 - [`go0/`](go0/) is the reference engine: parser, matcher, capture resolution, resource contracts, and an embedded copy of the locale data.
   A reference matcher that enumerates every parse checks its answers, and the host `regcomp()` checks them again.
 - [`go1/`](go1/) rewrites that engine in Vego, a Go subset built for mechanical translation, and exports it as `revera.vego.json`.
-- [`rust1/`](rust1/), [`zig1/`](zig1/) and [`cpp1/`](cpp1/) are the engine printed into each target language, with a hand-written public API in the shape that language expects.
+- [`rust1/`](rust1/), [`zig1/`](zig1/), [`cpp1/`](cpp1/), and [`c1/`](c1/) are the engine printed into each target language, with a hand-written public API in the shape that language expects.
 - [`lean/`](lean/) is the LEAN4 model of Vego.
   It gives the subset a formal semantics.
   It then proves that the shipped JSON artifacts are well formed, run without traps, reproduce the Go reference outputs, and stay inside their resource contracts.
@@ -72,7 +72,7 @@ cd go0 && go test ./...
 cd go1 && go test ./...
 ```
 
-Regenerate every Vego JSON and Rust, Zig, and C++ source artifact with one command:
+Regenerate every Vego JSON and Rust, Zig, C++, and C11 source artifact with one command:
 
 ```sh
 make generate
@@ -80,10 +80,10 @@ make check-generated
 ```
 
 `check-generated` renders into an isolated directory under `tmp/`, compares file contents, and exits nonzero without modifying the repository when an artifact is stale or missing.
-Set `GENERATION_TARGETS=rust`, `zig`, `cpp`, or a comma-separated selection to limit the target sources.
+Set `GENERATION_TARGETS=rust`, `zig`, `cpp`, `c`, or a comma-separated selection to limit the target sources.
 The two shared JSON files are always included.
 
-The Rust, Zig and C++ engines each build and verify from their own directory.
+The Rust, Zig, C++, and C11 engines each build and verify from their own directory.
 Their READMEs give the commands, including the differential run against the Go engine.
 
 One command decides whether a backend is conformant, and one command benchmarks every engine:
@@ -96,7 +96,7 @@ make profile
 ```
 
 `conform` builds each backend from its `backend.json`, then runs the probe, the differential corpus, stress rounds, the fuzz seed pack, the sanitizer and debug builds, and checks that the Lean data matches the corpus.
-`bench` prints compile, match, replacement and difficult-pattern figures with allocation counts, side by side for Go, Rust, Zig and C++.
+`bench` prints compile, match, replacement and difficult-pattern figures with allocation counts, side by side for Go, Rust, Zig, C++, and C11.
 `size` reports the generated code size per target, and `profile` writes CPU and allocation profiles of the Go engine.
 
 A rebuild of `src/rv_locale_data.inc` also needs JDK 17 or later and the pinned CLDR 48.2 artifacts.

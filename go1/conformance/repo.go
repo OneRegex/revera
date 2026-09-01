@@ -32,7 +32,7 @@ func FindRepositoryRoot(start string) (string, error) {
 
 // IsRepositoryRoot reports whether root holds the component directories and the go1 module.
 func IsRepositoryRoot(root string) bool {
-	for _, rel := range []string{"go1", "go1/revera", "go1/probe", "rust1", "zig1", "cpp1"} {
+	for _, rel := range []string{"go1", "go1/revera", "go1/probe", "rust1", "zig1", "cpp1", "c1"} {
 		if ValidateDirectoryComponents(root, rel) != nil {
 			return false
 		}
