@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -255,7 +256,41 @@ func (r *run) checkGenerated() Result {
 	if err != nil {
 		return r.record(repoScope, "generated", Failed, start, tail(out, 12))
 	}
+	if problems := LocaleDataProblems(r.opts.Repo); len(problems) > 0 {
+		return r.record(repoScope, "generated", Failed, start, strings.Join(problems, "; "))
+	}
 	return r.record(repoScope, "generated", Passed, start, "")
+}
+
+// localeDataCopies lists every checked-in copy of the locale blob, relative to the repository root.
+var localeDataCopies = []string{
+	"go0/locale/data.bin",
+	"c1/data.bin",
+	"cpp1/data.bin",
+	"rust1/src/data.bin",
+	"zig1/src/data.bin",
+}
+
+// LocaleDataProblems reports every copy of the locale blob, and the Lean hex dump of it, that differs from the embedded data.
+// The generated-artifact check does not cover the blob.
+func LocaleDataProblems(repo string) []string {
+	var problems []string
+	embedded := revera.EmbeddedLocaleData()
+	for _, rel := range localeDataCopies {
+		data, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
+		if err != nil {
+			problems = append(problems, rel+": "+err.Error())
+		} else if string(data) != embedded {
+			problems = append(problems, rel+" differs from go1/revera/data.bin")
+		}
+	}
+	hexData, err := os.ReadFile(filepath.Join(repo, "lean", "data", "localedata.hex"))
+	if err != nil {
+		problems = append(problems, "localedata.hex: "+err.Error())
+	} else if string(hexData) != hex.EncodeToString([]byte(embedded)) {
+		problems = append(problems, "localedata.hex is stale")
+	}
+	return problems
 }
 
 // prepare answers the corpora that the requested steps need and writes the fuzz seed pack.
@@ -321,14 +356,16 @@ func (r *run) backend(b *Backend) Summary {
 // The step names carry the prefix, so a checked build reports as checked/<name>/<step>.
 func (r *run) build(b *Backend, bd Build, prefix string, corpus *Corpus, stress *Corpus) Summary {
 	var out Summary
+	// The toolchain probe runs even when the build step is skipped, so a missing toolchain reports as skipped rather than as failures.
+	if len(bd.Requires) > 0 {
+		start := time.Now()
+		if msg, err := command(b.Dir, bd.Requires[0], bd.Requires[1:]...); err != nil {
+			return Summary{r.record(b.Name, prefix+"build", Skipped, start,
+				fmt.Sprintf("%s is not available: %s", strings.Join(bd.Requires, " "), firstLine(msg)))}
+		}
+	}
 	if !r.skip("build") {
 		start := time.Now()
-		if len(bd.Requires) > 0 {
-			if msg, err := command(b.Dir, bd.Requires[0], bd.Requires[1:]...); err != nil {
-				return Summary{r.record(b.Name, prefix+"build", Skipped, start,
-					fmt.Sprintf("%s is not available: %s", strings.Join(bd.Requires, " "), firstLine(msg)))}
-			}
-		}
 		if msg, err := BuildBinaries(b, bd); err != nil {
 			return Summary{r.record(b.Name, prefix+"build", Failed, start, tail(msg, 12))}
 		}
@@ -365,7 +402,7 @@ func (r *run) fuzzcase(b *Backend, bd Build) error {
 	if bd.Fuzzcase == "" {
 		return nil
 	}
-	out, err := command(b.Dir, b.Path(bd.Fuzzcase), r.pack)
+	out, err := boundedCommand(b.Dir, b.Path(bd.Fuzzcase), r.pack)
 	if err != nil {
 		return fmt.Errorf("%s: %w\n%s", bd.Fuzzcase, err, tail(out, 12))
 	}

@@ -8,8 +8,8 @@ int32_t parseBracket(vg::Arena& mem, parser& p, Locale& loc) {
     int64_t start = p.pos;
     p.pos += 1LL;
     bracketSet b{};
-    b.icase = (uint32_t(p.flags & FlagICase) != 0);
-    b.nlMode = (uint32_t(p.flags & FlagNewline) != 0);
+    b.icase = (uint32_t(p.flags & FlagICase) != 0U);
+    b.nlMode = (uint32_t(p.flags & FlagNewline) != 0U);
     if ((peekByte(p) == 94)) {
         b.negated = true;
         p.pos += 1LL;
@@ -566,6 +566,9 @@ int64_t structCmp(capSolver& s, Regexp& re, int32_t a, int32_t b) {
 }
 
 int64_t cmpCand(capSolver& s, Regexp& re, int32_t a, int32_t b) {
+    if (s.failed) {
+        return 1LL;
+    }
     if ((re.minSlots > 0LL)) {
         for (int64_t idx = 0LL; (idx < re.minSlots); idx += 1LL) {
             s.ctrA[idx] = 0LL;
@@ -600,7 +603,7 @@ int32_t bestParse(vg::Arena& mem, capSolver& s, Regexp& re, decoded& d, int32_t 
     if ((!capStep(s))) {
         return int32_t(0ULL - uint64_t(1));
     }
-    int32_t best = int32_t(int32_t(0ULL - uint64_t(1)));
+    int32_t best = int32_t(0ULL - uint64_t(1));
     switch (re.nodes[ni].op) {
     case opChar: {
         if (((j == (i + 1LL)) && charMatches(re, ni, d.runes[i]))) {
@@ -657,7 +660,7 @@ int32_t bestParse(vg::Arena& mem, capSolver& s, Regexp& re, decoded& d, int32_t 
     } break;
     case opRepeat: {
         if (((i == j) && (re.nodes[ni].min == 0LL))) {
-            int32_t sub_3 = int32_t(int32_t(0ULL - uint64_t(1)));
+            int32_t sub_3 = int32_t(0ULL - uint64_t(1));
             if ((re.nodes[ni].max != 0LL)) {
                 sub_3 = bestParse(mem, s, re, d, re.nodes[ni].ch[0LL], i, i);
             }
@@ -706,7 +709,7 @@ Tup_i64_i64 bestConcat(vg::Arena& mem, capSolver& s, Regexp& re, decoded& d, int
     }
     int64_t bestOff = int64_t(0ULL - uint64_t(1LL));
     int64_t bestLen = 0LL;
-    int32_t bestTree = int32_t(int32_t(0ULL - uint64_t(1)));
+    int32_t bestTree = int32_t(0ULL - uint64_t(1));
     int32_t head0 = re.nodes[ni].ch[idx];
     int64_t lo = (i + re.nodes[head0].minL);
     if ((re.nodes[ni].sufMax[(idx + 1LL)] < lenInf)) {
@@ -905,7 +908,7 @@ int64_t cMul(int64_t a, int64_t b) {
 }
 
 int64_t ContractHeapBytes(Contract& c) {
-    int64_t capture = int64_t(0LL);
+    int64_t capture = 0LL;
     if (c.HasOnePass) {
         capture = c.OnePass.HeapBytes;
     }
@@ -943,7 +946,7 @@ Contract ContractFor(Regexp& re, int64_t maxInput) {
     Contract c{};
     c.MaxInput = int64_t(length);
     c.Matcher = matcherContract(re, length, atom);
-    if ((re.progOK && (uint32_t(re.flags & FlagNoSub) == 0))) {
+    if ((re.progOK && (uint32_t(re.flags & FlagNoSub) == 0U))) {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length, atom);
             c.HasOnePass = true;
@@ -963,9 +966,9 @@ BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
     }
     int64_t n = int64_t(vg::len(re.prog.ins));
     int64_t k = int64_t(re.minSlots);
-    int64_t ring = int64_t(2LL);
+    int64_t ring = 2LL;
     if (re.prog.multi) {
-        ring = (maxElemAhead + 1LL);
+        ring = 9LL;
     }
     int64_t heap = workspaceHeapBound(n, k, ring);
     int64_t payloads = (n + 1LL);
@@ -975,7 +978,7 @@ BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
     int64_t perPop = cMul(2LL, (k + 3LL));
     int64_t perBoundary = ([&]{ auto _t3 = ([&]{ auto _t4 = n; auto _t5 = cMul(payloads, perPop); return cMul(_t4, _t5); }()); auto _t6 = ([&]{ auto _t7 = n; auto _t8 = cAdd(atom, (k + 8LL)); return cMul(_t7, _t8); }()); return cAdd(_t3, _t6); }());
     int64_t steps = ([&]{ auto _t9 = cAdd(length, 2LL); auto _t10 = perBoundary; return cMul(_t9, _t10); }());
-    int64_t stack = (int64_t(matcherStackBytes) + (equivFrames * frameBytes));
+    int64_t stack = 4608LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1003,11 +1006,11 @@ BackendContract solverContract(Regexp& re, int64_t length, int64_t atom) {
     int64_t tree = treeNodes(re.nodes, re.root, length);
     int64_t perStep = ([&]{ auto _t3 = atom; auto _t4 = ([&]{ auto _t5 = cMul(2LL, tree); auto _t6 = (cMul(2LL, int64_t(re.minSlots)) + 4LL); return cAdd(_t5, _t6); }()); return cAdd(_t3, _t4); }());
     int64_t steps = ([&]{ auto _t7 = cMul(structural, perStep); auto _t8 = cMul(tree, (int64_t(re.nsub) + 2LL)); return cAdd(_t7, _t8); }());
-    int64_t perAlloc = cAdd(((2LL * ptreeBytes) + mapEntryBytes), cMul(kidBytes, cAdd(solverFanout(re.nodes, re.root, length), 1LL)));
+    int64_t perAlloc = cAdd(224LL, cMul(kidBytes, cAdd(solverFanout(re.nodes, re.root, length), 1LL)));
     int64_t heap = ([&]{ auto _t9 = cMul(structural, perAlloc); auto _t10 = cMul(16LL, int64_t(re.minSlots)); return cAdd(_t9, _t10); }());
     heap = cAdd(heap, 4096LL);
     heap = ([&]{ auto _t11 = heap; auto _t12 = captureHeap(re, length); return cAdd(_t11, _t12); }());
-    int64_t stack = cMul(cAdd(depth, (equivFrames + 4LL)), frameBytes);
+    int64_t stack = cMul(cAdd(depth, 14LL), frameBytes);
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1015,7 +1018,7 @@ BackendContract solverContract(Regexp& re, int64_t length, int64_t atom) {
 }
 
 int64_t astSize(vg::Slice<node> nodes, int32_t ni) {
-    int64_t total = int64_t(1LL);
+    int64_t total = 1LL;
     for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
         total = ([&]{ auto _t1 = total; auto _t2 = astSize(nodes, nodes[ni].ch[i]); return cAdd(_t1, _t2); }());
     }
@@ -1023,7 +1026,7 @@ int64_t astSize(vg::Slice<node> nodes, int32_t ni) {
 }
 
 int64_t astHeight(vg::Slice<node> nodes, int32_t ni) {
-    int64_t deepest = int64_t(0LL);
+    int64_t deepest = 0LL;
     for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
         deepest = ([&]{ auto _t1 = deepest; auto _t2 = astHeight(nodes, nodes[ni].ch[i]); return std::max<int64_t>(_t1, _t2); }());
     }
@@ -1035,7 +1038,7 @@ int64_t atomCost(Regexp& re) {
 }
 
 int64_t atomCostNode(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, int32_t ni) {
-    int64_t cost = int64_t(1LL);
+    int64_t cost = 1LL;
     switch (nodes[ni].op) {
     case opChar: {
         cost = (int64_t(vg::len(nodes[ni].fold)) + 1LL);
@@ -1053,7 +1056,7 @@ int64_t atomCostNode(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, int32_t n
 
 int64_t bracketAtomCost(vg::Slice<bracketSet> brs, int32_t bi) {
     int64_t members = (int64_t(((vg::len(brs[bi].ranges) + vg::len(brs[bi].elems)) + vg::len(brs[bi].equivs))) + bracketFixedChecks);
-    int64_t cost = cMul((maxPreimages + 1LL), members);
+    int64_t cost = cMul(17LL, members);
     if ((!bracketHasMultiMembers(brs, bi))) {
         return cost;
     }
@@ -1063,15 +1066,15 @@ int64_t bracketAtomCost(vg::Slice<bracketSet> brs, int32_t bi) {
     }
     int64_t multi = elemChars;
     if ((vg::len(brs[bi].equivs) > 0LL)) {
-        int64_t candidates = int64_t(1LL);
+        int64_t candidates = 1LL;
         if (brs[bi].icase) {
             for (int64_t i_2 = 0LL; (i_2 < maxElemAhead); i_2 += 1LL) {
-                candidates *= (maxPreimages + 1LL);
+                candidates *= 17LL;
             }
         }
         multi = ([&]{ auto _t1 = multi; auto _t2 = ([&]{ auto _t3 = candidates; auto _t4 = cMul((int64_t(vg::len(brs[bi].equivs)) + 1LL), maxElemAhead); return cMul(_t3, _t4); }()); return cAdd(_t1, _t2); }());
     }
-    return ([&]{ auto _t5 = cost; auto _t6 = cMul((maxElemAhead - 1LL), multi); return cAdd(_t5, _t6); }());
+    return ([&]{ auto _t5 = cost; auto _t6 = cMul(7LL, multi); return cAdd(_t5, _t6); }());
 }
 
 int64_t solverSteps(vg::Slice<node> nodes, int32_t ni, int64_t length) {
@@ -1110,7 +1113,7 @@ int64_t repInstances(vg::Slice<node> nodes, int32_t ni, int64_t length) {
 int64_t solverDepth(vg::Slice<node> nodes, int32_t ni, int64_t length) {
     switch (nodes[ni].op) {
     case opGroup: case opAlt: case opConcat: {
-        int64_t deepest = int64_t(0LL);
+        int64_t deepest = 0LL;
         for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
             deepest = ([&]{ auto _t1 = deepest; auto _t2 = solverDepth(nodes, nodes[ni].ch[i], length); return std::max<int64_t>(_t1, _t2); }());
         }
@@ -1130,14 +1133,14 @@ int64_t solverDepth(vg::Slice<node> nodes, int32_t ni, int64_t length) {
 int64_t treeNodes(vg::Slice<node> nodes, int32_t ni, int64_t length) {
     switch (nodes[ni].op) {
     case opGroup: case opAlt: {
-        int64_t widest = int64_t(0LL);
+        int64_t widest = 0LL;
         for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
             widest = ([&]{ auto _t1 = widest; auto _t2 = treeNodes(nodes, nodes[ni].ch[i], length); return std::max<int64_t>(_t1, _t2); }());
         }
         return cAdd(widest, 1LL);
     } break;
     case opConcat: {
-        int64_t total = int64_t(1LL);
+        int64_t total = 1LL;
         for (int64_t i_2 = 0LL; (i_2 < vg::len(nodes[ni].ch)); i_2 += 1LL) {
             total = ([&]{ auto _t3 = total; auto _t4 = treeNodes(nodes, nodes[ni].ch[i_2], length); return cAdd(_t3, _t4); }());
         }
@@ -1152,7 +1155,7 @@ int64_t treeNodes(vg::Slice<node> nodes, int32_t ni, int64_t length) {
 }
 
 int64_t solverFanout(vg::Slice<node> nodes, int32_t ni, int64_t length) {
-    int64_t widest = int64_t(1LL);
+    int64_t widest = 1LL;
     switch (nodes[ni].op) {
     case opConcat: {
         widest = int64_t(vg::len(nodes[ni].ch));
@@ -1190,7 +1193,7 @@ int64_t workspaceHeapBound(int64_t n, int64_t k, int64_t ring) {
     int64_t heap = ([&]{ auto _t1 = ring; auto _t2 = cMul(n, (16LL + (4LL * k))); return cMul(_t1, _t2); }());
     heap = cAdd(heap, ((8LL * ((queueCompactFactor * n) + 2LL)) + n));
     heap = ([&]{ auto _t3 = heap; auto _t4 = (cMul(ring, 112LL) + 256LL); return cAdd(_t3, _t4); }());
-    return cAdd(heap, ((12LL * k) + (4LL * maxElemAhead)));
+    return cAdd(heap, ((12LL * k) + 32LL));
 }
 
 bool ctrLess(vg::Slice<uint32_t> a, vg::Slice<uint32_t> b) {
@@ -1238,9 +1241,9 @@ engineResult runPhaseA(vg::Arena& mem, Regexp& re, vg::Str subject, uint32_t efl
     e.eflags = eflags;
     e.k = re.minSlots;
     e.ring = 2LL;
-    e.nlMode = (uint32_t(re.flags & FlagNewline) != 0);
+    e.nlMode = (uint32_t(re.flags & FlagNewline) != 0U);
     if (re.prog.multi) {
-        e.ring = (maxElemAhead + 1LL);
+        e.ring = 9LL;
     }
     prepare(mem, ws, vg::len(re.prog.ins), e.k, e.ring);
     paRun(mem, e, ws, re);
@@ -1252,7 +1255,7 @@ engineResult runPhaseA(vg::Arena& mem, Regexp& re, vg::Str subject, uint32_t efl
 }
 
 uint32_t paGen(int64_t boundary) {
-    return uint32_t(uint32_t(boundary) + 1);
+    return uint32_t(uint32_t(boundary) + 1U);
 }
 
 void paConsider(phaseAState& e, engineWS& ws, int32_t start, vg::Slice<uint32_t> ctr, int64_t end) {
@@ -1491,14 +1494,14 @@ int64_t scanAhead(phaseAState& e, Regexp& re) {
 }
 
 bool bolAt(phaseAState& e, int32_t prev) {
-    return (((e.pos == 0LL) && (uint32_t(e.eflags & ExecNotBOL) == 0)) || (e.nlMode && (prev == 10)));
+    return (((e.pos == 0LL) && (uint32_t(e.eflags & ExecNotBOL) == 0U)) || (e.nlMode && (prev == 10)));
 }
 
 uint32_t continuationFlags(Regexp& re, vg::Str subject, int64_t pos, uint32_t eflags) {
     if ((pos == 0LL)) {
         return eflags;
     }
-    if (((uint32_t(re.flags & FlagNewline) != 0) && (subject[(pos - 1LL)] == 10))) {
+    if (((uint32_t(re.flags & FlagNewline) != 0U) && (subject[(pos - 1LL)] == 10))) {
         return uint32_t(eflags & ~(ExecNotBOL));
     }
     return uint32_t(eflags | ExecNotBOL);
@@ -1545,7 +1548,7 @@ void paRun(vg::Arena& mem, phaseAState& e, engineWS& ws, Regexp& re) {
             }
         }
         e.bol = bolAt(e, prev);
-        e.eol = ((atEnd && (uint32_t(e.eflags & ExecNotEOL) == 0)) || (e.nlMode && (e.cur == 10)));
+        e.eol = ((atEnd && (uint32_t(e.eflags & ExecNotEOL) == 0U)) || (e.nlMode && (e.cur == 10)));
         ws.queue = vg::append_slice(mem, ws.queue.head(0LL), ws.slots[si].active);
         if ((!e.matched)) {
             paRelax(mem, e, ws, si, re.prog.start, int32_t(e.pos), zeros);
@@ -1786,13 +1789,13 @@ bool localeLoad(Locale& l, vg::Str blob) {
 }
 
 bool localeValidate(Locale& l) {
-    if ((sectionLen(l, secCtypeStage1) < (2LL * ctypeStage1Entries))) {
+    if ((sectionLen(l, secCtypeStage1) < 8704LL)) {
         return false;
     }
     int64_t blocksLen = sectionLen(l, secCtypeBlocks);
     for (int64_t i = 0LL; (i < ctypeStage1Entries); i += 1LL) {
         int64_t block = int64_t(u16At(l, secCtypeStage1, i));
-        if ((((2LL * 256LL) * (block + 1LL)) > blocksLen)) {
+        if (((512LL * (block + 1LL)) > blocksLen)) {
             return false;
         }
     }
@@ -1893,7 +1896,7 @@ bool validScalar(int32_t r) {
 
 uint8_t asciiLower(uint8_t c) {
     if (((c >= 65) && (c <= 90))) {
-        return uint8_t(c + uint8_t(97 - 65));
+        return uint8_t(c + 32);
     }
     return c;
 }
@@ -2161,40 +2164,40 @@ uint16_t posixMask(int32_t r) {
     bool xdigit = ((digit || ((r >= 65) && (r <= 70))) || ((r >= 97) && (r <= 102)));
     uint16_t mask{};
     if (alnum) {
-        mask |= uint16_t(1 << classAlnum);
+        mask |= 1;
     }
     if (alpha) {
-        mask |= uint16_t(1 << classAlpha);
+        mask |= 2;
     }
     if (blank) {
-        mask |= uint16_t(1 << classBlank);
+        mask |= 4;
     }
     if (cntrl) {
-        mask |= uint16_t(1 << classCntrl);
+        mask |= 8;
     }
     if (digit) {
-        mask |= uint16_t(1 << classDigit);
+        mask |= 16;
     }
     if (graph) {
-        mask |= uint16_t(1 << classGraph);
+        mask |= 32;
     }
     if (lower) {
-        mask |= uint16_t(1 << classLower);
+        mask |= 64;
     }
     if (print) {
-        mask |= uint16_t(1 << classPrint);
+        mask |= 128;
     }
     if (punct) {
-        mask |= uint16_t(1 << classPunct);
+        mask |= 256;
     }
     if (space) {
-        mask |= uint16_t(1 << classSpace);
+        mask |= 512;
     }
     if (upper) {
-        mask |= uint16_t(1 << classUpper);
+        mask |= 1024;
     }
     if (xdigit) {
-        mask |= uint16_t(1 << classXdigit);
+        mask |= 2048;
     }
     return mask;
 }
@@ -2381,11 +2384,11 @@ int64_t compareSequence(Locale& l, vg::Slice<int32_t> seq, int64_t vego_index) {
 
 Tup_u32_bool elementID(Locale& l, vg::Slice<int32_t> seq) {
     if ((vg::len(seq) == 0LL)) {
-        return Tup_u32_bool{0, false};
+        return Tup_u32_bool{0U, false};
     }
     for (int64_t i = 0LL; (i < vg::len(seq)); i += 1LL) {
         if ((!validScalar(seq[i]))) {
-            return Tup_u32_bool{0, false};
+            return Tup_u32_bool{0U, false};
         }
     }
     if ((vg::len(seq) == 1LL)) {
@@ -2406,7 +2409,7 @@ Tup_u32_bool elementID(Locale& l, vg::Slice<int32_t> seq) {
             low = (middle + 1LL);
         }
     }
-    return Tup_u32_bool{0, false};
+    return Tup_u32_bool{0U, false};
 }
 
 bool u32Contains(Locale& l, int64_t sec, int64_t first, int64_t count, uint32_t needle) {
@@ -2459,10 +2462,10 @@ Tup_u32_bool collatingElementID(Locale& l, vg::Slice<int32_t> seq) {
     uint32_t element = _t1.r0;
     bool ok = _t1.r1;
     if ((!ok)) {
-        return Tup_u32_bool{0, false};
+        return Tup_u32_bool{0U, false};
     }
     if (((vg::len(seq) > 1LL) && (!isContraction(l, element)))) {
-        return Tup_u32_bool{0, false};
+        return Tup_u32_bool{0U, false};
     }
     return Tup_u32_bool{element, true};
 }
@@ -2507,7 +2510,7 @@ Tup_u32_bool findPair(Locale& l, int64_t sec, int64_t first, int64_t count, uint
             low = (middle + 1LL);
         }
     }
-    return Tup_u32_bool{0, false};
+    return Tup_u32_bool{0U, false};
 }
 
 uint64_t primaryToken(Locale& l, uint32_t element) {
@@ -2659,7 +2662,7 @@ bool charMatches(Regexp& re, int32_t ni, int32_t c) {
     if ((c < 0)) {
         return false;
     }
-    if ((uint32_t(re.flags & FlagICase) != 0)) {
+    if ((uint32_t(re.flags & FlagICase) != 0U)) {
         return runesContain(re.nodes[ni].fold, c);
     }
     return (c == re.nodes[ni].r);
@@ -2669,7 +2672,7 @@ bool anyMatches(Regexp& re, int32_t c) {
     if ((c <= 0)) {
         return false;
     }
-    if (((uint32_t(re.flags & FlagNewline) != 0) && (c == 10))) {
+    if (((uint32_t(re.flags & FlagNewline) != 0U) && (c == 10))) {
         return false;
     }
     return true;
@@ -2678,25 +2681,25 @@ bool anyMatches(Regexp& re, int32_t c) {
 bool atBOL(Regexp& re, decoded& d, int64_t i, uint32_t eflags) {
     if ((i == 0LL)) {
         if (d.atSubjectStart) {
-            return (uint32_t(eflags & ExecNotBOL) == 0);
+            return (uint32_t(eflags & ExecNotBOL) == 0U);
         }
-        return ((uint32_t(re.flags & FlagNewline) != 0) && d.prevIsNewline);
+        return ((uint32_t(re.flags & FlagNewline) != 0U) && d.prevIsNewline);
     }
-    return ((uint32_t(re.flags & FlagNewline) != 0) && (d.runes[(i - 1LL)] == 10));
+    return ((uint32_t(re.flags & FlagNewline) != 0U) && (d.runes[(i - 1LL)] == 10));
 }
 
 bool atEOL(Regexp& re, decoded& d, int64_t i, uint32_t eflags) {
     if ((i == vg::len(d.runes))) {
         if (d.atSubjectEnd) {
-            return (uint32_t(eflags & ExecNotEOL) == 0);
+            return (uint32_t(eflags & ExecNotEOL) == 0U);
         }
-        return ((uint32_t(re.flags & FlagNewline) != 0) && d.nextIsNewline);
+        return ((uint32_t(re.flags & FlagNewline) != 0U) && d.nextIsNewline);
     }
-    return ((uint32_t(re.flags & FlagNewline) != 0) && (d.runes[i] == 10));
+    return ((uint32_t(re.flags & FlagNewline) != 0U) && (d.runes[i] == 10));
 }
 
 void fillMatches(Regexp& re, decoded& d, vg::Slice<Match> caps, vg::Slice<Match> pmatch) {
-    if (((uint32_t(re.flags & FlagNoSub) != 0) || (vg::len(pmatch) == 0LL))) {
+    if (((uint32_t(re.flags & FlagNoSub) != 0U) || (vg::len(pmatch) == 0LL))) {
         return;
     }
     for (int64_t idx = 0LL; (idx < vg::len(pmatch)); idx += 1LL) {
@@ -3040,7 +3043,7 @@ void buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
 }
 
 int64_t instrEstimate(vg::Slice<node> nodes, int32_t ni) {
-    int64_t estimateCap = (int64_t(maxProgram) * 4LL);
+    int64_t estimateCap = 4194304LL;
     int64_t total = 0LL;
     switch (nodes[ni].op) {
     case opGroup: {
@@ -3106,11 +3109,11 @@ void compileProgram(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32
 
 uint32_t addInstr(vg::Arena& mem, progBuilder& b, instr ins) {
     if (b.tooBig) {
-        return 0;
+        return 0U;
     }
     if ((vg::len(b.prog.ins) >= maxProgram)) {
         b.tooBig = true;
-        return 0;
+        return 0U;
     }
     b.prog.ins = vg::append(mem, b.prog.ins, ins);
     return uint32_t((vg::len(b.prog.ins) - 1LL));
@@ -3186,16 +3189,16 @@ frag emit(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t ni, uin
         return consumeFrag(mem, b, iRune, uint32_t(nodes[ni].r), mask, extra);
     } break;
     case opAny: {
-        return consumeFrag(mem, b, iAny, 0, mask, extra);
+        return consumeFrag(mem, b, iAny, 0U, mask, extra);
     } break;
     case opBracket: {
         return consumeFrag(mem, b, iBracket, uint32_t(nodes[ni].br), mask, extra);
     } break;
     case opBOL: {
-        return consumeFrag(mem, b, iBOL, 0, 0ULL, vg::Slice<uint32_t>{});
+        return consumeFrag(mem, b, iBOL, 0U, 0ULL, vg::Slice<uint32_t>{});
     } break;
     case opEOL: {
-        return consumeFrag(mem, b, iEOL, 0, 0ULL, vg::Slice<uint32_t>{});
+        return consumeFrag(mem, b, iEOL, 0U, 0ULL, vg::Slice<uint32_t>{});
     } break;
     case opGroup: {
         return emit(mem, b, nodes, nodes[ni].ch[0LL], mask, extra);
@@ -3280,7 +3283,7 @@ frag emitRepeat(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t n
     if (nodes[ni].minimal) {
         int64_t slot = nodes[ni].vego_index;
         if ((slot < maskWidth)) {
-            mask_v |= (uint64_t(1ULL) << slot);
+            mask_v |= (1ULL << slot);
         } else {
             vg::Slice<uint32_t> grown = vg::make<uint32_t>(mem, (vg::len(extra_v) + 1LL));
             (void)(vg::vcopy(grown, extra_v));
@@ -3481,8 +3484,8 @@ Tup_t526567657870x_t4572726f72x Compile(vg::Arena& mem, vg::Str pattern, Locale 
     computeLengths(mem, re.nodes, re.loc, re.brackets, root);
     re.onePass = onePassAnalyze(mem, re.nodes, re.brackets, root);
     progBuilder b{};
-    b.icase = (uint32_t(flags & FlagICase) != 0);
-    compileProgram(mem, b, re.nodes, root, re.multi, (uint32_t(flags & FlagNewline) != 0));
+    b.icase = (uint32_t(flags & FlagICase) != 0U);
+    compileProgram(mem, b, re.nodes, root, re.multi, (uint32_t(flags & FlagNewline) != 0U));
     if ((b.errCode != ErrNone)) {
         return Tup_t526567657870x_t4572726f72x{re, compileError(b.errCode, int64_t(0ULL - uint64_t(1LL)))};
     }
@@ -3500,7 +3503,7 @@ int64_t NumSub(Regexp& re) {
 }
 
 bool trivialNullMatch(Regexp& re, vg::Slice<Match> pmatch) {
-    return (((re.nodes[re.root].minL == 0LL) && (!re.anchors)) && ((uint32_t(re.flags & FlagNoSub) != 0) || (vg::len(pmatch) == 0LL)));
+    return (((re.nodes[re.root].minL == 0LL) && (!re.anchors)) && ((uint32_t(re.flags & FlagNoSub) != 0U) || (vg::len(pmatch) == 0LL)));
 }
 
 Tup_bool_t4572726f72x Exec(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Slice<Match> pmatch, uint32_t eflags) {
@@ -3523,7 +3526,7 @@ Tup_bool_t4572726f72x Exec(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Slic
         if (trivialNullMatch(re, pmatch)) {
             return Tup_bool_t4572726f72x{true, noError()};
         }
-        if (((uint32_t(re.flags & FlagNoSub) != 0) || (vg::len(pmatch) == 0LL))) {
+        if (((uint32_t(re.flags & FlagNoSub) != 0U) || (vg::len(pmatch) == 0LL))) {
             engineResult probe = runPhaseA(mem, re, subject, eflags);
             if (probe.matched) {
                 return Tup_bool_t4572726f72x{true, noError()};
@@ -3535,7 +3538,7 @@ Tup_bool_t4572726f72x Exec(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Slic
     if ((!result.matched)) {
         return Tup_bool_t4572726f72x{false, noError()};
     }
-    if (((uint32_t(re.flags & FlagNoSub) != 0) || (vg::len(pmatch) == 0LL))) {
+    if (((uint32_t(re.flags & FlagNoSub) != 0U) || (vg::len(pmatch) == 0LL))) {
         return Tup_bool_t4572726f72x{true, noError()};
     }
     setMatch(pmatch, 0LL, result.so, result.eo);
@@ -3559,7 +3562,7 @@ Tup_t4d6174636849746572x_t4572726f72x MatchIterInit(Regexp& re, int64_t limit) {
     MatchIter it{};
     it.lastEnd = int64_t(0ULL - uint64_t(1LL));
     it.limit = limit;
-    if ((uint32_t(re.flags & FlagNoSub) != 0)) {
+    if ((uint32_t(re.flags & FlagNoSub) != 0U)) {
         it.done = true;
         return Tup_t4d6174636849746572x_t4572726f72x{it, compileError(ErrENoSub, int64_t(0ULL - uint64_t(1LL)))};
     }
@@ -3674,7 +3677,7 @@ Tup_st7265706c50617274x_t4572726f72x parseReplacement(vg::Arena& mem, vg::Str re
 }
 
 Tup_Str_t4572726f72x ReplaceAll(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Str replacement, int64_t limit, uint32_t eflags) {
-    if ((uint32_t(re.flags & FlagNoSub) != 0)) {
+    if ((uint32_t(re.flags & FlagNoSub) != 0U)) {
         return Tup_Str_t4572726f72x{vg::lit(""), compileError(ErrENoSub, int64_t(0ULL - uint64_t(1LL)))};
     }
     auto _t1 = parseReplacement(mem, replacement, re.nsub);
@@ -3912,7 +3915,7 @@ int32_t parseExpr(vg::Arena& mem, parser& p, Locale& loc) {
 int32_t charNode(vg::Arena& mem, parser& p, Locale& loc, int32_t r) {
     int32_t n = addNode(mem, p, opChar);
     p.nodes[n].r = r;
-    if ((uint32_t(p.flags & FlagICase) != 0)) {
+    if ((uint32_t(p.flags & FlagICase) != 0U)) {
         vg::Slice<int32_t> fold = vg::make_cap<int32_t>(mem, 0LL, 3LL);
         fold = appendUnique(mem, fold, r);
         fold = ([&]{ auto _t1 = fold; auto _t2 = localeToUpper(loc, r); return appendUnique(mem, _t1, _t2); }());
@@ -3965,7 +3968,7 @@ int32_t parseDup(vg::Arena& mem, parser& p, int32_t operand) {
         return operand;
     } break;
     }
-    bool minimal = (uint32_t(p.flags & FlagMinimal) != 0);
+    bool minimal = (uint32_t(p.flags & FlagMinimal) != 0U);
     if ((peekByte(p) == 63)) {
         p.pos += 1LL;
         minimal = (!minimal);

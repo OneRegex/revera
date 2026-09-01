@@ -32,7 +32,7 @@ pub fn bump(mem: &vg::Arena, c: &mut Counter, tag: i32) -> i64 {
 }
 
 pub fn logCode(c: &mut Counter) -> i64 {
-    let mut v: i64 = ((0i64) as i64);
+    let mut v: i64 = 0i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < c.log.len) {
@@ -58,7 +58,7 @@ pub fn BytesProbe(mem: &vg::Arena, s: vg::Str) -> i64 {
     if (b.len > 0i64) {
         unsafe { (*b.ptr(0i64)) = 88u8; }
     }
-    let mut t: i64 = ((0i64) as i64);
+    let mut t: i64 = 0i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < b.len) {
@@ -87,7 +87,7 @@ pub fn sliceFrom(mem: &vg::Arena, c: &mut Counter, n: i64) -> vg::Slice<i32> {
 }
 
 pub fn RangeProbe(mem: &vg::Arena, c: &mut Counter) -> i64 {
-    let mut t: i64 = ((0i64) as i64);
+    let mut t: i64 = 0i64;
     {
         let _t1 = { let _t4 = 4i64; sliceFrom(mem, c, _t4) };
         let mut _t2: i64 = 0;
@@ -105,7 +105,7 @@ pub fn RangeProbe(mem: &vg::Arena, c: &mut Counter) -> i64 {
 }
 
 pub fn RangeValProbe(xs: vg::Slice<i32>) -> i64 {
-    let mut t: i64 = ((0i64) as i64);
+    let mut t: i64 = 0i64;
     {
         let _t1 = xs;
         let mut _t2: i64 = 0;
@@ -131,7 +131,7 @@ pub fn RangeValProbe(xs: vg::Slice<i32>) -> i64 {
 }
 
 pub fn RangeIntProbe(n: i64) -> i64 {
-    let mut t: i64 = ((0i64) as i64);
+    let mut t: i64 = 0i64;
     {
         let _t1 = n;
         let mut _t2: i64 = 0;
@@ -149,7 +149,7 @@ pub fn RangeIntProbe(n: i64) -> i64 {
 pub fn PartialArray() -> i64 {
     let a: [i64; (5) as usize] = [7i64, 9i64, vg::zero::<i64>(), vg::zero::<i64>(), vg::zero::<i64>()];
     let names: [vg::Str; (3) as usize] = [vg::lit(b"a"), vg::zero::<vg::Str>(), vg::zero::<vg::Str>()];
-    let mut t: i64 = ((0i64) as i64);
+    let mut t: i64 = 0i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < 5i64) {
@@ -189,7 +189,7 @@ pub fn SpareProbe(mem: &vg::Arena) -> i64 {
     let mut s: vg::Slice<i64> = vg::make_cap::<i64>(mem, 0i64, 4i64);
     s = vg::append(mem, s, 5i64);
     s = s.head(4i64);
-    let mut t: i64 = ((0i64) as i64);
+    let mut t: i64 = 0i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < s.len) {
@@ -220,7 +220,7 @@ pub fn SpareProbe(mem: &vg::Arena) -> i64 {
 
 pub fn NilProbe(mem: &vg::Arena) -> i64 {
     let mut s: vg::Slice<i32> = vg::zero();
-    let mut t: i64 = ((0i64) as i64);
+    let mut t: i64 = 0i64;
     if (s.p.is_null()) {
         t += 1i64;
     }
@@ -265,7 +265,7 @@ pub fn SubWrite(mem: &vg::Arena, n: i64) -> i64 {
     let s: vg::Slice<i64> = vg::make::<i64>(mem, n);
     unsafe { (*s.tail(1i64).ptr(0i64)) = 7i64; }
     unsafe { (*s.tail(1i64).tail(1i64).ptr(0i64)) = 9i64; }
-    let mut t: i64 = ((0i64) as i64);
+    let mut t: i64 = 0i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < s.len) {
@@ -287,7 +287,7 @@ pub fn AndNotOrder(mem: &vg::Arena, c: &mut Counter) -> i64 {
 
 pub fn ZeroArray() -> i64 {
     let mut a: [i32; (0) as usize] = vg::zero();
-    let mut t: i64 = ((0i64) as i64);
+    let mut t: i64 = 0i64;
     if (!vg::arr_slice(&raw mut a, 0i64, ((0) as i64)).p.is_null()) {
         t += 1i64;
     }

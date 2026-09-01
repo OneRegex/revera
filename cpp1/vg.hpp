@@ -33,11 +33,13 @@ class Arena {
     void* alloc(size_t n) {
         alloc_count_++;
         alloc_bytes_ += n;
+        // The slot comes first, so a failed growth leaks no block.
+        blocks_.push_back(nullptr);
         void* p = std::malloc(n ? n : 1);
         if (p == nullptr) {
             std::abort();
         }
-        blocks_.push_back(p);
+        blocks_.back() = p;
         return p;
     }
 
@@ -256,6 +258,7 @@ inline int64_t vcopy_str(Slice<uint8_t> dst, Str src) {
 // C++ leaves that pair undefined even with -fwrapv.
 template <typename T>
 T sdiv(T a, T b) {
+    assert(b != 0);
     if (b == T(-1)) {
         return T(0U - typename std::make_unsigned<T>::type(a));
     }
@@ -264,6 +267,7 @@ T sdiv(T a, T b) {
 
 template <typename T>
 T srem(T a, T b) {
+    assert(b != 0);
     if (b == T(-1)) {
         return 0;
     }

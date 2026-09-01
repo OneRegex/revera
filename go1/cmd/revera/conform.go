@@ -11,7 +11,7 @@ import (
 )
 
 var conformUsage = `usage:
-  revera conform [-repo path] [-backend dir]... [-stress rounds] [-seed n] [-quick] [-skip steps] [-lean] [-allow-skip]
+  revera conform [-repo path] [-backend dir]... [-stress rounds] [-seed n] [-quick] [-skip steps] [-lean] [-allow-skip] [-timeout d]
 
 Runs the backend conformance kit.
 Without -backend, every directory with a backend.json below the repository root is checked.
@@ -30,6 +30,7 @@ func runConform(args []string, cwd string, stdout, stderr io.Writer) int {
 	quick := flags.Bool("quick", false, "shrink every random corpus block by ten")
 	lean := flags.Bool("lean", false, "also run the Lean build and the corpus replay")
 	allowSkip := flags.Bool("allow-skip", false, "exit 0 when steps were skipped but none failed")
+	timeout := flags.Duration("timeout", conformance.ProtocolTimeout, "time limit of one driver, probe, or fuzzcase run")
 	flags.StringVar(&repoValue, "repo", "", "repository root (default: discover from the working directory)")
 	flags.Var(&backendValues, "backend", "backend directory or manifest; repeatable")
 	flags.StringVar(&skipValue, "skip", "", "comma-separated steps to leave out")
@@ -47,6 +48,11 @@ func runConform(args []string, cwd string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "-stress and -seed must not be negative")
 		return 2
 	}
+	if *timeout <= 0 {
+		fmt.Fprintln(stderr, "-timeout must be positive")
+		return 2
+	}
+	conformance.ProtocolTimeout = *timeout
 	repo, err := conformance.ResolveRepositoryRoot(repoValue, cwd)
 	if err != nil {
 		fmt.Fprintln(stderr, err)

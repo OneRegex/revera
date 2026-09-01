@@ -616,9 +616,9 @@ func (g *gen) expr(e *vegoc.Expr) string {
 	case "unary":
 		switch e.Op {
 		case "-":
-			return "(-%" + g.expr(e.X) + ")"
+			return "(-%" + g.wide(e.X) + ")"
 		case "^":
-			return "(~" + g.expr(e.X) + ")"
+			return "(~" + g.wide(e.X) + ")"
 		case "!":
 			return "(!" + g.expr(e.X) + ")"
 		case "&":
@@ -662,6 +662,18 @@ func (g *gen) builtin(e *vegoc.Expr) string {
 			return fmt.Sprintf("try vg.appendSlice(mem, %s, %s, %s)", elem, g.expr(e.Args[0]), g.expr(e.Args[1]))
 		}
 		out := g.expr(e.Args[0])
+		if vegoc.AppendNeedsPin(e) {
+			// Every element evaluates before the first append writes, as in Go.
+			// The labeled block keeps the form an expression.
+			label := g.newTmp()
+			var pre []string
+			for _, a := range e.Args[1:] {
+				tmp := g.newTmp()
+				pre = append(pre, fmt.Sprintf("const %s = %s;", tmp, g.expr(a)))
+				out = fmt.Sprintf("try vg.append(mem, %s, %s, %s)", elem, out, tmp)
+			}
+			return fmt.Sprintf("%s: { %s break :%s %s; }", label, strings.Join(pre, " "), label, out)
+		}
 		for _, a := range e.Args[1:] {
 			out = fmt.Sprintf("try vg.append(mem, %s, %s, %s)", elem, out, g.expr(a))
 		}
@@ -671,10 +683,8 @@ func (g *gen) builtin(e *vegoc.Expr) string {
 			return fmt.Sprintf("vg.copyStr(%s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
 		}
 		return fmt.Sprintf("vg.copy(%s, %s, %s)", g.typ(e.Args[0].Typ.Elem), g.expr(e.Args[0]), g.expr(e.Args[1]))
-	case "min":
-		return fmt.Sprintf("@min(%s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
-	case "max":
-		return fmt.Sprintf("@max(%s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
+	case "min", "max":
+		return fmt.Sprintf("@%s(%s, %s)", e.Name, g.expr(e.Args[0]), g.expr(e.Args[1]))
 	}
 	fatal("unknown builtin", e.Name)
 	return ""
@@ -682,6 +692,17 @@ func (g *gen) builtin(e *vegoc.Expr) string {
 
 func isNil(e *vegoc.Expr) bool {
 	return e.K == "ident" && e.Name == "nil"
+}
+
+// wide renders an arithmetic operand at its Go type.
+// Zig narrows a @min or @max with a comptime-known operand, and a wrapping operator or a division helper would keep that narrow type.
+// Every other position coerces the value back on its own.
+func (g *gen) wide(e *vegoc.Expr) string {
+	if e.K == "builtin" && (e.Name == "min" || e.Name == "max") &&
+		(e.Args[0].IsConst || e.Args[1].IsConst) {
+		return fmt.Sprintf("@as(%s, %s)", g.typ(e.Typ), g.expr(e))
+	}
+	return g.expr(e)
 }
 
 func (g *gen) binary(e *vegoc.Expr) string {
@@ -714,7 +735,7 @@ func (g *gen) binary(e *vegoc.Expr) string {
 			return fmt.Sprintf("(!vg.structEq(%s, %s))", x, y)
 		}
 	}
-	x, y := g.expr(e.X), g.expr(e.Y)
+	x, y := g.wide(e.X), g.wide(e.Y)
 	// A constant left operand would reach a division helper as comptime_int.
 	// It could also make the @intCast of a shift lose its result type.
 	// The operand therefore takes its concrete type here.

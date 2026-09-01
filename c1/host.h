@@ -12,6 +12,36 @@
 
 #include "engine.h"
 
+// read_line reads one line of any length into *buf, growing it as needed.
+// It returns the length without the newline, or -1 at the end of the input.
+static inline long read_line(char **buf, size_t *cap) {
+    size_t len = 0;
+    for (;;) {
+        int c = getc(stdin);
+        if (c == EOF) {
+            if (len == 0) {
+                return -1;
+            }
+            break;
+        }
+        if (len + 2 > *cap) {
+            size_t next = *cap < 4096 ? 4096 : *cap * 2;
+            char *grown = (char *)realloc(*buf, next);
+            if (grown == NULL) {
+                abort();
+            }
+            *buf = grown;
+            *cap = next;
+        }
+        if (c == '\n') {
+            break;
+        }
+        (*buf)[len++] = (char)c;
+    }
+    (*buf)[len] = 0;
+    return (long)len;
+}
+
 static const char data_bin[] = {
 #embed "data.bin"
 };

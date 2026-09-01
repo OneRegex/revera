@@ -12,7 +12,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include <vector>
 
 #include "host.hpp"
 
@@ -38,8 +37,8 @@ int main() {
     Regexp cur_re;
     bool re_valid = false;
 
-    std::vector<char> line(1 << 20);
-    while (std::fgets(line.data(), int(line.size()), stdin) != nullptr) {
+    std::string line;
+    while (read_line(line)) {
         char* cursor = line.data();
         char* cmd = tok_next(&cursor);
         if (cmd == nullptr) {

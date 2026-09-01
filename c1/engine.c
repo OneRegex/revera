@@ -8,8 +8,8 @@ int32_t revera_eng_parseBracket(vg_arena *mem, revera_eng_parser *p, revera_eng_
     int64_t start = p->pos;
     p->pos += 1LL;
     revera_eng_bracketSet b = {0};
-    b.icase = (((uint32_t)(p->flags & revera_eng_FlagICase)) != 0);
-    b.nlMode = (((uint32_t)(p->flags & revera_eng_FlagNewline)) != 0);
+    b.icase = (((uint32_t)(p->flags & revera_eng_FlagICase)) != 0U);
+    b.nlMode = (((uint32_t)(p->flags & revera_eng_FlagNewline)) != 0U);
     if ((revera_eng_peekByte(p) == 94)) {
         b.negated = true;
         p->pos += 1LL;
@@ -653,6 +653,9 @@ int64_t revera_eng_structCmp(revera_eng_capSolver *s, revera_eng_Regexp *re, int
 }
 
 int64_t revera_eng_cmpCand(revera_eng_capSolver *s, revera_eng_Regexp *re, int32_t a, int32_t b) {
+    if (s->failed) {
+        return 1LL;
+    }
     if ((re->minSlots > 0LL)) {
         {
             int64_t idx = 0LL;
@@ -693,7 +696,7 @@ int32_t revera_eng_bestParse(vg_arena *mem, revera_eng_capSolver *s, revera_eng_
     if ((!(revera_eng_capStep(s)))) {
         return ((int32_t)(0ULL - (uint64_t)(1)));
     }
-    int32_t best = ((int32_t)(((int32_t)(0ULL - (uint64_t)(1)))));
+    int32_t best = ((int32_t)(0ULL - (uint64_t)(1)));
     switch ((*revera_eng_slice_node_at(re->nodes, ni)).op) {
     case revera_eng_opChar: {
         if (((j == (i + 1LL)) && revera_eng_charMatches(re, ni, (*revera_eng_slice_i32_at(d->runes, i))))) {
@@ -753,7 +756,7 @@ int32_t revera_eng_bestParse(vg_arena *mem, revera_eng_capSolver *s, revera_eng_
     } break;
     case revera_eng_opRepeat: {
         if (((i == j) && ((*revera_eng_slice_node_at(re->nodes, ni)).min == 0LL))) {
-            int32_t sub_3 = ((int32_t)(((int32_t)(0ULL - (uint64_t)(1)))));
+            int32_t sub_3 = ((int32_t)(0ULL - (uint64_t)(1)));
             if (((*revera_eng_slice_node_at(re->nodes, ni)).max != 0LL)) {
                 sub_3 = revera_eng_bestParse(mem, s, re, d, (*revera_eng_slice_i32_at((*revera_eng_slice_node_at(re->nodes, ni)).ch, 0LL)), i, i);
             }
@@ -802,7 +805,7 @@ revera_eng_Tup_i64_i64 revera_eng_bestConcat(vg_arena *mem, revera_eng_capSolver
     }
     int64_t bestOff = ((int64_t)(0ULL - (uint64_t)(1LL)));
     int64_t bestLen = 0LL;
-    int32_t bestTree = ((int32_t)(((int32_t)(0ULL - (uint64_t)(1)))));
+    int32_t bestTree = ((int32_t)(0ULL - (uint64_t)(1)));
     int32_t head0 = (*revera_eng_slice_i32_at((*revera_eng_slice_node_at(re->nodes, ni)).ch, idx));
     int64_t lo = (i + (*revera_eng_slice_node_at(re->nodes, head0)).minL);
     if (((*revera_eng_slice_i64_at((*revera_eng_slice_node_at(re->nodes, ni)).sufMax, (idx + 1LL))) < revera_eng_lenInf)) {
@@ -1019,7 +1022,7 @@ int64_t revera_eng_cMul(int64_t a, int64_t b) {
 }
 
 int64_t revera_eng_ContractHeapBytes(revera_eng_Contract *c) {
-    int64_t capture = ((int64_t)(0LL));
+    int64_t capture = 0LL;
     if (c->HasOnePass) {
         capture = c->OnePass.HeapBytes;
     }
@@ -1057,7 +1060,7 @@ revera_eng_Contract revera_eng_ContractFor(revera_eng_Regexp *re, int64_t maxInp
     revera_eng_Contract c = {0};
     c.MaxInput = ((int64_t)(length));
     c.Matcher = revera_eng_matcherContract(re, length, atom);
-    if ((re->progOK && (((uint32_t)(re->flags & revera_eng_FlagNoSub)) == 0))) {
+    if ((re->progOK && (((uint32_t)(re->flags & revera_eng_FlagNoSub)) == 0U))) {
         if (re->onePass) {
             c.OnePass = revera_eng_onePassContract(re, length, atom);
             c.HasOnePass = true;
@@ -1077,9 +1080,9 @@ revera_eng_BackendContract revera_eng_matcherContract(revera_eng_Regexp *re, int
     }
     int64_t n = ((int64_t)((re->prog.ins).len));
     int64_t k = ((int64_t)(re->minSlots));
-    int64_t ring = ((int64_t)(2LL));
+    int64_t ring = 2LL;
     if (re->prog.multi) {
-        ring = (revera_eng_maxElemAhead + 1LL);
+        ring = 9LL;
     }
     int64_t heap = revera_eng_workspaceHeapBound(n, k, ring);
     int64_t payloads = (n + 1LL);
@@ -1099,7 +1102,7 @@ revera_eng_BackendContract revera_eng_matcherContract(revera_eng_Regexp *re, int
     int64_t _t9 = revera_eng_cAdd(length, 2LL);
     int64_t _t10 = perBoundary;
     int64_t steps = revera_eng_cMul(_t9, _t10);
-    int64_t stack = (((int64_t)(revera_eng_matcherStackBytes)) + (revera_eng_equivFrames * revera_eng_frameBytes));
+    int64_t stack = 4608LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1143,7 +1146,7 @@ revera_eng_BackendContract revera_eng_solverContract(revera_eng_Regexp *re, int6
     int64_t _t7 = revera_eng_cMul(structural, perStep);
     int64_t _t8 = revera_eng_cMul(tree, (((int64_t)(re->nsub)) + 2LL));
     int64_t steps = revera_eng_cAdd(_t7, _t8);
-    int64_t perAlloc = revera_eng_cAdd(((2LL * revera_eng_ptreeBytes) + revera_eng_mapEntryBytes), revera_eng_cMul(revera_eng_kidBytes, revera_eng_cAdd(revera_eng_solverFanout(re->nodes, re->root, length), 1LL)));
+    int64_t perAlloc = revera_eng_cAdd(224LL, revera_eng_cMul(revera_eng_kidBytes, revera_eng_cAdd(revera_eng_solverFanout(re->nodes, re->root, length), 1LL)));
     int64_t _t9 = revera_eng_cMul(structural, perAlloc);
     int64_t _t10 = revera_eng_cMul(16LL, ((int64_t)(re->minSlots)));
     int64_t heap = revera_eng_cAdd(_t9, _t10);
@@ -1151,7 +1154,7 @@ revera_eng_BackendContract revera_eng_solverContract(revera_eng_Regexp *re, int6
     int64_t _t11 = heap;
     int64_t _t12 = revera_eng_captureHeap(re, length);
     heap = revera_eng_cAdd(_t11, _t12);
-    int64_t stack = revera_eng_cMul(revera_eng_cAdd(depth, (revera_eng_equivFrames + 4LL)), revera_eng_frameBytes);
+    int64_t stack = revera_eng_cMul(revera_eng_cAdd(depth, 14LL), revera_eng_frameBytes);
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1159,7 +1162,7 @@ revera_eng_BackendContract revera_eng_solverContract(revera_eng_Regexp *re, int6
 }
 
 int64_t revera_eng_astSize(revera_eng_slice_node nodes, int32_t ni) {
-    int64_t total = ((int64_t)(1LL));
+    int64_t total = 1LL;
     {
         int64_t i = 0LL;
         for (; (i < ((*revera_eng_slice_node_at(nodes, ni)).ch).len); i += 1LL) {
@@ -1172,7 +1175,7 @@ int64_t revera_eng_astSize(revera_eng_slice_node nodes, int32_t ni) {
 }
 
 int64_t revera_eng_astHeight(revera_eng_slice_node nodes, int32_t ni) {
-    int64_t deepest = ((int64_t)(0LL));
+    int64_t deepest = 0LL;
     {
         int64_t i = 0LL;
         for (; (i < ((*revera_eng_slice_node_at(nodes, ni)).ch).len); i += 1LL) {
@@ -1189,7 +1192,7 @@ int64_t revera_eng_atomCost(revera_eng_Regexp *re) {
 }
 
 int64_t revera_eng_atomCostNode(revera_eng_slice_node nodes, revera_eng_slice_bracketSet brs, int32_t ni) {
-    int64_t cost = ((int64_t)(1LL));
+    int64_t cost = 1LL;
     switch ((*revera_eng_slice_node_at(nodes, ni)).op) {
     case revera_eng_opChar: {
         cost = (((int64_t)(((*revera_eng_slice_node_at(nodes, ni)).fold).len)) + 1LL);
@@ -1212,7 +1215,7 @@ int64_t revera_eng_atomCostNode(revera_eng_slice_node nodes, revera_eng_slice_br
 
 int64_t revera_eng_bracketAtomCost(revera_eng_slice_bracketSet brs, int32_t bi) {
     int64_t members = (((int64_t)(((((*revera_eng_slice_bracketSet_at(brs, bi)).ranges).len + ((*revera_eng_slice_bracketSet_at(brs, bi)).elems).len) + ((*revera_eng_slice_bracketSet_at(brs, bi)).equivs).len))) + revera_eng_bracketFixedChecks);
-    int64_t cost = revera_eng_cMul((revera_eng_maxPreimages + 1LL), members);
+    int64_t cost = revera_eng_cMul(17LL, members);
     if ((!(revera_eng_bracketHasMultiMembers(brs, bi)))) {
         return cost;
     }
@@ -1225,12 +1228,12 @@ int64_t revera_eng_bracketAtomCost(revera_eng_slice_bracketSet brs, int32_t bi) 
     }
     int64_t multi = elemChars;
     if ((((*revera_eng_slice_bracketSet_at(brs, bi)).equivs).len > 0LL)) {
-        int64_t candidates = ((int64_t)(1LL));
+        int64_t candidates = 1LL;
         if ((*revera_eng_slice_bracketSet_at(brs, bi)).icase) {
             {
                 int64_t i_2 = 0LL;
                 for (; (i_2 < revera_eng_maxElemAhead); i_2 += 1LL) {
-                    candidates *= (revera_eng_maxPreimages + 1LL);
+                    candidates *= 17LL;
                 }
             }
         }
@@ -1241,7 +1244,7 @@ int64_t revera_eng_bracketAtomCost(revera_eng_slice_bracketSet brs, int32_t bi) 
         multi = revera_eng_cAdd(_t1, _t4);
     }
     int64_t _t5 = cost;
-    int64_t _t6 = revera_eng_cMul((revera_eng_maxElemAhead - 1LL), multi);
+    int64_t _t6 = revera_eng_cMul(7LL, multi);
     return revera_eng_cAdd(_t5, _t6);
 }
 
@@ -1302,7 +1305,7 @@ int64_t revera_eng_repInstances(revera_eng_slice_node nodes, int32_t ni, int64_t
 int64_t revera_eng_solverDepth(revera_eng_slice_node nodes, int32_t ni, int64_t length) {
     switch ((*revera_eng_slice_node_at(nodes, ni)).op) {
     case revera_eng_opGroup: case revera_eng_opAlt: case revera_eng_opConcat: {
-        int64_t deepest = ((int64_t)(0LL));
+        int64_t deepest = 0LL;
         {
             int64_t i = 0LL;
             for (; (i < ((*revera_eng_slice_node_at(nodes, ni)).ch).len); i += 1LL) {
@@ -1329,7 +1332,7 @@ int64_t revera_eng_solverDepth(revera_eng_slice_node nodes, int32_t ni, int64_t 
 int64_t revera_eng_treeNodes(revera_eng_slice_node nodes, int32_t ni, int64_t length) {
     switch ((*revera_eng_slice_node_at(nodes, ni)).op) {
     case revera_eng_opGroup: case revera_eng_opAlt: {
-        int64_t widest = ((int64_t)(0LL));
+        int64_t widest = 0LL;
         {
             int64_t i = 0LL;
             for (; (i < ((*revera_eng_slice_node_at(nodes, ni)).ch).len); i += 1LL) {
@@ -1341,7 +1344,7 @@ int64_t revera_eng_treeNodes(revera_eng_slice_node nodes, int32_t ni, int64_t le
         return revera_eng_cAdd(widest, 1LL);
     } break;
     case revera_eng_opConcat: {
-        int64_t total = ((int64_t)(1LL));
+        int64_t total = 1LL;
         {
             int64_t i_2 = 0LL;
             for (; (i_2 < ((*revera_eng_slice_node_at(nodes, ni)).ch).len); i_2 += 1LL) {
@@ -1363,7 +1366,7 @@ int64_t revera_eng_treeNodes(revera_eng_slice_node nodes, int32_t ni, int64_t le
 }
 
 int64_t revera_eng_solverFanout(revera_eng_slice_node nodes, int32_t ni, int64_t length) {
-    int64_t widest = ((int64_t)(1LL));
+    int64_t widest = 1LL;
     switch ((*revera_eng_slice_node_at(nodes, ni)).op) {
     case revera_eng_opConcat: {
         widest = ((int64_t)(((*revera_eng_slice_node_at(nodes, ni)).ch).len));
@@ -1413,7 +1416,7 @@ int64_t revera_eng_workspaceHeapBound(int64_t n, int64_t k, int64_t ring) {
     int64_t _t3 = heap;
     int64_t _t4 = (revera_eng_cMul(ring, 112LL) + 256LL);
     heap = revera_eng_cAdd(_t3, _t4);
-    return revera_eng_cAdd(heap, ((12LL * k) + (4LL * revera_eng_maxElemAhead)));
+    return revera_eng_cAdd(heap, ((12LL * k) + 32LL));
 }
 
 bool revera_eng_ctrLess(revera_eng_slice_u32 a, revera_eng_slice_u32 b) {
@@ -1464,9 +1467,9 @@ revera_eng_engineResult revera_eng_runPhaseA(vg_arena *mem, revera_eng_Regexp *r
     e.eflags = eflags;
     e.k = re->minSlots;
     e.ring = 2LL;
-    e.nlMode = (((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0);
+    e.nlMode = (((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0U);
     if (re->prog.multi) {
-        e.ring = (revera_eng_maxElemAhead + 1LL);
+        e.ring = 9LL;
     }
     revera_eng_prepare(mem, &(ws), (re->prog.ins).len, e.k, e.ring);
     revera_eng_paRun(mem, &(e), &(ws), re);
@@ -1478,7 +1481,7 @@ revera_eng_engineResult revera_eng_runPhaseA(vg_arena *mem, revera_eng_Regexp *r
 }
 
 uint32_t revera_eng_paGen(int64_t boundary) {
-    return ((uint32_t)(((uint32_t)(boundary)) + 1));
+    return ((uint32_t)(((uint32_t)(boundary)) + 1U));
 }
 
 void revera_eng_paConsider(revera_eng_phaseAState *e, revera_eng_engineWS *ws, int32_t start, revera_eng_slice_u32 ctr, int64_t end) {
@@ -1741,14 +1744,14 @@ int64_t revera_eng_scanAhead(revera_eng_phaseAState *e, revera_eng_Regexp *re) {
 }
 
 bool revera_eng_bolAt(revera_eng_phaseAState *e, int32_t prev) {
-    return (((e->pos == 0LL) && (((uint32_t)(e->eflags & revera_eng_ExecNotBOL)) == 0)) || (e->nlMode && (prev == 10)));
+    return (((e->pos == 0LL) && (((uint32_t)(e->eflags & revera_eng_ExecNotBOL)) == 0U)) || (e->nlMode && (prev == 10)));
 }
 
 uint32_t revera_eng_continuationFlags(revera_eng_Regexp *re, vg_str subject, int64_t pos, uint32_t eflags) {
     if ((pos == 0LL)) {
         return eflags;
     }
-    if (((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0) && (vg_str_at(subject, (pos - 1LL)) == 10))) {
+    if (((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0U) && (vg_str_at(subject, (pos - 1LL)) == 10))) {
         return ((uint32_t)(eflags & ~(revera_eng_ExecNotBOL)));
     }
     return ((uint32_t)(eflags | revera_eng_ExecNotBOL));
@@ -1796,7 +1799,7 @@ void revera_eng_paRun(vg_arena *mem, revera_eng_phaseAState *e, revera_eng_engin
             e->size = _t1.r1;
         }
         e->bol = revera_eng_bolAt(e, prev);
-        e->eol = ((atEnd && (((uint32_t)(e->eflags & revera_eng_ExecNotEOL)) == 0)) || (e->nlMode && (e->cur == 10)));
+        e->eol = ((atEnd && (((uint32_t)(e->eflags & revera_eng_ExecNotEOL)) == 0U)) || (e->nlMode && (e->cur == 10)));
         ws->queue = revera_eng_slice_u32_append_slice(mem, revera_eng_slice_u32_head(ws->queue, 0LL), (*revera_eng_slice_slotTable_at(ws->slots, si)).active);
         if ((!(e->matched))) {
             revera_eng_paRelax(mem, e, ws, si, re->prog.start, ((int32_t)(e->pos)), zeros);
@@ -2052,7 +2055,7 @@ bool revera_eng_localeLoad(revera_eng_Locale *l, vg_str blob) {
 }
 
 bool revera_eng_localeValidate(revera_eng_Locale *l) {
-    if ((revera_eng_sectionLen(l, revera_eng_secCtypeStage1) < (2LL * revera_eng_ctypeStage1Entries))) {
+    if ((revera_eng_sectionLen(l, revera_eng_secCtypeStage1) < 8704LL)) {
         return false;
     }
     int64_t blocksLen = revera_eng_sectionLen(l, revera_eng_secCtypeBlocks);
@@ -2060,7 +2063,7 @@ bool revera_eng_localeValidate(revera_eng_Locale *l) {
         int64_t i = 0LL;
         for (; (i < revera_eng_ctypeStage1Entries); i += 1LL) {
             int64_t block = ((int64_t)(revera_eng_u16At(l, revera_eng_secCtypeStage1, i)));
-            if ((((2LL * 256LL) * (block + 1LL)) > blocksLen)) {
+            if (((512LL * (block + 1LL)) > blocksLen)) {
                 return false;
             }
         }
@@ -2191,7 +2194,7 @@ bool revera_eng_validScalar(int32_t r) {
 
 uint8_t revera_eng_asciiLower(uint8_t c) {
     if (((c >= 65) && (c <= 90))) {
-        return ((uint8_t)(c + ((uint8_t)(97 - 65))));
+        return ((uint8_t)(c + 32));
     }
     return c;
 }
@@ -2476,40 +2479,40 @@ uint16_t revera_eng_posixMask(int32_t r) {
     bool xdigit = ((digit || ((r >= 65) && (r <= 70))) || ((r >= 97) && (r <= 102)));
     uint16_t mask = {0};
     if (alnum) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classAlnum));
+        mask |= 1;
     }
     if (alpha) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classAlpha));
+        mask |= 2;
     }
     if (blank) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classBlank));
+        mask |= 4;
     }
     if (cntrl) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classCntrl));
+        mask |= 8;
     }
     if (digit) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classDigit));
+        mask |= 16;
     }
     if (graph) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classGraph));
+        mask |= 32;
     }
     if (lower) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classLower));
+        mask |= 64;
     }
     if (print) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classPrint));
+        mask |= 128;
     }
     if (punct) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classPunct));
+        mask |= 256;
     }
     if (space) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classSpace));
+        mask |= 512;
     }
     if (upper) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classUpper));
+        mask |= 1024;
     }
     if (xdigit) {
-        mask |= (uint16_t)((uint32_t)(1) << (revera_eng_classXdigit));
+        mask |= 2048;
     }
     return mask;
 }
@@ -2713,13 +2716,13 @@ int64_t revera_eng_compareSequence(revera_eng_Locale *l, revera_eng_slice_i32 se
 
 revera_eng_Tup_u32_bool revera_eng_elementID(revera_eng_Locale *l, revera_eng_slice_i32 seq) {
     if (((seq).len == 0LL)) {
-        return (revera_eng_Tup_u32_bool){0, false};
+        return (revera_eng_Tup_u32_bool){0U, false};
     }
     {
         int64_t i = 0LL;
         for (; (i < (seq).len); i += 1LL) {
             if ((!(revera_eng_validScalar((*revera_eng_slice_i32_at(seq, i)))))) {
-                return (revera_eng_Tup_u32_bool){0, false};
+                return (revera_eng_Tup_u32_bool){0U, false};
             }
         }
     }
@@ -2741,7 +2744,7 @@ revera_eng_Tup_u32_bool revera_eng_elementID(revera_eng_Locale *l, revera_eng_sl
             low = (middle + 1LL);
         }
     }
-    return (revera_eng_Tup_u32_bool){0, false};
+    return (revera_eng_Tup_u32_bool){0U, false};
 }
 
 bool revera_eng_u32Contains(revera_eng_Locale *l, int64_t sec, int64_t first, int64_t count, uint32_t needle) {
@@ -2794,10 +2797,10 @@ revera_eng_Tup_u32_bool revera_eng_collatingElementID(revera_eng_Locale *l, reve
     uint32_t element = _t1.r0;
     bool ok = _t1.r1;
     if ((!(ok))) {
-        return (revera_eng_Tup_u32_bool){0, false};
+        return (revera_eng_Tup_u32_bool){0U, false};
     }
     if ((((seq).len > 1LL) && (!(revera_eng_isContraction(l, element))))) {
-        return (revera_eng_Tup_u32_bool){0, false};
+        return (revera_eng_Tup_u32_bool){0U, false};
     }
     return (revera_eng_Tup_u32_bool){element, true};
 }
@@ -2845,7 +2848,7 @@ revera_eng_Tup_u32_bool revera_eng_findPair(revera_eng_Locale *l, int64_t sec, i
             low = (middle + 1LL);
         }
     }
-    return (revera_eng_Tup_u32_bool){0, false};
+    return (revera_eng_Tup_u32_bool){0U, false};
 }
 
 uint64_t revera_eng_primaryToken(revera_eng_Locale *l, uint32_t element) {
@@ -3016,7 +3019,7 @@ bool revera_eng_charMatches(revera_eng_Regexp *re, int32_t ni, int32_t c) {
     if ((c < 0)) {
         return false;
     }
-    if ((((uint32_t)(re->flags & revera_eng_FlagICase)) != 0)) {
+    if ((((uint32_t)(re->flags & revera_eng_FlagICase)) != 0U)) {
         return revera_eng_runesContain((*revera_eng_slice_node_at(re->nodes, ni)).fold, c);
     }
     return (c == (*revera_eng_slice_node_at(re->nodes, ni)).r);
@@ -3026,7 +3029,7 @@ bool revera_eng_anyMatches(revera_eng_Regexp *re, int32_t c) {
     if ((c <= 0)) {
         return false;
     }
-    if (((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0) && (c == 10))) {
+    if (((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0U) && (c == 10))) {
         return false;
     }
     return true;
@@ -3035,25 +3038,25 @@ bool revera_eng_anyMatches(revera_eng_Regexp *re, int32_t c) {
 bool revera_eng_atBOL(revera_eng_Regexp *re, revera_eng_decoded *d, int64_t i, uint32_t eflags) {
     if ((i == 0LL)) {
         if (d->atSubjectStart) {
-            return (((uint32_t)(eflags & revera_eng_ExecNotBOL)) == 0);
+            return (((uint32_t)(eflags & revera_eng_ExecNotBOL)) == 0U);
         }
-        return ((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0) && d->prevIsNewline);
+        return ((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0U) && d->prevIsNewline);
     }
-    return ((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0) && ((*revera_eng_slice_i32_at(d->runes, (i - 1LL))) == 10));
+    return ((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0U) && ((*revera_eng_slice_i32_at(d->runes, (i - 1LL))) == 10));
 }
 
 bool revera_eng_atEOL(revera_eng_Regexp *re, revera_eng_decoded *d, int64_t i, uint32_t eflags) {
     if ((i == (d->runes).len)) {
         if (d->atSubjectEnd) {
-            return (((uint32_t)(eflags & revera_eng_ExecNotEOL)) == 0);
+            return (((uint32_t)(eflags & revera_eng_ExecNotEOL)) == 0U);
         }
-        return ((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0) && d->nextIsNewline);
+        return ((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0U) && d->nextIsNewline);
     }
-    return ((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0) && ((*revera_eng_slice_i32_at(d->runes, i)) == 10));
+    return ((((uint32_t)(re->flags & revera_eng_FlagNewline)) != 0U) && ((*revera_eng_slice_i32_at(d->runes, i)) == 10));
 }
 
 void revera_eng_fillMatches(revera_eng_Regexp *re, revera_eng_decoded *d, revera_eng_slice_Match caps, revera_eng_slice_Match pmatch) {
-    if (((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0) || ((pmatch).len == 0LL))) {
+    if (((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0U) || ((pmatch).len == 0LL))) {
         return;
     }
     {
@@ -3469,7 +3472,7 @@ void revera_eng_buildScanFilter(vg_arena *mem, revera_eng_program *pr, bool newl
 }
 
 int64_t revera_eng_instrEstimate(revera_eng_slice_node nodes, int32_t ni) {
-    int64_t estimateCap = (((int64_t)(revera_eng_maxProgram)) * 4LL);
+    int64_t estimateCap = 4194304LL;
     int64_t total = 0LL;
     switch ((*revera_eng_slice_node_at(nodes, ni)).op) {
     case revera_eng_opGroup: {
@@ -3541,11 +3544,11 @@ void revera_eng_compileProgram(vg_arena *mem, revera_eng_progBuilder *b, revera_
 
 uint32_t revera_eng_addInstr(vg_arena *mem, revera_eng_progBuilder *b, revera_eng_instr ins) {
     if (b->tooBig) {
-        return 0;
+        return 0U;
     }
     if (((b->prog.ins).len >= revera_eng_maxProgram)) {
         b->tooBig = true;
-        return 0;
+        return 0U;
     }
     b->prog.ins = revera_eng_slice_instr_append(mem, b->prog.ins, ins);
     return ((uint32_t)(((b->prog.ins).len - 1LL)));
@@ -3624,16 +3627,16 @@ revera_eng_frag revera_eng_emit(vg_arena *mem, revera_eng_progBuilder *b, revera
         return revera_eng_consumeFrag(mem, b, revera_eng_iRune, ((uint32_t)((*revera_eng_slice_node_at(nodes, ni)).r)), mask, extra);
     } break;
     case revera_eng_opAny: {
-        return revera_eng_consumeFrag(mem, b, revera_eng_iAny, 0, mask, extra);
+        return revera_eng_consumeFrag(mem, b, revera_eng_iAny, 0U, mask, extra);
     } break;
     case revera_eng_opBracket: {
         return revera_eng_consumeFrag(mem, b, revera_eng_iBracket, ((uint32_t)((*revera_eng_slice_node_at(nodes, ni)).br)), mask, extra);
     } break;
     case revera_eng_opBOL: {
-        return revera_eng_consumeFrag(mem, b, revera_eng_iBOL, 0, 0ULL, ((revera_eng_slice_u32){0}));
+        return revera_eng_consumeFrag(mem, b, revera_eng_iBOL, 0U, 0ULL, ((revera_eng_slice_u32){0}));
     } break;
     case revera_eng_opEOL: {
-        return revera_eng_consumeFrag(mem, b, revera_eng_iEOL, 0, 0ULL, ((revera_eng_slice_u32){0}));
+        return revera_eng_consumeFrag(mem, b, revera_eng_iEOL, 0U, 0ULL, ((revera_eng_slice_u32){0}));
     } break;
     case revera_eng_opGroup: {
         return revera_eng_emit(mem, b, nodes, (*revera_eng_slice_i32_at((*revera_eng_slice_node_at(nodes, ni)).ch, 0LL)), mask, extra);
@@ -3728,7 +3731,7 @@ revera_eng_frag revera_eng_emitRepeat(vg_arena *mem, revera_eng_progBuilder *b, 
     if ((*revera_eng_slice_node_at(nodes, ni)).minimal) {
         int64_t slot = (*revera_eng_slice_node_at(nodes, ni)).vego_index;
         if ((slot < revera_eng_maskWidth)) {
-            mask_v |= (((uint64_t)(1ULL)) << slot);
+            mask_v |= (1ULL << slot);
         } else {
             revera_eng_slice_u32 grown = revera_eng_slice_u32_make(mem, ((extra_v).len + 1LL));
             (void)(revera_eng_slice_u32_copy(grown, extra_v));
@@ -3962,8 +3965,8 @@ revera_eng_Tup_t526567657870x_t4572726f72x revera_eng_Compile(vg_arena *mem, vg_
     revera_eng_computeLengths(mem, re.nodes, &(re.loc), re.brackets, root);
     re.onePass = revera_eng_onePassAnalyze(mem, re.nodes, re.brackets, root);
     revera_eng_progBuilder b = {0};
-    b.icase = (((uint32_t)(flags & revera_eng_FlagICase)) != 0);
-    revera_eng_compileProgram(mem, &(b), re.nodes, root, re.multi, (((uint32_t)(flags & revera_eng_FlagNewline)) != 0));
+    b.icase = (((uint32_t)(flags & revera_eng_FlagICase)) != 0U);
+    revera_eng_compileProgram(mem, &(b), re.nodes, root, re.multi, (((uint32_t)(flags & revera_eng_FlagNewline)) != 0U));
     if ((b.errCode != revera_eng_ErrNone)) {
         revera_eng_Regexp _t3 = re;
         revera_eng_Error _t4 = revera_eng_compileError(b.errCode, ((int64_t)(0ULL - (uint64_t)(1LL))));
@@ -3985,7 +3988,7 @@ int64_t revera_eng_NumSub(revera_eng_Regexp *re) {
 }
 
 bool revera_eng_trivialNullMatch(revera_eng_Regexp *re, revera_eng_slice_Match pmatch) {
-    return ((((*revera_eng_slice_node_at(re->nodes, re->root)).minL == 0LL) && (!(re->anchors))) && ((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0) || ((pmatch).len == 0LL)));
+    return ((((*revera_eng_slice_node_at(re->nodes, re->root)).minL == 0LL) && (!(re->anchors))) && ((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0U) || ((pmatch).len == 0LL)));
 }
 
 revera_eng_Tup_bool_t4572726f72x revera_eng_Exec(vg_arena *mem, revera_eng_Regexp *re, vg_str subject, revera_eng_slice_Match pmatch, uint32_t eflags) {
@@ -4016,7 +4019,7 @@ revera_eng_Tup_bool_t4572726f72x revera_eng_Exec(vg_arena *mem, revera_eng_Regex
         if (revera_eng_trivialNullMatch(re, pmatch)) {
             return (revera_eng_Tup_bool_t4572726f72x){true, revera_eng_noError()};
         }
-        if (((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0) || ((pmatch).len == 0LL))) {
+        if (((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0U) || ((pmatch).len == 0LL))) {
             revera_eng_engineResult probe = revera_eng_runPhaseA(mem, re, subject, eflags);
             if (probe.matched) {
                 return (revera_eng_Tup_bool_t4572726f72x){true, revera_eng_noError()};
@@ -4028,7 +4031,7 @@ revera_eng_Tup_bool_t4572726f72x revera_eng_Exec(vg_arena *mem, revera_eng_Regex
     if ((!(result.matched))) {
         return (revera_eng_Tup_bool_t4572726f72x){false, revera_eng_noError()};
     }
-    if (((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0) || ((pmatch).len == 0LL))) {
+    if (((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0U) || ((pmatch).len == 0LL))) {
         return (revera_eng_Tup_bool_t4572726f72x){true, revera_eng_noError()};
     }
     revera_eng_setMatch(pmatch, 0LL, result.so, result.eo);
@@ -4055,7 +4058,7 @@ revera_eng_Tup_t4d6174636849746572x_t4572726f72x revera_eng_MatchIterInit(revera
     revera_eng_MatchIter it = {0};
     it.lastEnd = ((int64_t)(0ULL - (uint64_t)(1LL)));
     it.limit = limit;
-    if ((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0)) {
+    if ((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0U)) {
         it.done = true;
         revera_eng_MatchIter _t1 = it;
         revera_eng_Error _t2 = revera_eng_compileError(revera_eng_ErrENoSub, ((int64_t)(0ULL - (uint64_t)(1LL))));
@@ -4182,7 +4185,7 @@ revera_eng_Tup_st7265706c50617274x_t4572726f72x revera_eng_parseReplacement(vg_a
 }
 
 revera_eng_Tup_Str_t4572726f72x revera_eng_ReplaceAll(vg_arena *mem, revera_eng_Regexp *re, vg_str subject, vg_str replacement, int64_t limit, uint32_t eflags) {
-    if ((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0)) {
+    if ((((uint32_t)(re->flags & revera_eng_FlagNoSub)) != 0U)) {
         return (revera_eng_Tup_Str_t4572726f72x){vg_lit(""), revera_eng_compileError(revera_eng_ErrENoSub, ((int64_t)(0ULL - (uint64_t)(1LL))))};
     }
     revera_eng_Tup_st7265706c50617274x_t4572726f72x _t1 = revera_eng_parseReplacement(mem, replacement, re->nsub);
@@ -4427,7 +4430,7 @@ int32_t revera_eng_parseExpr(vg_arena *mem, revera_eng_parser *p, revera_eng_Loc
 int32_t revera_eng_charNode(vg_arena *mem, revera_eng_parser *p, revera_eng_Locale *loc, int32_t r) {
     int32_t n = revera_eng_addNode(mem, p, revera_eng_opChar);
     (*revera_eng_slice_node_at(p->nodes, n)).r = r;
-    if ((((uint32_t)(p->flags & revera_eng_FlagICase)) != 0)) {
+    if ((((uint32_t)(p->flags & revera_eng_FlagICase)) != 0U)) {
         revera_eng_slice_i32 fold = revera_eng_slice_i32_make_cap(mem, 0LL, 3LL);
         fold = revera_eng_appendUnique(mem, fold, r);
         revera_eng_slice_i32 _t1 = fold;
@@ -4487,7 +4490,7 @@ int32_t revera_eng_parseDup(vg_arena *mem, revera_eng_parser *p, int32_t operand
         return operand;
     } break;
     }
-    bool minimal = (((uint32_t)(p->flags & revera_eng_FlagMinimal)) != 0);
+    bool minimal = (((uint32_t)(p->flags & revera_eng_FlagMinimal)) != 0U);
     if ((revera_eng_peekByte(p) == 63)) {
         p->pos += 1LL;
         minimal = (!(minimal));

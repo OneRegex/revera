@@ -11,7 +11,7 @@ int64_t bump(vg::Arena& mem, Counter& c, int32_t tag) {
 }
 
 int64_t logCode(Counter& c) {
-    int64_t v = int64_t(0LL);
+    int64_t v = 0LL;
     for (int64_t i = 0LL; (i < vg::len(c.log)); i += 1LL) {
         v = ((v * 10LL) + int64_t(c.log[i]));
     }
@@ -31,7 +31,7 @@ int64_t BytesProbe(vg::Arena& mem, vg::Str s) {
     if ((vg::len(b) > 0LL)) {
         b[0LL] = 88;
     }
-    int64_t t = int64_t(0LL);
+    int64_t t = 0LL;
     for (int64_t i = 0LL; (i < vg::len(b)); i += 1LL) {
         t = ((t * 31LL) + int64_t(b[i]));
     }
@@ -48,7 +48,7 @@ vg::Slice<int32_t> sliceFrom(vg::Arena& mem, Counter& c, int64_t n) {
 }
 
 int64_t RangeProbe(vg::Arena& mem, Counter& c) {
-    int64_t t = int64_t(0LL);
+    int64_t t = 0LL;
     {
         auto _t1 = sliceFrom(mem, c, 4LL);
         for (int64_t _t2 = 0; _t2 < _t1.len; _t2++) {
@@ -62,7 +62,7 @@ int64_t RangeProbe(vg::Arena& mem, Counter& c) {
 }
 
 int64_t RangeValProbe(vg::Slice<int32_t> xs) {
-    int64_t t = int64_t(0LL);
+    int64_t t = 0LL;
     {
         auto _t1 = xs;
         for (int64_t _t2 = 0; _t2 < _t1.len; _t2++) {
@@ -78,7 +78,7 @@ int64_t RangeValProbe(vg::Slice<int32_t> xs) {
 }
 
 int64_t RangeIntProbe(int64_t n) {
-    int64_t t = int64_t(0LL);
+    int64_t t = 0LL;
     {
         auto _t1 = n;
         for (int64_t _t2 = 0; _t2 < _t1; _t2++) {
@@ -92,7 +92,7 @@ int64_t RangeIntProbe(int64_t n) {
 int64_t PartialArray() {
     std::array<int64_t, 5> a = std::array<int64_t, 5>{7LL, 9LL};
     std::array<vg::Str, 3> names = std::array<vg::Str, 3>{vg::lit("a")};
-    int64_t t = int64_t(0LL);
+    int64_t t = 0LL;
     for (int64_t i = 0LL; (i < 5LL); i += 1LL) {
         t = ((t * 10LL) + a[size_t(i)]);
     }
@@ -126,7 +126,7 @@ int64_t SpareProbe(vg::Arena& mem) {
     vg::Slice<int64_t> s = vg::make_cap<int64_t>(mem, 0LL, 4LL);
     s = vg::append(mem, s, 5LL);
     s = s.head(4LL);
-    int64_t t = int64_t(0LL);
+    int64_t t = 0LL;
     for (int64_t i = 0LL; (i < vg::len(s)); i += 1LL) {
         t = (((t * 10LL) + s[i]) + 1LL);
     }
@@ -145,7 +145,7 @@ int64_t SpareProbe(vg::Arena& mem) {
 
 int64_t NilProbe(vg::Arena& mem) {
     vg::Slice<int32_t> s{};
-    int64_t t = int64_t(0LL);
+    int64_t t = 0LL;
     if ((s.p == nullptr)) {
         t += 1LL;
     }
@@ -190,7 +190,7 @@ int64_t SubWrite(vg::Arena& mem, int64_t n) {
     vg::Slice<int64_t> s = vg::make<int64_t>(mem, n);
     s.tail(1LL)[0LL] = 7LL;
     s.tail(1LL).tail(1LL)[0LL] = 9LL;
-    int64_t t = int64_t(0LL);
+    int64_t t = 0LL;
     for (int64_t i = 0LL; (i < vg::len(s)); i += 1LL) {
         t = ((t * 10LL) + s[i]);
     }
@@ -206,7 +206,7 @@ int64_t AndNotOrder(vg::Arena& mem, Counter& c) {
 
 int64_t ZeroArray() {
     std::array<int32_t, 0> a{};
-    int64_t t = int64_t(0LL);
+    int64_t t = 0LL;
     if ((vg::arr_slice(a, 0, 0).p != nullptr)) {
         t += 1LL;
     }

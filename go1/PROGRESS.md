@@ -106,6 +106,18 @@ Deliverables: the subset specification, the translated engine, and a subset-to-J
   minMatchChars stays separate from computeLengths on purpose, because the two saturation caps differ.
   A merge would change the oversized-pattern fallback against go0.
 
+- An audit found one crash path in the solver.
+  Once an arena limit trips, every allocator hands out offset zero, so a record could name itself as its own child.
+  A counter comparison over such a record never returned, and each target would overflow its stack.
+  A limit scan in a scratch copy showed the cycle on `x*?(a*|(a*){250})`.
+  cmpCand now stops once the solver has failed, and capture_test.go pins that.
+  The same audit fixed the printers for constructs the engine never uses.
+  A constant expression prints as one folded literal in C, C++, and Rust, so an intermediate value no longer truncates to a leaf type.
+  A multi-element append pins its elements when a later one could read the appended buffer.
+  Zig casts a comptime-narrowed @min or @max back to the Go type where a wrapping operator consumes it.
+  The checker rejects a two-value assignment whose later place reads an earlier target, and it no longer folds a variable shift.
+  The C, C++, and Zig drivers read lines of any length, and the Zig driver no longer caps its iteration rows.
+
 ## Status: complete
 
 All three deliverables exist and are verified: the specification, the Vego engine, and the JSON translator, plus the json2go reference converter that proves the pipeline round-trips.

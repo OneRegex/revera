@@ -14,7 +14,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include <vector>
 
 #include "host.hpp"
 
@@ -81,8 +80,8 @@ int main() {
     Locale base_loc = base_locale();
     Locale cur_loc = LocalePOSIX();
 
-    std::vector<char> line(1 << 20);
-    while (std::fgets(line.data(), int(line.size()), stdin) != nullptr) {
+    std::string line;
+    while (read_line(line)) {
         char* cursor = line.data();
         char* cmd = tok_next(&cursor);
         if (cmd == nullptr) {

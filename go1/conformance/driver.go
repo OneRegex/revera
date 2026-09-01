@@ -2,10 +2,12 @@ package conformance
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"revera1/probe"
 )
@@ -18,10 +20,17 @@ type Report struct {
 	Failed bool
 }
 
+// ProtocolTimeout bounds one driver, probe, or fuzzcase run, so a wedged binary fails its step instead of holding the kit.
+// The conform command sets it from -timeout.
+var ProtocolTimeout = 30 * time.Minute
+
 // RunProtocol feeds a binary its input on stdin and returns its output lines.
 // A trailing carriage return is dropped, so a binary that writes CRLF text is compared on its content.
 func RunProtocol(bin string, input string) ([]string, error) {
-	cmd := exec.Command(bin)
+	ctx, cancel := context.WithTimeout(context.Background(), ProtocolTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin)
+	cmd.WaitDelay = 5 * time.Second
 	if input != "" {
 		cmd.Stdin = strings.NewReader(input)
 	}
@@ -29,6 +38,9 @@ func RunProtocol(bin string, input string) ([]string, error) {
 	cmd.Stdout = &out
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("%s: no result after %s", bin, ProtocolTimeout)
+		}
 		return nil, fmt.Errorf("%s: %w", bin, err)
 	}
 	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")

@@ -131,6 +131,7 @@ static inline vg_str vg_str_dup(vg_arena *mem, vg_str s) {
 // C leaves that pair undefined even with -fwrapv.
 
 static inline int64_t vg_sdiv_i64(int64_t a, int64_t b) {
+    assert(b != 0);
     if (b == -1) {
         return (int64_t)(0ULL - (uint64_t)a);
     }
@@ -138,6 +139,7 @@ static inline int64_t vg_sdiv_i64(int64_t a, int64_t b) {
 }
 
 static inline int64_t vg_srem_i64(int64_t a, int64_t b) {
+    assert(b != 0);
     if (b == -1) {
         return 0;
     }
@@ -145,6 +147,7 @@ static inline int64_t vg_srem_i64(int64_t a, int64_t b) {
 }
 
 static inline int32_t vg_sdiv_i32(int32_t a, int32_t b) {
+    assert(b != 0);
     if (b == -1) {
         return (int32_t)(0U - (uint32_t)a);
     }
@@ -152,6 +155,7 @@ static inline int32_t vg_sdiv_i32(int32_t a, int32_t b) {
 }
 
 static inline int32_t vg_srem_i32(int32_t a, int32_t b) {
+    assert(b != 0);
     if (b == -1) {
         return 0;
     }

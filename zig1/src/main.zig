@@ -131,8 +131,9 @@ fn handle(h: *Host, w: *Io.Writer, line: []const u8) !void {
             }
             var iter = ires[0];
             const pmatch = try vg.make(gpa, engine.Match, engine.NumSub(&h.re) + 1);
-            const rows = try gpa.alloc(u8, 1 << 22);
-            var rw = Io.Writer.fixed(rows);
+            // The rows grow with the match count.
+            var rows: Io.Writer.Allocating = .init(gpa);
+            const rw = &rows.writer;
             var count: i64 = 0;
             while (true) {
                 const res = try engine.MatchIterNext(gpa, &h.re, &iter, subject, eflags, pmatch);
@@ -157,7 +158,7 @@ fn handle(h: *Host, w: *Io.Writer, line: []const u8) !void {
             try w.print("I 0 {d}", .{count});
             if (count > 0) {
                 try w.writeAll(" ");
-                try w.writeAll(rw.buffered());
+                try w.writeAll(rows.written());
             }
             try w.writeAll("\n");
         },
@@ -223,12 +224,26 @@ pub fn main(init: std.process.Init) !void {
     h.base = host.loadBase();
     h.cur = engine.LocalePOSIX();
 
-    while (try r.takeDelimiter('\n')) |line| {
-        if (line.len == 0) {
-            continue;
+    // A line has no fixed bound, because a subject may be up to 2^31-1 bytes.
+    var line_w: Io.Writer.Allocating = .init(gpa);
+    defer line_w.deinit();
+    while (true) {
+        line_w.clearRetainingCapacity();
+        const ended = if (r.streamDelimiter(&line_w.writer, '\n')) |_| false else |err| switch (err) {
+            error.EndOfStream => true,
+            else => |e| return e,
+        };
+        if (!ended) {
+            r.toss(1);
         }
-        try handle(&h, w, line);
-        try w.flush();
+        const line = line_w.written();
+        if (line.len > 0) {
+            try handle(&h, w, line);
+            try w.flush();
+        }
+        if (ended) {
+            break;
+        }
     }
     try w.flush();
 }

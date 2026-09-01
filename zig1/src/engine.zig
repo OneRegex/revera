@@ -1065,6 +1065,9 @@ pub fn structCmp(s: *capSolver, re: *Regexp, a: i32, b: i32) i64 {
 }
 
 pub fn cmpCand(s: *capSolver, re: *Regexp, a: i32, b: i32) i64 {
+    if (s.failed) {
+        return 1;
+    }
     if ((re.minSlots > 0)) {
         {
             var idx: i64 = 0;

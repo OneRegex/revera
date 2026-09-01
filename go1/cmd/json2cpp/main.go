@@ -656,7 +656,24 @@ func narrow(t *vegoc.Type) bool {
 	return false
 }
 
+// constLiteral renders a constant integer expression as one literal of its type.
+// The value folds at the precision Go uses, so no intermediate result truncates to a leaf type.
+func (g *gen) constLiteral(e *vegoc.Expr) (string, bool) {
+	switch e.K {
+	case "int", "char", "ident":
+		return "", false
+	}
+	v, ok := vegoc.FoldConst(g.p, e)
+	if !ok {
+		return "", false
+	}
+	return g.expr(vegoc.ConstExpr(v, e.Typ)), true
+}
+
 func (g *gen) expr(e *vegoc.Expr) string {
+	if lit, ok := g.constLiteral(e); ok {
+		return lit
+	}
 	switch e.K {
 	case "int", "char":
 		return g.intLiteral(e)
@@ -802,6 +819,9 @@ func (g *gen) intLiteral(e *vegoc.Expr) string {
 		switch e.Typ.K {
 		case vegoc.KU64:
 			return e.Value + "ULL"
+		case vegoc.KU32:
+			// The suffix keeps a shift of the literal unsigned.
+			return e.Value + "U"
 		case vegoc.KI64, vegoc.KInt:
 			// The magnitude of MinInt64 under unary minus has no signed spelling.
 			// The conversion comes from unsigned instead, which C++20 defines as modular.
@@ -836,6 +856,23 @@ func (g *gen) builtin(e *vegoc.Expr) string {
 				return fmt.Sprintf("vg::append_str(mem, %s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
 			}
 			return fmt.Sprintf("vg::append_slice(mem, %s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
+		}
+		if vegoc.AppendNeedsPin(e) {
+			// Every element evaluates before the first append writes, as in Go.
+			clone := *e
+			clone.Args = make([]*vegoc.Expr, len(e.Args))
+			clone.Args[0] = e.Args[0]
+			var inits []string
+			for i, a := range e.Args[1:] {
+				if constish(a) {
+					clone.Args[i+1] = a
+					continue
+				}
+				h := g.newTmp()
+				inits = append(inits, fmt.Sprintf("auto %s = %s;", h, g.expr(a)))
+				clone.Args[i+1] = &vegoc.Expr{K: "ident", Name: h, Typ: a.Typ}
+			}
+			return fmt.Sprintf("([&]{ %s return %s; }())", strings.Join(inits, " "), g.builtin(&clone))
 		}
 		out := g.expr(e.Args[0])
 		for _, a := range e.Args[1:] {

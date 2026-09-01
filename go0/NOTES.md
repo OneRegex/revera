@@ -199,6 +199,11 @@ After the fix, 20,000 random pattern/subject pairs, including anchors and negate
 
 ## Observations
 
+- The generation stamps of a pooled workspace are uint32 values that grow across runs.
+  A run stamps boundaries base+1 through base+len(subject)+1, so the reset threshold in prepare leaves room for the largest subject.
+  The earlier threshold did not, and a subject of 2^28 characters on a well-used workspace lost threads to stale stamps.
+  engine_test.go checks the arithmetic.
+
 - macOS libc agrees with rule 3 of section 4.3 on the classic case: `(a|ab)(c|bcd)(d*)` on `abcd` gives `(0,2)(2,3)(3,4)`.
   Group 1 takes its longest compatible match.
   Folklore expectations of `(0,1)(1,4)` follow a different reading and do not bind this implementation.

@@ -1133,7 +1133,24 @@ func addressable(e *vegoc.Expr) bool {
 	return false
 }
 
+// constLiteral renders a constant integer expression as one literal of its type.
+// The value folds at the precision Go uses, so no intermediate result truncates to a leaf type.
+func (g *gen) constLiteral(e *vegoc.Expr) (string, bool) {
+	switch e.K {
+	case "int", "char", "ident":
+		return "", false
+	}
+	v, ok := vegoc.FoldConst(g.p, e)
+	if !ok {
+		return "", false
+	}
+	return g.expr(vegoc.ConstExpr(v, e.Typ)), true
+}
+
 func (g *gen) expr(e *vegoc.Expr) string {
+	if lit, ok := g.constLiteral(e); ok {
+		return lit
+	}
 	switch e.K {
 	case "int", "char":
 		return g.intLiteral(e)
@@ -1327,6 +1344,9 @@ func (g *gen) intLiteral(e *vegoc.Expr) string {
 		switch e.Typ.K {
 		case vegoc.KU64:
 			return e.Value + "ULL"
+		case vegoc.KU32:
+			// The suffix keeps a shift of the literal unsigned.
+			return e.Value + "U"
 		case vegoc.KI64, vegoc.KInt:
 			// The magnitude of MinInt64 under unary minus has no signed spelling.
 			// The conversion comes from unsigned instead, and the cast truncates modularly on every real target.
@@ -1374,6 +1394,14 @@ func (g *gen) builtin(e *vegoc.Expr) string {
 				return fmt.Sprintf("%s_append_str(mem, %s, %s)", name, args[0], args[1])
 			}
 			return fmt.Sprintf("%s_append_slice(mem, %s, %s)", name, args[0], args[1])
+		}
+		if vegoc.AppendNeedsPin(e) {
+			// Every element evaluates before the first append writes, as in Go.
+			for i := 1; i < len(args); i++ {
+				if !constish(e.Args[i]) {
+					args[i] = g.hoist(e.Args[i].Typ, args[i])
+				}
+			}
 		}
 		out := args[0]
 		for _, a := range args[1:] {

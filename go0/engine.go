@@ -64,10 +64,14 @@ func (re *Regexp) putWS(ws *engineWS) {
 	re.pool.Put(ws)
 }
 
+// baseResetLimit is the largest generation base a run may start from.
+// It keeps every stamp of a run on the largest subject below 2^32, so none can wrap onto a stale one.
+const baseResetLimit = ^uint32(0) - uint32(subjectLimit) - 2*(maxElemAhead+1)
+
 // prepare sizes the workspace for this program.
 // workspaceHeapBound mirrors this sizing for the resource contract, so the two must stay in step.
 func (ws *engineWS) prepare(prog *program, k, ring int) {
-	if ws.base > 0xf000_0000 {
+	if ws.base > baseResetLimit {
 		for i := range ws.slots {
 			clear(ws.slots[i].stamp)
 		}

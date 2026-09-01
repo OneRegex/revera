@@ -9,7 +9,7 @@ int64_t probe_bump(vg_arena *mem, probe_Counter *c, int32_t tag) {
 }
 
 int64_t probe_logCode(probe_Counter *c) {
-    int64_t v = ((int64_t)(0LL));
+    int64_t v = 0LL;
     {
         int64_t i = 0LL;
         for (; (i < (c->log).len); i += 1LL) {
@@ -32,7 +32,7 @@ int64_t probe_BytesProbe(vg_arena *mem, vg_str s) {
     if (((b).len > 0LL)) {
         (*probe_slice_u8_at(b, 0LL)) = 88;
     }
-    int64_t t = ((int64_t)(0LL));
+    int64_t t = 0LL;
     {
         int64_t i = 0LL;
         for (; (i < (b).len); i += 1LL) {
@@ -55,7 +55,7 @@ probe_slice_i32 probe_sliceFrom(vg_arena *mem, probe_Counter *c, int64_t n) {
 }
 
 int64_t probe_RangeProbe(vg_arena *mem, probe_Counter *c) {
-    int64_t t = ((int64_t)(0LL));
+    int64_t t = 0LL;
     {
         probe_slice_i32 _t1 = probe_sliceFrom(mem, c, 4LL);
         for (int64_t _t2 = 0; _t2 < _t1.len; _t2++) {
@@ -69,7 +69,7 @@ int64_t probe_RangeProbe(vg_arena *mem, probe_Counter *c) {
 }
 
 int64_t probe_RangeValProbe(probe_slice_i32 xs) {
-    int64_t t = ((int64_t)(0LL));
+    int64_t t = 0LL;
     {
         probe_slice_i32 _t1 = xs;
         for (int64_t _t2 = 0; _t2 < _t1.len; _t2++) {
@@ -88,7 +88,7 @@ int64_t probe_RangeValProbe(probe_slice_i32 xs) {
 }
 
 int64_t probe_RangeIntProbe(int64_t n) {
-    int64_t t = ((int64_t)(0LL));
+    int64_t t = 0LL;
     {
         int64_t _t1 = n;
         for (int64_t _t2 = 0; _t2 < _t1; _t2++) {
@@ -102,7 +102,7 @@ int64_t probe_RangeIntProbe(int64_t n) {
 int64_t probe_PartialArray(void) {
     probe_arr_i64_5 a = ((probe_arr_i64_5){.v = {7LL, 9LL}});
     probe_arr_Str_3 names = ((probe_arr_Str_3){.v = {vg_lit("a")}});
-    int64_t t = ((int64_t)(0LL));
+    int64_t t = 0LL;
     {
         int64_t i = 0LL;
         for (; (i < 5LL); i += 1LL) {
@@ -152,7 +152,7 @@ int64_t probe_SpareProbe(vg_arena *mem) {
     probe_slice_i64 s = probe_slice_i64_make_cap(mem, 0LL, 4LL);
     s = probe_slice_i64_append(mem, s, 5LL);
     s = probe_slice_i64_head(s, 4LL);
-    int64_t t = ((int64_t)(0LL));
+    int64_t t = 0LL;
     {
         int64_t i = 0LL;
         for (; (i < (s).len); i += 1LL) {
@@ -177,7 +177,7 @@ int64_t probe_SpareProbe(vg_arena *mem) {
 
 int64_t probe_NilProbe(vg_arena *mem) {
     probe_slice_i32 s = {0};
-    int64_t t = ((int64_t)(0LL));
+    int64_t t = 0LL;
     if (((s).p == NULL)) {
         t += 1LL;
     }
@@ -222,7 +222,7 @@ int64_t probe_SubWrite(vg_arena *mem, int64_t n) {
     probe_slice_i64 s = probe_slice_i64_make(mem, n);
     (*probe_slice_i64_at(probe_slice_i64_tail(s, 1LL), 0LL)) = 7LL;
     (*probe_slice_i64_at(probe_slice_i64_tail(probe_slice_i64_tail(s, 1LL), 1LL), 0LL)) = 9LL;
-    int64_t t = ((int64_t)(0LL));
+    int64_t t = 0LL;
     {
         int64_t i = 0LL;
         for (; (i < (s).len); i += 1LL) {
@@ -246,7 +246,7 @@ int64_t probe_AndNotOrder(vg_arena *mem, probe_Counter *c) {
 
 int64_t probe_ZeroArray(void) {
     probe_arr_i32_0 a = {0};
-    int64_t t = ((int64_t)(0LL));
+    int64_t t = 0LL;
     if (((probe_arr_i32_0_slice(&(a), 0, 0)).p != NULL)) {
         t += 1LL;
     }

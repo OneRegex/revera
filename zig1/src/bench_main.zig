@@ -212,12 +212,26 @@ pub fn main(init: std.process.Init) !void {
     h.base = host.loadBase();
     h.cur = engine.LocalePOSIX();
 
-    while (try r.takeDelimiter('\n')) |line| {
-        if (line.len == 0) {
-            continue;
+    // A line has no fixed bound, because a subject may be up to 2^31-1 bytes.
+    var line_w: Io.Writer.Allocating = .init(gpa);
+    defer line_w.deinit();
+    while (true) {
+        line_w.clearRetainingCapacity();
+        const ended = if (r.streamDelimiter(&line_w.writer, '\n')) |_| false else |err| switch (err) {
+            error.EndOfStream => true,
+            else => |e| return e,
+        };
+        if (!ended) {
+            r.toss(1);
         }
-        try handle(&h, io, w, line);
-        try w.flush();
+        const line = line_w.written();
+        if (line.len > 0) {
+            try handle(&h, io, w, line);
+            try w.flush();
+        }
+        if (ended) {
+            break;
+        }
     }
     try w.flush();
 }

@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Build names one way to build a backend and the binaries it produces.
@@ -179,6 +181,8 @@ func SelectBackends(repo, cwd string, values []string) ([]*Backend, error) {
 		return backends, nil
 	}
 	var backends []*Backend
+	// A backend named twice would build twice in one directory at once.
+	seen := map[string]bool{}
 	for _, value := range values {
 		path := value
 		if !filepath.IsAbs(path) {
@@ -195,6 +199,10 @@ func SelectBackends(repo, cwd string, values []string) ([]*Backend, error) {
 		if err != nil {
 			return nil, err
 		}
+		if seen[b.Dir] {
+			continue
+		}
+		seen[b.Dir] = true
 		backends = append(backends, b)
 	}
 	return backends, nil
@@ -220,11 +228,29 @@ func BuildBinaries(b *Backend, bd Build) (string, error) {
 }
 
 // command runs one program in dir and returns its combined output.
+// A build or a Lean replay can take as long as it needs, so nothing bounds it.
 func command(dir string, name string, args ...string) (string, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		return string(out), fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
+	}
+	return string(out), nil
+}
+
+// boundedCommand is command under ProtocolTimeout, for a binary that must answer.
+func boundedCommand(dir string, name string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ProtocolTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = dir
+	cmd.WaitDelay = 5 * time.Second
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if ctx.Err() != nil {
+			return string(out), fmt.Errorf("%s %s: no result after %s", name, strings.Join(args, " "), ProtocolTimeout)
+		}
 		return string(out), fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
 	}
 	return string(out), nil

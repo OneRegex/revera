@@ -43,7 +43,8 @@ typedef enum {
 } revera_status;
 
 // revera_error reports one failed operation.
-// offset is REVERA_NO_OFFSET when the failure has no pattern position.
+// offset is the byte position of the failure in the pattern, or in the replacement text for a replacement error.
+// It is REVERA_NO_OFFSET when the failure has no position.
 // message points to static storage.
 typedef struct {
     revera_status status;

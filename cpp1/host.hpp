@@ -11,6 +11,19 @@
 #include <cstring>
 #include <string>
 
+// read_line reads one line of any length, without its newline.
+// It returns false at the end of the input.
+inline bool read_line(std::string& out) {
+    out.clear();
+    for (int c = std::getchar(); c != EOF; c = std::getchar()) {
+        if (c == '\n') {
+            return true;
+        }
+        out.push_back(char(c));
+    }
+    return !out.empty();
+}
+
 #include "engine.hpp"
 
 static const char data_bin[] = {

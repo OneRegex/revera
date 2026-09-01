@@ -378,6 +378,34 @@ func Impure(e *Expr) bool {
 	return found
 }
 
+// AppendNeedsPin reports whether a non-spread append must evaluate its elements into temporaries first.
+// The printers nest one append per element, so a later element could see an earlier write.
+// Only a call, or a read of a slice or array with the same element type, can do that.
+func AppendNeedsPin(e *Expr) bool {
+	if e.K != "builtin" || e.Name != "append" || e.Spread || len(e.Args) < 3 {
+		return false
+	}
+	elem := e.Args[0].Typ.Elem
+	for _, a := range e.Args[2:] {
+		if Impure(a) {
+			return true
+		}
+		reads := false
+		WalkExpr(a, func(x *Expr) {
+			if x.K != "index" || x.X.Typ == nil {
+				return
+			}
+			if (x.X.Typ.K == KSlice || x.X.Typ.K == KArray) && Same(x.X.Typ.Elem, elem) {
+				reads = true
+			}
+		})
+		if reads {
+			return true
+		}
+	}
+	return false
+}
+
 // LoadFile reads a Vego JSON file, loads it, and checks it.
 // This is the full front end that every printer runs.
 func LoadFile(path string) (*Program, error) {

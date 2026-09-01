@@ -11396,6 +11396,29 @@
    "body": [
     {
      "cond": {
+      "k": "field",
+      "name": "failed",
+      "x": {
+       "k": "ident",
+       "name": "s"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "int",
+         "value": "1"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "cond": {
       "k": "binary",
       "op": "\u003e",
       "x": {

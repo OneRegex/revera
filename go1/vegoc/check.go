@@ -346,6 +346,7 @@ func (c *checker) checkStmt(s *Stmt) {
 				}
 				c.markMutated(l)
 			}
+			checkAssignOrder(s.Lhs)
 			return
 		}
 		l := s.Lhs[0]
@@ -459,6 +460,26 @@ func (c *checker) checkStmt(s *Stmt) {
 		c.checkBody(s.Body)
 	default:
 		panic("unknown statement kind " + s.K)
+	}
+}
+
+// checkAssignOrder rejects a two-value assignment whose later place reads an earlier target, as in i, x[i] = f().
+// Go evaluates every place before it assigns, but the printers assign in order, and only such a statement tells the two apart.
+func checkAssignOrder(lhs []*Expr) {
+	for i, target := range lhs {
+		if target.K != "ident" || target.Name == "_" {
+			continue
+		}
+		for _, later := range lhs[i+1:] {
+			if later.K == "ident" {
+				continue
+			}
+			WalkExpr(later, func(e *Expr) {
+				if e.K == "ident" && e.Name == target.Name {
+					panic("two-value assign place reads the earlier target " + target.Name + ", which the printers cannot order")
+				}
+			})
+		}
 	}
 }
 
@@ -900,7 +921,8 @@ func (c *checker) defaultType(e *Expr) {
 		// A rune-defaulted constant stays int32.
 		t = TI32
 	}
-	if t.IsInteger() {
+	// A constant shifted by a variable count is untyped without being constant, so only a constant folds.
+	if t.IsInteger() && e.IsConst {
 		v := c.fold(e)
 		if !integerFits(v, t) {
 			panic(fmt.Sprintf("integer constant %s does not fit %s", v, t))
@@ -943,7 +965,12 @@ func (c *checker) fold(e *Expr) *big.Int {
 		case "-":
 			return x.Neg(x)
 		case "^":
-			return x.Not(x)
+			r := x.Not(x)
+			// The complement of a typed unsigned constant stays inside its type, as in ^uint32(0).
+			if !e.X.Untyped && e.X.Typ != nil && e.X.Typ.IsInteger() && !e.X.Typ.Signed() {
+				r = truncateTo(r, e.X.Typ)
+			}
+			return r
 		}
 	case "binary":
 		x := c.fold(e.X)
@@ -992,6 +1019,31 @@ func (c *checker) fold(e *Expr) *big.Int {
 		}
 	}
 	panic("cannot fold constant expression " + e.K)
+}
+
+// FoldConst evaluates a constant integer expression at the precision Go uses and returns the value its type holds.
+// It reports false when e is not a constant integer expression.
+func FoldConst(p *Program, e *Expr) (v *big.Int, ok bool) {
+	if e == nil || !e.IsConst || e.Typ == nil || !e.Typ.IsInteger() {
+		return nil, false
+	}
+	defer func() {
+		if recover() != nil {
+			v, ok = nil, false
+		}
+	}()
+	c := &checker{p: p}
+	return truncateTo(c.fold(e), e.Typ), true
+}
+
+// ConstExpr builds the literal form of an integer value of type t.
+// A negative value becomes the negation of its magnitude, and the result carries no constant flag.
+func ConstExpr(v *big.Int, t *Type) *Expr {
+	if v.Sign() < 0 {
+		magnitude := new(big.Int).Neg(v)
+		return &Expr{K: "unary", Op: "-", Typ: t, X: &Expr{K: "int", Value: magnitude.String(), Typ: t}}
+	}
+	return &Expr{K: "int", Value: v.String(), Typ: t}
 }
 
 func truncateTo(v *big.Int, t *Type) *big.Int {

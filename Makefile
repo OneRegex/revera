@@ -43,6 +43,7 @@ conform:
 
 # Cross-language benchmarks; BENCH_FLAGS passes options through, for example BENCH_FLAGS="-go0 -only hard/".
 bench:
+	mkdir -p tmp
 	cd go1 && go run ./cmd/bench -build -tsv ../tmp/bench-results.tsv $(BENCH_FLAGS)
 
 size:
@@ -50,6 +51,7 @@ size:
 
 # CPU and allocation profiles of the Go engine over the shared cases, in tmp/.
 profile:
+	mkdir -p tmp
 	cd go1 && go test ./revera -run '^$$' -bench 'BenchmarkEngine' -benchmem \
 		-cpuprofile ../tmp/cpu.pprof -memprofile ../tmp/mem.pprof -o ../tmp/revera.test
 	cd go1 && go tool pprof -top -nodecount 25 ../tmp/revera.test ../tmp/cpu.pprof

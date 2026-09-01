@@ -137,7 +137,9 @@ impl Error {
         ErrorKind::from_code(self.code)
     }
 
-    /// Returns the byte offset in the pattern where compilation stopped, when the failure has one.
+    /// Returns the byte offset where the failure was found, when it has one.
+    /// Compilation errors point into the pattern.
+    /// The escape and back-reference errors of `replace_all` and `replacen` point into the replacement text.
     pub fn offset(&self) -> Option<usize> {
         self.offset
     }

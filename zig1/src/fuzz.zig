@@ -117,7 +117,7 @@ test "engine fuzz" {
     defer ctx.arena.deinit();
     try std.testing.fuzz(&ctx, testOne, .{ .corpus = &.{
         seed("\x00\x00\x06(a|b)*\x01xababab"),
-        seed("\x01\x10\x0b([[.ch.]]|c)\x03\\1-chcchxch"),
+        seed("\x01\x10\x0c([[.ch.]]|c)\x03\\1-chcchxch"),
         seed("\x08\x22\x05(a*?)\x00\naaa"),
     } });
 }

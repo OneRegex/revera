@@ -61,12 +61,9 @@ int main(void) {
     revera_eng_Regexp cur_re = {0};
     bool re_valid = false;
 
-    size_t line_cap = 1 << 20;
-    char *line = (char *)malloc(line_cap);
-    if (line == NULL) {
-        abort();
-    }
-    while (fgets(line, (int)line_cap, stdin) != NULL) {
+    size_t line_cap = 0;
+    char *line = NULL;
+    while (read_line(&line, &line_cap) >= 0) {
         char *cursor = line;
         char *cmd = tok_next(&cursor);
         if (cmd == NULL) {

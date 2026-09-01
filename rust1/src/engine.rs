@@ -11,11 +11,11 @@ pub const itemElem: u8 = 1u8;
 pub const itemEquiv: u8 = 2u8;
 pub const itemClass: u8 = 3u8;
 pub const capWorkLimit: i64 = 50000000i64;
-pub const solverArenaLimit: i64 = (1i64 << 26i64);
-pub const contractCap: i64 = (((1i64) as i64) << 62i64);
+pub const solverArenaLimit: i64 = 67108864i64;
+pub const contractCap: i64 = 4611686018427387904i64;
 pub const frameBytes: i64 = 256i64;
 pub const matcherStackBytes: i64 = 2048i64;
-pub const equivFrames: i64 = (maxElemAhead + 2i64);
+pub const equivFrames: i64 = 10i64;
 pub const ptreeBytes: i64 = 48i64;
 pub const kidBytes: i64 = 8i64;
 pub const mapEntryBytes: i64 = 128i64;
@@ -96,11 +96,11 @@ pub const iSplit: u8 = 6u8;
 pub const iJmp: u8 = 7u8;
 pub const iMatch: u8 = 8u8;
 pub const iFail: u8 = 9u8;
-pub const failMinNone: i64 = (((1i64) as i64) << 62i64);
-pub const maxProgram: i64 = (1i64 << 20i64);
+pub const failMinNone: i64 = 4611686018427387904i64;
+pub const maxProgram: i64 = 1048576i64;
 pub const maskWidth: i64 = 64i64;
-pub const subjectLimit: i64 = ((1i64 << 31i64) - 1i64);
-pub const lengthCap: i64 = (((1i64) as i64) << 40i64);
+pub const subjectLimit: i64 = 2147483647i64;
+pub const lengthCap: i64 = 1099511627776i64;
 pub const opChar: u8 = 0u8;
 pub const opAny: u8 = 1u8;
 pub const opBracket: u8 = 2u8;
@@ -111,7 +111,7 @@ pub const opAlt: u8 = 6u8;
 pub const opRepeat: u8 = 7u8;
 pub const opGroup: u8 = 8u8;
 pub const infinite: i64 = (1i64).wrapping_neg();
-pub const lenInf: i64 = (1i64 << 30i64);
+pub const lenInf: i64 = 1073741824i64;
 pub const invalidRune: i32 = (1i32).wrapping_neg();
 
 pub static classNames: [vg::Str; (numClasses) as usize] = [vg::lit(b"alnum"), vg::lit(b"alpha"), vg::lit(b"blank"), vg::lit(b"cntrl"), vg::lit(b"digit"), vg::lit(b"graph"), vg::lit(b"lower"), vg::lit(b"print"), vg::lit(b"punct"), vg::lit(b"space"), vg::lit(b"upper"), vg::lit(b"xdigit")];
@@ -1150,6 +1150,9 @@ pub fn structCmp(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
 }
 
 pub fn cmpCand(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
+    if s.failed {
+        return 1i64;
+    }
     if (re.minSlots > 0i64) {
         {
             let mut idx: i64 = 0i64;
@@ -1196,7 +1199,7 @@ pub fn bestParse(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut de
     if (!capStep(s)) {
         return (1i32).wrapping_neg();
     }
-    let mut best: i32 = (((1i32).wrapping_neg()) as i32);
+    let mut best: i32 = (1i32).wrapping_neg();
     {
         let _t3 = re.nodes.get(((ni) as i64)).op;
         if _t3 == opChar {
@@ -1252,7 +1255,7 @@ pub fn bestParse(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut de
             }
         } else if _t3 == opRepeat {
             if ((i == j) && (re.nodes.get(((ni) as i64)).min == 0i64)) {
-                let mut sub_3: i32 = (((1i32).wrapping_neg()) as i32);
+                let mut sub_3: i32 = (1i32).wrapping_neg();
                 if (re.nodes.get(((ni) as i64)).max != 0i64) {
                     sub_3 = { let _t40 = re.nodes.get(((ni) as i64)).ch.get(0i64); let _t41 = i; let _t42 = i; bestParse(mem, s, re, d, _t40, _t41, _t42) };
                 }
@@ -1300,7 +1303,7 @@ pub fn bestConcat(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut d
     }
     let mut bestOff: i64 = (1i64).wrapping_neg();
     let mut bestLen: i64 = 0i64;
-    let mut bestTree: i32 = (((1i32).wrapping_neg()) as i32);
+    let mut bestTree: i32 = (1i32).wrapping_neg();
     let head0: i32 = re.nodes.get(((ni) as i64)).ch.get(idx);
     let mut lo: i64 = (i + re.nodes.get(((head0) as i64)).minL);
     if (re.nodes.get(((ni) as i64)).sufMax.get((idx + 1i64)) < lenInf) {
@@ -1535,7 +1538,7 @@ pub fn cMul(a: i64, b: i64) -> i64 {
 }
 
 pub fn ContractHeapBytes(c: &mut Contract) -> i64 {
-    let mut capture: i64 = ((0i64) as i64);
+    let mut capture: i64 = 0i64;
     if c.HasOnePass {
         capture = c.OnePass.HeapBytes;
     }
@@ -1593,9 +1596,9 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
     }
     let n: i64 = ((re.prog.ins.len) as i64);
     let k: i64 = ((re.minSlots) as i64);
-    let mut ring: i64 = ((2i64) as i64);
+    let mut ring: i64 = 2i64;
     if re.prog.multi {
-        ring = (maxElemAhead + 1i64);
+        ring = 9i64;
     }
     let heap: i64 = workspaceHeapBound(n, k, ring);
     let mut payloads: i64 = (n + 1i64);
@@ -1605,7 +1608,7 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
     let perPop: i64 = cMul(2i64, (k + 3i64));
     let perBoundary: i64 = cAdd(cMul(n, cMul(payloads, perPop)), cMul(n, cAdd(atom, (k + 8i64))));
     let steps: i64 = cMul(cAdd(length, 2i64), perBoundary);
-    let stack: i64 = (((matcherStackBytes) as i64) + (equivFrames * frameBytes));
+    let stack: i64 = 4608i64;
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1633,11 +1636,11 @@ pub fn solverContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContrac
     let tree: i64 = treeNodes(re.nodes, re.root, length);
     let perStep: i64 = cAdd(atom, cAdd(cMul(2i64, tree), (cMul(2i64, ((re.minSlots) as i64)) + 4i64)));
     let steps: i64 = cAdd(cMul(structural, perStep), cMul(tree, (((re.nsub) as i64) + 2i64)));
-    let perAlloc: i64 = cAdd(((2i64 * ptreeBytes) + mapEntryBytes), cMul(kidBytes, cAdd(solverFanout(re.nodes, re.root, length), 1i64)));
+    let perAlloc: i64 = cAdd(224i64, cMul(kidBytes, cAdd(solverFanout(re.nodes, re.root, length), 1i64)));
     let mut heap: i64 = cAdd(cMul(structural, perAlloc), cMul(16i64, ((re.minSlots) as i64)));
     heap = cAdd(heap, 4096i64);
     heap = cAdd(heap, { let _t1 = length; captureHeap(re, _t1) });
-    let stack: i64 = cMul(cAdd(depth, (equivFrames + 4i64)), frameBytes);
+    let stack: i64 = cMul(cAdd(depth, 14i64), frameBytes);
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1645,7 +1648,7 @@ pub fn solverContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContrac
 }
 
 pub fn astSize(nodes: vg::Slice<node>, ni: i32) -> i64 {
-    let mut total: i64 = ((1i64) as i64);
+    let mut total: i64 = 1i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < nodes.get(((ni) as i64)).ch.len) {
@@ -1659,7 +1662,7 @@ pub fn astSize(nodes: vg::Slice<node>, ni: i32) -> i64 {
 }
 
 pub fn astHeight(nodes: vg::Slice<node>, ni: i32) -> i64 {
-    let mut deepest: i64 = ((0i64) as i64);
+    let mut deepest: i64 = 0i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < nodes.get(((ni) as i64)).ch.len) {
@@ -1677,7 +1680,7 @@ pub fn atomCost(re: &mut Regexp) -> i64 {
 }
 
 pub fn atomCostNode(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i32) -> i64 {
-    let mut cost: i64 = ((1i64) as i64);
+    let mut cost: i64 = 1i64;
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opChar {
@@ -1700,7 +1703,7 @@ pub fn atomCostNode(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i32)
 
 pub fn bracketAtomCost(brs: vg::Slice<bracketSet>, bi: i32) -> i64 {
     let members: i64 = (((((brs.get(((bi) as i64)).ranges.len + brs.get(((bi) as i64)).elems.len) + brs.get(((bi) as i64)).equivs.len)) as i64) + bracketFixedChecks);
-    let cost: i64 = cMul((maxPreimages + 1i64), members);
+    let cost: i64 = cMul(17i64, members);
     if (!bracketHasMultiMembers(brs, bi)) {
         return cost;
     }
@@ -1716,13 +1719,13 @@ pub fn bracketAtomCost(brs: vg::Slice<bracketSet>, bi: i32) -> i64 {
     }
     let mut multi: i64 = elemChars;
     if (brs.get(((bi) as i64)).equivs.len > 0i64) {
-        let mut candidates: i64 = ((1i64) as i64);
+        let mut candidates: i64 = 1i64;
         if brs.get(((bi) as i64)).icase {
             {
                 let mut i_2: i64 = 0i64;
                 '_b2: while (i_2 < maxElemAhead) {
                     '_c2: {
-                        candidates *= (maxPreimages + 1i64);
+                        candidates *= 17i64;
                     }
                     i_2 += 1i64;
                 }
@@ -1730,7 +1733,7 @@ pub fn bracketAtomCost(brs: vg::Slice<bracketSet>, bi: i32) -> i64 {
         }
         multi = cAdd(multi, cMul(candidates, cMul((((brs.get(((bi) as i64)).equivs.len) as i64) + 1i64), maxElemAhead)));
     }
-    return cAdd(cost, cMul((maxElemAhead - 1i64), multi));
+    return cAdd(cost, cMul(7i64, multi));
 }
 
 pub fn solverSteps(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
@@ -1774,7 +1777,7 @@ pub fn solverDepth(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opGroup || _t1 == opAlt || _t1 == opConcat {
-            let mut deepest: i64 = ((0i64) as i64);
+            let mut deepest: i64 = 0i64;
             {
                 let mut i: i64 = 0i64;
                 '_b2: while (i < nodes.get(((ni) as i64)).ch.len) {
@@ -1799,7 +1802,7 @@ pub fn treeNodes(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opGroup || _t1 == opAlt {
-            let mut widest: i64 = ((0i64) as i64);
+            let mut widest: i64 = 0i64;
             {
                 let mut i: i64 = 0i64;
                 '_b2: while (i < nodes.get(((ni) as i64)).ch.len) {
@@ -1811,7 +1814,7 @@ pub fn treeNodes(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
             }
             return cAdd(widest, 1i64);
         } else if _t1 == opConcat {
-            let mut total: i64 = ((1i64) as i64);
+            let mut total: i64 = 1i64;
             {
                 let mut i_2: i64 = 0i64;
                 '_b3: while (i_2 < nodes.get(((ni) as i64)).ch.len) {
@@ -1830,7 +1833,7 @@ pub fn treeNodes(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
 }
 
 pub fn solverFanout(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
-    let mut widest: i64 = ((1i64) as i64);
+    let mut widest: i64 = 1i64;
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opConcat {
@@ -1879,7 +1882,7 @@ pub fn workspaceHeapBound(n: i64, k: i64, ring: i64) -> i64 {
     let mut heap: i64 = cMul(ring, cMul(n, (16i64 + (4i64 * k))));
     heap = cAdd(heap, ((8i64 * ((queueCompactFactor * n) + 2i64)) + n));
     heap = cAdd(heap, (cMul(ring, 112i64) + 256i64));
-    return cAdd(heap, ((12i64 * k) + (4i64 * maxElemAhead)));
+    return cAdd(heap, ((12i64 * k) + 32i64));
 }
 
 pub fn ctrLess(a: vg::Slice<u32>, b: vg::Slice<u32>) -> bool {
@@ -1935,7 +1938,7 @@ pub fn runPhaseA(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, eflags: u32
     e.ring = 2i64;
     e.nlMode = ((re.flags & FlagNewline) != 0u32);
     if re.prog.multi {
-        e.ring = (maxElemAhead + 1i64);
+        e.ring = 9i64;
     }
     { let _t1 = re.prog.ins.len; let _t2 = e.k; let _t3 = e.ring; prepare(mem, &mut ws, _t1, _t2, _t3) };
     paRun(mem, &mut e, &mut ws, re);
@@ -2527,7 +2530,7 @@ pub fn localeLoad(l: &mut Locale, blob: vg::Str) -> bool {
 }
 
 pub fn localeValidate(l: &mut Locale) -> bool {
-    if ({ let _t1 = secCtypeStage1; sectionLen(l, _t1) } < (2i64 * ctypeStage1Entries)) {
+    if ({ let _t1 = secCtypeStage1; sectionLen(l, _t1) } < 8704i64) {
         return false;
     }
     let blocksLen: i64 = { let _t2 = secCtypeBlocks; sectionLen(l, _t2) };
@@ -2536,7 +2539,7 @@ pub fn localeValidate(l: &mut Locale) -> bool {
         '_b3: while (i < ctypeStage1Entries) {
             '_c3: {
                 let block: i64 = (({ let _t4 = secCtypeStage1; let _t5 = i; u16At(l, _t4, _t5) }) as i64);
-                if (((2i64 * 256i64) * (block + 1i64)) > blocksLen) {
+                if ((512i64 * (block + 1i64)) > blocksLen) {
                     return false;
                 }
             }
@@ -2682,7 +2685,7 @@ pub fn validScalar(r: i32) -> bool {
 
 pub fn asciiLower(c: u8) -> u8 {
     if ((c >= 65u8) && (c <= 90u8)) {
-        return (c + (97u8 - 65u8));
+        return (c + 32u8);
     }
     return c;
 }
@@ -2968,40 +2971,40 @@ pub fn posixMask(r: i32) -> u16 {
     let xdigit: bool = ((digit || ((r >= 65i32) && (r <= 70i32))) || ((r >= 97i32) && (r <= 102i32)));
     let mut mask: u16 = vg::zero();
     if alnum {
-        mask |= (1u16 << classAlnum);
+        mask |= 1u16;
     }
     if alpha {
-        mask |= (1u16 << classAlpha);
+        mask |= 2u16;
     }
     if blank {
-        mask |= (1u16 << classBlank);
+        mask |= 4u16;
     }
     if cntrl {
-        mask |= (1u16 << classCntrl);
+        mask |= 8u16;
     }
     if digit {
-        mask |= (1u16 << classDigit);
+        mask |= 16u16;
     }
     if graph {
-        mask |= (1u16 << classGraph);
+        mask |= 32u16;
     }
     if lower {
-        mask |= (1u16 << classLower);
+        mask |= 64u16;
     }
     if print {
-        mask |= (1u16 << classPrint);
+        mask |= 128u16;
     }
     if punct {
-        mask |= (1u16 << classPunct);
+        mask |= 256u16;
     }
     if space {
-        mask |= (1u16 << classSpace);
+        mask |= 512u16;
     }
     if upper {
-        mask |= (1u16 << classUpper);
+        mask |= 1024u16;
     }
     if xdigit {
-        mask |= (1u16 << classXdigit);
+        mask |= 2048u16;
     }
     return mask;
 }
@@ -4002,7 +4005,7 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) {
 }
 
 pub fn instrEstimate(nodes: vg::Slice<node>, ni: i32) -> i64 {
-    let estimateCap: i64 = (((maxProgram) as i64) * 4i64);
+    let estimateCap: i64 = 4194304i64;
     let mut total: i64 = 0i64;
     {
         let _t1 = nodes.get(((ni) as i64)).op;
@@ -4261,7 +4264,7 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
     if nodes.get(((ni) as i64)).minimal {
         let slot: i64 = nodes.get(((ni) as i64)).index;
         if (slot < maskWidth) {
-            mask_v |= (((1u64) as u64) << slot);
+            mask_v |= (1u64 << slot);
         } else {
             let grown: vg::Slice<u32> = vg::make::<u32>(mem, (extra_v.len + 1i64));
             let _ = vg::vcopy(grown, extra_v);

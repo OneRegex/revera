@@ -695,7 +695,24 @@ func isBorrowArg(a *vegoc.Expr) bool {
 	return a.Typ != nil && a.Typ.K == vegoc.KPtr
 }
 
+// constLiteral renders a constant integer expression as one literal of its type.
+// The value folds at the precision Go uses, so no intermediate result truncates to a leaf type.
+func (g *gen) constLiteral(e *vegoc.Expr) (string, bool) {
+	switch e.K {
+	case "int", "char", "ident":
+		return "", false
+	}
+	v, ok := vegoc.FoldConst(g.p, e)
+	if !ok {
+		return "", false
+	}
+	return g.expr(vegoc.ConstExpr(v, e.Typ)), true
+}
+
 func (g *gen) expr(e *vegoc.Expr) string {
+	if lit, ok := g.constLiteral(e); ok {
+		return lit
+	}
 	switch e.K {
 	case "int", "char":
 		return intLiteral(e)
@@ -854,6 +871,16 @@ func (g *gen) builtin(e *vegoc.Expr) string {
 			return fmt.Sprintf("vg::append_slice(mem, %s, %s)", g.expr(e.Args[0]), g.expr(e.Args[1]))
 		}
 		out := g.expr(e.Args[0])
+		if vegoc.AppendNeedsPin(e) {
+			// Every element evaluates before the first append writes, as in Go.
+			var pre []string
+			for _, a := range e.Args[1:] {
+				tmp := g.newTmp()
+				pre = append(pre, fmt.Sprintf("let %s = %s;", tmp, g.expr(a)))
+				out = fmt.Sprintf("vg::append(mem, %s, %s)", out, tmp)
+			}
+			return "{ " + strings.Join(pre, " ") + " " + out + " }"
+		}
 		for _, a := range e.Args[1:] {
 			out = fmt.Sprintf("vg::append(mem, %s, %s)", out, g.expr(a))
 		}

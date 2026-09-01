@@ -196,7 +196,13 @@ func structCmp(s *capSolver, re *Regexp, a int32, b int32) int {
 // cmpCand compares two parses of the same pattern node over the same span.
 // It compares the minimal repetition counters first, then the structure.
 // A negative result means a wins.
+//
+// After a failure, every allocator hands out offset zero, so a record can name itself as its own child and a walk would never end.
+// The failure decides the outcome anyway, so the comparison stops there.
 func cmpCand(s *capSolver, re *Regexp, a int32, b int32) int {
+	if s.failed {
+		return 1
+	}
 	if re.minSlots > 0 {
 		for idx := 0; idx < re.minSlots; idx++ {
 			s.ctrA[idx] = 0
