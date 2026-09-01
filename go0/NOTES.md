@@ -204,7 +204,3 @@ After the fix, 20,000 random pattern/subject pairs, including anchors and negate
   Folklore expectations of `(0,1)(1,4)` follow a different reading and do not bind this implementation.
 - Go's `regexp.CompilePOSIX` diverges from POSIX on newline handling: dot excludes newline, negated classes exclude newline, and anchors match at line boundaries.
   The stdlib differential avoids newline in subjects and negated classes in patterns for this reason.
-
-## What went wrong along the way
-
-[`MISTAKES.md`](../MISTAKES.md) at the repository root keeps that record, with the symptom and the fix for each one.

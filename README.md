@@ -4,7 +4,7 @@ This repository is a clean-room implementation of the POSIX.1-2024 Extended Regu
 
 It holds one written contract, one reference engine in Go, and the same engine in Rust, Zig, C++, and C11.
 The five engines come from a single source, through a mechanical pipeline.
-A LEAN4 model proves what that pipeline preserves.
+A Lean 4 model proves what that pipeline preserves.
 A C locale runtime and its generated CLDR tables supply the character classes, case mappings and collating data underneath.
 
 ## Repository contents
@@ -34,9 +34,10 @@ A C locale runtime and its generated CLDR tables supply the character classes, c
   A reference matcher that enumerates every parse checks its answers, and the host `regcomp()` checks them again.
 - [`go1/`](go1/) rewrites that engine in Vego, a Go subset built for mechanical translation, and exports it as `revera.vego.json`.
 - [`rust1/`](rust1/), [`zig1/`](zig1/), [`cpp1/`](cpp1/), and [`c1/`](c1/) are the engine printed into each target language, with a hand-written public API in the shape that language expects.
-- [`lean/`](lean/) is the LEAN4 model of Vego.
+- [`lean/`](lean/) is the Lean 4 model of Vego.
   It gives the subset a formal semantics.
-  It then proves that the shipped JSON artifacts are well formed, run without traps, reproduce the Go reference outputs, and stay inside their resource contracts.
+  It proves that the shipped JSON artifacts are well formed.
+  It also checks that the embedded probe and selected corpus executions reproduce the Go reference outputs and stay inside their resource contracts.
 
 Each directory has a README that states its own API and how to verify it.
 
@@ -55,7 +56,6 @@ Project changes belong outside `ref/`, unless a reference revision moves on purp
 
 - [`Makefile`](Makefile) builds and runs the locale tests.
 - [`LICENSES/Unicode-3.0.txt`](LICENSES/Unicode-3.0.txt) is the license of the generated Unicode and CLDR data.
-- [`LOG.md`](LOG.md), [`MISTAKES.md`](MISTAKES.md) and [`api-faq.md`](api-faq.md) record the work and the corrections along the way.
 
 ## Build and test
 
@@ -68,8 +68,8 @@ make test
 The Go engines need only a Go toolchain:
 
 ```sh
-cd go0 && go test ./...
-cd go1 && go test ./...
+(cd go0 && go test ./...)
+(cd go1 && go test ./...)
 ```
 
 Regenerate every Vego JSON and Rust, Zig, C++, and C11 source artifact with one command:
@@ -79,7 +79,7 @@ make generate
 make check-generated
 ```
 
-`check-generated` renders into an isolated directory under `tmp/`, compares file contents, and exits nonzero without modifying the repository when an artifact is stale or missing.
+`check-generated` renders into an isolated directory under `tmp/`, compares file contents, and exits nonzero without modifying checked generated artifacts when an artifact is stale or missing.
 Set `GENERATION_TARGETS=rust`, `zig`, `cpp`, `c`, or a comma-separated selection to limit the target sources.
 The two shared JSON files are always included.
 
