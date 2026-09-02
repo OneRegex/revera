@@ -370,12 +370,12 @@ c := re.<span class="tok-fn">Contract</span>(<span class="tok-num">65536</span>)
 }</code></pre>
 <pre class="pane" role="tabpanel" id="pane-ts" aria-labelledby="tab-ts" data-pane="ts" tabindex="0"><code><span class="tok-kw">import</span> { Regex } <span class="tok-kw">from</span> <span class="tok-str">"revera"</span>;
 
-<span class="tok-kw">const</span> re = Regex.<span class="tok-fn">compile</span>(<span class="tok-str">"(abc)([0-9]*)"</span>);
+<span class="tok-kw">const</span> re = <span class="tok-kw">new</span> <span class="tok-fn">Regex</span>(<span class="tok-str">"(abc)([0-9]*)"</span>);
 <span class="tok-kw">const</span> caps = re.<span class="tok-fn">captures</span>(<span class="tok-str">"__abc12__"</span>);
 <span class="tok-kw">if</span> (caps === <span class="tok-kw">null</span>) {
     <span class="tok-kw">throw new</span> <span class="tok-fn">Error</span>(<span class="tok-str">"no match"</span>);
 }
-console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<span class="tok-num">1</span>));</code></pre>
+console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<span class="tok-num">1</span>)?.text);</code></pre>
       </div>
       <div class="codeblock__foot">// every one of them prints: <code>abc</code></div>
     </div>

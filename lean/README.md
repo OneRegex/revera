@@ -3,7 +3,7 @@
 This directory holds the Lean 4 formalization that the Vego specification promises, and a formal model of the ERE specification the engine implements.
 
 It gives the subset a formal semantics.
-It applies that semantics to the exact JSON artifacts that the Go, Rust, Zig, C++, and C11 printers consume.
+It applies that semantics to the exact JSON artifacts that the Go, Rust, Zig, TypeScript, C++, and C11 printers consume.
 It states the POSIX ERE contract of `docs/POSIX-1-2024-ERE-SPECIFICATION.md` as a Lean definition, and checks the interpreted engine against that definition.
 
 The theorems in `Vego/Theorems.lean` are machine checked.
@@ -271,7 +271,7 @@ What remains corpus-bound is the control flow of the walk and of the capture sol
 
 ## What this means for the pipeline
 
-The generated Rust, Zig, C++, and C11 engines come from the same JSON that the theorems cover.
+The generated Rust, Zig, TypeScript, C++, and C11 engines come from the same JSON that the theorems cover.
 `dev/internal/conformance/crosscheck` verifies all four against the Go engine on the same corpus.
 
 On the covered corpus commands, the Lean semantics therefore anchors the whole chain.

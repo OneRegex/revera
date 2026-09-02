@@ -1,0 +1,22 @@
+{
+  "name": "ts",
+  "generated": ["src/engine.ts", "src/probe_engine.ts"],
+  "toolchain": ["node", "--version"],
+  "release": {
+    "build": [["make", "all"]],
+    "driver": "driver",
+    "probe": "probe",
+    "bench": "bench",
+    "fuzzcase": "fuzzcase"
+  },
+  "checked": [
+    {
+      "name": "typecheck",
+      "requires": ["npx", "--no-install", "tsc", "--version"],
+      "build": [["make", "check"]],
+      "driver": "driver",
+      "probe": "probe",
+      "fuzzcase": "fuzzcase"
+    }
+  ]
+}

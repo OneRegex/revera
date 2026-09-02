@@ -37,7 +37,7 @@ import (
 )
 
 // licenseCopies are the package directories that carry their own copy of the root license files.
-var licenseCopies = []string{"go", "rust", "zig", "native"}
+var licenseCopies = []string{"go", "rust", "zig", "ts", "native"}
 
 // dataLicense is the license of the embedded CLDR data.
 const dataLicense = "LICENSES/Unicode-3.0.txt"

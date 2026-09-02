@@ -7,6 +7,7 @@
 //	vegoc emit go   [-o engine.go] input.json
 //	vegoc emit rust [-o engine.rs] input.json
 //	vegoc emit zig  [-o engine.zig] input.json
+//	vegoc emit ts   [-o engine.ts] input.json
 //	vegoc emit cpp  [-header engine.hpp] [-source engine.cpp] [-namespace name] input.json
 //	vegoc emit c    [-header engine.h] [-source engine.c] [-prefix name] input.json
 //	vegoc version
@@ -31,6 +32,7 @@ import (
 	"github.com/oneregex/revera/vego/compiler/printer/cpp"
 	"github.com/oneregex/revera/vego/compiler/printer/golang"
 	"github.com/oneregex/revera/vego/compiler/printer/rust"
+	"github.com/oneregex/revera/vego/compiler/printer/ts"
 	"github.com/oneregex/revera/vego/compiler/printer/zig"
 )
 
@@ -40,6 +42,7 @@ const usageText = `usage:
   vegoc emit go   [-o engine.go] input.json
   vegoc emit rust [-o engine.rs] input.json
   vegoc emit zig  [-o engine.zig] input.json
+  vegoc emit ts   [-o engine.ts] input.json
   vegoc emit cpp  [-header engine.hpp] [-source engine.cpp] [-namespace name] input.json
   vegoc emit c    [-header engine.h] [-source engine.c] [-prefix name] input.json
   vegoc version
@@ -168,6 +171,14 @@ func runEmit(args []string, stdout, stderr io.Writer) int {
 			}
 			return zig.Emit(p)
 		})
+	case "ts":
+		return emitOne(target, rest, stdout, stderr, func(blob []byte) (string, error) {
+			p, err := load(blob)
+			if err != nil {
+				return "", err
+			}
+			return ts.Emit(p)
+		})
 	case "cpp":
 		flags := newFlagSet("emit cpp", stderr,
 			"usage: vegoc emit cpp [-header engine.hpp] [-source engine.cpp] [-namespace name] input.json")
@@ -193,7 +204,7 @@ func runEmit(args []string, stdout, stderr io.Writer) int {
 			return c.Emit(p, c.Options{HeaderName: filepath.Base(*header), Prefix: *prefix})
 		})
 	}
-	fmt.Fprintf(stderr, "unknown emit target %q; the targets are go, rust, zig, cpp and c\n", target)
+	fmt.Fprintf(stderr, "unknown emit target %q; the targets are go, rust, zig, ts, cpp and c\n", target)
 	return 2
 }
 

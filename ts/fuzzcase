@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs the fuzzcase host under Node, which executes the TypeScript sources directly.
+exec node "$(dirname "$0")/src/fuzzcase_main.ts" "$@"

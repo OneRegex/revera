@@ -3,7 +3,7 @@
 ## Supported versions
 
 Only the latest release of Revera receives fixes.
-One release number covers the Go, Rust, Zig, C and C++ implementations, so a fix lands in all five at once.
+One release number covers the Go, Rust, Zig, C, C++ and TypeScript implementations, so a fix lands in all six at once.
 
 ## Reporting a vulnerability
 

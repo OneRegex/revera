@@ -256,6 +256,7 @@ var DataCopies = []string{
 	"dev/internal/reference/locale/data.bin",
 	"rust/src/data.bin",
 	"zig/src/data.bin",
+	"ts/src/data.bin",
 	"native/c/data.bin",
 	"native/cpp/data.bin",
 }

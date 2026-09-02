@@ -1,13 +1,13 @@
 #!/bin/sh
 # Copy the license files of the repository root into every package that ships on its own.
-# Cargo, the Zig package manager and the native archive all read from their own directory,
+# Cargo, the Zig package manager, npm and the native archive all read from their own directory,
 # and the Go module of go/ needs the data license next to data.bin.
 # The dist command checks that the copies are current.
 
 set -eu
 cd "$(dirname "$0")/.."
 
-for dir in go rust zig native; do
+for dir in go rust zig ts native; do
     mkdir -p "$dir/LICENSES"
     cp LICENSES/Unicode-3.0.txt "$dir/LICENSES/Unicode-3.0.txt"
     if [ -f LICENSE ]; then

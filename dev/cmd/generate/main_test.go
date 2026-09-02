@@ -46,7 +46,7 @@ func writeTestFile(t *testing.T, path string, content []byte) {
 func createFixtureRepository(t *testing.T, parent string) string {
 	t.Helper()
 	repo := filepath.Join(parent, "repository with spaces")
-	for _, rel := range []string{"go", "vego/probe", "dev", "rust", "zig", "native/c", "native/cpp", "tmp"} {
+	for _, rel := range []string{"go", "vego/probe", "dev", "rust", "zig", "ts", "native/c", "native/cpp", "tmp"} {
 		if err := os.MkdirAll(filepath.Join(repo, filepath.FromSlash(rel)), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -136,7 +136,7 @@ func generationTempEntries(t *testing.T, repo string) []string {
 }
 
 func TestParseTargets(t *testing.T) {
-	all := targetSet{"rust": true, "zig": true, "cpp": true, "c": true}
+	all := targetSet{"rust": true, "zig": true, "ts": true, "cpp": true, "c": true}
 	cases := []struct {
 		name   string
 		values []string
@@ -144,8 +144,8 @@ func TestParseTargets(t *testing.T) {
 	}{
 		{name: "default", want: all},
 		{name: "all", values: []string{"all"}, want: all},
-		{name: "comma list", values: []string{"rust, zig,cpp,c"}, want: all},
-		{name: "repeated", values: []string{"cpp", "rust", "zig", "c"}, want: all},
+		{name: "comma list", values: []string{"rust, zig,ts,cpp,c"}, want: all},
+		{name: "repeated", values: []string{"cpp", "rust", "ts", "zig", "c"}, want: all},
 		{name: "deduplicated", values: []string{"rust,rust"}, want: targetSet{"rust": true}},
 		{name: "one", values: []string{" zig "}, want: targetSet{"zig": true}},
 	}
@@ -193,6 +193,7 @@ func TestArtifactsAndPlanAreDeterministic(t *testing.T) {
 		"revera.vego.json", "vego/probe/probe.vego.json",
 		"rust/src/engine.rs", "rust/src/probe_engine.rs",
 		"zig/src/engine.zig", "zig/src/probe_engine.zig",
+		"ts/src/engine.ts", "ts/src/probe_engine.ts",
 		"native/cpp/engine.hpp", "native/cpp/engine.cpp",
 		"native/cpp/probe_engine.hpp", "native/cpp/probe_engine.cpp",
 		"native/c/engine.h", "native/c/engine.c",
@@ -211,6 +212,7 @@ func TestArtifactsAndPlanAreDeterministic(t *testing.T) {
 		"export revera IR", "export probe IR",
 		"generate Rust engine", "generate Rust probe",
 		"generate Zig engine", "generate Zig probe",
+		"generate TypeScript engine", "generate TypeScript probe",
 		"generate C++ engine", "generate C++ probe",
 		"generate C engine", "generate C probe",
 	}
@@ -221,11 +223,11 @@ func TestArtifactsAndPlanAreDeterministic(t *testing.T) {
 	if !slices.Equal(gotSteps, wantSteps) {
 		t.Fatalf("steps = %q, want %q", gotSteps, wantSteps)
 	}
-	cpp := plan[6]
+	cpp := plan[8]
 	if !slices.Contains(cpp.args, "revera::engine") {
 		t.Fatalf("C++ engine arguments omit the namespace: %q", cpp.args)
 	}
-	c := plan[8]
+	c := plan[10]
 	if !slices.Contains(c.args, "revera_eng") {
 		t.Fatalf("C engine arguments omit the prefix: %q", c.args)
 	}

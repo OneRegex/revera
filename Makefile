@@ -21,6 +21,7 @@ lint:
 	cd vego && golangci-lint run ./...
 	cd dev && golangci-lint run ./...
 	cd rust && cargo clippy --workspace --all-targets
+	cd ts && npx --no-install tsc --noEmit -p tsconfig.json
 
 # CONFORM_FLAGS passes options through, for example CONFORM_FLAGS="-backend ../native/cpp -lean".
 conform:

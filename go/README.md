@@ -1,14 +1,14 @@
 # Revera for Go
 
 This module is the Go implementation of the Revera POSIX.1-2024 extended regular expression engine.
-Across the project, the five language implementations are cross-checked on the shared conformance corpus.
+Across the project, the six language implementations are cross-checked on the shared conformance corpus.
 
 The module path is `github.com/oneregex/revera/go`, and it has no dependencies.
 
 The engine is written in Vego, the strict Go subset that [`../vego/SPECIFICATION.md`](../vego/SPECIFICATION.md) defines.
 For that reason, this directory is also the canonical source of every other implementation.
 
-`vegoc export` turns it into `../revera.vego.json`, and the printers of `vegoc emit` turn that file into the Rust, Zig, C++ and C engines.
+`vegoc export` turns it into `../revera.vego.json`, and the printers of `vegoc emit` turn that file into the Rust, Zig, TypeScript, C++ and C engines.
 
 ## Using it
 

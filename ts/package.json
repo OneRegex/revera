@@ -1,0 +1,38 @@
+{
+  "name": "revera",
+  "version": "0.1.0",
+  "description": "POSIX.1-2024 extended regular expressions, generated from the Revera Vego engine",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/revera.ts",
+  "types": "./src/revera.ts",
+  "exports": {
+    ".": "./src/revera.ts"
+  },
+  "files": [
+    "src/revera.ts",
+    "src/engine.ts",
+    "src/vg.ts",
+    "src/data.bin",
+    "README.md",
+    "LICENSE",
+    "LICENSES"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test test/"
+  },
+  "keywords": [
+    "regex",
+    "posix",
+    "ere",
+    "regular-expressions"
+  ],
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs the driver host under Node, which executes the TypeScript sources directly.
+exec node "$(dirname "$0")/src/driver.ts" "$@"

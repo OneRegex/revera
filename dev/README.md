@@ -10,7 +10,7 @@ Within the repository, the module depends on the `go` and `vego` modules through
 Run them from this directory.
 Each one finds the repository root from the working directory, or takes `-repo`.
 
-- `go run ./cmd/generate [-check] [-target rust,zig,cpp,c|all]` renders the Vego IR and the generated engines with `vegoc`, into a staging directory under `tmp/`, and installs them in one transaction.
+- `go run ./cmd/generate [-check] [-target rust,zig,ts,cpp,c|all]` renders the Vego IR and the generated engines with `vegoc`, into a staging directory under `tmp/`, and installs them in one transaction.
   With `-check` it compares the staged output with the checked-in files and installs nothing.
   `make generate` and `make check-generated` at the root call it.
 - `go run ./cmd/conform [-backend dir]... [-stress rounds] [-seed n] [-quick] [-skip steps] [-lean] [-allow-skip] [-timeout duration]` runs the backend conformance kit.
@@ -44,7 +44,7 @@ go test ./...
 go test -count=1 -timeout 30m ./internal/differential
 go test -count=1 -timeout 30m -race ./internal/differential
 go test ./internal/differential -run TestLocaleExpectedData -update
-go run ./internal/conformance/crosscheck ../rust/target/release/driver ../zig/zig-out/bin/driver ../native/cpp/driver ../native/c/driver
+go run ./internal/conformance/crosscheck ../rust/target/release/driver ../zig/zig-out/bin/driver ../ts/driver ../native/cpp/driver ../native/c/driver
 go run ./internal/conformance/probecheck ../rust/target/release/probe
 ```
 
@@ -67,7 +67,7 @@ It also refuses to run when the three package versions disagree, when a license 
 
 However, it does not regenerate or test the committed files, so run `make check-generated` and the release validation before committing the revision to stage.
 
-Separately, `sh sync-licenses.sh` copies the root license files into `go/`, `rust/`, `zig/` and `native/`.
+Separately, `sh sync-licenses.sh` copies the root license files into `go/`, `rust/`, `zig/`, `ts/` and `native/`.
 
 ## License
 

@@ -3,8 +3,8 @@
 //
 // Usage:
 //
-//	generate [-repo path] [-target rust,zig,cpp,c|all]
-//	generate -check [-repo path] [-target rust,zig,cpp,c|all]
+//	generate [-repo path] [-target rust,zig,ts,cpp,c|all]
+//	generate -check [-repo path] [-target rust,zig,ts,cpp,c|all]
 //
 // With -check, nothing is installed; the command compares the staged output with the checked-in files and exits nonzero when one is stale or missing.
 package main
@@ -25,13 +25,13 @@ import (
 )
 
 const usageText = `usage:
-  generate [-repo path] [-target rust,zig,cpp,c|all]
-  generate -check [-repo path] [-target rust,zig,cpp,c|all]
+  generate [-repo path] [-target rust,zig,ts,cpp,c|all]
+  generate -check [-repo path] [-target rust,zig,ts,cpp,c|all]
 
 The -target flag may be repeated. Omitting it selects all targets.
 -check compares the staged output with the checked-in files and installs nothing.`
 
-var targetOrder = []string{"rust", "zig", "cpp", "c"}
+var targetOrder = []string{"rust", "zig", "ts", "cpp", "c"}
 
 type targetValues []string
 
@@ -48,7 +48,7 @@ type targetSet map[string]bool
 
 func parseTargets(values []string) (targetSet, error) {
 	if len(values) == 0 {
-		return targetSet{"rust": true, "zig": true, "cpp": true, "c": true}, nil
+		return targetSet{"rust": true, "zig": true, "ts": true, "cpp": true, "c": true}, nil
 	}
 	selected := targetSet{}
 	sawAll := false
@@ -72,7 +72,7 @@ func parseTargets(values []string) (targetSet, error) {
 		if len(selected) != 0 || len(values) != 1 || strings.TrimSpace(values[0]) != "all" {
 			return nil, fmt.Errorf("target all cannot be combined with another target")
 		}
-		return targetSet{"rust": true, "zig": true, "cpp": true, "c": true}, nil
+		return targetSet{"rust": true, "zig": true, "ts": true, "cpp": true, "c": true}, nil
 	}
 	return selected, nil
 }
@@ -129,6 +129,11 @@ func artifactsFor(targets targetSet) []artifact {
 		artifacts = append(artifacts,
 			artifact{rel: "zig/src/engine.zig"},
 			artifact{rel: "zig/src/probe_engine.zig"})
+	}
+	if targets["ts"] {
+		artifacts = append(artifacts,
+			artifact{rel: "ts/src/engine.ts"},
+			artifact{rel: "ts/src/probe_engine.ts"})
 	}
 	if targets["cpp"] {
 		artifacts = append(artifacts,
@@ -206,6 +211,11 @@ func generationPlan(repo, stage string, targets targetSet) []generationStep {
 		steps = append(steps,
 			single("generate Zig engine", "zig", "zig/src/engine.zig", reveraJSON),
 			single("generate Zig probe", "zig", "zig/src/probe_engine.zig", probeJSON))
+	}
+	if targets["ts"] {
+		steps = append(steps,
+			single("generate TypeScript engine", "ts", "ts/src/engine.ts", reveraJSON),
+			single("generate TypeScript probe", "ts", "ts/src/probe_engine.ts", probeJSON))
 	}
 	if targets["cpp"] {
 		steps = append(steps,

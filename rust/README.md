@@ -3,7 +3,7 @@
 Revera is a POSIX.1-2024 extended regular expression engine.
 This directory is the Rust instantiation and the source of the `revera` crate for crates.io.
 
-The same engine exists in Go, Rust, Zig, C and C++, generated from one Vego source and exercised by one cross-language conformance suite.
+The same engine exists in Go, Rust, Zig, C, C++ and TypeScript, generated from one Vego source and exercised by one cross-language conformance suite.
 In addition, the Lean development gives Vego machine-checked semantics, and the repository's Lean README states its exact proof coverage.
 
 The engine speaks the POSIX ERE language: leftmost-longest matching, no backreferences, no Perl escapes.

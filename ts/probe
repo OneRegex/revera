@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs the probe host under Node, which executes the TypeScript sources directly.
+exec node "$(dirname "$0")/src/probe_main.ts" "$@"
