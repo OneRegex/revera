@@ -11,3 +11,4 @@ SWIVAL.md
 lean/.lake/
 tmp/
 ts/node_modules/
+ts/dist/

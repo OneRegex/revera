@@ -112,16 +112,20 @@ The runtime keeps one pair of counters for the bench host, and nothing else.
 ## Build and verify
 
 The hosts and the tests run straight from the TypeScript sources.
-Node 22.18 or later executes `.ts` files directly, so there is no build step.
+Node 22.18 or later executes `.ts` files directly, so there is no build step for them.
 The type checker is the one thing that `npm install` adds.
 
 ```sh
 npm install
 npm run check                 # tsc --noEmit
 npm test                      # node --test test/
+npm run build                 # dist/: the package entry as JavaScript with declarations
 (cd ../dev && go run ./internal/conformance/crosscheck ../ts/driver)
 (cd ../dev && go run ./internal/conformance/probecheck ../ts/probe)
 ```
+
+The published package is `dist/`, because Node does not strip types from files under `node_modules`.
+`npm run build` compiles `revera.ts` and what it imports with `tsconfig.build.json`, rewrites the import extensions, and copies `data.bin` next to the output; `npm pack` runs it first.
 
 `driver` speaks the line protocol that `dev/internal/protocol/driver.go` defines, and `crosscheck` runs the corpus through it.
 `probe` prints the lines of the `vego/probe` package, which covers the subset constructs the engine never uses.
@@ -136,6 +140,7 @@ The one-command check is the conformance kit:
 It reads `backend.json`, runs the syntax check of the release build and the type check of the checked build, and runs the probe, the corpus and the fuzz seeds against each.
 Every runtime check of the engine, bounds and integer range alike, is on in both builds; the checked build adds the type checker, and it is skipped when the `typescript` package is not installed.
 
-The generated code runs about ten times slower than the native targets on the corpus.
+The generated code compiles patterns about five times slower than the native targets and matches five to ten times slower.
 Every element access carries a bounds check, every slice operation allocates a header, and the memo hash runs on `bigint`.
+The allocation counters agree with the other generated targets request for request, which is a useful check that the runtime follows the same growth rule.
 `docs/BENCHMARKS.md` records the figures.

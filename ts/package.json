@@ -4,16 +4,16 @@
   "description": "POSIX.1-2024 extended regular expressions, generated from the Revera Vego engine",
   "license": "MIT",
   "type": "module",
-  "main": "./src/revera.ts",
-  "types": "./src/revera.ts",
+  "main": "./dist/revera.js",
+  "types": "./dist/revera.d.ts",
   "exports": {
-    ".": "./src/revera.ts"
+    ".": {
+      "types": "./dist/revera.d.ts",
+      "default": "./dist/revera.js"
+    }
   },
   "files": [
-    "src/revera.ts",
-    "src/engine.ts",
-    "src/vg.ts",
-    "src/data.bin",
+    "dist",
     "README.md",
     "LICENSE",
     "LICENSES"
@@ -22,8 +22,10 @@
     "node": ">=22.18"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && cp src/data.bin dist/data.bin",
     "check": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "prepack": "npm run build"
   },
   "keywords": [
     "regex",

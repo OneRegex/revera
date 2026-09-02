@@ -49,6 +49,7 @@ The kit discovers every `*/backend.json` below the repository root and every `na
 - `generated` lists the generated sources, for the code-size report of `dev/cmd/bench size`.
 - `engine_symbols` is a regular expression over symbol names in the release driver.
   The code-size report sums the machine code of the functions it matches.
+  A backend that runs under an interpreter leaves it out, and the report then gives its source size only.
 - `toolchain` is a command that prints the compiler version, for the header of the benchmark report.
 - `release` is the optimized build.
   `build` is a list of argument vectors, run in order in the backend directory.

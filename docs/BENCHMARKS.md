@@ -27,9 +27,9 @@ Each case runs a fixed number of iterations, chosen so one repetition takes a fe
 The Go sessions run a garbage collection before each repetition, as `testing.B` does, so garbage from the earlier passes does not land inside a timed one.
 The tables report the fastest repetition; `-tsv` also records the slowest, so the noise of a run is visible.
 An untimed pass counts allocations: the bytes and the number of requests that the operation makes to its allocator.
-In Go these are heap allocations; in Rust, Zig, C++, and C11 they are arena requests, counted by the runtime.
+In Go these are heap allocations; in Rust, Zig, C++, and C11 they are arena requests, counted by the runtime; in TypeScript they are the buffers the runtime allocates for the engine, with the bytes at the element widths the runtime assumes.
 A match operation allocates its match buffer, as every public API does.
-The four generated targets report the same counts and, up to struct padding, the same bytes, which is expected, since they run the same program through the same growth rule, and it is a useful cross-check of the counters.
+The five generated targets report the same counts and, up to struct padding, the same bytes, which is expected, since they run the same program through the same growth rule, and it is a useful cross-check of the counters.
 
 The contract column of the allocation table is `ContractHeapBytes` of the pattern for the length of the subject.
 It is a bound, not a prediction, and the table shows how far the bound sits above the measured figure.
@@ -67,6 +67,7 @@ For a target-native profile, `perf record` on Linux and Instruments on macOS wor
 The source figure is the generated engine source of the target, and the Vego source for Go.
 The code figure is the machine code of the engine functions in the release driver, summed from the symbol table with `debug/macho` or `debug/elf`; the `engine_symbols` expression of `backend.json` selects the symbols, and for Go the host files are subtracted.
 The text figure is the whole executable section of the driver, which includes the runtime and the standard library of the language.
+A backend whose manifest has no `engine_symbols` expression, such as TypeScript, has no machine code to measure and reports its source figures only.
 
 Reference machine, 2026-08-31:
 
@@ -180,6 +181,35 @@ The targets column shows the C++ figure for the compile cases.
 Rust and Zig report a few percent less there, because they reorder struct fields while C++ keeps the declaration order, so a C++ AST node carries more padding.
 The match and replace figures are identical in the three targets.
 The full table with every column is in `tmp/bench-results.tsv` after a run.
+
+### TypeScript
+
+The TypeScript target runs under Node, so its figures come from a JIT, and they were measured on 2026-09-02 with Node 26.8.1 on the same machine, in one `make bench BENCH_FLAGS="-reference"` run with every other target.
+The C figures of that run are given next to them, since they moved by a few percent from the tables above.
+
+| case                   |        ts |        c | ratio |
+| ---------------------- | --------: | -------: | ----: |
+| compile/literal        |    2.2 us |   441 ns |   5.0 |
+| compile/alternation    |    7.1 us |   1.5 us |   4.7 |
+| compile/words          |   32.8 us |   6.7 us |   4.9 |
+| compile/counted-255    |   15.7 us |   4.4 us |   3.6 |
+| match/literal-hit      |   26.8 us |   3.6 us |   7.4 |
+| match/groups-long      |  313.9 us |  32.6 us |   9.6 |
+| match/words            |   2.37 ms | 224.5 us |  10.6 |
+| match/classes          |  123.8 us |  14.7 us |   8.4 |
+| match/utf8             |    2.4 us |   339 ns |   7.1 |
+| match/cs-collating     |   52.1 us |   3.5 us |  14.9 |
+| hard/nested-counted    |   2.15 ms | 156.1 us |  13.8 |
+| hard/five-dot-stars    |  14.97 ms | 861.6 us |  17.4 |
+| hard/re2-classic       |  341.0 us |  39.4 us |   8.7 |
+| hard/capacity-fallback | 300.19 ms | 28.74 ms |  10.4 |
+| replace/groups         |   1.57 ms | 113.6 us |  13.8 |
+| replace/empty-matches  |  549.6 us | 132.3 us |   4.2 |
+
+Compilation runs about five times slower than C, and matching between seven and seventeen times slower.
+A profile with `node --cpu-prof` puts the phase A matcher on top, and the cost is structural: every element access reads a slice header and checks its bounds, every subslice and append allocates a header, every 64-bit add is range-checked, and the memo hash and the capture masks compute on `bigint`.
+The allocation table shows the TypeScript column equal to the other generated targets in requests on every case, and a few percent above them in bytes, since the runtime charges a fixed width per struct field.
+`make size` reports the source figures only for TypeScript, because the engine has no machine code; the engine and probe sources are 233 KB and 6,253 lines, the largest of the printed engines because of the pinned bases and the bounds checks written out.
 
 ## What the figures say
 

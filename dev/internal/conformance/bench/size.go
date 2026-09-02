@@ -20,10 +20,12 @@ import (
 )
 
 // sizeRow is the code-size report of one engine.
+// A backend without engine_symbols has no machine code to measure, so only its source figures are set.
 type sizeRow struct {
 	name        string
 	sourceBytes int64
 	sourceLines int64
+	hasCode     bool
 	codeBytes   uint64
 	functions   int
 	textBytes   uint64
@@ -73,8 +75,11 @@ func runSize(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintln(stdout, "source is the engine source of the language, code is the machine code of the engine functions in the release driver, text is the whole executable section of that driver")
 	table := [][]string{{"engine", "source bytes", "source lines", "code bytes", "functions", "driver text bytes"}}
 	for _, r := range rows {
-		table = append(table, []string{r.name, fmt.Sprint(r.sourceBytes), fmt.Sprint(r.sourceLines),
-			fmt.Sprint(r.codeBytes), fmt.Sprint(r.functions), fmt.Sprint(r.textBytes)})
+		code, functions, text := "", "", ""
+		if r.hasCode {
+			code, functions, text = fmt.Sprint(r.codeBytes), fmt.Sprint(r.functions), fmt.Sprint(r.textBytes)
+		}
+		table = append(table, []string{r.name, fmt.Sprint(r.sourceBytes), fmt.Sprint(r.sourceLines), code, functions, text})
 	}
 	conformance.WriteTable(stdout, table, true)
 	return 0
@@ -101,7 +106,7 @@ func goSize(repo string) (sizeRow, error) {
 	if err != nil {
 		return sizeRow{}, err
 	}
-	row := sizeRow{name: "go", textBytes: report.TextBytes}
+	row := sizeRow{name: "go", hasCode: true, textBytes: report.TextBytes}
 	row.codeBytes, row.functions = report.Sum(regexp.MustCompile(`^`+regexp.QuoteMeta(conformance.EngineModulePath)+`\.`), drop)
 	sources, err := filepath.Glob(filepath.Join(engine, "*.go"))
 	if err != nil {
@@ -159,6 +164,10 @@ func backendSize(b *conformance.Backend) (sizeRow, error) {
 			return sizeRow{}, err
 		}
 	}
+	if b.Symbols == nil {
+		// An interpreted target, such as TypeScript, has no machine code and no engine_symbols expression.
+		return row, nil
+	}
 	driver := b.Path(b.Release.Driver)
 	if _, err := os.Stat(driver); err != nil {
 		return sizeRow{}, fmt.Errorf("%s: release driver missing; build it first: %v", b.Name, err)
@@ -167,10 +176,8 @@ func backendSize(b *conformance.Backend) (sizeRow, error) {
 	if err != nil {
 		return sizeRow{}, err
 	}
+	row.hasCode = true
 	row.textBytes = report.TextBytes
-	if b.Symbols == nil {
-		return sizeRow{}, fmt.Errorf("%s: backend.json has no engine_symbols expression", b.Name)
-	}
 	row.codeBytes, row.functions = report.Sum(b.Symbols, nil)
 	if row.functions == 0 {
 		return sizeRow{}, fmt.Errorf("%s: engine_symbols %q matches no function in %s", b.Name, b.EngineSymbols, b.Release.Driver)
