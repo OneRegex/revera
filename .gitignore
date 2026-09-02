@@ -1,9 +1,12 @@
+*PROGRESS.md
 *~
-AGENTS.md
-CLAUDE.md
-SWIVAL.md
-MISTAKES.md
 .claude/
 .swival/
-tmp/
+AGENTS.md
+CLAUDE.md
+MISTAKES.md
+PROGRESS.md
+SWIVAL.md
 lean/.lake/
+tmp/
+ts/node_modules/
