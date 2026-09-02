@@ -12,7 +12,7 @@
   "checked": [
     {
       "name": "typecheck",
-      "requires": ["npx", "--no-install", "tsc", "--version"],
+      "requires": ["node", "-e", "require.resolve('typescript/package.json'); require.resolve('@types/node/package.json')"],
       "build": [["make", "check"]],
       "driver": "driver",
       "probe": "probe",

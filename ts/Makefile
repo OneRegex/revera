@@ -1,5 +1,6 @@
 # The hosts run straight from the TypeScript sources under Node, so a build is a syntax check of each entry point.
-# check runs the type checker, which needs the typescript package that npm install provides.
+# check runs the type checker, which needs the typescript and @types/node packages that npm ci installs.
+# A tsc found elsewhere on the PATH is not enough, since tsconfig.json asks for the node type definitions.
 
 NODE ?= node
 HOSTS = src/driver.ts src/probe_main.ts src/bench_main.ts src/fuzzcase_main.ts
