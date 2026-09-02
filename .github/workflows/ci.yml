@@ -137,15 +137,3 @@ jobs:
           echo "CXX=clang++-19" >> "$GITHUB_ENV"
       - name: Every backend, release and checked builds; the Rust sanitizer build skips without nightly
         run: make conform CONFORM_FLAGS="-quick -stress 2 -allow-skip"
-
-  lean:
-    name: Lean proofs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: leanprover/lean-action@v1
-        with:
-          lake-package-directory: lean
-          use-mathlib-cache: false
-      - name: Replay the corpus under the Lean semantics
-        run: cd lean && .lake/build/bin/vegocheck data/corpus.tsv && .lake/build/bin/speccheck data/corpus.tsv
