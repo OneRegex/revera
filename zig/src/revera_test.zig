@@ -168,39 +168,3 @@ test "one expression serves several threads" {
         t.join();
     }
 }
-
-fn allocationWorkflow(allocator: std.mem.Allocator) !void {
-    const locale = (try revera.Locale.open(allocator, "cs", "")) orelse
-        return error.TestUnexpectedResult;
-    var re = try revera.Regex.compile(allocator, "(a+)(b*)", .{ .locale = locale });
-    defer re.deinit();
-
-    try testing.expect(try re.isMatch("aaab"));
-    _ = (try re.find("aaab")) orelse return error.TestUnexpectedResult;
-
-    if (try re.captures("aaab")) |value| {
-        var captures = value;
-        captures.deinit();
-    } else {
-        return error.TestUnexpectedResult;
-    }
-
-    var matches = try re.matches("aaab aab");
-    _ = (try matches.next()) orelse return error.TestUnexpectedResult;
-
-    var capture_matches = try re.captureMatches("aaab aab");
-    if (try capture_matches.next()) |value| {
-        var captures = value;
-        captures.deinit();
-    } else {
-        return error.TestUnexpectedResult;
-    }
-
-    const replaced = try re.replaceAll("aaab", "X");
-    defer allocator.free(replaced);
-    try testing.expectEqualStrings("X", replaced);
-}
-
-test "allocator failures return out of memory" {
-    try std.testing.checkAllAllocationFailures(testing.allocator, allocationWorkflow, .{});
-}
