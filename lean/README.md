@@ -156,7 +156,10 @@ Finally, all three statements are finite: they quantify over the corpus and the 
 
 `PhaseA.run_steps_le`, `PhaseA.run_heap_le` and `phaseA_link_agrees`.
 
-`Vego/PhaseA.lean` models the phase A matcher of `engine.go` function for function.
+The matcher has two stages.
+Phase A scans the subject once, advances every viable automaton path in lockstep, and selects the overall match start and end; Phase B later resolves subexpression captures inside that span.
+
+`Vego/PhaseA.lean` models the Phase A matcher of `engine.go` function for function.
 It covers the slot tables and their generation stamps, the relaxation queue and its compaction, the merge order of payloads, the consuming transitions with their counter increments, the scan filter and the early stop.
 It is parametric in the compiled program, in the atom tests, and in the subject, and it meters its own events.
 `stepFigure` prices those events one unit per loop iteration and per call, the way the interpreter's loop meter prices the Vego code.

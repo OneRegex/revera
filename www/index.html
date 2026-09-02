@@ -478,7 +478,9 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
           <span class="kicker">Correctness and interoperability</span>
           <h2>Tested across languages. Proved against the specification.</h2>
           <p class="section__sub">No single mechanism carries the claim.
-            Each layer catches what the others cannot.</p>
+            Each layer catches what the others cannot.
+            Phase A is the first matching stage: it scans the subject once and selects the overall match span before
+            Phase B resolves subexpression captures.</p>
         </div>
 
         <div class="layers">
@@ -499,7 +501,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
           <div class="card">
             <h3>Proofs about the shipped artifact</h3>
             <p>Lean decodes the exact IR files that ship, proves them well formed, and proves universal heap and step
-              bounds for phase A of the matcher, along with the soundness of the meter that records those costs.
+              bounds for Phase A of the matcher, along with the soundness of the meter that records those costs.
               The proved file is the released file.</p>
           </div>
         </div>
@@ -508,8 +510,8 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
           <p>The proofs have explicit limits, and the Lean README states each one.
             The corpus and exhaustive checks are finite, not universal.
             Non-POSIX locale behavior is outside the model.
-            The link between the proved phase A properties and the shipped engine covers corpus executions that use
-            phase A alone.
+            The link between the proved Phase A properties and the shipped engine covers corpus executions that use
+            Phase A alone.
             The generated Rust, Zig, C, C++ and TypeScript engines are tied to the proved IR by the conformance corpus,
             not by a proof of the printers.</p>
         </div>

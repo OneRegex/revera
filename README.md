@@ -9,10 +9,14 @@ A compiler exports it as Vego IR, and printers turn that IR into the Rust, Zig, 
 As a result, all six libraries come from one engine source.
 The conformance corpus cross-checks their matches, errors and resource-contract reports.
 
+Matching has two stages.
+Phase A scans the subject once, advances every viable automaton path in lockstep, and selects the overall match start and end.
+Phase B then resolves subexpression captures inside that span when the caller requests them.
+
 The Lean 4 model provides the formal side of the project.
 It proves the shipped IR well formed.
 It also checks the interpreted engine against a formal ERE model on the constrained corpus cases and an exhaustive small domain.
-In addition, it proves phase A properties under the stated hypotheses.
+In addition, it proves Phase A properties under the stated hypotheses.
 
 Finally, the engines embed generated CLDR and Unicode tables for character classes, case mappings and collating data.
 The `locale/` directory contains the C runtime and the generator used to reproduce and verify those tables.
@@ -63,9 +67,9 @@ Replacement and iteration commands are checked for output agreement only, and ex
 Separately, the development states the ERE specification as a Lean definition.
 It checks the interpreted engine against that definition on every constrained corpus command and on an exhaustive small domain.
 
-For phase A, the heap and step bounds are proved for every well-formed program, atom test and subject.
+For Phase A, the heap and step bounds are proved for every well-formed program, atom test and subject.
 The reported match is also proved correct under the additional hypotheses stated in the formalization.
-However, the link to the shipped engine covers only corpus executions that use phase A alone.
+However, the link to the shipped engine covers only corpus executions that use Phase A alone.
 
 [`lean/README.md`](lean/README.md) states each theorem and what it does not cover.
 

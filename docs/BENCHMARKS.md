@@ -207,7 +207,8 @@ The C figures of that run are given next to them, since they moved by a few perc
 | replace/empty-matches  |  549.6 us | 132.3 us |   4.2 |
 
 Compilation runs about five times slower than C, and matching between seven and seventeen times slower.
-A profile with `node --cpu-prof` puts the phase A matcher on top, and the cost is structural: every element access reads a slice header and checks its bounds, every subslice and append allocates a header, every 64-bit add is range-checked, and the memo hash and the capture masks compute on `bigint`.
+A profile with `node --cpu-prof` puts the Phase A matcher, which selects the overall match span, on top.
+The cost is structural: every element access reads a slice header and checks its bounds, every subslice and append allocates a header, every 64-bit add is range-checked, and the memo hash and the capture masks compute on `bigint`.
 The allocation table shows the TypeScript column equal to the other generated targets in requests on every case, and a few percent above them in bytes, since the runtime charges a fixed width per struct field.
 `make size` reports the source figures only for TypeScript, because the engine has no machine code; the engine and probe sources are 233 KB and 6,253 lines, the largest of the printed engines because of the pinned bases and the bounds checks written out.
 
