@@ -15,18 +15,21 @@ Each one finds the repository root from the working directory, or takes `-repo`.
   `make generate` and `make check-generated` at the root call it.
 - `go run ./cmd/conform [-backend dir]... [-stress rounds] [-seed n] [-quick] [-skip steps] [-lean] [-allow-skip] [-timeout duration]` runs the backend conformance kit.
   `make conform` calls it.
-- `go run ./cmd/bench [-backend dir]... [-reps n] [-scale factor] [-reference] [-build] [-only prefix] [-tsv file]` runs the shared benchmark cases on every engine, and `go run ./cmd/bench size [-backend dir]...` reports the generated code sizes.
-  `make bench` and `make size` call them.
+- `go run ./cmd/bench [-backend dir]... [-reps n] [-scale factor] [-reference] [-build] [-only prefix] [-tsv file]` runs the shared benchmark cases on every engine.
+  In addition, `go run ./cmd/bench size [-backend dir]...` reports the generated code sizes.
+  `make bench` and `make size` call these commands.
 - `go run ./cmd/dist [-commit ref] [-allow-dirty] [-out dir]` stages the release assets; see below.
 
 ## Packages
 
-- `internal/protocol/` is the Go side of the line protocols and the shared cases that every target implements: the driver session, the bench cases and session, the corpus tables and the fuzz input format with its seed pack.
+- `internal/protocol/` is the Go side of the line protocols and the shared cases that every target implements.
+  It holds the driver session, the bench cases and session, the corpus tables, and the fuzz input format with its seed pack.
   Every target's `driver`, `bench` and `fuzzcase` binary mirrors these files.
 - `internal/conformance/` is the kit: the corpus builder, the driver and probe runners, the fuzz seed pack, the manifest loader and the step pipeline.
   [`../docs/CONFORMANCE-KIT.md`](../docs/CONFORMANCE-KIT.md) describes it.
-  Its subdirectories hold standalone diagnostic commands and reporting helpers:
-  `godriver` speaks the driver and bench protocols with the Go engine, `proberef` prints the probe report, `fuzzcase` replays a seed pack, `crosscheck` diffs drivers against the Go engine, `probecheck` diffs probe binaries, `bench` is the benchmark logic, and `codesize` reads the machine code sizes out of a binary.
+  Its subdirectories hold standalone diagnostic commands and reporting helpers.
+  `godriver` speaks the driver and bench protocols with the Go engine, while `proberef` prints the probe report and `fuzzcase` replays a seed pack.
+  In addition, `crosscheck` compares drivers with the Go engine, `probecheck` compares probe binaries, `bench` contains the benchmark logic, and `codesize` reads machine-code sizes from a binary.
 - `internal/reference/` is the reference engine, the first Go implementation of the specification.
   An enumerating matcher and the host `regcomp()` check it, and the Revera engine is checked against it.
   It sits under `internal` so that nobody mistakes it for a second supported Go implementation.
@@ -52,7 +55,9 @@ The differential suite is heavy, so give it `-count=1` and an explicit `-timeout
 
 ## Release staging
 
-`go run ./cmd/dist`, or `make dist` at the root, stages the release assets in `tmp/dist/`: the Zig package archive, the native package archive, the two IR files and a manifest with the source commit, the `vegoc` version, the IR digest and the checksum of every file.
+`go run ./cmd/dist`, or `make dist` at the root, stages the release assets in `tmp/dist/`.
+The assets are the Zig package archive, the native package archive and the two IR files.
+The manifest records the source commit, the `vegoc` version, the IR digest and the checksum of every staged asset.
 
 To make the output reproducible, the command reads every file from the commit it records and writes archives with sorted members, fixed modes and ownership, and timestamps normalized to the commit time.
 As a result, two runs on the same commit produce the same bytes.

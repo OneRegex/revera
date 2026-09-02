@@ -117,7 +117,10 @@ Finally, `profile` writes CPU and allocation profiles of the Go engine.
 
 `make licenses` synchronizes `LICENSE` and `LICENSES/Unicode-3.0.txt` into `go/`, `rust/`, `zig/` and `native/`.
 Before a release, replace `unreleased` in the version's changelog heading with its date, run `make licenses`, and commit the result.
-`make dist` then reads committed `HEAD`, refuses tracked changes, checks the Cargo, Zig and CMake versions and the license copies, and stages deterministic Zig and native archives, both IR files, and a manifest with the source commit, `vegoc` version, IR digest and asset checksums in `tmp/dist/`.
+
+`make dist` then reads committed `HEAD` and refuses tracked changes.
+It checks the Cargo, Zig and CMake versions as well as the license copies.
+Finally, it stages deterministic Zig and native archives, both IR files, and a manifest with the source commit, `vegoc` version, IR digest and asset checksums in `tmp/dist/`.
 
 ## Versions
 

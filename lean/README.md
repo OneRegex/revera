@@ -77,6 +77,7 @@ Instead, it folds a constant factor of slack into its per-record sizes to cover 
 
 Two corpus patterns cannot run under the interpreter in any reasonable time, and the theorem leaves their executions out.
 That is 1,056 X commands of the 86,704, so the theorem covers 85,648 commands.
+
 Both nest a star inside counted repetitions, `((a*){250}){250}b` in six blocks and `((a*){4}){4}` in six more.
 The parse search then explores a very large number of ways to split a subject among nullable instances.
 The cost comes from the nesting, not from the subject.
@@ -97,7 +98,7 @@ An X command allocates its own match buffer and writes no session root.
 It fails if the filter ever stops keeping every compile, or matches everything, or matches nothing.
 
 The `vegocheck` executable replays any corpus dump from disk through the same code path and enforces the same bounds.
-That is the practical way to check a subset, and to see which command diverges.
+That is the practical way to check a subset and see which command diverges.
 
 `runCorpusFuel` also accepts a fuel bound.
 Fuel caps the recursion depth of each engine call, not the aggregate work of a command.
@@ -126,17 +127,21 @@ Every constrained command's recorded output meets its verdict.
 The walk leaves a command unconstrained in exactly the counted cases: the locale is not POSIX, the pattern is free, the subject holds a NUL or is not valid UTF-8, or the enumeration ran out of budget.
 `expectedCoverage` pins the figures, so any drift in coverage fails the theorem.
 
-On the current corpus, all 9,653 defined patterns compile with the specification's subexpression count, all 66 free spellings in the corpus are the ones the engine rejects, and 66,576 executions produce the specified line.
+On the current corpus, all 9,653 defined patterns compile with the specification's subexpression count.
+In addition, all 66 free spellings in the corpus are the ones the engine rejects.
+Finally, 66,576 executions produce the specified line.
 The 1,512 executions left out are the ones on subjects with NUL bytes or invalid UTF-8, which are not strings of the interface.
 
 `engine_meets_spec_on_corpus` composes that theorem with the corpus theorem.
 For every corpus command the specification constrains, the interpreted engine prints a line that meets the specification's verdict.
-The recorded Go outputs are the bridge between the two native evaluations, and both sides are checked against them, so the Go engine is not in the trust base of the composed statement.
+The recorded Go outputs are the bridge between the two native evaluations.
+Because both sides are checked against those outputs, the Go engine is not in the trust base of the composed statement.
 
 `engine_meets_spec_exhaustively` compares the two directly, on inputs no engine has seen.
 `Vego/Exhaustive.lean` runs two sweeps over a token language of fourteen tokens: the atoms `a`, `b`, `.`, `[ab]` and `[^a]`, parentheses, `|`, the duplications `*`, `+`, `?` and `{0,1}`, and both anchors.
 
-The structure sweep takes every string of one through four tokens, which is 41,370 patterns, and every subject over `{a, b}` of up to three characters, with and without `REG_MINIMAL` and with and without the two execution flags.
+The structure sweep takes every string of one through four tokens, which is 41,370 patterns, and every subject over `{a, b}` of up to three characters.
+It tests each pair with and without `REG_MINIMAL` and with and without the two execution flags.
 The flag sweep takes every string of one through three tokens under all sixteen compile flag combinations and all four execution flag combinations, on subjects that add newlines and uppercase letters.
 
 Each defined pattern is compiled under the formal Vego semantics and executed on each subject, and the line must be the one the specification requires.
@@ -151,7 +156,8 @@ Finally, all three statements are finite: they quantify over the corpus and the 
 
 `PhaseA.run_steps_le`, `PhaseA.run_heap_le` and `phaseA_link_agrees`.
 
-`Vego/PhaseA.lean` is a model of the phase A matcher of `engine.go`: the slot tables and their generation stamps, the relaxation queue and its compaction, the merge order of payloads, the consuming transitions with their counter increments, the scan filter and the early stop, function for function.
+`Vego/PhaseA.lean` models the phase A matcher of `engine.go` function for function.
+It covers the slot tables and their generation stamps, the relaxation queue and its compaction, the merge order of payloads, the consuming transitions with their counter increments, the scan filter and the early stop.
 It is parametric in the compiled program, in the atom tests, and in the subject, and it meters its own events.
 `stepFigure` prices those events one unit per loop iteration and per call, the way the interpreter's loop meter prices the Vego code.
 
@@ -162,19 +168,25 @@ The closure is the hard part.
 Its cost is paid by a potential: the queue length plus, for every instruction of the slot, the rank of its stored payload among the payloads known at the boundary.
 A successful merge stores a strictly better payload and lowers a rank, every pop shortens the queue, and a compaction is paid by the entries it drops.
 
-The buffers are bounded through the growth rule: the active list of a slot holds distinct instructions, the queue never passes twice the program length plus one, and the geometric argument of `CostLemmas.lean` turns those needs into capacities.
+The buffers are bounded through the growth rule.
+The active list of a slot holds distinct instructions, while the queue never passes twice the program length plus one.
+The geometric argument of `CostLemmas.lean` then turns those needs into capacities.
 
 `phaseA_link_agrees` ties the model to the engine.
-On every corpus execution that runs phase A alone, which is every `NoSub` pattern and every pattern without a group, the model run on the program read out of the interpreted `Regexp` reproduces the engine's match result, allocates exactly the bytes the interpreter counts, and its step figure dominates the interpreter's loop meter.
+The link covers every corpus execution that runs phase A alone, which means every `NoSub` pattern and every pattern without a group.
+On those executions, the model runs on the program read from the interpreted `Regexp` and reproduces the engine's match result.
+It also allocates exactly the bytes that the interpreter counts, while its step figure dominates the interpreter's loop meter.
+
 On every `T` command of such a pattern, the heap and step figures the engine reports equal the proven figures.
-`linkCoverage` pins the counts: 47922 executions, 46 contract queries, and 6893 programs that pass `Prog.wfCheck`.
+`linkCoverage` pins the counts: 47,922 executions, 46 contract queries, and 6,893 programs that pass `Prog.wfCheck`.
 
 On the linked corpus executions, `contract.go` computes exactly `heapFigure` and `stepsFigure` for phase A.
 Those are the bounds proved universally for the model under the well-formedness hypotheses above.
 
 Two things led to this.
-An adversarial probe found that the previous phase A heap figure was unsound: `(a{0,8}){0,8}b` on `aaaaaaaa` allocated 7546 bytes against a figure of 7290 under the portable growth rule, because the doubling of the active lists and of the queue was folded in too tightly.
-The proof then showed what the constants must be, and the per-boundary step budget grew with them.
+First, an adversarial probe found that the previous phase A heap figure was unsound.
+Under the portable growth rule, `(a{0,8}){0,8}b` on `aaaaaaaa` allocated 7,546 bytes against a figure of 7,290 because the doubling of the active lists and queue was folded in too tightly.
+Second, the proof showed what the constants must be, and the per-boundary step budget grew with them.
 
 The non-POSIX locales and the multi-character probes are inside the universal theorems but outside the corpus link, which covers the POSIX locale.
 Phase B, the capture solver, keeps its corpus-bound contract check.
@@ -188,13 +200,15 @@ This one says what it answers.
 `Vego/PhaseACorrect.lean` states the reference the model is judged against, and that reference knows nothing of slots, generations or queues.
 
 A thread is a boundary index of the subject, an instruction, the start it carries and its counters.
-It steps along an epsilon edge of the program, where `^` and `$` read the anchors from the subject, or it consumes: one character when the single test accepts it, or a collating element of several characters when a bracket probe does.
+It can step along an epsilon edge of the program, where `^` and `$` read the anchors from the subject.
+Alternatively, it consumes one character when the single test accepts it, or a collating element of several characters when a bracket probe does.
 Consuming steps bump the counters the way the engine does.
 A thread is reached when a spawn at some boundary of the subject steps to it.
 
 A candidate is a reached thread at the accept instruction, taken as its start, its counters and its end position.
 The selection order is the engine's: earliest start, then smallest counters, then longest end.
-`run_correct` says that when the model reports a match, its start and end with the counters it kept form a candidate that the order puts at or before every candidate, and that when it reports none, there is no candidate at all.
+When the model reports a match, `run_correct` says that its start, end and retained counters form a candidate that the order puts at or before every other candidate.
+When the model reports no match, the theorem says that no candidate exists.
 
 The proof is an invariant over the boundary loop.
 Every fresh entry of a slot is a thread the reference reached, so the model never invents a match.
@@ -207,12 +221,14 @@ A dominated payload cannot produce a better candidate, because bumps only raise 
 
 The closure at a boundary is proved by the same drain induction as the cost bound, with a queued-or-done invariant per fresh instruction.
 The consuming phase then delivers each arrival to the slot of its target boundary.
-The early stop is justified because no live future slot leaves no path that could beat the best.
+The early stop is justified when no future slot remains live, because no remaining path can beat the best match.
 
-The scan filter's jump is proved under `ScanSound`, an assumption stated against the reference: when the filter is enabled the ring has two slots, and a jump lands on a boundary of the subject, past only boundaries whose spawns cannot accept.
+The scan filter's jump is proved under `ScanSound`, an assumption stated against the reference.
+When the filter is enabled, the ring has two slots, and a jump lands on a subject boundary after skipping only boundaries whose spawns cannot accept.
 That assumption is about the compiler's choice of stop bytes, which the model does not contain, so it stays a hypothesis.
 
-The other hypotheses are the program well-formedness that `Prog.wfCheck` decides, which `phaseA_link_agrees` now checks on every corpus program, and the fit of the multi-character probes in the ring.
+The other hypotheses cover program well-formedness and the fit of multi-character probes in the ring.
+`Prog.wfCheck` decides the well-formedness condition, which `phaseA_link_agrees` now checks on every corpus program.
 The theorem depends on `propext`, `Classical.choice` and `Quot.sound` only.
 
 ### 7. The cost model holds for every input
@@ -235,7 +251,8 @@ A growing append, a make, a slice literal, and the two string conversions each r
 The `cAdd` and `cMul` lemmas pin the saturating contract arithmetic down on its domain.
 A figure below the saturation mark is the exact arithmetic value, and no figure ever passes the mark.
 
-`Vego/MeterSound.lean` extends this to the whole interpreter, by one mutual induction on fuel over every evaluation function.
+`Vego/MeterSound.lean` extends this result to the whole interpreter.
+It uses one mutual induction on fuel over every evaluation function.
 On any successful run, no meter counter ever decreases.
 The call-depth counter returns to its entry value when a call completes, so the recorded maximum is the true peak of the run.
 The lemmas are `MOK_evalExpr` through `MOK_runFn`, and `callIdx_meterOK` for harness calls.
@@ -254,7 +271,7 @@ What remains corpus-bound is the control flow of the walk and of the capture sol
 
 ## What this means for the pipeline
 
-The generated Rust, Zig, C++, and C11 engines come from the same JSON the theorems talk about.
+The generated Rust, Zig, C++, and C11 engines come from the same JSON that the theorems cover.
 `dev/internal/conformance/crosscheck` verifies all four against the Go engine on the same corpus.
 
 On the covered corpus commands, the Lean semantics therefore anchors the whole chain.
@@ -302,6 +319,7 @@ data/               probe.expected, corpus.tsv, localedata.hex
 Memory is a heap of cells.
 Each local variable lives in a cell.
 Each buffer from make, append, a slice literal or a byte conversion lives in its own cell.
+
 A slice value is a header of cell, path, offset, length and capacity.
 Views therefore alias exactly as in Go, views of local arrays included.
 
@@ -317,7 +335,9 @@ The specification declares them target defined and keeps them out of observable 
 
 The artifact, corpus and exhaustive theorems use `native_decide`, so they rest on the Lean kernel plus the Lean compiler, through `Lean.ofReduceBool`.
 The Go engine produces the reference outputs of the corpus theorem.
-The specification theorems replace that reference with the `Ere` model for every command they cover, so on those commands the Go engine is out of the trust base and the model of the specification is in it.
+
+The specification theorems replace that reference with the `Ere` model for every command they cover.
+On those commands, the Go engine is therefore outside the trust base, while the specification model is inside it.
 The model is meant to be read against the specification, section by section, and `Ere/Examples.lean` checks it against the examples of section 16.
 
 The specification theorems are finite: they cover the corpus and the enumerated domain, not every pattern.

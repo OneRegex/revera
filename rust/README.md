@@ -8,7 +8,6 @@ In addition, the Lean development gives Vego machine-checked semantics, and the 
 
 The engine speaks the POSIX ERE language: leftmost-longest matching, no backreferences, no Perl escapes.
 Therefore, it is the engine to reach for when a pattern must mean the same thing as it does in `regcomp()` and `regexec()`.
-
 For package discovery, the crate keywords are regex, posix, ere and regular-expressions.
 
 ## Using it
@@ -41,7 +40,6 @@ The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not expos
 
 The directory is a Cargo workspace with two packages.
 The root package is the library, and it is the only one that ships.
-
 The second package, `tools`, holds the binaries that the conformance kit and the bench harness drive.
 
 ```
@@ -89,13 +87,12 @@ It supplies the `Copy` `Slice<T>` and `Str` header types with Go slice semantics
 
 `Arena` is `!Sync`, so the compiler refuses to share one between threads.
 A Vego view can alias, which a Rust reference cannot express, so a slice lowers to a raw pointer and a length.
-
 The Vego specification explicitly permits this lowering, and every access stays bounds-checked.
 
 `Regex` is `Sync` even though `Arena` is not.
 It never writes to its arena after `build`, and every search copies the header it walks.
-
 Moreover, every allocation a search makes goes to an arena that the search owns and frees.
+Moreover, every allocation that a search makes goes to an arena that the search owns and frees.
 
 ## Build and verify
 
@@ -108,8 +105,7 @@ cargo build --release --workspace
 
 `driver` speaks the line protocol that `dev/internal/protocol/driver.go` defines, and `crosscheck` runs the corpus through it.
 `probe` prints the lines of the `vego/probe` package, which covers the subset constructs the engine never uses.
-
-For comparison, `dev/internal/conformance/proberef` prints the reference lines and `probecheck` diffs the two.
+For comparison, `dev/internal/conformance/proberef` prints the reference lines, and `probecheck` compares the two outputs.
 
 The one-command check is the conformance kit:
 
@@ -122,7 +118,6 @@ Specifically, the release build runs the full corpus and the random stress round
 
 One known limit remains.
 A call that passes the same struct variable through two pointer arguments is valid Vego, but Rust rejects it at compile time with E0499.
-
 In that case, the failure is loud, not silent.
 
 Both profiles turn overflow checks off, so integer arithmetic wraps like Go.
@@ -140,7 +135,6 @@ A `B` line names one operation, compile, match or replace, with its iteration an
 
 The answer gives the arena bytes and allocation requests of one operation, then the wall-clock nanoseconds of each repetition.
 `Arena::stats` in `src/vg.rs` supplies the counts, so they cover engine-level requests only.
-
 Finally, `dev/cmd/bench` drives every target with the same cases.
 
 ```sh
@@ -182,7 +176,9 @@ The binaries land in `target/asan-bin/`.
 ## What ships
 
 `Cargo.toml` declares version `0.1.0` and the MIT license.
-`cargo package --list` includes `src/lib.rs`, `src/engine.rs`, `src/vg.rs`, `src/data.bin`, `tests/api.rs`, this README, the Cargo package metadata, `LICENSE` and `LICENSES/Unicode-3.0.txt`, the license of the embedded data.
+`cargo package --list` includes `src/lib.rs`, `src/engine.rs`, `src/vg.rs`, `src/data.bin`, `tests/api.rs` and this README.
+It also includes the Cargo package metadata and `LICENSE`.
+The license for the embedded data ships as `LICENSES/Unicode-3.0.txt`.
 
 `LICENSE` and `LICENSES/` are copies of the repository root files that `make licenses` keeps current.
 Accordingly, the repository's release staging command refuses missing or stale copies.

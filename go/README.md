@@ -90,7 +90,10 @@ go test -run '^$' -fuzz FuzzDifferential -fuzztime 60s ./internal/differential
 ```
 
 These differential and cross-language checks cover finite corpora.
-The Lean development proves universal phase A heap and step bounds under its stated hypotheses, while its full engine-to-specification checks cover a finite corpus and exhaustive small domain; [`../lean/README.md`](../lean/README.md) gives the exact boundary.
+
+By contrast, the Lean development proves universal phase A heap and step bounds under its stated hypotheses.
+Its full engine-to-specification checks cover a finite corpus and an exhaustive small domain.
+[`../lean/README.md`](../lean/README.md) gives the exact boundary.
 
 An edit to a subset file changes the exported IR.
 Afterwards, run `make generate` at the repository root, followed by `make check-generated`.
