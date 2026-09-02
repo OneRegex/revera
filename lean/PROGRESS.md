@@ -2,7 +2,7 @@
 
 ## Findings and decisions
 
-- The JSON grammar of VEGO-SPECIFICATION.md section 8 maps onto a small mutual AST (`Ast.lean`).
+- The JSON grammar of vego/SPECIFICATION.md section 8 maps onto a small mutual AST (`Ast.lean`).
   Both shipped artifacts decode with a total, fuel-bounded decoder.
   All string literals in both programs are ASCII, so JSON string values equal their byte content.
 - The model does not interpret the raw tree with runtime type guessing.
@@ -21,7 +21,7 @@
   The specification now states the rule: such capacities are target defined and must not reach observable output.
   The revera engine's one post-growth `cap` read (`capture.go` kidAlloc) only picks between two equivalent paths, and the cross-target corpus agreement checks exactly that.
 - The Go original's own probe host, driver host, and crosscheck corpus provide the reference outputs.
-  The Lean harnesses (`Probe.lean`, `Driver.lean`) mirror probe_host.go and driver_host.go call for call, including the FNV case digest and the session state machine.
+  The Lean harnesses (`Probe.lean`, `Driver.lean`) mirror probe_host.go and dev/internal/protocol/driver.go call for call, including the FNV case digest and the session state machine.
 - Bring-up found two real bugs, both in the Lean model and not in the vego artifacts.
   The elaborator dropped the slot counter of nested blocks, which made frames too small.
   A first `findCase` draft recursed through a placeholder.

@@ -1,0 +1,466 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oneregex/revera/vego/schema/vego.schema.json",
+  "title": "Vego IR",
+  "description": "Structural schema of the JSON form of a Vego program, as section 8 of SPECIFICATION.md defines it. The schema checks shapes only; the typing, scoping and ownership rules stay in the prose and in the checker.",
+  "type": "object",
+  "required": ["vego", "package", "consts", "vars", "types", "funcs"],
+  "additionalProperties": false,
+  "properties": {
+    "vego": { "const": 1, "description": "The IR compatibility major." },
+    "package": { "$ref": "#/$defs/identifier" },
+    "consts": { "type": "array", "items": { "$ref": "#/$defs/constDecl" } },
+    "vars": { "type": "array", "items": { "$ref": "#/$defs/varDecl" } },
+    "types": { "type": "array", "items": { "$ref": "#/$defs/typeDecl" } },
+    "funcs": { "type": "array", "items": { "$ref": "#/$defs/funcDecl" } }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "scalarName": {
+      "enum": ["bool", "uint8", "uint16", "uint32", "uint64", "int32", "int64", "int", "string"]
+    },
+    "type": {
+      "description": "A type reference.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["k", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "named" },
+            "name": { "$ref": "#/$defs/scalarName" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "elem"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "slice" },
+            "elem": { "$ref": "#/$defs/type" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "len", "elem"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "array" },
+            "len": { "$ref": "#/$defs/expr" },
+            "elem": { "$ref": "#/$defs/type" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "struct_ref" },
+            "name": { "$ref": "#/$defs/identifier" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "ptr" },
+            "name": { "$ref": "#/$defs/identifier" }
+          }
+        }
+      ]
+    },
+    "optionalType": {
+      "oneOf": [{ "$ref": "#/$defs/type" }, { "type": "null" }]
+    },
+    "optionalExpr": {
+      "oneOf": [{ "$ref": "#/$defs/expr" }, { "type": "null" }]
+    },
+    "optionalStmt": {
+      "oneOf": [{ "$ref": "#/$defs/stmt" }, { "type": "null" }]
+    },
+    "block": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stmt" }
+    },
+    "optionalBlock": {
+      "oneOf": [{ "$ref": "#/$defs/block" }, { "type": "null" }]
+    },
+    "field": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/identifier" },
+        "type": { "$ref": "#/$defs/type" }
+      }
+    },
+    "constDecl": {
+      "type": "object",
+      "required": ["k", "name", "type", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "k": { "const": "const" },
+        "name": { "$ref": "#/$defs/identifier" },
+        "type": { "$ref": "#/$defs/optionalType" },
+        "value": { "$ref": "#/$defs/expr" }
+      }
+    },
+    "varDecl": {
+      "type": "object",
+      "required": ["k", "name", "type", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "k": { "const": "var" },
+        "name": { "$ref": "#/$defs/identifier" },
+        "type": { "$ref": "#/$defs/optionalType" },
+        "value": { "$ref": "#/$defs/optionalExpr" }
+      }
+    },
+    "typeDecl": {
+      "type": "object",
+      "required": ["k", "name", "fields"],
+      "additionalProperties": false,
+      "properties": {
+        "k": { "const": "type" },
+        "name": { "$ref": "#/$defs/identifier" },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } }
+      }
+    },
+    "funcDecl": {
+      "type": "object",
+      "required": ["k", "name", "params", "results", "body"],
+      "additionalProperties": false,
+      "properties": {
+        "k": { "const": "func" },
+        "name": { "$ref": "#/$defs/identifier" },
+        "params": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "results": { "type": "array", "items": { "$ref": "#/$defs/type" } },
+        "body": { "$ref": "#/$defs/block" }
+      }
+    },
+    "stmt": {
+      "description": "A statement.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["k", "name", "type", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "var_decl" },
+            "name": { "$ref": "#/$defs/identifier" },
+            "type": { "$ref": "#/$defs/optionalType" },
+            "value": { "$ref": "#/$defs/optionalExpr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "names", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "define" },
+            "names": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 2,
+              "items": { "$ref": "#/$defs/identifier" }
+            },
+            "value": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "lhs", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "assign" },
+            "lhs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 2,
+              "items": { "$ref": "#/$defs/expr" }
+            },
+            "value": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "op", "lhs", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "op_assign" },
+            "op": { "enum": ["+=", "-=", "*=", "/=", "%=", "|=", "&=", "^=", "<<=", ">>=", "&^="] },
+            "lhs": { "$ref": "#/$defs/expr" },
+            "value": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "op", "lhs"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "incdec" },
+            "op": { "enum": ["++", "--"] },
+            "lhs": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "cond", "then", "else"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "if" },
+            "cond": { "$ref": "#/$defs/expr" },
+            "then": { "$ref": "#/$defs/block" },
+            "else": { "$ref": "#/$defs/optionalBlock" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "init", "cond", "post", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "for" },
+            "init": { "$ref": "#/$defs/optionalStmt" },
+            "cond": { "$ref": "#/$defs/optionalExpr" },
+            "post": { "$ref": "#/$defs/optionalStmt" },
+            "body": { "$ref": "#/$defs/block" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "idx", "val", "over", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "range" },
+            "idx": { "oneOf": [{ "$ref": "#/$defs/identifier" }, { "type": "null" }] },
+            "val": { "oneOf": [{ "$ref": "#/$defs/identifier" }, { "type": "null" }] },
+            "over": { "$ref": "#/$defs/expr" },
+            "body": { "$ref": "#/$defs/block" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "tag", "cases", "default"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "switch" },
+            "tag": { "$ref": "#/$defs/expr" },
+            "cases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["values", "body"],
+                "additionalProperties": false,
+                "properties": {
+                  "values": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/expr" } },
+                  "body": { "$ref": "#/$defs/block" }
+                }
+              }
+            },
+            "default": { "$ref": "#/$defs/optionalBlock" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "enum": ["break", "continue"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "values"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "return" },
+            "values": { "type": "array", "items": { "$ref": "#/$defs/expr" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "expr_stmt" },
+            "value": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "block" },
+            "body": { "$ref": "#/$defs/block" }
+          }
+        }
+      ]
+    },
+    "decimal": {
+      "description": "An integer literal as a decimal string, so 64-bit values survive readers that parse numbers as doubles.",
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)$"
+    },
+    "expr": {
+      "description": "An expression.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["k", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "enum": ["int", "char"] },
+            "value": { "$ref": "#/$defs/decimal" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "str" },
+            "value": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "bool" },
+            "value": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "ident" },
+            "name": { "$ref": "#/$defs/identifier" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "x", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "field" },
+            "x": { "$ref": "#/$defs/expr" },
+            "name": { "$ref": "#/$defs/identifier" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "x", "index"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "index" },
+            "x": { "$ref": "#/$defs/expr" },
+            "index": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "x", "lo", "hi"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "slice_expr" },
+            "x": { "$ref": "#/$defs/expr" },
+            "lo": { "$ref": "#/$defs/optionalExpr" },
+            "hi": { "$ref": "#/$defs/optionalExpr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "fn", "args"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "call" },
+            "fn": { "$ref": "#/$defs/identifier" },
+            "args": { "type": "array", "items": { "$ref": "#/$defs/expr" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "fn", "args", "spread", "type"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "builtin" },
+            "fn": { "enum": ["len", "cap", "append", "make", "copy", "min", "max"] },
+            "args": { "type": "array", "items": { "$ref": "#/$defs/expr" } },
+            "spread": { "type": "boolean" },
+            "type": { "$ref": "#/$defs/optionalType" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "type", "x"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "conv" },
+            "type": { "$ref": "#/$defs/type" },
+            "x": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "op", "x"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "unary" },
+            "op": { "enum": ["-", "^", "!", "&"] },
+            "x": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "op", "x", "y"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "binary" },
+            "op": { "enum": ["+", "-", "*", "/", "%", "<<", ">>", "&", "|", "^", "&^", "&&", "||", "==", "!=", "<", "<=", ">", ">="] },
+            "x": { "$ref": "#/$defs/expr" },
+            "y": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "type", "fields"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "composite" },
+            "type": { "$ref": "#/$defs/type" },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "value"],
+                "additionalProperties": false,
+                "properties": {
+                  "name": { "$ref": "#/$defs/identifier" },
+                  "value": { "$ref": "#/$defs/expr" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "type", "elems"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "const": "composite" },
+            "type": { "$ref": "#/$defs/type" },
+            "elems": { "type": "array", "items": { "$ref": "#/$defs/expr" } }
+          }
+        }
+      ]
+    }
+  }
+}

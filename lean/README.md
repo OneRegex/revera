@@ -1,4 +1,4 @@
-# The LEAN4 model of Vego, and the ERE specification
+# The Lean 4 model of Vego and the ERE specification
 
 This directory holds the Lean 4 formalization that the Vego specification promises, and a formal model of the ERE specification the engine implements.
 
@@ -9,17 +9,18 @@ The theorems in `Vego/Theorems.lean` are machine checked.
 
 ## What is proved
 
-The theorems of `Vego/Theorems.lean` are about the embedded copies of `go1/probe.vego.json` and `go1/revera.vego.json`, byte for byte.
+The theorems of `Vego/Theorems.lean` are about the embedded copies of `vego/probe/probe.vego.json` and of `revera.vego.json` at the repository root, byte for byte.
 Native evaluation checks them.
 The Lake configuration tracks every embedded JSON, corpus, locale, and probe input, so changing one rebuilds the modules that contain it.
-The theorems of `Vego/CostLemmas.lean`, `Vego/MeterSound.lean`, `Vego/PhaseAProofs.lean` and `Vego/PhaseARun.lean` quantify over all inputs and are proved by induction, with no native evaluation.
+The theorems of `Vego/CostLemmas.lean`, `Vego/MeterSound.lean`, `Vego/PhaseAProofs.lean` and `Vego/PhaseARun.lean` are universal rather than corpus enumerations and are proved by induction, with no native evaluation.
+Their hypotheses are stated in sections 5 through 7.
 
 ### 1. The artifacts are well formed
 
 `probe_wellformed` and `revera_wellformed`.
 
 Both programs decode from JSON and elaborate into a fully typed core.
-Elaboration replays what the Go compiler and vego2json guarantee.
+Elaboration replays what the Go compiler and `vegoc check` guarantee.
 Every name resolves, and every operator gets one width.
 Untyped constants fold exactly and fit their contexts, composite literals are complete, and control flow is well shaped.
 Success is therefore a well-formedness proof for the shipped artifacts.
@@ -29,7 +30,7 @@ Success is therefore a well-formedness proof for the shipped artifacts.
 `probe_agrees`.
 
 Under the formal semantics, the probe program reproduces the 29 report lines of the Go original.
-Those lines live in `lean/data/probe.expected`, from `cmd/proberef`.
+Those lines live in `lean/data/probe.expected`, from `dev/internal/conformance/proberef`.
 The probe matrix pins the semantic corners of the language.
 Those corners are division overflow, wrapping at every width, evaluation order, spare-capacity zeroing, nil-ness, range copies, struct equality with string arrays, and writes through subslice views.
 
@@ -37,7 +38,7 @@ Those corners are division overflow, wrapping at every width, evaluation order, 
 
 `revera_corpus_agrees_within_contract`.
 
-Under the formal semantics, the revera engine answers the embedded crosscheck corpus exactly like the Go reference.
+Under the formal semantics, the Revera engine answers the retained commands of the embedded crosscheck corpus exactly like the Go reference.
 That corpus is `lean/data/corpus.tsv`, which pairs each command with the output of the Go engine.
 The replay uses the same driver protocol as the Zig, C++ and Rust targets: compile, execute, replace, iterate, contracts, locale selection and case digests.
 The runs hit no trap anywhere in the millions of interpreted operations these commands execute.
@@ -51,7 +52,7 @@ Before each call, the session computes the contract of the pattern for the subje
 A measurement above `ContractHeapBytes`, `ContractStackBytes` or `ContractSteps` is a hard fault.
 The stack comparison uses the 256-byte frame estimate of the contract.
 
-That covers the X commands, which are 76112 of the corpus.
+That covers the 76,112 retained X commands.
 It does not cover R and I.
 ReplaceAll and MatchIterNext call Exec themselves, and the session measures only its own calls.
 Those 360 commands are therefore checked for output agreement alone.
@@ -66,7 +67,7 @@ The runtimes round a zero-length request up to one element, and malloc adds its 
 It folds a constant factor of slack into its per-record sizes to cover it.
 
 Two corpus patterns cannot run under the interpreter in any reasonable time, and the theorem leaves their executions out.
-That is 1056 X commands of the 86704, so the theorem covers 85648.
+That is 1,056 X commands of the 86,704, so the theorem covers 85,648 commands.
 Both nest a star inside counted repetitions, `((a*){250}){250}b` in six blocks and `((a*){4}){4}` in six more.
 The parse search then explores a very large number of ways to split a subject among nullable instances.
 The cost comes from the nesting, not from the subject.
@@ -75,7 +76,7 @@ The second needs minutes on the empty subject.
 Replaying all twelve blocks would take days.
 
 What stays is chosen so that nothing escapes the check that matters.
-Every compile command of the corpus stays, all 9780 of them, so no pattern goes uncompiled and unchecked.
+Every compile command of the corpus stays, all 9,780 of them, so no pattern goes uncompiled and unchecked.
 The T commands of those blocks stay too, so the contract figures of the two extreme patterns still compare against the Go reference.
 Those are the largest figures in the corpus, which makes them the ones worth keeping.
 Only the executions go, and dropping them is sound for the session state.
@@ -108,8 +109,8 @@ It reads only the commands, never the recorded outputs.
 Every constrained command's recorded output meets its verdict.
 The walk leaves a command unconstrained in exactly the counted cases: the locale is not POSIX, the pattern is free, the subject holds a NUL or is not valid UTF-8, or the enumeration ran out of budget.
 `expectedCoverage` pins the figures, so any drift in coverage fails the theorem.
-On the current corpus, all 9653 defined patterns compile with the specification's subexpression count, all 66 free spellings in the corpus are the ones the engine rejects, and 66576 executions produce the specified line.
-The 1512 executions left out are the ones on subjects with NUL bytes or invalid UTF-8, which are not strings of the interface.
+On the current corpus, all 9,653 defined patterns compile with the specification's subexpression count, all 66 free spellings in the corpus are the ones the engine rejects, and 66,576 executions produce the specified line.
+The 1,512 executions left out are the ones on subjects with NUL bytes or invalid UTF-8, which are not strings of the interface.
 
 `engine_meets_spec_on_corpus` composes that theorem with the corpus theorem.
 For every corpus command the specification constrains, the interpreted engine prints a line that meets the specification's verdict.
@@ -117,17 +118,17 @@ The recorded Go outputs are the bridge between the two native evaluations, and b
 
 `engine_meets_spec_exhaustively` compares the two directly, on inputs no engine has seen.
 `Vego/Exhaustive.lean` runs two sweeps over a token language of fourteen tokens: the atoms `a`, `b`, `.`, `[ab]` and `[^a]`, parentheses, `|`, the duplications `*`, `+`, `?` and `{0,1}`, and both anchors.
-The structure sweep takes every string of one through four tokens, which is 41370 patterns, and every subject over `{a, b}` of up to three characters, with and without `REG_MINIMAL` and with and without the two execution flags.
+The structure sweep takes every string of one through four tokens, which is 41,370 patterns, and every subject over `{a, b}` of up to three characters, with and without `REG_MINIMAL` and with and without the two execution flags.
 The flag sweep takes every string of one through three tokens under all sixteen compile flag combinations and all four execution flag combinations, on subjects that add newlines and uppercase letters.
 Each defined pattern is compiled under the formal Vego semantics and executed on each subject, and the line must be the one the specification requires.
-That is 42128 compiles and 1576896 executions, and `coverageStructure` and `coverageFlags` pin those figures.
+That is 42,128 compiles and 1,576,896 executions, and `coverageStructure` and `coverageFlags` pin those figures.
 
 What these theorems do not cover is stated as plainly.
 Non-POSIX locales are outside the model, because sections 7.7 and 14.3 leave ranges and multi-character lists to the implementation there.
 The `R`, `I` and `T` commands are engine interfaces without a POSIX counterpart.
 And all three statements are finite: they quantify over the corpus and the enumerated domain, not over every pattern and subject.
 
-### 5. The phase A contract is proved for every input
+### 5. The phase A heap and step bounds are universal
 
 `PhaseA.run_steps_le`, `PhaseA.run_heap_le` and `phaseA_link_agrees`.
 
@@ -146,7 +147,8 @@ The buffers are bounded through the growth rule: the active list of a slot holds
 On every corpus execution that runs phase A alone, which is every `NoSub` pattern and every pattern without a group, the model run on the program read out of the interpreted `Regexp` reproduces the engine's match result, allocates exactly the bytes the interpreter counts, and its step figure dominates the interpreter's loop meter.
 On every `T` command of such a pattern, the heap and step figures the engine reports equal the proven figures.
 `linkCoverage` pins the counts: 47922 executions, 46 contract queries, and 6893 programs that pass `Prog.wfCheck`.
-`contract.go` now computes exactly `heapFigure` and `stepsFigure` for phase A, so the shipped contract is the proven bound.
+On the linked corpus executions, `contract.go` computes exactly `heapFigure` and `stepsFigure` for phase A.
+Those are the bounds proved universally for the model under the well-formedness hypotheses above.
 
 Two things led to this.
 An adversarial probe found that the previous phase A heap figure was unsound: `(a{0,8}){0,8}b` on `aaaaaaaa` allocated 7546 bytes against a figure of 7290 under the portable growth rule, because the doubling of the active lists and of the queue was folded in too tightly.
@@ -154,7 +156,7 @@ The proof then showed what the constants must be, and the per-boundary step budg
 The non-POSIX locales and the multi-character probes are inside the universal theorems but outside the corpus link, which covers the POSIX locale.
 Phase B, the capture solver, keeps its corpus-bound contract check.
 
-### 6. Phase A computes the right match for every input
+### 6. The phase A result is correct under stated hypotheses
 
 `phaseA_run_correct`, from `PhaseA.run_correct` of `Vego/PhaseARun.lean`.
 
@@ -212,17 +214,18 @@ That reading can neither under-count an allocation nor misattribute the call dep
 
 The corpus theorem and these lemmas meet in the middle.
 The lemmas prove the meter and the growth arithmetic right for all inputs.
-The corpus theorem checks the engine against its contract through that meter, on every recorded execution.
-The phase A matcher is modeled and proved universally, for its cost and for its result.
+The corpus theorem checks the engine against its contract through that meter on every retained Exec command.
+The phase A cost bounds are universal under program and atom-test well-formedness.
+Its result theorem additionally assumes that multi-character probes fit the ring and that the scan filter satisfies `ScanSound`.
 What remains corpus-bound is the control flow of the walk and of the capture solver.
 
 ## What this means for the pipeline
 
 The generated Rust, Zig, C++, and C11 engines come from the same JSON the theorems talk about.
-`cmd/crosscheck` verifies all four against the Go engine on the same corpus.
-The Lean semantics therefore anchors the whole chain.
-One side runs JSON through the formal semantics to the reference outputs.
-The other side runs the same JSON through a printer into a target engine, and reaches the same outputs.
+`dev/internal/conformance/crosscheck` verifies all four against the Go engine on the same corpus.
+On the covered corpus commands, the Lean semantics therefore anchors the whole chain.
+One side runs JSON through the formal semantics to the recorded outputs.
+The other side runs the same JSON through a printer into a target engine and reaches the same outputs through the conformance tests.
 
 ## Structure
 
@@ -239,15 +242,15 @@ Vego/Core.lean      typed core: resolved names, widths, zero fills
 Vego/Elab.lean      elaborator (checker): raw tree to typed core
 Vego/Interp.lean    operational semantics: heap, traps, fuel, meter
 Vego/PhaseA.lean    the phase A matcher, modeled with its meter
-Vego/PhaseAProofs.lean the phase A contract, proved for every program and subject
+Vego/PhaseAProofs.lean universal phase A heap and step bounds for well-formed programs and atom tests
 Vego/PhaseACorrect.lean the reference semantics of a program, and the closure of one boundary proved against it
-Vego/PhaseARun.lean the phase A result, proved for every program and subject
+Vego/PhaseARun.lean the phase A result under well-formedness, ring-fit and ScanSound hypotheses
 Vego/PhaseALink.lean the model against the interpreted engine on the corpus
 Vego/CostLemmas.lean universal theorems about the cost model
 Vego/MeterSound.lean meter soundness for the whole interpreter
 Vego/Machine.lean   host API: init, call, allocate, read back
 Vego/Probe.lean     probe harness (the Lean probe_host)
-Vego/Driver.lean    driver protocol session (the Lean driver_host)
+Vego/Driver.lean    driver protocol session (the Lean driver host)
 Vego/CorpusData.lean the embedded corpus and the replay set
 Vego/Corpus.lean    the replay proposition of the corpus theorem
 Vego/SpecCheck.lean the specification's verdict on every corpus command
@@ -276,25 +279,26 @@ The specification declares them target defined and keeps them out of observable 
 
 ## Trust base
 
-The proofs use `native_decide`, so they rest on the Lean kernel plus the Lean compiler, through `Lean.ofReduceBool`.
+The artifact, corpus and exhaustive theorems use `native_decide`, so they rest on the Lean kernel plus the Lean compiler, through `Lean.ofReduceBool`.
 The Go engine produces the reference outputs of the corpus theorem.
 The specification theorems replace that reference with the `Ere` model for every command they cover, so on those commands the Go engine is out of the trust base and the model of the specification is in it.
 The model is meant to be read against the specification, section by section, and `Ere/Examples.lean` checks it against the examples of section 16.
 The specification theorems are finite: they cover the corpus and the enumerated domain, not every pattern.
-The elaborator does not re-check the buffer-ownership clauses that vego2json leaves to review, which are moves and rule 9.
+The elaborator does not re-check the buffer-ownership clauses that `vegoc check` leaves to review, which are moves and rule 9.
 The semantics does not need them, because it models aliasing directly.
 
 ## Regenerating the data
 
-```
-cd go1
-go run ./cmd/proberef > ../lean/data/probe.expected
-go run ./cmd/crosscheck -dumpexpected ../lean/data/corpus.tsv
-xxd -p revera/data.bin | tr -d '\n' > ../lean/data/localedata.hex
+```sh
+cd dev
+go run ./internal/conformance/proberef > ../lean/data/probe.expected
+go run ./internal/conformance/crosscheck -dumpexpected ../lean/data/corpus.tsv
+xxd -p ../go/data.bin | tr -d '\n' > ../lean/data/localedata.hex
 cd ../lean && lake build && .lake/build/bin/vegocheck data/corpus.tsv
 ```
 
-`lake build` checks every theorem and takes about twenty minutes.
+`lake build` checks every theorem.
+A warm rebuild is fast, while a change to an embedded input reruns the native evaluations.
 To find where a change broke things, replay a dump with `vegocheck` instead.
 It enforces the same contract bounds and names the first command that diverges.
 `speccheck data/corpus.tsv` walks a dump under the specification and prints the coverage and every mismatch.

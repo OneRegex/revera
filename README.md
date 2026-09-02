@@ -1,95 +1,102 @@
-# re-vera2
+# Revera
 
-This repository is a clean-room implementation of the POSIX.1-2024 Extended Regular Expression language.
+One POSIX regex engine in Go, Rust, Zig, C and C++, cross-checked for one behavior and backed by machine-checked Lean semantics and proofs.
 
-It holds one written contract, one reference engine in Go, and the same engine in Rust, Zig, C++, and C11.
-The five engines come from a single source, through a mechanical pipeline.
-A Lean 4 model proves what that pipeline preserves.
-A C locale runtime and its generated CLDR tables supply the character classes, case mappings and collating data underneath.
+Revera is a clean-room implementation of the POSIX.1-2024 Extended Regular Expression language.
+The engine is written once, in Vego, a strict Go subset built for mechanical translation.
+A compiler exports it as Vego IR, and printers turn that IR into the Rust, Zig, C++ and C engines.
+
+As a result, all five libraries come from one engine source.
+The conformance corpus cross-checks their matches, errors and resource-contract reports.
+
+Meanwhile, a Lean 4 model gives Vego formal semantics.
+It proves the shipped IR well formed and checks the interpreted engine against a formal ERE model on the constrained corpus cases and an exhaustive small domain.
+It also proves phase A properties under the stated hypotheses.
+
+Finally, the engines embed generated CLDR and Unicode tables for character classes, case mappings and collating data.
+The `locale/` directory contains the C runtime and the generator used to reproduce and verify those tables.
+
+## The libraries
+
+| Language | Package                                      | Directory     |
+| -------- | -------------------------------------------- | ------------- |
+| Go       | `github.com/oneregex/revera/go`              | `go/`         |
+| Rust     | crate `revera`                               | `rust/`       |
+| Zig      | package `revera`                             | `zig/`        |
+| C        | `Revera::C`, `librevera_c`, `revera-c`       | `native/c/`   |
+| C++      | `Revera::CXX`, `librevera_cxx`, `revera-cxx` | `native/cpp/` |
+
+Each directory has a README with the API and the verification commands of that language.
+The Go engine is the canonical source.
+The generated engine files of the other languages keep their names everywhere: `engine.rs`, `engine.zig`, `engine.hpp` with `engine.cpp`, and `engine.h` with `engine.c`.
 
 ## Repository contents
 
-### Specifications and design notes
+- `revera.vego.json` is the engine as Vego IR, the release artifact from which every generated backend starts.
+- [`go/`](go/) is the canonical Vego source of the engine, plus its Go host files.
+- [`vego/`](vego/) is the language: [`SPECIFICATION.md`](vego/SPECIFICATION.md), the structural schema of the IR, the compiler, the `vegoc` command, and the probe program that a Vego backend must reproduce.
+- [`rust/`](rust/), [`zig/`](zig/) and [`native/`](native/) are the engine printed into each target language, with a hand-written public API in the shape that language expects.
+  `native/` is one CMake package with the C and C++ libraries.
+- [`lean/`](lean/) is the Lean 4 model of Vego and the formal model of the ERE specification, with the theorems and the corpus replay tools.
+- [`locale/`](locale/) is the C locale runtime, the CLDR tables, their tests and their generator.
+- [`dev/`](dev/) is the development module: the reference engine, the conformance kit, the generator, the benchmarks and the fuzz drivers.
+  It is never published.
+- [`docs/`](docs/) holds the specifications and the reports:
+  [`POSIX-1-2024-ERE-SPECIFICATION.md`](docs/POSIX-1-2024-ERE-SPECIFICATION.md) is the contract every engine implements;
+  [`TRE-POSIX-ERE-DIVERGENCES.md`](docs/TRE-POSIX-ERE-DIVERGENCES.md) records where TRE differs from it;
+  [`ERE-IMPLEMENTATION-TECHNIQUES.md`](docs/ERE-IMPLEMENTATION-TECHNIQUES.md) collects techniques from TRE, RE2 and MinRX;
+  [`LOCALE-TABLES.md`](docs/LOCALE-TABLES.md) documents the locale model;
+  [`CONFORMANCE-KIT.md`](docs/CONFORMANCE-KIT.md) describes the backend conformance kit;
+  [`BENCHMARKS.md`](docs/BENCHMARKS.md) describes the benchmarks and records the figures.
+- [`third_party/`](third_party/) holds pinned upstream trees as submodules, for study only: TRE, RE2 and MinRX.
 
-- [`docs/POSIX-1-2024-ERE-SPECIFICATION.md`](docs/POSIX-1-2024-ERE-SPECIFICATION.md) is the contract every engine here implements.
-  It restates POSIX.1-2024 Issue 8 for an implementer, and it decides the outcomes POSIX leaves open.
-- [`docs/TRE-POSIX-ERE-DIVERGENCES.md`](docs/TRE-POSIX-ERE-DIVERGENCES.md) records where the pinned TRE tree differs from the contract, with the source lines that prove it.
-- [`docs/ERE-IMPLEMENTATION-TECHNIQUES.md`](docs/ERE-IMPLEMENTATION-TECHNIQUES.md) collects techniques from TRE, RE2 and MinRX, and marks the semantics each one assumes.
-- [`docs/LOCALE-TABLES.md`](docs/LOCALE-TABLES.md) documents the locale model, the data coverage, and how to reproduce the tables.
-- [`docs/CONFORMANCE-KIT.md`](docs/CONFORMANCE-KIT.md) describes the backend conformance kit and the manifest a new target provides.
-- [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) describes the cross-language benchmarks, the profiling workflow, and records the current figures.
+## What is proved
 
-### Locale runtime
+The Lean development proves both IR files well formed and proves that the interpreted probe reproduces the Go report.
 
-- [`src/rv_locale.h`](src/rv_locale.h) is the locale API.
-- [`src/rv_locale.c`](src/rv_locale.c) answers class, case, collating-element and primary-equivalence lookups without allocating.
-- `src/rv_locale_data.inc` holds the generated CLDR 48.2 and Unicode 17.0.0 tables.
-  They cover 1,122 CLDR locales with their collation types, plus the `C` and `POSIX` aliases.
-- [`tools/GenerateLocaleData.java`](tools/GenerateLocaleData.java) and [`tools/generate-locale-data.sh`](tools/generate-locale-data.sh) reproduce those tables from pinned CLDR artifacts.
-- [`tests/`](tests/) exercises the public API and checks the invariants of the generated tables.
+Its corpus theorem compares the interpreted engine with recorded Go answers on the embedded replay set and meters the retained Exec commands against their contracts.
+Replacement and iteration commands are checked for output agreement only, and exceptionally expensive Exec commands are excluded.
 
-### Engines
+Separately, the development states the ERE specification as a Lean definition.
+It checks the interpreted engine against that definition on every constrained corpus command and on an exhaustive small domain.
 
-- [`go0/`](go0/) is the reference engine: parser, matcher, capture resolution, resource contracts, and an embedded copy of the locale data.
-  A reference matcher that enumerates every parse checks its answers, and the host `regcomp()` checks them again.
-- [`go1/`](go1/) rewrites that engine in Vego, a Go subset built for mechanical translation, and exports it as `revera.vego.json`.
-- [`rust1/`](rust1/), [`zig1/`](zig1/), [`cpp1/`](cpp1/), and [`c1/`](c1/) are the engine printed into each target language, with a hand-written public API in the shape that language expects.
-- [`lean/`](lean/) is the Lean 4 model of Vego, and a formal model of the ERE specification.
-  It gives the subset a formal semantics.
-  It proves that the shipped JSON artifacts are well formed.
-  It checks that the embedded probe and selected corpus executions reproduce the Go reference outputs and stay inside their resource contracts.
-  It also states the specification itself as a Lean definition, and proves that the interpreted engine meets it on every covered corpus command and on an exhaustive small domain.
-  The resource contract of the phase A matcher is proved for every program and subject, and the engine computes the proven figures.
-  The match the phase A matcher reports is proved to be the earliest-start, smallest-counters, longest-end match of the program, for every program and subject.
+For phase A, the heap and step bounds are proved for every well-formed program, atom test and subject.
+The reported match is also proved correct under the additional hypotheses stated in the formalization.
+However, the link to the shipped engine covers only corpus executions that use phase A alone.
 
-Each directory has a README that states its own API and how to verify it.
-
-### Reference engines
-
-`ref/` holds independent upstream trees, used as evidence and as design references.
-They are pinned to these revisions:
-
-- `ref/tre` at `71bfcaf0af3994384987c6c2679ed7d078ffe189` is the POSIX-oriented implementation and the divergence baseline.
-- `ref/re2` at `972a15cedd008d846f1a39b2e88ce48d7f166cbd` is a linear-time engine design reference.
-- `ref/minrx` at `d13610cdf983337d32b5e07a46da69e40ec5adb0` is a compact structured-NFA design reference.
-
-Project changes belong outside `ref/`, unless a reference revision moves on purpose.
-
-### Supporting material
-
-- [`Makefile`](Makefile) builds and runs the locale tests.
-- [`LICENSES/Unicode-3.0.txt`](LICENSES/Unicode-3.0.txt) is the license of the generated Unicode and CLDR data.
+[`lean/README.md`](lean/README.md) states each theorem and what it does not cover.
 
 ## Build and test
 
-A C11 compiler is enough for the locale runtime and its tests:
-
 ```sh
-make test
+git clone --recurse-submodules https://github.com/oneregex/revera
+cd revera
+make test                          # the C locale runtime
+(cd go && GOWORK=off go test -count=1 ./...)
+(cd vego && GOWORK=off go test -count=1 ./...)
+(cd dev && go test -count=1 -timeout 30m ./...)
+(cd rust && cargo test --workspace)
+(cd zig && zig build test)
+(cd lean && lake build)
+cmake -S native -B tmp/native-build -DBUILD_TESTING=ON \
+  && cmake --build tmp/native-build \
+  && ctest --test-dir tmp/native-build --output-on-failure
 ```
 
-The Go engines need only a Go toolchain:
+The two Go modules are tested with `GOWORK=off`, because the workspace file would hide a missing dependency.
 
-```sh
-(cd go0 && go test ./...)
-(cd go1 && go test ./...)
-```
-
-Regenerate every Vego JSON and Rust, Zig, C++, and C11 source artifact with one command:
+Regenerate the IR and every generated engine with one command, and check that they are current with another:
 
 ```sh
 make generate
 make check-generated
 ```
 
-`check-generated` renders into an isolated directory under `tmp/`, compares file contents, and exits nonzero without modifying checked generated artifacts when an artifact is stale or missing.
+`check-generated` renders into an isolated directory under `tmp/`, compares file contents, and exits nonzero without touching a checked-in file when one is stale or missing.
 Set `GENERATION_TARGETS=rust`, `zig`, `cpp`, `c`, or a comma-separated selection to limit the target sources.
-The two shared JSON files are always included.
+The two IR files are always included.
 
-The Rust, Zig, C++, and C11 engines each build and verify from their own directory.
-Their READMEs give the commands, including the differential run against the Go engine.
-
-One command decides whether a backend is conformant, and one command benchmarks every engine:
+One command runs the conformance suite for every generated backend, and one command benchmarks every engine:
 
 ```sh
 make conform
@@ -98,9 +105,38 @@ make size
 make profile
 ```
 
-`conform` builds each backend from its `backend.json`, then runs the probe, the differential corpus, stress rounds, the fuzz seed pack, the sanitizer and debug builds, and checks that the Lean data matches the corpus.
-`bench` prints compile, match, replacement and difficult-pattern figures with allocation counts, side by side for Go, Rust, Zig, C++, and C11.
-`size` reports the generated code size per target, and `profile` writes CPU and allocation profiles of the Go engine.
+`conform` builds each generated backend from its `backend.json`, runs the release probe, differential corpus, stress rounds and fuzz seed pack, and verifies that the checked-in Lean data is current.
+It attempts each manifest's configured debug or sanitizer builds and repeats the light checks when their toolchains are available.
 
-A rebuild of `src/rv_locale_data.inc` also needs JDK 17 or later and the pinned CLDR 48.2 artifacts.
-[`docs/LOCALE-TABLES.md`](docs/LOCALE-TABLES.md#reproduction) gives the exact inputs and command.
+`make conform CONFORM_FLAGS="-lean"` also builds the Lean development, runs `vegocheck` on the Lean-covered corpus commands, and runs `speccheck` on the specification-constrained commands.
+
+`bench` builds every release backend, then prints compile, match, replacement and difficult-pattern figures with allocation counts.
+`size` reads those release drivers and reports engine source and machine-code sizes, so run it after `make bench` or `make conform`.
+Finally, `profile` writes CPU and allocation profiles of the Go engine.
+
+`make licenses` synchronizes `LICENSE` and `LICENSES/Unicode-3.0.txt` into `go/`, `rust/`, `zig/` and `native/`.
+Before a release, replace `unreleased` in the version's changelog heading with its date, run `make licenses`, and commit the result.
+`make dist` then reads committed `HEAD`, refuses tracked changes, checks the Cargo, Zig and CMake versions and the license copies, and stages deterministic Zig and native archives, both IR files, and a manifest with the source commit, `vegoc` version, IR digest and asset checksums in `tmp/dist/`.
+
+## Versions
+
+Three axes move on their own:
+
+- the Revera engine release, one number shared by the five implementations, starting at `0.1.0`;
+- the Vego toolchain, its own SemVer, starting at `0.1.0`, which `vegoc version` prints;
+- the Vego IR compatibility major, the `"vego": 1` field of the IR.
+
+Engine releases use matching project `vX.Y.Z` and Go engine `go/vX.Y.Z` tags.
+Vego releases use independent `vego/vA.B.C` tags; the first engine and Vego releases both happen to be `0.1.0`.
+[`CHANGELOG.md`](CHANGELOG.md) records the releases, and [`SECURITY.md`](SECURITY.md) says how to report a vulnerability.
+
+## License
+
+Revera is licensed under the MIT license, in [`LICENSE`](LICENSE).
+
+The MIT license covers the Vego source, the Vego IR, the generated engines in every language, the hand-written runtimes and the binaries built from them.
+
+The embedded Unicode and CLDR data is under the Unicode License v3, in [`LICENSES/Unicode-3.0.txt`](LICENSES/Unicode-3.0.txt).
+Therefore, every independently shipped Revera engine package carries a copy of both files.
+
+By contrast, the Vego toolchain contains no Unicode or CLDR data.

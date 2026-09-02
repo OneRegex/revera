@@ -1,4 +1,4 @@
-# Shared by go0/ and go1/; run golangci-lint from inside either module.
+# Shared by the go, vego and dev modules; run golangci-lint from inside one of them.
 version: "2"
 
 linters:
@@ -28,7 +28,7 @@ linters:
     paths:
       - tmp
     rules:
-      # go1/probe exercises Vego corners on purpose: dead nil checks,
+      # vego/probe exercises Vego corners on purpose: dead nil checks,
       # writes to range variables, and similar constructs.
       - path: (^|/)probe/
         linters:

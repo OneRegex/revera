@@ -7,8 +7,8 @@ import Vego.Decode
 
 namespace Vego
 
-def probeJsonText : String := include_str "../../go1/probe.vego.json"
+def probeJsonText : String := include_str "../../vego/probe/probe.vego.json"
 
-def reveraJsonText : String := include_str "../../go1/revera.vego.json"
+def reveraJsonText : String := include_str "../../revera.vego.json"
 
 end Vego

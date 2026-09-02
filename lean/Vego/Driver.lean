@@ -1,7 +1,7 @@
 /-
 The cross-language driver protocol, instantiated over the interpreted revera engine.
 
-This is the Lean counterpart of revera/driver_host.go.
+This is the Lean counterpart of dev/internal/protocol/driver.go.
 One session holds the base locale table, the selected locale, and the compiled pattern.
 Every protocol command maps to calls into the checked program.
 The crosscheck corpus, evaluated by the Go original, gives the expected output for every command.

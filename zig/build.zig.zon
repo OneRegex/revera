@@ -1,0 +1,24 @@
+.{
+    .name = .revera,
+    .version = "0.1.0",
+    .fingerprint = 0x810e496510273260, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.17.0-dev.1936+5a625d5f3",
+    .dependencies = .{},
+    // Only these files go into the package hash and into the fetched copy.
+    // fuzz.zig and host.zig are there because `zig build test` runs the fuzz seed corpus.
+    // LICENSE and LICENSES are copies of the root files, kept in step by `make licenses`.
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "README.md",
+        "LICENSE",
+        "LICENSES",
+        "src/revera.zig",
+        "src/engine.zig",
+        "src/vg.zig",
+        "src/data.bin",
+        "src/revera_test.zig",
+        "src/fuzz.zig",
+        "src/host.zig",
+    },
+}

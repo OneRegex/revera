@@ -66,12 +66,13 @@ Download these CLDR 48.2 release artifacts from `https://www.unicode.org/Public/
 Then run:
 
 ```sh
-tools/generate-locale-data.sh \
+cd locale && tools/generate-locale-data.sh \
   /path/to/cldr-common-48.2.zip \
   /path/to/cldr-tools-48.2.jar \
   /path/to/jdk
 ```
 
+The script runs from `locale/` and writes `rv_locale_data.inc` there, unless a fourth argument names another output.
 The script needs JDK 17 or later at generation time only.
 It verifies both artifacts by SHA-512 before it runs.
 The CLDR tools manifest identifies code commit `11299982335beb974c1c63c45265184e759c0f41`, tagged `release-48-2` in the CLDR repository.

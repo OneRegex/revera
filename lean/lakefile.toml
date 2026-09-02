@@ -3,12 +3,12 @@ defaultTargets = ["Ere", "Vego", "vegocheck", "speccheck", "exhaustcheck", "Proo
 
 [[input_file]]
 name = "probeJson"
-path = "../go1/probe.vego.json"
+path = "../vego/probe/probe.vego.json"
 text = true
 
 [[input_file]]
 name = "reveraJson"
-path = "../go1/revera.vego.json"
+path = "../revera.vego.json"
 text = true
 
 [[input_file]]

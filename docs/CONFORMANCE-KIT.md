@@ -4,13 +4,13 @@ A backend is one instantiation of the Vego engine: a printer output plus a hand-
 This kit decides whether a backend is conformant with one command.
 It packages the probe protocol, the corpus generator, the differential runner, the stress rounds, the fuzz entry points, the checked builds, and the Lean replay.
 
-The kit lives in `go1/conformance`.
-The command is the `conform` subcommand of `go1/cmd/revera`, and the root Makefile wraps it:
+The kit lives in `dev/internal/conformance`.
+The command is `dev/cmd/conform`, and the root Makefile wraps it:
 
 ```sh
 make conform
-make conform CONFORM_FLAGS="-backend ../cpp1"
-cd go1 && go run ./cmd/revera conform -backend ../rust1 -stress 50 -lean
+make conform CONFORM_FLAGS="-backend ../native/cpp"
+cd dev && go run ./cmd/conform -backend ../rust -stress 50 -lean
 ```
 
 The exit status is 0 only when every step passed.
@@ -19,7 +19,7 @@ The last lines give one verdict per backend.
 ## What a backend must provide
 
 Each backend directory holds a `backend.json` manifest.
-The kit discovers every `*/backend.json` below the repository root, or takes the directories named with `-backend`.
+The kit discovers every `*/backend.json` below the repository root and every `native/*/backend.json`, or takes the directories named with `-backend`.
 
 ```json
 {
@@ -46,7 +46,7 @@ The kit discovers every `*/backend.json` below the repository root, or takes the
 ```
 
 - `name` identifies the backend in reports.
-- `generated` lists the generated sources, for the code-size report of `cmd/bench size`.
+- `generated` lists the generated sources, for the code-size report of `dev/cmd/bench size`.
 - `engine_symbols` is a regular expression over symbol names in the release driver.
   The code-size report sums the machine code of the functions it matches.
 - `toolchain` is a command that prints the compiler version, for the header of the benchmark report.
@@ -54,21 +54,21 @@ The kit discovers every `*/backend.json` below the repository root, or takes the
   `build` is a list of argument vectors, run in order in the backend directory.
   The paths are relative to the backend directory.
   `driver` and `probe` are required.
-  `bench` is used by `cmd/bench`, and `fuzzcase` by the fuzz step.
+  `bench` is used by `dev/cmd/bench`, and `fuzzcase` by the fuzz step.
 - `checked` lists builds with runtime checks: sanitizers, debug modes, or a checked optimization level.
   A build with `requires` runs that command first, and a failure marks the build as skipped instead of failed.
   This is for optional toolchains, such as a nightly Rust for AddressSanitizer.
 
 The binaries speak three protocols, all defined on the Go side:
 
-| Binary   | Protocol                                     | Reference                   |
-| -------- | -------------------------------------------- | --------------------------- |
-| driver   | driver line protocol, one answer per command | `go1/revera/driver_host.go` |
-| probe    | prints the probe report lines                | `go1/cmd/proberef`          |
-| fuzzcase | runs a seed pack, prints the count           | `go1/cmd/fuzzcase`          |
-| bench    | bench line protocol                          | `go1/revera/bench_host.go`  |
+| Binary   | Protocol                                     | Reference                            |
+| -------- | -------------------------------------------- | ------------------------------------ |
+| driver   | driver line protocol, one answer per command | `dev/internal/protocol/driver.go`                  |
+| probe    | prints the probe report lines                | `dev/internal/conformance/proberef`  |
+| fuzzcase | runs a seed pack, prints the count           | `dev/internal/conformance/fuzzcase`  |
+| bench    | bench line protocol                          | `dev/internal/protocol/bench.go`                   |
 
-The existing drivers in `rust1/src/main.rs`, `zig1/src/main.zig`, `cpp1/driver.cpp`, and `c1/driver.c` are the models for a new one.
+The existing drivers in `rust/tools/src/main.rs`, `zig/src/main.zig`, `native/cpp/driver.cpp`, and `native/c/driver.c` are the models for a new one.
 
 ## The steps
 
@@ -76,7 +76,7 @@ The kit runs these steps, in this order, and records each outcome with its durat
 
 | Step             | Scope   | What it checks                                                                                                                                                                       |
 | ---------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| generated        | repo    | `revera check-generated`: every generated artifact is current.                                                                                                                       |
+| generated        | repo    | `dev/cmd/generate -check`: every generated artifact is current.                                                                                                                      |
 | corpus           | repo    | Builds the corpus, the stress rounds and the fuzz seed pack, and answers them with the Go engine.                                                                                    |
 | build            | backend | The release build commands succeed and produce the named binaries.                                                                                                                   |
 | probe            | backend | The probe output equals the Go probe report, line by line.                                                                                                                           |
@@ -98,7 +98,7 @@ The Lean replay leaves those executions out as well, plus those of `((a*){4}){4}
 The stress rounds are reproducible.
 Round `i` uses seed `seed+i`, and the seed alone selects the flag set and the alphabet.
 A later run with `-seed 120 -stress 30` therefore continues a first run with `-seed 100 -stress 20` without repeating a pattern.
-`cmd/crosscheck -extra n` runs the same rounds from seed 100.
+`dev/internal/conformance/crosscheck -extra n` runs the same rounds from seed 100.
 
 The Lean steps tie the backend to the proofs.
 The theorems in `lean/Vego/Theorems.lean` replay the same corpus that the driver answered, so a backend that passes the corpus step agrees with the engine the proofs cover.
@@ -108,7 +108,7 @@ The `lean-data` step fails when the corpus changed and the Lean data was not reg
 ## The fuzz entry points
 
 One input format drives every fuzz entry point, so one seed pack and one reproducer serve all backends.
-`go1/revera/fuzz_host.go` defines it:
+`dev/internal/protocol/fuzz.go` defines it:
 
 ```
 byte 0      compile flags, masked with 0x0f
@@ -123,15 +123,15 @@ rest        the subject
 The procedure is the same everywhere: select the locale, compile, exec with captures, replace, iterate three matches, compute the contract.
 Every result is ignored; a crash, an assertion, or a sanitizer report is the signal.
 
-| Backend | Entry point                                 | Coverage-guided run                                                  |
-| ------- | ------------------------------------------- | -------------------------------------------------------------------- |
-| go1     | `FuzzEngine` in `go1/revera/fuzz_test.go`   | `cd go1 && go test ./revera -run '^$' -fuzz FuzzEngine`              |
-| rust1   | `fuzz_one` in `rust1/src/fuzz.rs`           | `cd rust1/fuzz && cargo +nightly fuzz run engine` (needs cargo-fuzz) |
-| zig1    | `fuzzOne` in `zig1/src/fuzz.zig`            | `cd zig1 && zig build test --fuzz`                                   |
-| cpp1    | `LLVMFuzzerTestOneInput` in `cpp1/fuzz.cpp` | `cd cpp1 && make libfuzzer && ./libfuzzer corpus/` (Linux clang)     |
-| c1      | `LLVMFuzzerTestOneInput` in `c1/fuzz.c`     | `cd c1 && make libfuzzer && ./libfuzzer corpus/` (Linux clang)       |
+| Backend | Entry point                                       | Coverage-guided run                                                    |
+| ------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
+| go      | `FuzzEngine` in `go/fuzz_test.go`                 | `cd go && go test . -run '^$' -fuzz FuzzEngine`                        |
+| rust    | `fuzz_one` in `rust/tools/src/fuzz.rs`                  | `cd rust/fuzz && cargo +nightly fuzz run engine` (needs cargo-fuzz)    |
+| zig     | `fuzzOne` in `zig/src/fuzz.zig`                   | `cd zig && zig build test --fuzz`                                      |
+| cpp     | `LLVMFuzzerTestOneInput` in `native/cpp/fuzz.cpp` | `cd native/cpp && make libfuzzer && ./libfuzzer corpus/` (Linux clang) |
+| c       | `LLVMFuzzerTestOneInput` in `native/c/fuzz.c`     | `cd native/c && make libfuzzer && ./libfuzzer corpus/` (Linux clang)   |
 
-The Go entry point does more than the others: it also compares go1 with go0 on compile, exec and replace, so it is a differential fuzzer for the engine logic that every backend inherits.
+The Go entry point does more than the others: it also compares the Go engine with the reference engine on compile, exec and replace, so it is a differential fuzzer for the engine logic that every backend inherits.
 The `fuzzcase` binaries are the deterministic form: they run a seed pack with no coverage feedback, which is what the kit needs for a bounded, repeatable verdict.
 The seed pack is `tmp/conformance/fuzz-seeds.pack`, written by the corpus step from `revera.FuzzSeeds()`.
 
@@ -139,23 +139,23 @@ The seed pack is `tmp/conformance/fuzz-seeds.pack`, written by the corpus step f
 
 | Backend | Build                            | What it catches                                                             |
 | ------- | -------------------------------- | --------------------------------------------------------------------------- |
-| rust1   | `cargo build`                    | The runtime's `assert!` bounds checks, in the debug profile.                |
-| rust1   | `sh asan-build.sh`, nightly ASan | Out-of-bounds and use-after-free through raw pointers.                      |
-| zig1    | `zig build -p zig-out/debug`     | Every Zig safety check of Debug mode.                                       |
-| cpp1    | `make sanitize`                  | AddressSanitizer and UndefinedBehaviorSanitizer, fatal on the first report. |
-| c1      | `make sanitize`                  | AddressSanitizer and UndefinedBehaviorSanitizer, fatal on the first report. |
+| rust    | `cargo build`                    | The runtime's `assert!` bounds checks, in the debug profile.                |
+| rust    | `sh asan-build.sh`, nightly ASan | Out-of-bounds and use-after-free through raw pointers.                      |
+| zig     | `zig build -p zig-out/debug`     | Every Zig safety check of Debug mode.                                       |
+| cpp     | `make sanitize`                  | AddressSanitizer and UndefinedBehaviorSanitizer, fatal on the first report. |
+| c       | `make sanitize`                  | AddressSanitizer and UndefinedBehaviorSanitizer, fatal on the first report. |
 
 The Rust sanitizer build needs the nightly toolchain and is skipped without it.
 A skipped step keeps the verdict from being complete, so the exit status stays 1 unless `-allow-skip` is given.
 
 ## Adding a backend
 
-1. Write the printer and the runtime, and add the generation step to `go1/cmd/revera`.
+1. Write the printer and the runtime, and add the generation step to `dev/cmd/generate`.
 2. Write the driver, the probe, the fuzzcase runner and the bench binary, following the existing ones.
 3. Add `backend.json` with the release build and at least one checked build.
 4. Run `make conform CONFORM_FLAGS="-backend ../<dir>"`.
 5. Run `make bench` and `make size` and record the figures in `docs/BENCHMARKS.md`.
 
 The kit reports the first ten mismatched lines of a corpus run with the command, the expected answer and the answer received.
-`go run ./cmd/godriver` answers the same protocol with the Go engine, so a single command can be replayed by hand.
-`go run ./cmd/crosscheck -dump corpus.txt` writes the whole command stream for a driver under a debugger.
+`cd dev && go run ./internal/conformance/godriver` answers the same protocol with the Go engine, so a single command can be replayed by hand.
+`cd dev && go run ./internal/conformance/crosscheck -dump corpus.txt` writes the whole command stream for a driver under a debugger.

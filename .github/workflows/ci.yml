@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The Zig version follows minimum_zig_version in zig/build.zig.zon; move both together.
+env:
+  ZIG_VERSION: 0.17.0-dev.1936+5a625d5f3
+
+jobs:
+  generated:
+    name: Generated artifacts and licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+      - run: make check-generated
+      - name: License copies are current
+        run: sh dev/sync-licenses.sh && git diff --exit-code
+
+  go:
+    name: Go modules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+      - name: Engine module without the workspace
+        run: cd go && GOWORK=off go build ./... && GOWORK=off go test ./...
+      - name: Vego module without the workspace
+        run: cd vego && GOWORK=off go build ./... && GOWORK=off go test ./...
+      - name: Development module
+        run: cd dev && go vet ./... && go test -count=1 -timeout 30m ./...
+
+  locale:
+    name: Locale runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test
+
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cd rust && cargo build --workspace && cargo test --workspace
+      - run: cd rust && cargo clippy --workspace --all-targets -- -D warnings
+      - name: The crate packages with only the library and the licenses
+        run: cd rust && cargo package && cargo package --list
+
+  zig:
+    name: Zig
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - run: cd zig && zig build && zig build test
+      - run: cd zig && zig build --build-file tools/build.zig -Drelease -p zig-out
+
+  native:
+    name: C and C++
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S native -B build/native -DBUILD_TESTING=ON
+      - run: cmake --build build/native
+      - run: ctest --test-dir build/native --output-on-failure
+
+  archives:
+    name: Release archives
+    runs-on: ubuntu-latest
+    needs: [generated]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Stage the assets from the commit
+        run: |
+          if grep -Eq '^## [0-9]+\.[0-9]+\.[0-9]+ - [0-9]{4}-[0-9]{2}-[0-9]{2}$' CHANGELOG.md; then
+            cd dev && go run ./cmd/dist
+          else
+            echo "CHANGELOG.md has no dated section yet; staging with the date check bypassed"
+            sed -i 's/^\(## [0-9.]*\) - unreleased$/\1 - 1970-01-01/' CHANGELOG.md
+            cd dev && go run ./cmd/dist -allow-dirty
+          fi
+      - name: The Zig archive builds and tests as fetched
+        run: |
+          mkdir -p build/zig-archive && tar -xzf tmp/dist/revera-zig-*.tar.gz -C build/zig-archive
+          cd build/zig-archive/revera-zig-* && zig build && zig build test
+      - name: The native archive configures, builds, tests and installs
+        run: |
+          mkdir -p build/native-archive && tar -xzf tmp/dist/revera-native-*.tar.gz -C build/native-archive
+          cmake -S build/native-archive/revera-native-* -B build/native-archive/build -DBUILD_TESTING=ON
+          cmake --build build/native-archive/build
+          ctest --test-dir build/native-archive/build --output-on-failure
+          cmake --install build/native-archive/build --prefix build/native-archive/prefix
+          test -f build/native-archive/prefix/share/doc/revera/LICENSE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: tmp/dist
+
+  conform:
+    name: Conformance kit
+    runs-on: ubuntu-latest
+    needs: [generated, go]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Install clang 19, which the native Makefiles need for #embed
+        run: |
+          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 19
+          echo "CC=clang-19" >> "$GITHUB_ENV"
+          echo "CXX=clang++-19" >> "$GITHUB_ENV"
+      - name: Every backend, release and checked builds; the Rust sanitizer build skips without nightly
+        run: make conform CONFORM_FLAGS="-quick -stress 2 -allow-skip"
+
+  lean:
+    name: Lean proofs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: lean
+          use-mathlib-cache: false
+      - name: Replay the corpus under the Lean semantics
+        run: cd lean && .lake/build/bin/vegocheck data/corpus.tsv && .lake/build/bin/speccheck data/corpus.tsv

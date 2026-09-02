@@ -1,60 +1,53 @@
-CC ?= cc
-CFLAGS ?= -O2
-CPPFLAGS ?=
 GENERATION_TARGETS ?= all
 
-WARNINGS = -Wall -Wextra -Wpedantic -Werror
+.PHONY: all test generate check-generated lint conform bench size profile licenses dist clean
 
-.PHONY: all clean test generate check-generated lint conform bench size profile
+# The locale runtime and its C tests.
+all:
+	$(MAKE) -C locale all
 
-all: build/test_locale build/test_locale_internal
+test:
+	$(MAKE) -C locale test
 
-build:
-	mkdir -p build
-
-build/test_locale: src/rv_locale.c src/rv_locale.h src/rv_locale_data.inc \
-		tests/test_locale.c | build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) -std=c11 -Isrc \
-		src/rv_locale.c tests/test_locale.c -o $@
-
-build/test_locale_internal: src/rv_locale.c src/rv_locale.h \
-		src/rv_locale_data.inc tests/test_locale_internal.c | build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) -std=c11 -Isrc \
-		tests/test_locale_internal.c -o $@
-
-test: build/test_locale build/test_locale_internal
-	./build/test_locale
-	./build/test_locale_internal
-
+# The Vego IR and the generated engines, rendered by vegoc into tmp/ and installed in one transaction.
 generate:
-	cd go1 && go run ./cmd/revera generate -target $(GENERATION_TARGETS)
+	cd dev && go run ./cmd/generate -target $(GENERATION_TARGETS)
 
 check-generated:
-	cd go1 && go run ./cmd/revera check-generated -target $(GENERATION_TARGETS)
+	cd dev && go run ./cmd/generate -check -target $(GENERATION_TARGETS)
 
 lint:
-	cd go0 && golangci-lint run ./...
-	cd go1 && golangci-lint run ./...
-	cd rust1 && cargo clippy --all-targets
+	cd go && golangci-lint run ./...
+	cd vego && golangci-lint run ./...
+	cd dev && golangci-lint run ./...
+	cd rust && cargo clippy --workspace --all-targets
 
-# CONFORM_FLAGS passes options through, for example CONFORM_FLAGS="-backend ../cpp1 -lean".
+# CONFORM_FLAGS passes options through, for example CONFORM_FLAGS="-backend ../native/cpp -lean".
 conform:
-	cd go1 && go run ./cmd/revera conform $(CONFORM_FLAGS)
+	cd dev && go run ./cmd/conform $(CONFORM_FLAGS)
 
-# Cross-language benchmarks; BENCH_FLAGS passes options through, for example BENCH_FLAGS="-go0 -only hard/".
+# Cross-language benchmarks; BENCH_FLAGS passes options through, for example BENCH_FLAGS="-reference -only hard/".
 bench:
 	mkdir -p tmp
-	cd go1 && go run ./cmd/bench -build -tsv ../tmp/bench-results.tsv $(BENCH_FLAGS)
+	cd dev && go run ./cmd/bench -build -tsv ../tmp/bench-results.tsv $(BENCH_FLAGS)
 
 size:
-	cd go1 && go run ./cmd/bench size
+	cd dev && go run ./cmd/bench size
 
 # CPU and allocation profiles of the Go engine over the shared cases, in tmp/.
 profile:
 	mkdir -p tmp
-	cd go1 && go test ./revera -run '^$$' -bench 'BenchmarkEngine' -benchmem \
+	cd dev && go test ./internal/protocol -run '^$$' -bench 'BenchmarkEngine' -benchmem \
 		-cpuprofile ../tmp/cpu.pprof -memprofile ../tmp/mem.pprof -o ../tmp/revera.test
-	cd go1 && go tool pprof -top -nodecount 25 ../tmp/revera.test ../tmp/cpu.pprof
+	cd dev && go tool pprof -top -nodecount 25 ../tmp/revera.test ../tmp/cpu.pprof
+
+# Copies of LICENSE and LICENSES/ in every package directory.
+licenses:
+	sh dev/sync-licenses.sh
+
+# The release archives, the IR files and their manifest, in tmp/dist/, built from the recorded commit.
+dist:
+	cd dev && go run ./cmd/dist
 
 clean:
-	rm -f build/test_locale build/test_locale_internal
+	$(MAKE) -C locale clean

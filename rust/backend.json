@@ -1,0 +1,30 @@
+{
+  "name": "rust",
+  "generated": ["src/engine.rs", "src/probe_engine.rs"],
+  "engine_symbols": "6engine[0-9]",
+  "toolchain": ["rustc", "--version"],
+  "release": {
+    "build": [["cargo", "build", "--release", "--workspace"]],
+    "driver": "target/release/driver",
+    "probe": "target/release/probe",
+    "bench": "target/release/bench",
+    "fuzzcase": "target/release/fuzzcase"
+  },
+  "checked": [
+    {
+      "name": "debug",
+      "build": [["cargo", "build", "--workspace"]],
+      "driver": "target/debug/driver",
+      "probe": "target/debug/probe",
+      "fuzzcase": "target/debug/fuzzcase"
+    },
+    {
+      "name": "asan",
+      "requires": ["cargo", "+nightly", "--version"],
+      "build": [["sh", "asan-build.sh"]],
+      "driver": "target/asan-bin/driver",
+      "probe": "target/asan-bin/probe",
+      "fuzzcase": "target/asan-bin/fuzzcase"
+    }
+  ]
+}

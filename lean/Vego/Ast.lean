@@ -1,7 +1,7 @@
 /-
 Abstract syntax of Vego, the mechanically translatable Go subset.
 
-The shapes here mirror section 8 of go1/VEGO-SPECIFICATION.md one to one.
+The shapes here mirror section 8 of vego/SPECIFICATION.md one to one.
 The JSON file is the portable artifact, and this AST is its Lean image.
 Integer and character literals arrive as decimal strings in the JSON and are parsed into `Int` during decoding.
 -/

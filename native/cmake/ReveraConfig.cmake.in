@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/ReveraTargets.cmake")
+
+# Both libraries always install together, so a request for one component or the other always succeeds.
+set(Revera_C_FOUND TRUE)
+set(Revera_CXX_FOUND TRUE)
+check_required_components(Revera)

@@ -1,0 +1,9 @@
+prefix=@revera_pc_prefix@
+libdir=${prefix}/@revera_pc_libdir@
+includedir=${prefix}/@revera_pc_includedir@
+
+Name: revera-cxx
+Description: POSIX ERE regular expressions for C++20, with a leftmost-longest engine and CLDR locales
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lrevera_cxx
+Cflags: -I${includedir}

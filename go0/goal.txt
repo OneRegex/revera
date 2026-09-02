@@ -1,5 +1,0 @@
-In go0/ directory, create a correct, portable Go implementation of the docs/POSIX-1-2024-ERE-SPECIFICATION.md specification. Use ASD-STE100 .
-Your implementation must be memory efficient, minimizing allocations. Study  implementation techniques from  ERE-IMPLEMENTATION-TECHNIQUES.md file and use LOCALE-TABLES.md for architecture-independent locale handling.
-Assume that the input will always be UTF-8 
-Keep track of your progress and notes in a markdown file.
-You're free to invent new implementation techniques if you can provably show that they are more efficient than the state of the art while remaining fully correct and that you can safely implement them.

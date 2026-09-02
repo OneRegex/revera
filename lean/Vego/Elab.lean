@@ -1,7 +1,7 @@
 /-
 Elaboration of the raw syntax tree into the typed core.
 
-This pass replays the typing knowledge that the Go compiler and the vego2json checker guarantee.
+This pass replays the typing knowledge that the Go compiler and the vegoc checker guarantee.
 It resolves every name and gives every operation its wrapping width.
 It folds untyped constant arithmetic exactly the way Go does, and it inserts the implicit zero values.
 A program that elaborates is well formed, and that success is one of the machine-checked theorems.

@@ -1,0 +1,41 @@
+[package]
+name = "revera"
+version = "0.1.0"
+edition = "2021"
+description = "A POSIX.1-2024 ERE engine with one behavior in Go, Rust, Zig, C and C++, generated from one Vego source and checked against Lean proofs"
+repository = "https://github.com/oneregex/revera"
+readme = "README.md"
+license = "MIT"
+keywords = ["regex", "posix", "ere", "regular-expressions"]
+categories = ["text-processing"]
+include = [
+    "src/lib.rs",
+    "src/engine.rs",
+    "src/vg.rs",
+    "src/data.bin",
+    "tests/api.rs",
+    "README.md",
+    "LICENSE*",
+    "LICENSES/**",
+]
+
+[lib]
+name = "revera"
+path = "src/lib.rs"
+
+# The drivers, the bench and fuzz runners live in tools/ and never ship.
+# The cargo-fuzz crate declares its own workspace, so it stays out of this one.
+[workspace]
+members = ["tools"]
+exclude = ["fuzz"]
+
+# The Vego specification gives integers Go's wrapping semantics, so
+# overflow checks stay off in every profile. The runtime's bounds
+# asserts use assert!, which debug-assertions does not control, but
+# keeping it on also guards the few debug_assert! sites in std.
+[profile.dev]
+overflow-checks = false
+
+[profile.release]
+overflow-checks = false
+debug-assertions = true
