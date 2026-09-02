@@ -21,7 +21,11 @@ func testTempDir(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir, err := os.MkdirTemp(filepath.Join(repo, "tmp"), "revera-cli-test-")
+	root := filepath.Join(repo, "tmp")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.MkdirTemp(root, "revera-cli-test-")
 	if err != nil {
 		t.Fatal(err)
 	}
