@@ -191,3 +191,48 @@ func TestEmitMatchesCheckedInEngine(t *testing.T) {
 		}
 	}
 }
+
+func TestKeyedCompositeKeepsSourceOrderWhenValuesHaveEffects(t *testing.T) {
+	const src = `{"vego": 1, "package": "t", "consts": [], "vars": [],
+	 "types": [{"k": "type", "name": "S", "fields": [
+		{"name": "a", "type": {"k": "named", "name": "int"}},
+		{"name": "b", "type": {"k": "named", "name": "int"}}]}],
+	 "funcs": [
+		{"k": "func", "name": "n", "params": [], "results": [{"k": "named", "name": "int"}],
+		 "body": [{"k": "return", "values": [{"k": "int", "value": "1"}]}]},
+		{"k": "func", "name": "mk", "params": [], "results": [{"k": "struct_ref", "name": "S"}],
+		 "body": [{"k": "return", "values": [{"k": "composite", "type": {"k": "struct_ref", "name": "S"},
+			"fields": [{"name": "b", "value": {"k": "call", "fn": "n", "args": []}},
+			           {"name": "a", "value": {"k": "call", "fn": "n", "args": []}}]}]}]}
+	]}`
+	out, err := Emit(load(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "return (_t1 = n(), _t2 = n(), new S(_t2, _t1));"
+	if !strings.Contains(out, want) {
+		t.Errorf("generated output does not contain %q:\n%s", want, out)
+	}
+}
+
+func TestRangeOverArrayValueCopiesTheArray(t *testing.T) {
+	const src = `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
+		{"k": "func", "name": "f",
+		 "params": [{"name": "a", "type": {"k": "array", "len": {"k": "int", "value": "3"}, "elem": {"k": "named", "name": "int32"}}}],
+		 "results": [{"k": "named", "name": "int32"}],
+		 "body": [
+			{"k": "define", "names": ["t"], "value": {"k": "conv", "type": {"k": "named", "name": "int32"}, "x": {"k": "int", "value": "0"}}},
+			{"k": "range", "idx": "_", "val": "v", "over": {"k": "ident", "name": "a"},
+			 "body": [{"k": "op_assign", "op": "+=", "lhs": {"k": "ident", "name": "t"}, "value": {"k": "ident", "name": "v"}}]},
+			{"k": "return", "values": [{"k": "ident", "name": "t"}]}
+		 ]}
+	]}`
+	out, err := Emit(load(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "const _t1 = a.slice();"
+	if !strings.Contains(out, want) {
+		t.Errorf("generated output does not contain %q:\n%s", want, out)
+	}
+}

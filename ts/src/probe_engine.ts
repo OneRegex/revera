@@ -220,7 +220,7 @@ export function AndNotProbe(a: number, b: number): number {
 }
 
 export function ShiftProbe(x: bigint, n: number): bigint {
-    return (BigInt.asUintN(64, x << BigInt(n)) >> BigInt(vg.div(n, 2)));
+    return (BigInt.asUintN(64, x << vg.shiftCount(n)) >> vg.shiftCount(vg.div(n, 2)));
 }
 
 export function ConvProbe(x: bigint): bigint {

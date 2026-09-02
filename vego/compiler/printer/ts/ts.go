@@ -745,7 +745,12 @@ func (g *gen) emitRange(s *compiler.Stmt, depth int) {
 	g.indent(depth)
 	g.wf("{\n")
 	g.indent(depth + 1)
-	g.wf("const %s = %s;\n", over, g.expr(s.Value))
+	// Go ranges over a copy of an array value, so a write to the array inside the body cannot reach a later element.
+	operand := g.expr(s.Value)
+	if s.Value.Typ.K == compiler.KArray && s.ValName != "" && s.ValName != "_" {
+		operand = g.stored(s.Value)
+	}
+	g.wf("const %s = %s;\n", over, operand)
 	limit := over
 	switch s.Value.Typ.K {
 	case compiler.KSlice:
@@ -1520,7 +1525,7 @@ func (g *gen) bigCount(e *compiler.Expr) string {
 	if isBig(e.Typ) {
 		return g.expr(e)
 	}
-	return "BigInt(" + g.expr(e) + ")"
+	return "vg.shiftCount(" + g.expr(e) + ")"
 }
 
 func (g *gen) composite(e *compiler.Expr) string {
@@ -1531,21 +1536,35 @@ func (g *gen) composite(e *compiler.Expr) string {
 		if len(e.Fields) == 0 {
 			return "new " + ident(t.Name) + "()"
 		}
-		given := map[string]*compiler.Expr{}
+		// Go evaluates the keyed values in source order, and the constructor takes them in declaration order.
+		// When the two orders differ and a value has side effects, the values are pinned first.
+		given := map[string]string{}
+		var pins []string
+		pin := g.compositeNeedsPin(decl, e)
 		for _, f := range e.Fields {
-			given[f.Name] = f.Value
+			code := g.stored(f.Value)
+			if pin {
+				t := g.hoisted(f.Value.Typ)
+				pins = append(pins, t+" = "+code)
+				code = t
+			}
+			given[f.Name] = code
 		}
 		var args []string
 		last := 0
 		for i, f := range decl.Fields {
-			if v, ok := given[f.Name]; ok {
-				args = append(args, g.stored(v))
+			if code, ok := given[f.Name]; ok {
+				args = append(args, code)
 				last = i + 1
 			} else {
 				args = append(args, g.zero(f.Type))
 			}
 		}
-		return "new " + ident(t.Name) + "(" + strings.Join(args[:last], ", ") + ")"
+		out := "new " + ident(t.Name) + "(" + strings.Join(args[:last], ", ") + ")"
+		if pin {
+			return "(" + strings.Join(pins, ", ") + ", " + out + ")"
+		}
+		return out
 	case compiler.KSlice:
 		var parts []string
 		for _, el := range e.Elems {
@@ -1569,6 +1588,29 @@ func (g *gen) composite(e *compiler.Expr) string {
 	}
 	fatal("composite of", t)
 	return ""
+}
+
+// compositeNeedsPin reports whether a keyed struct literal lists its fields out of declaration order while one of them has side effects.
+func (g *gen) compositeNeedsPin(decl *compiler.StructDecl, e *compiler.Expr) bool {
+	impure := false
+	for _, f := range e.Fields {
+		if compiler.Impure(f.Value) {
+			impure = true
+		}
+	}
+	if !impure {
+		return false
+	}
+	position := map[string]int{}
+	for i, f := range decl.Fields {
+		position[f.Name] = i
+	}
+	for i := 1; i < len(e.Fields); i++ {
+		if position[e.Fields[i].Name] < position[e.Fields[i-1].Name] {
+			return true
+		}
+	}
+	return false
 }
 
 // jsEscape writes bytes as a JavaScript string literal body where every character is one byte.

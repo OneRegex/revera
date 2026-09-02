@@ -137,6 +137,17 @@ test("contract", () => {
     assert.equal(DUP_MAX, 255);
 });
 
+test("numeric arguments must be integers", () => {
+    const re = new Regex("a");
+    assert.throws(() => re.replaceAll("aaa", "x", 1.5), RangeError);
+    assert.throws(() => re.replaceAll("aaa", "x", NaN), RangeError);
+    assert.throws(() => re.contract(1.5), RangeError);
+    assert.equal(new Regex("(a)(b)").captures("ab")?.get(0.5), null);
+    const blob = embeddedLocaleData();
+    blob[0] ^= 0xff;
+    assert.ok(Locale.open("cs"));
+});
+
 test("interval bounds", () => {
     assert.equal(new Regex("a{2,3}").find("aaaa")?.text, "aaa");
     assert.throws(() => new Regex(`a{0,${DUP_MAX + 1}}`), RegexError);

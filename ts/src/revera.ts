@@ -28,9 +28,16 @@ const decoder = new TextDecoder();
 
 const localeData: Uint8Array = new Uint8Array(readFileSync(new URL("./data.bin", import.meta.url)));
 
-/** Returns the CLDR locale blob compiled into this package. */
+/** Returns a copy of the CLDR locale blob compiled into this package. */
 export function embeddedLocaleData(): Uint8Array {
-    return localeData;
+    return localeData.slice();
+}
+
+function integer(value: number, what: string): number {
+    if (!Number.isInteger(value)) {
+        throw new RangeError(`${what} must be an integer, not ${value}`);
+    }
+    return value;
 }
 
 /** The largest interval count a pattern may ask for, as in `a{0,255}`. */
@@ -210,7 +217,7 @@ export class Captures implements Iterable<Match | null> {
 
     /** Returns group i, or null when it took no part in the match or does not exist. */
     get(i: number): Match | null {
-        if (i < 0 || 2 * i + 1 >= this.spans.length) {
+        if (!Number.isInteger(i) || i < 0 || 2 * i + 1 >= this.spans.length) {
             return null;
         }
         const so = this.spans[2 * i];
@@ -389,7 +396,7 @@ export class Regex {
 
     /** The same as replaceAll, returning the bytes of the result. */
     replaceAllBytes(subject: Text, replacement: Text, limit: number = -1): Uint8Array {
-        const res = engine.ReplaceAll(this.re, bytes(subject), bytes(replacement), limit, 0);
+        const res = engine.ReplaceAll(this.re, bytes(subject), bytes(replacement), integer(limit, "limit"), 0);
         if (res[1].Code !== engine.ErrNone) {
             raise(res[1]);
         }
@@ -427,7 +434,7 @@ export class Regex {
 
     /** Bounds what one search can cost on a subject of at most maxInput bytes. */
     contract(maxInput: number): Contract {
-        const c = engine.ContractFor(this.re, maxInput);
+        const c = engine.ContractFor(this.re, integer(maxInput, "maxInput"));
         return {
             hasSolver: c.HasSolver,
             heapBytes: engine.ContractHeapBytes(c),

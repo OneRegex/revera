@@ -407,6 +407,16 @@ export function chk(v: number): number {
     return v;
 }
 
+// exact guards an operand of a helper whose result would round silently past 2^53.
+// A constant that a double holds exactly, such as a power of two used as a sentinel, can sit past that limit.
+// It may be compared and copied, but it must not divide or mask.
+function exact(v: number): number {
+    if (v > MAX_EXACT || v < -MAX_EXACT) {
+        fail("64-bit integer operand " + v + " exceeds the exact range of a JavaScript number");
+    }
+    return v;
+}
+
 // div and rem are Go's truncating division and remainder for number operands.
 // The exactness argument: for |a| < 2^53 the rounded quotient never crosses an integer, so trunc(a / b) is the true quotient.
 // The callers narrow the result for int32, where MinInt32 / -1 wraps.
@@ -414,7 +424,7 @@ export function div(a: number, b: number): number {
     if (b === 0) {
         fail("integer divide by zero");
     }
-    return Math.trunc(a / b);
+    return Math.trunc(exact(a) / exact(b));
 }
 
 export function rem(a: number, b: number): number {
@@ -422,7 +432,7 @@ export function rem(a: number, b: number): number {
         fail("integer divide by zero");
     }
     // Adding zero turns a negative zero into zero.
-    return (a % b) + 0;
+    return (exact(a) % exact(b)) + 0;
 }
 
 export function divBig(a: bigint, b: bigint): bigint {
@@ -439,7 +449,11 @@ export function remBig(a: bigint, b: bigint): bigint {
     return a % b;
 }
 
+// A negative shift count is a runtime panic in Go, and a count of 64 or more shifts every bit out.
 export function shl64(a: number, n: number): number {
+    if (n < 0) {
+        fail("negative shift count");
+    }
     if (n >= 64) {
         return 0;
     }
@@ -447,6 +461,9 @@ export function shl64(a: number, n: number): number {
 }
 
 export function shr64(a: number, n: number): number {
+    if (n < 0) {
+        fail("negative shift count");
+    }
     if (n >= 64) {
         return a < 0 ? -1 : 0;
     }
@@ -468,28 +485,28 @@ export function and64(a: number, b: number): number {
     if (fits32(a, b)) {
         return a & b;
     }
-    return join(Math.floor(a / 4294967296) & Math.floor(b / 4294967296), a & b);
+    return join(Math.floor(exact(a) / 4294967296) & Math.floor(exact(b) / 4294967296), a & b);
 }
 
 export function or64(a: number, b: number): number {
     if (fits32(a, b)) {
         return a | b;
     }
-    return join(Math.floor(a / 4294967296) | Math.floor(b / 4294967296), a | b);
+    return join(Math.floor(exact(a) / 4294967296) | Math.floor(exact(b) / 4294967296), a | b);
 }
 
 export function xor64(a: number, b: number): number {
     if (fits32(a, b)) {
         return a ^ b;
     }
-    return join(Math.floor(a / 4294967296) ^ Math.floor(b / 4294967296), a ^ b);
+    return join(Math.floor(exact(a) / 4294967296) ^ Math.floor(exact(b) / 4294967296), a ^ b);
 }
 
 export function andnot64(a: number, b: number): number {
     if (fits32(a, b)) {
         return a & ~b;
     }
-    return join(Math.floor(a / 4294967296) & ~Math.floor(b / 4294967296), a & ~b);
+    return join(Math.floor(exact(a) / 4294967296) & ~Math.floor(exact(b) / 4294967296), a & ~b);
 }
 
 export function not64(a: number): number {
@@ -503,6 +520,14 @@ export function intOf(b: bigint): number {
         fail("64-bit integer " + v + " exceeds the exact range of a JavaScript number");
     }
     return Number(v);
+}
+
+// shiftCount turns a number shift count into a bigint, and rejects a negative one as Go does.
+export function shiftCount(n: number): bigint {
+    if (n < 0) {
+        fail("negative shift count");
+    }
+    return BigInt(n);
 }
 
 export function minBig(a: bigint, b: bigint): bigint {

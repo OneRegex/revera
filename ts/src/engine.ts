@@ -4931,7 +4931,7 @@ export function emitRepeat(b: progBuilder, nodes: vg.Slice<node>, ni: number, ma
     if (nodes.buf[nodes.off + vg.ix(ni, nodes.len)].minimal) {
         const slot: number = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].index;
         if ((slot < maskWidth)) {
-            mask_v = (mask_v | BigInt.asUintN(64, 1n << BigInt(slot)));
+            mask_v = (mask_v | BigInt.asUintN(64, 1n << vg.shiftCount(slot)));
         } else {
             const grown: vg.Slice<number> = vg.make(vg.U32, vg.chk(extra_v.len + 1));
             vg.copy(vg.U32, grown, extra_v);
