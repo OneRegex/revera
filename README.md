@@ -9,9 +9,10 @@ A compiler exports it as Vego IR, and printers turn that IR into the Rust, Zig, 
 As a result, all five libraries come from one engine source.
 The conformance corpus cross-checks their matches, errors and resource-contract reports.
 
-Meanwhile, a Lean 4 model gives Vego formal semantics.
-It proves the shipped IR well formed and checks the interpreted engine against a formal ERE model on the constrained corpus cases and an exhaustive small domain.
-It also proves phase A properties under the stated hypotheses.
+The Lean 4 model provides the formal side of the project.
+It proves the shipped IR well formed.
+It also checks the interpreted engine against a formal ERE model on the constrained corpus cases and an exhaustive small domain.
+In addition, it proves phase A properties under the stated hypotheses.
 
 Finally, the engines embed generated CLDR and Unicode tables for character classes, case mappings and collating data.
 The `locale/` directory contains the C runtime and the generator used to reproduce and verify those tables.

@@ -3,7 +3,7 @@
 This module is the Go implementation of the Revera POSIX.1-2024 extended regular expression engine.
 Across the project, the five language implementations are cross-checked on the shared conformance corpus.
 
-The module path is `github.com/oneregex/revera/go`, and it has no dependency.
+The module path is `github.com/oneregex/revera/go`, and it has no dependencies.
 
 The engine is written in Vego, the strict Go subset that [`../vego/SPECIFICATION.md`](../vego/SPECIFICATION.md) defines.
 For that reason, this directory is also the canonical source of every other implementation.
@@ -25,10 +25,10 @@ groups, err := re.FindStringSubmatch("__abc12__")
 ```
 
 `revera_host.go` holds the idiomatic Go surface.
-It is a host file, outside the subset, so every target writes the same thing for itself.
+Because it is a host file outside the subset, every target provides its own public surface.
 
 - `New` compiles and returns `(*Regexp, error)`.
-  `MustNew` panics instead, for patterns fixed at build time.
+  For patterns fixed at build time, use `MustNew`, which panics on compilation errors.
 - The options are functions: `CaseInsensitive()`, `NewlineSensitive()`, `NoCaptures()`, `ShortestMatch()`, and `In(loc)` for a locale.
 - The methods take the names of the standard `regexp` package: `MatchString`, `FindStringIndex`, `FindStringSubmatch`, `FindAllString`, `ReplaceAllString`, and the rest.
   Each one adds an `error` result, because a subject can exceed the capacity of the engine.
@@ -36,7 +36,7 @@ It is a host file, outside the subset, so every target writes the same thing for
 - `Error` implements the `error` interface.
 - `OpenLocale("cs", "")` selects a CLDR locale for bracket expressions.
   The default is POSIX.
-- `re.Contract(maxInput)` reports what one search can cost, before it runs.
+- `re.Contract(maxInput)` reports what one search can cost before it runs.
 
 ## Layout
 

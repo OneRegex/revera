@@ -2,10 +2,11 @@
 
 This package is a clean-room Go implementation of [`docs/POSIX-1-2024-ERE-SPECIFICATION.md`](../../../docs/POSIX-1-2024-ERE-SPECIFICATION.md).
 It is the reference engine, not a supported Go implementation.
-The supported Go implementation is the `go` module at the repository root, and the differential tests compare that engine with this one.
+
+By contrast, the supported Go implementation is the `go` module at the repository root, and the differential tests compare that engine with this one.
 
 It implements the full Issue 8 Extended Regular Expression language.
-That includes the Issue 8 repetition modifier, written `*?`, `+?`, `??` and `{m,n}?`, and `REG_MINIMAL`.
+Specifically, it includes the Issue 8 repetition modifier, written `*?`, `+?`, `??` and `{m,n}?`, and `REG_MINIMAL`.
 
 ## Packages
 
@@ -45,11 +46,13 @@ The callback returns false to stop early.
 
 `ReplaceAll` rewrites every match with a sed-style replacement text.
 `&` inserts the whole match, `\1` through `\9` insert one group, and a backslash escapes the next character.
-`ReplaceAllFunc` asks a callback for each replacement instead, and inserts the returned text literally.
 
-Each function takes a limit on the number of matches, before the flags.
-A negative limit means no bound, like the `preg_replace` limit.
-With `ReplaceAll` and `ReplaceAllFunc`, the subject past the last counted match stays as it is.
+By contrast, `ReplaceAllFunc` asks a callback for each replacement and inserts the returned text literally.
+
+Each function takes a match limit before the flags.
+As with the `preg_replace` limit, a negative value means no bound.
+
+For `ReplaceAll` and `ReplaceAllFunc`, the subject past the last counted match stays unchanged.
 
 ```go
 result, err := re.ReplaceAll("aabb xab", `\2\1`, -1, 0)
@@ -64,14 +67,17 @@ result, err = re.ReplaceAllFunc(subject, -1, 0, func(pmatch []reference.Match) s
 
 All three follow the usual global-substitution rule.
 The next search starts at the previous match end, and it skips a null match there.
-All three need offsets, so an expression compiled with `NoSub` reports `ENoSub`.
+
+Because all three need offsets, an expression compiled with `NoSub` reports `ENoSub`.
 
 ### Resource contracts
 
 `CompileWithContract` compiles like `Compile` and also returns a `Contract`.
-A contract bounds the heap, the stack and the abstract steps of one `Exec` call, on a subject of at most `maxInput` bytes.
-The figures come per backend, and the `HeapBytes`, `StackBytes` and `Steps` methods combine them for a whole call.
-An application can compare the figures against its budget and refuse a pattern before it ever runs.
+
+The resulting contract bounds the heap, the stack and the abstract steps of one `Exec` call on a subject of at most `maxInput` bytes.
+The contract stores figures per backend, while the `HeapBytes`, `StackBytes` and `Steps` methods combine them for a whole call.
+
+This structure lets an application compare the figures against its budget and refuse a pattern before it ever runs.
 
 ```go
 re, c, err := reference.CompileWithContract(pattern, loc, 0, 1<<16)
@@ -80,11 +86,13 @@ if err == nil && (c.HeapBytes() > heapBudget || c.Steps() > stepBudget) {
 }
 ```
 
-Heap figures count the explicit allocations the engine performs, with fixed 64-bit field sizes.
-They are therefore identical on every platform.
-They leave out allocator rounding, object headers and garbage collection.
+Heap figures count the explicit allocations that the engine performs, using fixed 64-bit field sizes.
+Because those field sizes are fixed, the figures are identical on every platform.
+
+However, they leave out allocator rounding, object headers and garbage collection.
+
 Steps are abstract unit-cost operations, not time.
-They are worst-case bounds, and ordinary subjects stay far below them.
+The reported step counts are worst-case bounds, although ordinary subjects stay far below them.
 
 ## Input model
 

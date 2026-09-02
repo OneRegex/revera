@@ -5,7 +5,7 @@ This directory is the C11 port of the Revera engine, a POSIX ERE regex engine wi
 `engine.h` and `engine.c` are generated from `revera.vego.json` at the repository root by `vegoc emit c`.
 Do not edit them.
 
-The hand-written files are the public API and the minimal runtime that the Vego specification asks every target to supply.
+By contrast, the hand-written files are the public API and the minimal runtime that the Vego specification asks every target to supply.
 
 ## Using it
 

@@ -1,8 +1,9 @@
 # Development module
 
-This module, `github.com/oneregex/revera/dev`, holds everything the repository needs and no user does.
-It is never published.
-It depends on the `go` and `vego` modules through the `replace` directives of its `go.mod`, and the root `go.work` ties the three together.
+This module, `github.com/oneregex/revera/dev`, contains the repository's development and release infrastructure.
+It is not published for users.
+
+Within the repository, the module depends on the `go` and `vego` modules through the `replace` directives of its `go.mod`, and the root `go.work` ties all three modules together.
 
 ## Commands
 
@@ -45,16 +46,23 @@ go run ./internal/conformance/probecheck ../rust/target/release/probe
 ```
 
 The differential suite is heavy, so give it `-count=1` and an explicit `-timeout`.
+
 `crosscheck` and `probecheck` need release drivers; debug builds are far too slow for the corpus.
 `bench size` builds the Go driver itself but expects every selected backend's release driver to exist, so run `make bench` or `make conform` first.
 
 ## Release staging
 
 `go run ./cmd/dist`, or `make dist` at the root, stages the release assets in `tmp/dist/`: the Zig package archive, the native package archive, the two IR files and a manifest with the source commit, the `vegoc` version, the IR digest and the checksum of every file.
-It reads every file from the commit it records, refuses a dirty tracked tree unless `-allow-dirty` is given, and writes archives with sorted members, fixed modes and ownership, and timestamps normalized to the commit time, so two runs on the same commit give the same bytes.
+
+To make the output reproducible, the command reads every file from the commit it records and writes archives with sorted members, fixed modes and ownership, and timestamps normalized to the commit time.
+As a result, two runs on the same commit produce the same bytes.
+
+The command refuses a dirty tracked tree unless `-allow-dirty` is given.
 It also refuses to run when the three package versions disagree, when a license copy is stale, or when `CHANGELOG.md` has no dated section for the version.
-It does not regenerate or test the committed files, so run `make check-generated` and the release validation before committing the revision to stage.
-`sh sync-licenses.sh` copies the root license files into `go/`, `rust/`, `zig/` and `native/`.
+
+However, it does not regenerate or test the committed files, so run `make check-generated` and the release validation before committing the revision to stage.
+
+Separately, `sh sync-licenses.sh` copies the root license files into `go/`, `rust/`, `zig/` and `native/`.
 
 ## License
 

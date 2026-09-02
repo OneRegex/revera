@@ -1,13 +1,15 @@
 # Revera for Rust
 
 Revera is a POSIX.1-2024 extended regular expression engine.
-The same engine exists in Go, Rust, Zig, C and C++, generated from one Vego source and exercised by one cross-language conformance suite.
-The Lean development gives Vego machine-checked semantics, and the repository's Lean README states its exact proof coverage.
 This directory is the Rust instantiation and the source of the `revera` crate for crates.io.
 
+The same engine exists in Go, Rust, Zig, C and C++, generated from one Vego source and exercised by one cross-language conformance suite.
+In addition, the Lean development gives Vego machine-checked semantics, and the repository's Lean README states its exact proof coverage.
+
 The engine speaks the POSIX ERE language: leftmost-longest matching, no backreferences, no Perl escapes.
-It is the engine to reach for when a pattern must mean the same thing as it does in `regcomp()` and `regexec()`.
-The crate keywords are regex, posix, ere and regular-expressions.
+Therefore, it is the engine to reach for when a pattern must mean the same thing as it does in `regcomp()` and `regexec()`.
+
+For package discovery, the crate keywords are regex, posix, ere and regular-expressions.
 
 ## Using it
 
@@ -39,7 +41,8 @@ The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not expos
 
 The directory is a Cargo workspace with two packages.
 The root package is the library, and it is the only one that ships.
-The `tools` package holds the binaries that the conformance kit and the bench harness drive.
+
+The second package, `tools`, holds the binaries that the conformance kit and the bench harness drive.
 
 ```
 |-------------------------------|-------------------------------------------------|
@@ -65,6 +68,7 @@ The `tools` package holds the binaries that the conformance kit and the bench ha
 
 `src/engine.rs` and `src/probe_engine.rs` come from `revera.vego.json` at the repository root.
 The printer is `vegoc emit rust`, the package `vego/compiler/printer/rust`.
+
 Regenerate them from the repository root:
 
 ```sh
@@ -76,18 +80,22 @@ The output is byte-exact and is not `rustfmt` clean by design, so never format t
 
 The `driver`, `bench` and `fuzzcase` binaries include `src/engine.rs` and `src/vg.rs` by path with `#[path]` attributes.
 The `probe` binary includes `src/probe_engine.rs` and `src/vg.rs` the same way.
-They never link the library crate, so a driver failure points at the engine or the runtime and not at the API layer.
+
+Because those binaries never link the library crate, a driver failure points at the engine or the runtime and not at the API layer.
 `tools/src/host.rs` supplies the embedded locale data and protocol helpers to the engine-based tools.
 
 `src/vg.rs` is the runtime.
 It supplies the `Copy` `Slice<T>` and `Str` header types with Go slice semantics, the conversion and comparison helpers, and the `Arena` allocator.
+
 `Arena` is `!Sync`, so the compiler refuses to share one between threads.
 A Vego view can alias, which a Rust reference cannot express, so a slice lowers to a raw pointer and a length.
-The Vego specification names that route for generated code, and every access stays bounds-checked.
+
+The Vego specification explicitly permits this lowering, and every access stays bounds-checked.
 
 `Regex` is `Sync` even though `Arena` is not.
 It never writes to its arena after `build`, and every search copies the header it walks.
-Every allocation a search makes goes to an arena that the search owns and frees.
+
+Moreover, every allocation a search makes goes to an arena that the search owns and frees.
 
 ## Build and verify
 
@@ -100,7 +108,8 @@ cargo build --release --workspace
 
 `driver` speaks the line protocol that `dev/internal/protocol/driver.go` defines, and `crosscheck` runs the corpus through it.
 `probe` prints the lines of the `vego/probe` package, which covers the subset constructs the engine never uses.
-`dev/internal/conformance/proberef` prints the reference lines and `probecheck` diffs the two.
+
+For comparison, `dev/internal/conformance/proberef` prints the reference lines and `probecheck` diffs the two.
 
 The one-command check is the conformance kit:
 
@@ -109,15 +118,17 @@ The one-command check is the conformance kit:
 ```
 
 It reads `backend.json`, builds the release and checked variants, and runs the probe and fuzz seeds against each.
-The release build runs the full corpus and the random stress rounds; checked builds run the smaller checked corpus and omit stress.
+Specifically, the release build runs the full corpus and the random stress rounds, while checked builds run the smaller checked corpus and omit stress.
 
-One known limit.
+One known limit remains.
 A call that passes the same struct variable through two pointer arguments is valid Vego, but Rust rejects it at compile time with E0499.
-The failure is loud, not silent.
+
+In that case, the failure is loud, not silent.
 
 Both profiles turn overflow checks off, so integer arithmetic wraps like Go.
-The runtime uses `assert!` rather than `debug_assert!`, so an out-of-range index aborts in every profile.
-That is the Go behavior the specification requires.
+Because the runtime uses `assert!` rather than `debug_assert!`, an out-of-range index aborts in every profile.
+This matches the Go behavior that the specification requires.
+
 Cargo reads profiles from the workspace root, so the two profiles live in the root `Cargo.toml` and apply to the tools as well.
 
 ## Bench, fuzz and checked builds
@@ -126,9 +137,11 @@ The release build also produces `bench` and `fuzzcase` under `target/release/`.
 
 `bench` speaks the bench protocol that `dev/internal/protocol/bench.go` defines.
 A `B` line names one operation, compile, match or replace, with its iteration and repetition counts.
+
 The answer gives the arena bytes and allocation requests of one operation, then the wall-clock nanoseconds of each repetition.
 `Arena::stats` in `src/vg.rs` supplies the counts, so they cover engine-level requests only.
-`dev/cmd/bench` drives every target with the same cases.
+
+Finally, `dev/cmd/bench` drives every target with the same cases.
 
 ```sh
 printf 'P\nB m match 100 3 0 28617c62292b 616261626162 2d\n' | target/release/bench
@@ -136,14 +149,17 @@ printf 'P\nB m match 100 3 0 28617c62292b 616261626162 2d\n' | target/release/be
 
 `tools/src/fuzz.rs` is the fuzz entry point.
 `fuzz_one` decodes one byte string into flags, a locale choice, a pattern, a replacement and a subject.
-It then runs compile, exec, replace, the match iterator and the contract on them and ignores every result.
+
+It then runs compile, exec, replace, the match iterator and the contract on them, and it ignores every result.
 The input layout is `dev/internal/protocol/fuzz.go`, shared with the other targets, so a corpus transfers between them.
+
 `fuzzcase <packfile>` replays a pack of seed inputs and prints how many it ran.
 A pack is a sequence of records, each a 4-byte little-endian length followed by that many bytes.
-A crash is the only signal.
+Therefore, a crash is the only signal.
 
 `fuzz/` is a cargo-fuzz crate over the same entry point.
 It includes the runtime, the engine, `tools/src/host.rs` and `tools/src/fuzz.rs` by path, so it needs no library crate.
+
 It declares its own workspace, and the root manifest excludes it.
 With `cargo-fuzz` installed and the nightly toolchain:
 
@@ -153,6 +169,7 @@ cd fuzz && cargo +nightly fuzz run engine
 
 Two builds keep every check on.
 `cargo build --workspace` is the debug profile.
+
 AddressSanitizer needs the nightly toolchain and an explicit target triple.
 `asan-build.sh` reads the host triple from `rustc -vV` and runs that build for the whole workspace:
 
@@ -166,6 +183,8 @@ The binaries land in `target/asan-bin/`.
 
 `Cargo.toml` declares version `0.1.0` and the MIT license.
 `cargo package --list` includes `src/lib.rs`, `src/engine.rs`, `src/vg.rs`, `src/data.bin`, `tests/api.rs`, this README, the Cargo package metadata, `LICENSE` and `LICENSES/Unicode-3.0.txt`, the license of the embedded data.
+
 `LICENSE` and `LICENSES/` are copies of the repository root files that `make licenses` keeps current.
-The repository's release staging command refuses missing or stale copies.
-The tools, the fuzz crate, `backend.json` and `asan-build.sh` stay in the repository.
+Accordingly, the repository's release staging command refuses missing or stale copies.
+
+By contrast, the tools, the fuzz crate, `backend.json` and `asan-build.sh` stay in the repository.

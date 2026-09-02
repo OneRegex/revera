@@ -4,8 +4,9 @@ Revera is a POSIX ERE regex engine with leftmost-longest matching, and this dire
 
 `src/engine.zig` is generated from `revera.vego.json` at the repository root by `vegoc emit zig`.
 Do not edit it.
-`src/revera.zig` is the hand-written public API, and `src/vg.zig` is the small runtime that the Vego specification asks every target to supply.
-The other hand-written source files support tests and development tools.
+
+In contrast, `src/revera.zig` is the hand-written public API, and `src/vg.zig` is the small runtime that the Vego specification asks every target to supply.
+The remaining hand-written source files support tests and development tools.
 
 ## Depend on it
 
@@ -23,8 +24,9 @@ exe.root_module.addImport("revera", revera.module("revera"));
 ```
 
 The package reads `release`, a boolean, and not `optimize`.
-When `release` is true the engine builds in ReleaseSafe, and otherwise in Debug.
-Both keep every bounds check.
+When `release` is true, the engine builds in ReleaseSafe.
+Otherwise, it builds in Debug.
+Both modes keep every bounds check.
 
 ## Use it
 
@@ -62,7 +64,8 @@ The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not expos
 ## Layout
 
 The package itself is the set of files listed in `.paths` of `build.zig.zon`: the API, the engine, the runtime, the data blob, the tests, and the two files that `zig build test` needs for the fuzz seed corpus.
-The other files are the tools that the repository uses to verify the engine, and they do not ship with the package.
+
+By contrast, the other files are the tools that the repository uses to verify the engine, and they do not ship with the package.
 
 | File                    | Role                                                                                                          |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -91,7 +94,9 @@ make generate GENERATION_TARGETS=zig
 
 A plain `zig build` compiles nothing and installs nothing.
 It only exposes the module.
-The driver, probe, bench and fuzzcase tools have their own build file in `tools/`, outside the package, and it reaches the sources through a path dependency on the package:
+
+Instead, the driver, probe, bench and fuzzcase tools have their own build file in `tools/`, outside the package.
+That build file reaches the sources through a path dependency on the package:
 
 ```sh
 zig build test
@@ -103,8 +108,9 @@ zig build --build-file tools/build.zig -Drelease -p zig-out
 
 `zig build test` runs the API tests and the fuzz seed corpus.
 `-Drelease` selects ReleaseSafe, and without it the tools build in Debug.
+
 The runtime keeps its bounds asserts in every mode.
-An out-of-range index aborts, which is the Go behavior the specification requires.
+As a result, an out-of-range index aborts, which is the Go behavior the specification requires.
 
 `probe` is the runner for the `vego/probe` package.
 That package covers the subset constructs the engine never uses.
@@ -112,7 +118,7 @@ That package covers the subset constructs the engine never uses.
 ## Bench
 
 `zig-out/bin/bench` times one engine operation per `B` command and reports its allocations.
-`dev/cmd/bench` drives it with the shared cases, but it also answers by hand:
+Although `dev/cmd/bench` drives it with the shared cases, the bench binary also accepts commands directly:
 
 ```sh
 printf 'P\nB m match 100 3 0 28617c62292b 616261626162 2d\n' | zig-out/bin/bench
@@ -120,15 +126,17 @@ printf 'P\nB m match 100 3 0 28617c62292b 616261626162 2d\n' | zig-out/bin/bench
 
 The answer is `B m 0 <bytes> <allocs> <ns> <ns> <ns>`.
 The bytes and allocations count the requests the engine makes to its allocator during one operation.
+
 An untimed pass measures them through a counting allocator that wraps the arena, and the timed passes use the plain arena.
-Time comes from the `awake` clock of `std.Io`, which is monotonic.
+Timing, in turn, comes from the `awake` clock of `std.Io`, which is monotonic.
 
 ## Fuzz
 
 `src/fuzz.zig` exposes `fuzzOne`, which runs compile, exec, replace, iteration and the contract on one input.
 Every target reads the same input layout, and the comment at the top of the file describes it.
+
 The file also holds the test `engine fuzz`, which `zig build test` runs on a small seed corpus.
-The same binary fuzzes with the built-in fuzzer:
+In addition, the same binary fuzzes with the built-in fuzzer:
 
 ```sh
 zig build test --fuzz=10K
@@ -137,13 +145,15 @@ zig build test --fuzz
 
 The first form runs a bounded number of inputs and prints a coverage report.
 The second form runs until interrupted and serves a coverage web interface on a local port.
+
 Both keep their corpus under `.zig-cache/f/`.
 On macOS the fuzzer works with this Zig version, and only Windows and 32-bit targets are excluded.
 
 `zig-out/bin/fuzzcase <packfile>` replays a pack of inputs through `fuzzOne`.
 A pack is a sequence of records, each a little-endian `u32` length followed by that many bytes.
+
 It prints `fuzzcase: <count> inputs` and exits 0, and a crash is the signal.
-A missing or truncated pack gives a message on stderr and exit status 1.
+However, a missing or truncated pack gives a message on stderr and exit status 1.
 
 ## Checked build
 
@@ -159,7 +169,9 @@ That produces `zig-out/debug/bin/driver`, `probe`, `bench` and `fuzzcase`, and l
 ## Release archive
 
 The Zig package manager wants `build.zig.zon` at the root of the archive, and this directory is not the root of the repository.
-A release therefore attaches `revera-zig-0.1.0.tar.gz`, built from `zig/` with exactly the files selected by `.paths`, including `LICENSE` and `LICENSES/`, under one top-level directory.
+Therefore, a release attaches `revera-zig-0.1.0.tar.gz`, built from `zig/` with exactly the files selected by `.paths`, including `LICENSE` and `LICENSES/`, under one top-level directory.
+
 `make dist` at the repository root builds this deterministic archive from committed `HEAD`.
 It refuses tracked changes, mismatched Rust, Zig and native package versions, missing or stale license copies, and an undated release changelog.
+
 Run `make licenses` before committing a release when the root license files change.

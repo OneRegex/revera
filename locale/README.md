@@ -20,7 +20,8 @@ The API works on Unicode scalar values and explicit scalar sequences; UTF-8 deco
 The `C` and `POSIX` names select the built-in POSIX locale.
 
 Locale values are small structs that the caller owns.
-Moreover, lookups allocate no memory, and returned locale names point into static generated data.
+Lookups also allocate no memory.
+The returned locale names point into static generated data.
 
 ## Build and test
 
