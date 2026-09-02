@@ -922,7 +922,7 @@ A conforming implementation can reject them, assign an extension meaning, or in 
 
 | Condition                                                                            | Examples or notes                                                                                       |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| Empty entire ERE, empty group, or empty branch                                       | empty pattern, `()`, `\|a`, `a\|`, `a\|\|b`                                                           |
+| Empty entire ERE, empty group, or empty branch                                       | empty pattern, `()`, `\|a`, `a\|`, `a\|\|b`                                                             |
 | Unescaped `[` that does not form a complete bracket expression                       | bracket imbalance is commonly reported as `REG_EBRACK`                                                  |
 | Unmatched opening parenthesis or otherwise malformed grouping                        | parenthesis imbalance is commonly reported as `REG_EPAREN`                                              |
 | Trailing backslash                                                                   | commonly reported as `REG_EESCAPE`                                                                      |
@@ -931,7 +931,7 @@ A conforming implementation can reject them, assign an extension meaning, or in 
 | A character class name is not defined by the current locale                          | it is not the grammar's `class_name` token and can be rejected with `REG_ECTYPE`                        |
 | `*`, `+`, `?`, or `{` first in an ERE or immediately after `\|`, `^`, `$`, or `(`    | the postfix operator lacks a permitted operand                                                          |
 | `{` not part of a valid interval                                                     | includes malformed contents and values outside the required interval domain                             |
-| `\|` first or last, after `\|` or `(`, or before `)`                                 | these are the empty-branch cases plus the explicitly listed placements                                 |
+| `\|` first or last, after `\|` or `(`, or before `)`                                 | these are the empty-branch cases plus the explicitly listed placements                                  |
 | More than one adjacent duplication after recognizing an optional repetition modifier | examples include `a**`, `a+*`, `a{2}+`, and a third `?` after `a??`                                     |
 | One range's ending point is also the next range's starting point                     | `[a-m-o]`                                                                                               |
 
@@ -1051,17 +1051,17 @@ The examples use single-byte POSIX-locale characters unless noted.
 
 ### 16.1 Selection and grouping
 
-| ERE       | Subject   | Required result                                                                           |
-| --------- | --------- | ----------------------------------------------------------------------------------------- |
-| `b\|ab`   | `ab`      | whole match `ab` at `[0,2)`, because an earlier start wins                                |
-| `a\|ab`   | `ab`      | whole match `ab`, because branch order does not beat longest match                        |
-| `(a\|aa)(a*)` | `aaa` | whole `aaa`; group 1 is `aa`; group 2 is `a`                                              |
-| `(ab)*`   | `abab`    | whole `[0,4)`; group 1 reports its last participation `[2,4)`                             |
-| `(a)?b`   | `b`       | whole `[0,1)`; group 1 is `[-1,-1)` in descriptive notation, meaning both fields are `-1` |
-| `(a*)b`   | `b`       | group 1 participates with the empty match `[0,0)`                                         |
-| `.*c`     | `abc abc` | match `abc abc` through the last `c`                                                      |
-| `.*?c`    | `abc abc` | match `abc` through the first `c`                                                         |
-| `(.*?).*` | `abcdef`  | whole `abcdef`; group 1 is empty at `[0,0)`                                               |
+| ERE           | Subject   | Required result                                                                           |
+| ------------- | --------- | ----------------------------------------------------------------------------------------- |
+| `b\|ab`       | `ab`      | whole match `ab` at `[0,2)`, because an earlier start wins                                |
+| `a\|ab`       | `ab`      | whole match `ab`, because branch order does not beat longest match                        |
+| `(a\|aa)(a*)` | `aaa`     | whole `aaa`; group 1 is `aa`; group 2 is `a`                                              |
+| `(ab)*`       | `abab`    | whole `[0,4)`; group 1 reports its last participation `[2,4)`                             |
+| `(a)?b`       | `b`       | whole `[0,1)`; group 1 is `[-1,-1)` in descriptive notation, meaning both fields are `-1` |
+| `(a*)b`       | `b`       | group 1 participates with the empty match `[0,0)`                                         |
+| `.*c`         | `abc abc` | match `abc abc` through the last `c`                                                      |
+| `.*?c`        | `abc abc` | match `abc` through the first `c`                                                         |
+| `(.*?).*`     | `abcdef`  | whole `abcdef`; group 1 is empty at `[0,0)`                                               |
 
 The notation `[-1,-1)` in the table is only mnemonic.
 The actual nonparticipation record is `rm_so == -1` and `rm_eo == -1`, not a mathematical interval.

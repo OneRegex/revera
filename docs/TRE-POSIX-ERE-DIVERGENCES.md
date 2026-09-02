@@ -36,14 +36,14 @@ The terms below are deliberate:
 
 The audited tree has six concrete conformance gaps:
 
-| Area | POSIX.1-2024 requirement | TRE behavior |
-| --- | --- | --- |
-| Collating symbols | A valid `[.collating-element.]` inside a bracket expression denotes that collating element. | TRE returns `REG_ECOLLATE` for every `[.` item, including the single-character `[[.a.]]`. |
-| Equivalence classes | A valid `[=collating-element=]` denotes its primary equivalence class; if the element has no class, it is treated as a collating symbol. | TRE returns `REG_ECOLLATE` for every `[=` item, including `[[=a=]]`. |
-| Minimal-match compilation flag | `<regex.h>` defines `REG_MINIMAL`, which reverses the default greediness of ERE duplication symbols and the meaning of the `?` repetition modifier. | TRE does not define or test `REG_MINIMAL`. It implements the same behavior under the nonstandard name `REG_UNGREEDY`. |
-| Match-offset type in the standalone ABI | `regoff_t` is a signed integer type able to hold the largest value representable by either `ptrdiff_t` or `ssize_t`. | TRE declares `regoff_t` as `int` when it does not use the system regex ABI. On the audited LP64 build it was 32 bits while `ptrdiff_t` and `ssize_t` were 64 bits. |
-| `REG_NOSUB` output argument | When an expression was compiled with `REG_NOSUB`, `regexec()` must ignore `pmatch`. | On a successful match TRE writes `{-1,-1}` to every one of the `nmatch` elements, even though `REG_NOSUB` was set. |
-| Case-insensitive non-matching lists | Under XBD 4.1's closure, a string that matches case-sensitively must keep matching after case-counterpart substitution. Case-insensitive `[^a]` must therefore match `a`, because `A` matches case-sensitively. | TRE case-expands the positive list and then inverts it, so case-insensitive `[^a]` matches neither `a` nor `A`. |
+| Area                                    | POSIX.1-2024 requirement                                                                                                                                                                                        | TRE behavior                                                                                                                                                       |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Collating symbols                       | A valid `[.collating-element.]` inside a bracket expression denotes that collating element.                                                                                                                     | TRE returns `REG_ECOLLATE` for every `[.` item, including the single-character `[[.a.]]`.                                                                          |
+| Equivalence classes                     | A valid `[=collating-element=]` denotes its primary equivalence class; if the element has no class, it is treated as a collating symbol.                                                                        | TRE returns `REG_ECOLLATE` for every `[=` item, including `[[=a=]]`.                                                                                               |
+| Minimal-match compilation flag          | `<regex.h>` defines `REG_MINIMAL`, which reverses the default greediness of ERE duplication symbols and the meaning of the `?` repetition modifier.                                                             | TRE does not define or test `REG_MINIMAL`. It implements the same behavior under the nonstandard name `REG_UNGREEDY`.                                              |
+| Match-offset type in the standalone ABI | `regoff_t` is a signed integer type able to hold the largest value representable by either `ptrdiff_t` or `ssize_t`.                                                                                            | TRE declares `regoff_t` as `int` when it does not use the system regex ABI. On the audited LP64 build it was 32 bits while `ptrdiff_t` and `ssize_t` were 64 bits. |
+| `REG_NOSUB` output argument             | When an expression was compiled with `REG_NOSUB`, `regexec()` must ignore `pmatch`.                                                                                                                             | On a successful match TRE writes `{-1,-1}` to every one of the `nmatch` elements, even though `REG_NOSUB` was set.                                                 |
+| Case-insensitive non-matching lists     | Under XBD 4.1's closure, a string that matches case-sensitively must keep matching after case-counterpart substitution. Case-insensitive `[^a]` must therefore match `a`, because `A` matches case-sensitively. | TRE case-expands the positive list and then inverts it, so case-insensitive `[^a]` matches neither `a` nor `A`.                                                    |
 
 TRE's [`TODO`, lines 12-15](../third_party/tre/TODO) acknowledges the first two gaps as missing features.
 The README understates the first one, because the parser rejects single-character collating symbols as well as multi-character ones.
@@ -65,10 +65,10 @@ It never parses the element or asks the locale whether it is valid.
 
 Observed in the isolated default build:
 
-| Pattern | Locale-independent subject | `tre_regcomp()` result |
-| --- | --- | --- |
-| `[[.a.]]` | `a` | `REG_ECOLLATE` |
-| `[[.ch.]]` | `ch` | `REG_ECOLLATE` before locale validity is considered |
+| Pattern    | Locale-independent subject | `tre_regcomp()` result                              |
+| ---------- | -------------------------- | --------------------------------------------------- |
+| `[[.a.]]`  | `a`                        | `REG_ECOLLATE`                                      |
+| `[[.ch.]]` | `ch`                       | `REG_ECOLLATE` before locale validity is considered |
 
 Consequences include:
 
@@ -180,12 +180,12 @@ The matcher rejects a character when either of its cases belongs to the class, a
 
 Observed in the isolated default build, POSIX locale, `REG_EXTENDED | REG_ICASE`:
 
-| Pattern | Subject | Issue 8 closure requires | TRE result |
-| --- | --- | --- | --- |
-| `[^a]` | `a` | match | no match |
-| `[^a]` | `A` | match | no match |
-| `[^[:lower:]]` | `a` | match | no match |
-| `[^a-z]` | `m` | match | no match |
+| Pattern        | Subject | Issue 8 closure requires | TRE result |
+| -------------- | ------- | ------------------------ | ---------- |
+| `[^a]`         | `a`     | match                    | no match   |
+| `[^a]`         | `A`     | match                    | no match   |
+| `[^[:lower:]]` | `a`     | match                    | no match   |
+| `[^a-z]`       | `m`     | match                    | no match   |
 
 Two control probes ran in the same build.
 Case-sensitive `[^a]` matches `A`, and the positive-direction closure works, because `[a]` and `a` with `REG_ICASE` both match `A`.
@@ -201,20 +201,20 @@ It is a gap against that text, not a TRE-specific defect relative to common prac
 These constructs are not in the POSIX ERE grammar.
 Where the POSIX text assigns undefined behavior to the underlying spelling, accepting it as an extension is explicitly permitted.
 
-| TRE construct | TRE meaning | POSIX status |
-| --- | --- | --- |
-| `\0` through `\9` | Single-digit back-reference syntax; it selects TRE's backtracking matcher. `\0` is accepted although undocumented, and a forward reference is accepted if that capture exists later in the ERE. | Back-references exist only in the POSIX BRE grammar. An escaped ordinary digit in an ERE has undefined meaning. |
-| `\a`, `\e`, `\f`, `\n`, `\r`, `\t` | Control-character escapes. | Escaping an ERE ordinary character is undefined. A literal newline remains subject to `REG_NEWLINE`. |
-| `\d`, `\D`, `\s`, `\S`, `\w`, `\W` | Macros for digit, space, and word bracket expressions and their negations. TRE defines word as alphanumeric or underscore. | Not POSIX ERE syntax; these are meanings assigned to otherwise undefined escapes. |
-| `\<`, `\>`, `\b`, `\B` | Beginning/end-of-word, word-boundary, and non-word-boundary zero-width assertions. | Not POSIX ERE assertions; POSIX has only `^` and `$`. |
-| `\xHH`, `\x{H...}` | Numeric character escapes. The short form consumes zero through two hexadecimal digits, and the braced form accepts zero through eight; an empty digit sequence has value zero. | Not POSIX ERE syntax. |
-| `\Q ... \E` | Temporarily quote pattern text as literal. | Not POSIX ERE syntax. |
-| `(?#comment)` | Ignored comment. | Not in the POSIX grouping grammar. |
-| `(?:ERE)` | Non-capturing group. | POSIX groups always count as parenthesized subexpressions. |
-| `(?flags)ERE` and `(?flags:ERE)` | Change `i`, `n`, `r`, or `U` options for the rest of a containing group or for one group. A `-` turns options off. | POSIX compilation flags apply to the compiled expression as a whole; inline option groups are not defined. |
-| `{,n}` | Zero through `n` repetitions. | POSIX intervals require the first count. A left brace not in a valid interval has undefined behavior. |
-| `{,}` | Zero or more repetitions. | Same undefined area; equivalent in language to `*`. |
-| `{+...-...#...~..., ...}` settings | Per-subexpression insertion, deletion, substitution, total-error, and cost controls for approximate matching. | Approximate matching and this interval-like syntax are outside POSIX. |
+| TRE construct                      | TRE meaning                                                                                                                                                                                     | POSIX status                                                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `\0` through `\9`                  | Single-digit back-reference syntax; it selects TRE's backtracking matcher. `\0` is accepted although undocumented, and a forward reference is accepted if that capture exists later in the ERE. | Back-references exist only in the POSIX BRE grammar. An escaped ordinary digit in an ERE has undefined meaning. |
+| `\a`, `\e`, `\f`, `\n`, `\r`, `\t` | Control-character escapes.                                                                                                                                                                      | Escaping an ERE ordinary character is undefined. A literal newline remains subject to `REG_NEWLINE`.            |
+| `\d`, `\D`, `\s`, `\S`, `\w`, `\W` | Macros for digit, space, and word bracket expressions and their negations. TRE defines word as alphanumeric or underscore.                                                                      | Not POSIX ERE syntax; these are meanings assigned to otherwise undefined escapes.                               |
+| `\<`, `\>`, `\b`, `\B`             | Beginning/end-of-word, word-boundary, and non-word-boundary zero-width assertions.                                                                                                              | Not POSIX ERE assertions; POSIX has only `^` and `$`.                                                           |
+| `\xHH`, `\x{H...}`                 | Numeric character escapes. The short form consumes zero through two hexadecimal digits, and the braced form accepts zero through eight; an empty digit sequence has value zero.                 | Not POSIX ERE syntax.                                                                                           |
+| `\Q ... \E`                        | Temporarily quote pattern text as literal.                                                                                                                                                      | Not POSIX ERE syntax.                                                                                           |
+| `(?#comment)`                      | Ignored comment.                                                                                                                                                                                | Not in the POSIX grouping grammar.                                                                              |
+| `(?:ERE)`                          | Non-capturing group.                                                                                                                                                                            | POSIX groups always count as parenthesized subexpressions.                                                      |
+| `(?flags)ERE` and `(?flags:ERE)`   | Change `i`, `n`, `r`, or `U` options for the rest of a containing group or for one group. A `-` turns options off.                                                                              | POSIX compilation flags apply to the compiled expression as a whole; inline option groups are not defined.      |
+| `{,n}`                             | Zero through `n` repetitions.                                                                                                                                                                   | POSIX intervals require the first count. A left brace not in a valid interval has undefined behavior.           |
+| `{,}`                              | Zero or more repetitions.                                                                                                                                                                       | Same undefined area; equivalent in language to `*`.                                                             |
+| `{+...-...#...~..., ...}` settings | Per-subexpression insertion, deletion, substitution, total-error, and cost controls for approximate matching.                                                                                   | Approximate matching and this interval-like syntax are outside POSIX.                                           |
 
 The escape macros are enumerated in [`lib/tre-parse.c`, lines 53-63](../third_party/tre/lib/tre-parse.c).
 The parser implementations for quoting, assertions, numeric escapes, and ERE back-references are at [`lib/tre-parse.c`, lines 1383-1530](../third_party/tre/lib/tre-parse.c).
@@ -303,17 +303,17 @@ TRE is namespaced as a library rather than installed as the system POSIX regex p
 
 TRE also exposes the following options outside POSIX:
 
-| Interface | Effect |
-| --- | --- |
-| `REG_BASIC` | Explicit name for the zero-valued default BRE mode. |
-| `REG_LITERAL` / `REG_NOSPEC` | Treat the entire pattern literally. |
-| `REG_RIGHT_ASSOC` | Use right-associative concatenation; this can change capture allocation while leaving the whole match unchanged. |
-| `REG_UNGREEDY` | TRE's name for the behavior Issue 8 standardizes as `REG_MINIMAL`. |
-| `REG_USEBYTES` | Treat input units as raw bytes. |
-| `REG_APPROX_MATCHER` | Force the approximate matcher. |
-| `REG_BACKTRACKING_MATCHER` | Force the backtracking matcher. |
-| `REG_BADMAX` | More specific extension error for a repetition count above `RE_DUP_MAX`; in system-ABI mode it aliases `REG_BADBR`. |
-| `REG_OK` | Name the zero success result. |
+| Interface                    | Effect                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `REG_BASIC`                  | Explicit name for the zero-valued default BRE mode.                                                                 |
+| `REG_LITERAL` / `REG_NOSPEC` | Treat the entire pattern literally.                                                                                 |
+| `REG_RIGHT_ASSOC`            | Use right-associative concatenation; this can change capture allocation while leaving the whole match unchanged.    |
+| `REG_UNGREEDY`               | TRE's name for the behavior Issue 8 standardizes as `REG_MINIMAL`.                                                  |
+| `REG_USEBYTES`               | Treat input units as raw bytes.                                                                                     |
+| `REG_APPROX_MATCHER`         | Force the approximate matcher.                                                                                      |
+| `REG_BACKTRACKING_MATCHER`   | Force the backtracking matcher.                                                                                     |
+| `REG_BADMAX`                 | More specific extension error for a repetition count above `RE_DUP_MAX`; in system-ABI mode it aliases `REG_BADBR`. |
+| `REG_OK`                     | Name the zero success result.                                                                                       |
 
 The definitions are in [`include/tre/tre.h`, lines 54-90 and 109-161](../third_party/tre/include/tre/tre.h).
 TRE also adds the `reg_errcode_t` typedef used by its implementation.
@@ -330,18 +330,18 @@ The added APIs extend rather than contradict the standard interfaces.
 The following areas were checked because older descriptions of POSIX EREs commonly differ.
 They are not divergences in this tree:
 
-| Area | Result |
-| --- | --- |
-| Leftmost match and submatches | TRE's exact matcher is designed to select the leftmost-longest whole match and recursively ordered submatches. No contrary behavior was found in the audited source or focused probes. |
-| Minimal repetition syntax | `*?`, `+?`, `??`, and `{m,n}?` implement Issue 8 leftmost-shortest repetition, measured in characters rather than merely iteration count. |
-| Anchors anywhere in an ERE | TRE parses unescaped `^` and `$` as anchors everywhere. Thus `a^` and `$a` compile but cannot match `a`, as Issue 8 requires. |
-| `REG_NEWLINE`, `REG_NOTBOL`, `REG_NOTEOL` | Dot and non-matching-list newline exclusion and the anchor exceptions around newline agree with `regcomp()` requirements. |
-| Escaped `]` and `}` outside brackets | TRE's general escape path makes `\]` and `\}` literal, as Issue 8 requires. |
-| Ordinary backslash inside brackets | TRE treats backslash as an ordinary bracket member, consistent with the POSIX bracket-expression rules. |
-| Standard character classes | TRE delegates class lookup and membership to `wctype()` / `iswctype()` when available and supplies the standard class set in its fallback. Unknown names return `REG_ECTYPE`. |
-| Repetition limits | TRE sets `RE_DUP_MAX` to 255 and accepts the three required interval forms through that value. |
-| Pattern length | TRE caps a pattern at 65,536 units. POSIX only requires support for every RE of 256 bytes or fewer, so this larger implementation limit is permitted. |
-| `regfree()` and `errno` | A focused probe preserved a sentinel `errno` value across `tre_regfree()`, consistent with the Issue 8 requirement. |
+| Area                                      | Result                                                                                                                                                                                 |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Leftmost match and submatches             | TRE's exact matcher is designed to select the leftmost-longest whole match and recursively ordered submatches. No contrary behavior was found in the audited source or focused probes. |
+| Minimal repetition syntax                 | `*?`, `+?`, `??`, and `{m,n}?` implement Issue 8 leftmost-shortest repetition, measured in characters rather than merely iteration count.                                              |
+| Anchors anywhere in an ERE                | TRE parses unescaped `^` and `$` as anchors everywhere. Thus `a^` and `$a` compile but cannot match `a`, as Issue 8 requires.                                                          |
+| `REG_NEWLINE`, `REG_NOTBOL`, `REG_NOTEOL` | Dot and non-matching-list newline exclusion and the anchor exceptions around newline agree with `regcomp()` requirements.                                                              |
+| Escaped `]` and `}` outside brackets      | TRE's general escape path makes `\]` and `\}` literal, as Issue 8 requires.                                                                                                            |
+| Ordinary backslash inside brackets        | TRE treats backslash as an ordinary bracket member, consistent with the POSIX bracket-expression rules.                                                                                |
+| Standard character classes                | TRE delegates class lookup and membership to `wctype()` / `iswctype()` when available and supplies the standard class set in its fallback. Unknown names return `REG_ECTYPE`.          |
+| Repetition limits                         | TRE sets `RE_DUP_MAX` to 255 and accepts the three required interval forms through that value.                                                                                         |
+| Pattern length                            | TRE caps a pattern at 65,536 units. POSIX only requires support for every RE of 256 bytes or fewer, so this larger implementation limit is permitted.                                  |
+| `regfree()` and `errno`                   | A focused probe preserved a sentinel `errno` value across `tre_regfree()`, consistent with the Issue 8 requirement.                                                                    |
 
 ## Verification record
 

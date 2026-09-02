@@ -61,12 +61,12 @@ The kit discovers every `*/backend.json` below the repository root and every `na
 
 The binaries speak three protocols, all defined on the Go side:
 
-| Binary   | Protocol                                     | Reference                            |
-| -------- | -------------------------------------------- | ------------------------------------ |
-| driver   | driver line protocol, one answer per command | `dev/internal/protocol/driver.go`                  |
-| probe    | prints the probe report lines                | `dev/internal/conformance/proberef`  |
-| fuzzcase | runs a seed pack, prints the count           | `dev/internal/conformance/fuzzcase`  |
-| bench    | bench line protocol                          | `dev/internal/protocol/bench.go`                   |
+| Binary   | Protocol                                     | Reference                           |
+| -------- | -------------------------------------------- | ----------------------------------- |
+| driver   | driver line protocol, one answer per command | `dev/internal/protocol/driver.go`   |
+| probe    | prints the probe report lines                | `dev/internal/conformance/proberef` |
+| fuzzcase | runs a seed pack, prints the count           | `dev/internal/conformance/fuzzcase` |
+| bench    | bench line protocol                          | `dev/internal/protocol/bench.go`    |
 
 The existing drivers in `rust/tools/src/main.rs`, `zig/src/main.zig`, `ts/src/driver.ts`, `native/cpp/driver.cpp`, and `native/c/driver.c` are the models for a new one.
 A binary can be a script: the TypeScript hosts are shell wrappers that run the sources under Node.
@@ -127,7 +127,7 @@ Every result is ignored; a crash, an assertion, or a sanitizer report is the sig
 | Backend | Entry point                                       | Coverage-guided run                                                    |
 | ------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
 | go      | `FuzzEngine` in `go/fuzz_test.go`                 | `cd go && go test . -run '^$' -fuzz FuzzEngine`                        |
-| rust    | `fuzz_one` in `rust/tools/src/fuzz.rs`                  | `cd rust/fuzz && cargo +nightly fuzz run engine` (needs cargo-fuzz)    |
+| rust    | `fuzz_one` in `rust/tools/src/fuzz.rs`            | `cd rust/fuzz && cargo +nightly fuzz run engine` (needs cargo-fuzz)    |
 | zig     | `fuzzOne` in `zig/src/fuzz.zig`                   | `cd zig && zig build test --fuzz`                                      |
 | ts      | `fuzzOne` in `ts/src/fuzz.ts`                     | none; the seed pack runner is the only form                            |
 | cpp     | `LLVMFuzzerTestOneInput` in `native/cpp/fuzz.cpp` | `cd native/cpp && make libfuzzer && ./libfuzzer corpus/` (Linux clang) |
@@ -144,7 +144,7 @@ The seed pack is `tmp/conformance/fuzz-seeds.pack`, written by the corpus step f
 | rust    | `cargo build`                    | The runtime's `assert!` bounds checks, in the debug profile.                |
 | rust    | `sh asan-build.sh`, nightly ASan | Out-of-bounds and use-after-free through raw pointers.                      |
 | zig     | `zig build -p zig-out/debug`     | Every Zig safety check of Debug mode.                                       |
-| ts      | `make check`, `tsc --noEmit`     | The type checker; the runtime checks of the engine are on in every build.  |
+| ts      | `make check`, `tsc --noEmit`     | The type checker; the runtime checks of the engine are on in every build.   |
 | cpp     | `make sanitize`                  | AddressSanitizer and UndefinedBehaviorSanitizer, fatal on the first report. |
 | c       | `make sanitize`                  | AddressSanitizer and UndefinedBehaviorSanitizer, fatal on the first report. |
 

@@ -46,16 +46,16 @@ Locals with a conflicting name are renamed during translation.
 
 ### 2.1 Scalar types
 
-| Type   | Meaning                                     |
-|--------|---------------------------------------------|
-| bool   | truth value                                 |
-| uint8  | unsigned 8-bit integer (byte is not used)   |
-| uint16 | unsigned 16-bit integer                     |
-| uint32 | unsigned 32-bit integer                     |
-| uint64 | unsigned 64-bit integer                     |
-| int32  | signed 32-bit integer                       |
-| int64  | signed 64-bit integer                       |
-| int    | signed integer, exactly 64 bits wide        |
+| Type   | Meaning                                   |
+| ------ | ----------------------------------------- |
+| bool   | truth value                               |
+| uint8  | unsigned 8-bit integer (byte is not used) |
+| uint16 | unsigned 16-bit integer                   |
+| uint32 | unsigned 32-bit integer                   |
+| uint64 | unsigned 64-bit integer                   |
+| int32  | signed 32-bit integer                     |
+| int64  | signed 64-bit integer                     |
+| int    | signed integer, exactly 64 bits wide      |
 
 `int` is the index type: `len`, `cap`, and index expressions use it.
 A Vego program must only run on targets where `int` is 64 bits, and translators must map it to a 64-bit signed type.
@@ -207,19 +207,19 @@ In particular, `string(i)` from an integer is not in the subset.
 
 ### 5.1 Builtin functions
 
-| Builtin            | Rule                                          |
-|--------------------|-----------------------------------------------|
-| len(x)             | strings, slices, arrays                       |
-| cap(x)             | slices                                        |
-| append(s, e...)    | one or more element arguments                 |
-| append(s, s2...)   | spread form: one slice argument, or a string  |
-|                    | when the element type is uint8                |
-| make([]T, n)       | zeroed buffer                                 |
-| make([]T, n, c)    | zeroed buffer with capacity                   |
-| copy(dst, src)     | overlap-safe (memmove); returns count or the  |
-|                    | result is discarded                           |
-| min(a, b)          | two arguments, same scalar type               |
-| max(a, b)          | two arguments, same scalar type               |
+| Builtin          | Rule                                         |
+| ---------------- | -------------------------------------------- |
+| len(x)           | strings, slices, arrays                      |
+| cap(x)           | slices                                       |
+| append(s, e...)  | one or more element arguments                |
+| append(s, s2...) | spread form: one slice argument, or a string |
+|                  | when the element type is uint8               |
+| make([]T, n)     | zeroed buffer                                |
+| make([]T, n, c)  | zeroed buffer with capacity                  |
+| copy(dst, src)   | overlap-safe (memmove); returns count or the |
+|                  | result is discarded                          |
+| min(a, b)        | two arguments, same scalar type              |
+| max(a, b)        | two arguments, same scalar type              |
 
 `clear`, `new`, `panic`, `recover`, `print`, `println`, `delete`, and `complex/real/imag` are not in the subset.
 Out-of-range indexing and slicing abort the program in every target, as in Go.
@@ -396,20 +396,20 @@ The JSON therefore doubles as the subset's machine definition: what the tool emi
 
 The subset was chosen so each construct has a direct target form:
 
-| Vego                 | C++                | Rust                | Zig                  |
-|----------------------|--------------------|---------------------|----------------------|
-| int / int64          | int64_t            | i64                 | i64                  |
-| int32 / uint8 ...    | int32_t, uint8_t   | i32, u8             | i32, u8              |
-| string               | std::string_view*  | &[u8]*              | []const u8*          |
-| []T                  | std::vector<T>     | Vec<T>              | std.ArrayList(T)     |
-| [N]T                 | std::array<T,N>    | [T; N]              | [N]T                 |
-| struct               | struct             | struct              | struct               |
-| *S parameter         | S&                 | &mut S              | *S                   |
-| slice parameter      | std::span<T>       | &mut [T] or raw     | []T                  |
-| multiple results     | struct / pair      | tuple               | struct               |
-| append               | push_back / insert | extend / push       | appendSlice / append |
-| copy                 | memmove            | copy_within / copy  | @memmove             |
-| abort on bad index   | assert / at()      | panic (checked)     | safety check         |
+| Vego               | C++                | Rust               | Zig                  |
+| ------------------ | ------------------ | ------------------ | -------------------- |
+| int / int64        | int64_t            | i64                | i64                  |
+| int32 / uint8 ...  | int32_t, uint8_t   | i32, u8            | i32, u8              |
+| string             | std::string_view*  | &[u8]*             | []const u8*          |
+| []T                | std::vector<T>     | Vec<T>             | std.ArrayList(T)     |
+| [N]T               | std::array<T,N>    | [T; N]             | [N]T                 |
+| struct             | struct             | struct             | struct               |
+| *S parameter       | S&                 | &mut S             | *S                   |
+| slice parameter    | std::span<T>       | &mut [T] or raw    | []T                  |
+| multiple results   | struct / pair      | tuple              | struct               |
+| append             | push_back / insert | extend / push      | appendSlice / append |
+| copy               | memmove            | copy_within / copy | @memmove             |
+| abort on bad index | assert / at()      | panic (checked)    | safety check         |
 
 (*) An owned result string (rule 6.5) becomes std::string, String, or an allocated []u8 in the target.
 The exemption of rule 6.7 makes both representations valid for stored strings.
@@ -450,12 +450,12 @@ The generated engine stays reachable underneath for the few calls the wrapper le
 
 The four targets keep the two levels apart like this:
 
-| Target | Generated engine    | Public API                |
-|--------|---------------------|---------------------------|
-| Go     | package `revera`    | methods in `*_host.go`    |
-| C++    | `revera::engine`    | `revera` in `revera.hpp`  |
-| Rust   | hidden `engine` mod | crate root, `lib.rs`      |
-| Zig    | `engine.zig`        | `revera.zig` module       |
+| Target | Generated engine    | Public API               |
+| ------ | ------------------- | ------------------------ |
+| Go     | package `revera`    | methods in `*_host.go`   |
+| C++    | `revera::engine`    | `revera` in `revera.hpp` |
+| Rust   | hidden `engine` mod | crate root, `lib.rs`     |
+| Zig    | `engine.zig`        | `revera.zig` module      |
 
 Only C++ needs help from its printer: both levels share one namespace mechanism, so `vegoc emit cpp` takes a `-namespace` flag that moves the generated code out of the way.
 

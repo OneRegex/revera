@@ -12,11 +12,11 @@ The inspected revisions are:
 - RE2 `972a15cedd008d846f1a39b2e88ce48d7f166cbd`.
 - MinRX `d13610cdf983337d32b5e07a46da69e40ec5adb0`.
 
-| Reference | Most useful ideas | Semantic boundary |
-| --- | --- | --- |
-| TRE | Tagged TNFA, arenas, start filtering | Known Issue 8 gaps |
-| RE2 | Sparse sets and executor fast paths | Different syntax, locale, captures |
-| MinRX | Structured NFA and compact path state | Unproven; collation gaps |
+| Reference | Most useful ideas                     | Semantic boundary                  |
+| --------- | ------------------------------------- | ---------------------------------- |
+| TRE       | Tagged TNFA, arenas, start filtering  | Known Issue 8 gaps                 |
+| RE2       | Sparse sets and executor fast paths   | Different syntax, locale, captures |
+| MinRX     | Structured NFA and compact path state | Unproven; collation gaps           |
 
 The central rule is to optimize a proved-equivalent representation, not to adopt a reference engine's observable choices.
 RE2 uses backtracking-style submatch priority in its NFA on purpose, at [`re2/nfa.cc`, lines 7-22](../third_party/re2/re2/nfa.cc).

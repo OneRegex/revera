@@ -16,6 +16,7 @@ go run ./cmd/vegoc export -o ../revera.vego.json ../go
 go run ./cmd/vegoc emit go   -o engine.go ../revera.vego.json
 go run ./cmd/vegoc emit rust -o engine.rs ../revera.vego.json
 go run ./cmd/vegoc emit zig  -o engine.zig ../revera.vego.json
+go run ./cmd/vegoc emit ts   -o engine.ts ../revera.vego.json
 go run ./cmd/vegoc emit cpp  -header engine.hpp -source engine.cpp -namespace revera::engine ../revera.vego.json
 go run ./cmd/vegoc emit c    -header engine.h -source engine.c -prefix revera_eng ../revera.vego.json
 go run ./cmd/vegoc version
@@ -36,7 +37,7 @@ Install it with `go install github.com/oneregex/revera/vego/cmd/vegoc@latest`.
   It loads the IR, types every expression, folds constants, and computes local usage and mutation.
 - `compiler/export/` is the checker and exporter.
   It reads a Go package, skips the `_host.go` and `_test.go` files, checks the subset rules and writes the IR.
-- `compiler/printer/golang/`, `rust/`, `zig/`, `cpp/` and `c/` print the IR in each target language.
+- `compiler/printer/golang/`, `rust/`, `zig/`, `ts/`, `cpp/` and `c/` print the IR in each target language.
   The Go printer emits formatted Go source for inspection; the other printers lower the same typed IR into their target languages.
 - `cmd/vegoc/` is the command line over the packages above.
 - `probe/` is a second Vego program, the conformance program of a Vego backend.
@@ -49,7 +50,7 @@ Install it with `go install github.com/oneregex/revera/vego/cmd/vegoc@latest`.
 GOWORK=off go test ./...
 ```
 
-The printer tests compile their output where a toolchain is present: `clang` for C, `c++` for C++, `zig` for Zig, and `rustc` for Rust.
+The printer tests compile their output where a toolchain is present: `clang` for C, `c++` for C++, `zig` for Zig, `rustc` for Rust, and `node --check` for TypeScript.
 The Lean model in [`../lean`](../lean) gives the subset its formal semantics and checks the two IR files byte for byte.
 
 ## Writing a new backend

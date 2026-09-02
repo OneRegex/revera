@@ -50,10 +50,10 @@ JavaScript has one number type, a double, which is exact for integers up to 2^53
 Vego, the language the engine is written in, computes in 64-bit integers.
 The printer maps the two like this:
 
-| Vego type                      | TypeScript type | How                                                        |
-| ------------------------------ | --------------- | ---------------------------------------------------------- |
-| `int`, `int32`, `uint32`, ...  | `number`        | The narrow types wrap with `\| 0`, `>>> 0` and `& 0xff`.   |
-| `int64`, `uint64`              | `bigint`        | Exact at 64 bits, wrapped with `BigInt.asIntN` and `asUintN`. |
+| Vego type                     | TypeScript type | How                                                           |
+| ----------------------------- | --------------- | ------------------------------------------------------------- |
+| `int`, `int32`, `uint32`, ... | `number`        | The narrow types wrap with `\| 0`, `>>> 0` and `& 0xff`.      |
+| `int64`, `uint64`             | `bigint`        | Exact at 64 bits, wrapped with `BigInt.asIntN` and `asUintN`. |
 
 `int` is the index type, so it is everywhere: lengths, offsets, counters.
 Its values are bounded by the size of a subject, and a subject longer than 2^53 bytes does not exist in practice.
@@ -67,23 +67,23 @@ The probe program, which exercises the corners of the language on purpose, repro
 ## Layout
 
 ```
-| Path                      | Role                                                    |
-| ------------------------- | ------------------------------------------------------- |
-| src/revera.ts             | The public API. It reads data.bin at load time.         |
-| src/engine.ts             | The generated engine. Do not edit it.                   |
-| src/probe_engine.ts       | The generated probe. Do not edit it.                    |
-| src/vg.ts                 | The runtime the Vego specification asks for.            |
-| src/data.bin              | The CLDR locale blob.                                   |
-| test/revera.test.ts       | Tests of the public API, under node --test.             |
-| src/driver.ts             | The differential driver.                                |
-| src/probe_main.ts         | The probe runner.                                       |
-| src/bench_main.ts         | The bench driver.                                       |
-| src/fuzz.ts               | The fuzz entry point.                                   |
-| src/fuzzcase_main.ts      | The seed pack runner.                                   |
-| src/host.ts               | What the hosts share: blob, loader, hex, line reader.   |
-| driver, probe, bench, fuzzcase | Shell wrappers that run the hosts under Node.     |
-| backend.json              | How the conformance kit builds and runs this.           |
-| Makefile                  | The syntax check, the type check and the tests.         |
+| Path                           | Role                                                  |
+| ------------------------------ | ----------------------------------------------------- |
+| src/revera.ts                  | The public API. It reads data.bin at load time.       |
+| src/engine.ts                  | The generated engine. Do not edit it.                 |
+| src/probe_engine.ts            | The generated probe. Do not edit it.                  |
+| src/vg.ts                      | The runtime the Vego specification asks for.          |
+| src/data.bin                   | The CLDR locale blob.                                 |
+| test/revera.test.ts            | Tests of the public API, under node --test.           |
+| src/driver.ts                  | The differential driver.                              |
+| src/probe_main.ts              | The probe runner.                                     |
+| src/bench_main.ts              | The bench driver.                                     |
+| src/fuzz.ts                    | The fuzz entry point.                                 |
+| src/fuzzcase_main.ts           | The seed pack runner.                                 |
+| src/host.ts                    | What the hosts share: blob, loader, hex, line reader. |
+| driver, probe, bench, fuzzcase | Shell wrappers that run the hosts under Node.         |
+| backend.json                   | How the conformance kit builds and runs this.         |
+| Makefile                       | The syntax check, the type check and the tests.       |
 ```
 
 `src/engine.ts` and `src/probe_engine.ts` come from `revera.vego.json` at the repository root.
