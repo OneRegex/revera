@@ -202,7 +202,7 @@ Slice<T> grow(Arena& mem, Slice<T> s, int64_t need) {
 }
 
 template <typename T>
-Slice<T> append(Arena& mem, Slice<T> s, T v) {
+Slice<T> append(Arena& mem, Slice<T> s, std::type_identity_t<T> v) {
     if (s.len == s.cap) {
         s = grow(mem, s, s.len + 1);
     }
