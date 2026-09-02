@@ -14,8 +14,8 @@ jobs:
     name: Generated artifacts and licenses
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod
       - run: make check-generated
@@ -26,8 +26,8 @@ jobs:
     name: Go modules
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod
       - name: Engine module without the workspace
@@ -41,14 +41,14 @@ jobs:
     name: Locale runtime
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: make test
 
   rust:
     name: Rust
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -61,7 +61,7 @@ jobs:
     name: Zig
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
@@ -72,7 +72,7 @@ jobs:
     name: C and C++
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cmake -S native -B build/native -DBUILD_TESTING=ON
       - run: cmake --build build/native
       - run: ctest --test-dir build/native --output-on-failure
@@ -82,10 +82,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [generated]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod
       - uses: mlugg/setup-zig@v2
@@ -112,7 +112,7 @@ jobs:
           ctest --test-dir build/native-archive/build --output-on-failure
           cmake --install build/native-archive/build --prefix build/native-archive/prefix
           test -f build/native-archive/prefix/share/doc/revera/LICENSE
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-assets
           path: tmp/dist
@@ -122,8 +122,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [generated, go]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod
       - uses: dtolnay/rust-toolchain@stable
@@ -142,7 +142,7 @@ jobs:
     name: Lean proofs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: lean
