@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revera &middot; POSIX.1-2024 regular expressions across languages</title>
+<meta name="description" content="Revera is a clean-room POSIX.1-2024 extended regular expression engine written in Vego, with APIs for Go, Rust, Zig, C, and C++. Every engine core is cross-checked against the same corpus, and the project includes machine-checked Lean proofs.">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#overview">Skip to content</a>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <p class="topbar-date">MIT License &middot; POSIX.1-2024</p>
+    <nav class="topbar-links" aria-label="Sections">
+      <a href="#overview">Overview</a>
+      <a href="#pipeline">Design</a>
+      <a href="#contracts">Contracts</a>
+      <a href="#proof">Verification</a>
+      <a href="#libraries">Packages</a>
+    </nav>
+  </div>
+</header>
+
+<section class="masthead">
+  <div class="wrap">
+    <p class="kicker">A project of the OneRegex initiative</p>
+    <h1 class="paper-name">Revera</h1>
+    <p class="masthead-sub">One engine source, a machine-checked specification, and consistent APIs across five languages</p>
+  </div>
+</section>
+
+<main>
+
+<article class="lead" id="overview">
+  <div class="wrap lead-grid">
+    <div class="lead-main">
+      <p class="section-label">Overview</p>
+      <h2>Consistent semantics across languages, checked with Lean and cross-language tests</h2>
+
+      <p class="lead-para">Regular expression libraries differ.
+      Each implementation has its own dialect and feature set,
+      so the same pattern can produce different matches for the same input in different libraries.</p>
+
+      <p>These differences become defects when regular expressions process untrusted data.
+      Regular expressions power security tools and filters,
+      and end users sometimes supply the patterns.
+      A match that depends on the implementation is a defect, not a feature.</p>
+
+      <p>Regular expressions have no single specification.
+      POSIX.1-2024 defines a current Extended Regular Expression (ERE) standard,
+      which Revera implements across its target languages.</p>
+
+      <p><strong>Revera is a clean-room implementation of POSIX.1-2024 ERE.</strong>
+      The canonical engine is written in Vego, a strict Go subset built for mechanical translation.
+      A compiler exports it as Vego IR, and printers generate the Rust, Zig, C++, and C engine cores from that IR.
+      Each target adds a hand-written public API and small runtime.
+      All five engine cores are cross-checked against the same corpus for matches, errors, and resource-contract reports.</p>
+
+      <p>Beyond cross-language testing, Lean defines formal semantics for Vego, proves that the shipped IR is well-formed,
+      and checks the interpreted engine against a formal ERE model over the corpus and an exhaustive small domain.
+      Before a match runs, a resource contract bounds heap use and abstract work and estimates stack use.</p>
+    </div>
+
+    <div class="lead-side">
+      <div class="logo-figure">
+        <img src="assets/logo.png" alt="The Revera logo: bracketed pattern pieces over a dark field" width="160" height="160">
+      </div>
+
+      <div class="sidebox">
+        <h3>Summary</h3>
+        <ul class="glance">
+          <li><strong>Matching</strong> Leftmost-longest POSIX ERE</li>
+          <li><strong>Languages</strong> Go, Rust, Zig, C, and C++</li>
+          <li><strong>Testing</strong> Shared corpus and per-target fuzzing</li>
+          <li><strong>Repository</strong> <a href="https://github.com/oneregex/revera">github.com/oneregex/revera</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</article>
+
+<article class="band band-paper" id="pipeline">
+  <div class="wrap">
+    <p class="section-label">Design</p>
+    <h2>Any number of engines from one source</h2>
+
+    <ol class="pipeline">
+      <li class="pipeline-step">
+        <span class="step-no">1</span>
+        <h3>Write in Vego</h3>
+        <p>The engine is written in Vego, a strict subset of Go:
+        no imports, no methods, no interfaces, no function values, no generics.
+        The checker rejects constructs outside the subset and reports the source location.</p>
+      </li>
+      <li class="pipeline-step">
+        <span class="step-no">2</span>
+        <h3>Export the IR</h3>
+        <p><code>vegoc export</code> turns the source into the Vego IR, stored as <code>revera.vego.json</code>.
+        That release artifact is the input to each generated backend.</p>
+      </li>
+      <li class="pipeline-step">
+        <span class="step-no">3</span>
+        <h3>Generate each target</h3>
+        <p>Each printer lowers the same IR to its target language.
+        Each target also includes an idiomatic, hand-written public API and a small runtime.</p>
+      </li>
+      <li class="pipeline-step">
+        <span class="step-no">4</span>
+        <h3>Cross-check the results</h3>
+        <p>Every implementation runs the same conformance corpus, which covers matches, errors, replacements,
+        iteration, and resource contracts. The <code>make conform</code> command runs the corpus against every backend.</p>
+      </li>
+    </ol>
+
+    <figure class="codefig">
+      <figcaption>Each package exposes a hand-written API over the same engine source. Rust, Zig, C, and C++ use engine cores generated from the Vego IR.</figcaption>
+      <div class="codegrid">
+        <pre class="code code-go"><code><span class="cmt">// Go</span>
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/oneregex/revera/go"
+)
+
+func main() {
+    re, err := revera.New("(abc)([0-9]*)")
+    if err != nil {
+        log.Fatal(err)
+    }
+    groups, err := re.FindStringSubmatch("__abc12__")
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(groups[1])
+}</code></pre>
+        <pre class="code code-rust"><code><span class="cmt">// Rust</span>
+use revera::Regex;
+
+fn main() -&gt; Result&lt;(), revera::Error&gt; {
+    let re = Regex::new("(abc)([0-9]*)")?;
+    let caps = re.captures("__abc12__")?.expect("a match");
+    println!("{}", &amp;caps[1]);
+    Ok(())
+}</code></pre>
+        <pre class="code code-zig"><code><span class="cmt">// Zig</span>
+const std = @import("std");
+const revera = @import("revera");
+
+pub fn main(init: std.process.Init) !void {
+    var re = try revera.Regex.compile(init.gpa, "(abc)([0-9]*)", .{});
+    defer re.deinit();
+
+    var caps = (try re.captures("__abc12__")).?;
+    defer caps.deinit();
+    std.debug.print("{s}\n", .{caps.get(1).?.text()});
+}</code></pre>
+        <pre class="code code-cpp"><code><span class="cmt">// C++20</span>
+#include &lt;iostream&gt;
+#include &lt;revera/revera.hpp&gt;
+
+int main() {
+    revera::Regex re("(abc)([0-9]*)");
+    auto caps = re.captures("__abc12__");
+    if (!caps || !(*caps)[1]) {
+        return 1;
+    }
+    std::cout &lt;&lt; (*caps)[1]-&gt;str() &lt;&lt; '\n';
+}</code></pre>
+        <pre class="code code-c"><code><span class="cmt">/* C11 */</span>
+#include &lt;stdio.h&gt;
+#include &lt;revera/revera.h&gt;
+
+int main(void) {
+    const char pattern[] = "(abc)([0-9]*)";
+    const char subject[] = "__abc12__";
+    revera_error error;
+    revera_regex *re = revera_compile(pattern, sizeof(pattern) - 1, NULL, &amp;error);
+    if (re == NULL) {
+        return 1;
+    }
+
+    revera_match groups[3];
+    if (!revera_captures(re, subject, sizeof(subject) - 1, groups, 3, &amp;error)) {
+        revera_regex_free(re);
+        return 1;
+    }
+    printf("%.*s\n", (int)(groups[1].end - groups[1].start),
+           subject + groups[1].start);
+    revera_regex_free(re);
+}</code></pre>
+      </div>
+    </figure>
+  </div>
+</article>
+
+<article class="band band-ink" id="contracts">
+  <div class="wrap">
+    <p class="section-label">Resource contracts</p>
+    <h2 class="on-dark">A resource report computed before a search begins</h2>
+    <p class="band-intro on-dark">For a given pattern and maximum input length,
+    Revera reports a heap bound, a step bound, and a stack estimate.
+    Applications can compare the report with a resource budget before running a search.</p>
+
+    <div class="contract-grid">
+      <div class="contract-card">
+        <p class="contract-name">HeapBytes</p>
+        <p class="contract-desc">The maximum number of explicitly allocated heap bytes for a match on a subject up to the specified length.</p>
+      </div>
+      <div class="contract-card">
+        <p class="contract-name">StackBytes</p>
+        <p class="contract-desc">An estimate of the deepest stack use, based on fixed frame sizes shared by every target.</p>
+      </div>
+      <div class="contract-card">
+        <p class="contract-name">Steps</p>
+        <p class="contract-desc">An upper bound on abstract work, counted as one step per loop iteration or function call.</p>
+      </div>
+    </div>
+
+    <div class="contract-example">
+      <pre class="code on-dark-code"><code>package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/oneregex/revera/go"
+)
+
+func main() {
+    if len(os.Args) != 2 {
+        log.Fatal("usage: contract PATTERN")
+    }
+    re, err := revera.New(os.Args[1])
+    if err != nil {
+        log.Fatal(err)
+    }
+    c := re.Contract(4096)
+    fmt.Printf("heap: %d bytes\nstack: %d bytes\nsteps: %d\n",
+        c.HeapBytes(), c.StackBytes(), c.Steps())
+}</code></pre>
+      <p class="on-dark-note">The report applies to every subject up to the specified length; it is not a measurement of one run.
+      A nested pattern can report a heap bound in the tens of gigabytes.
+      If a search would exceed the engine's memory capacity, it returns a capacity error while its memory use remains bounded.</p>
+    </div>
+
+  </div>
+</article>
+
+<article class="band band-paper" id="proof">
+  <div class="wrap">
+    <p class="section-label">Verification</p>
+    <h2>The Lean 4 model and what it proves</h2>
+    <p class="band-intro">Testing covers finite inputs. The Lean development adds machine-checked proofs
+    about the Vego language, the shipped IR, and the POSIX ERE specification itself.</p>
+
+    <div class="proof-grid">
+      <section class="proof-item">
+        <h3>The shipped IR is well formed</h3>
+        <p>The theorems apply to exact, byte-for-byte copies of the shipped engine and probe IR files.
+        Lean decodes both JSON files and elaborates them into a fully typed core,
+        where every name resolves and every operator has a uniquely determined width.</p>
+      </section>
+      <section class="proof-item">
+        <h3>The engine agrees with the specification on checked inputs</h3>
+        <p>The ERE specification is encoded in Lean from the standard text.
+        The engine satisfies that definition for every covered corpus case, and an exhaustive sweep checks
+        every compilation and execution in a small pattern domain.</p>
+      </section>
+      <section class="proof-item">
+        <h3>The generated backends agree on the corpus</h3>
+        <p>The Lean interpreter and every generated backend replay the same corpus.
+        For each covered command, the generated implementations produce the same output as the canonical Go engine.</p>
+      </section>
+      <section class="proof-item">
+        <h3>Phase A heap and step bounds are universal</h3>
+        <p>Phase A of the matcher has universal heap and step bounds, proved by induction
+        for every well-formed program, atom test, and subject.
+        The meter that records those costs is itself proved sound.</p>
+      </section>
+    </div>
+
+    <div class="proof-fine">
+      <p>The proofs have explicit limits.
+      The corpus and exhaustive checks are finite, not universal.
+      Non-POSIX locale behavior is outside the model.
+      For the capture solver, contract validation is limited to the corpus cases.
+      The Lean README states the exact boundary of each theorem.</p>
+    </div>
+  </div>
+</article>
+
+<article class="band band-paper" id="libraries">
+  <div class="wrap">
+    <p class="section-label">Packages</p>
+    <h2>Language packages in this repository</h2>
+
+    <div class="libtable-wrap">
+      <table class="libtable">
+        <caption class="visually-hidden">The Revera libraries</caption>
+        <thead>
+          <tr><th scope="col">Language</th><th scope="col">Package</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Go</th><td><a href="https://github.com/oneregex/revera/tree/main/go"><code>github.com/oneregex/revera/go</code></a></td></tr>
+          <tr><th scope="row">Rust</th><td><a href="https://github.com/oneregex/revera/tree/main/rust"><code>revera</code></a></td></tr>
+          <tr><th scope="row">Zig</th><td><a href="https://github.com/oneregex/revera/tree/main/zig"><code>revera</code></a></td></tr>
+          <tr><th scope="row">C</th><td><a href="https://github.com/oneregex/revera/tree/main/native/c"><code>Revera::C</code></a></td></tr>
+          <tr><th scope="row">C++</th><td><a href="https://github.com/oneregex/revera/tree/main/native/cpp"><code>Revera::CXX</code></a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="lib-note">Every package embeds the same CLDR and Unicode locale tables,
+    which provide character classes, case mappings, and collating elements for the supported CLDR locales.
+    A compiled engine is read-only and can be shared across threads.
+    Zig callers must use a thread-safe allocator when compiling it.</p>
+  </div>
+</article>
+
+</main>
+
+<footer class="colophon">
+  <div class="wrap colophon-grid">
+    <div class="colophon-brand">
+      <img src="assets/logo.png" alt="" width="44" height="44">
+      <div>
+        <p class="colophon-name">Revera</p>
+        <p>A project of the OneRegex initiative.</p>
+      </div>
+    </div>
+    <div class="colophon-col">
+      <h4>Documentation</h4>
+      <ul>
+        <li><a href="https://github.com/oneregex/revera/blob/main/docs/POSIX-1-2024-ERE-SPECIFICATION.md">The ERE specification</a></li>
+        <li><a href="https://github.com/oneregex/revera/tree/main/lean">The Lean model</a></li>
+        <li><a href="https://github.com/oneregex/revera/blob/main/vego/SPECIFICATION.md">The Vego language</a></li>
+        <li><a href="https://github.com/oneregex/revera/blob/main/docs/CONFORMANCE-KIT.md">The conformance kit</a></li>
+      </ul>
+    </div>
+    <div class="colophon-col">
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/oneregex/revera">Repository</a></li>
+        <li><a href="https://github.com/oneregex/revera/blob/main/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/oneregex/revera/blob/main/SECURITY.md">Security policy</a></li>
+        <li><a href="https://github.com/oneregex/revera/blob/main/LICENSE">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="wrap colophon-base">
+    <p>The embedded Unicode and CLDR data are licensed under the Unicode License v3.</p>
+  </div>
+</footer>
+
+</body>
+</html>
