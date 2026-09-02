@@ -15,4 +15,4 @@ The date replaces `unreleased` when the tag is made; `make dist` checks for it.
 - The Vego language: the specification, the structural schema of the IR, the compiler and the `vegoc` command.
 - The Lean 4 model of Vego and of the ERE specification, with the corpus, specification and phase A theorems.
 - The backend conformance kit, the cross-language benchmarks and the fuzz drivers, in the unpublished `dev` module.
-- The Go modules `github.com/oneregex/revera/go` and `github.com/oneregex/revera/vego`, the `revera` crate, the `revera` Zig package, the `revera` npm package and the `revera` CMake package with `Revera::C` and `Revera::CXX`.
+- The Go modules `github.com/oneregex/revera/go` and `github.com/oneregex/revera/vego`, the `revera` crate, the `revera` Zig package, the `@oneregex/revera` npm package and the `revera` CMake package with `Revera::C` and `Revera::CXX`.

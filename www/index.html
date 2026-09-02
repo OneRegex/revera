@@ -368,7 +368,7 @@ c := re.<span class="tok-fn">Contract</span>(<span class="tok-num">65536</span>)
     }
     std::cout &lt;&lt; (*caps)[<span class="tok-num">1</span>]-&gt;<span class="tok-fn">str</span>() &lt;&lt; <span class="tok-str">'\n'</span>;
 }</code></pre>
-<pre class="pane" role="tabpanel" id="pane-ts" aria-labelledby="tab-ts" data-pane="ts" tabindex="0"><code><span class="tok-kw">import</span> { Regex } <span class="tok-kw">from</span> <span class="tok-str">"revera"</span>;
+<pre class="pane" role="tabpanel" id="pane-ts" aria-labelledby="tab-ts" data-pane="ts" tabindex="0"><code><span class="tok-kw">import</span> { Regex } <span class="tok-kw">from</span> <span class="tok-str">"@oneregex/revera"</span>;
 
 <span class="tok-kw">const</span> re = <span class="tok-kw">new</span> <span class="tok-fn">Regex</span>(<span class="tok-str">"(abc)([0-9]*)"</span>);
 <span class="tok-kw">const</span> caps = re.<span class="tok-fn">captures</span>(<span class="tok-str">"__abc12__"</span>);
@@ -385,7 +385,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
       <div><dt>Rust</dt><dd><code>cargo add revera</code></dd></div>
       <div><dt>Zig</dt><dd><code>zig fetch --save https://github.com/oneregex/revera/releases/download/v0.1.0/revera-zig-0.1.0.tar.gz</code></dd></div>
       <div><dt>C and C++</dt><dd><code>find_package(Revera CONFIG REQUIRED)</code> then link <code>Revera::C</code> or <code>Revera::CXX</code></dd></div>
-      <div><dt>TypeScript</dt><dd><code>npm install revera</code></dd></div>
+      <div><dt>TypeScript</dt><dd><code>npm install @oneregex/revera</code></dd></div>
     </dl>
   </div>
 </section>

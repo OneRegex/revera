@@ -26,7 +26,7 @@ The `locale/` directory contains the C runtime and the generator used to reprodu
 | Zig        | package `revera`                             | `zig/`        |
 | C          | `Revera::C`, `librevera_c`, `revera-c`       | `native/c/`   |
 | C++        | `Revera::CXX`, `librevera_cxx`, `revera-cxx` | `native/cpp/` |
-| TypeScript | npm package `revera`                         | `ts/`         |
+| TypeScript | npm package `@oneregex/revera`               | `ts/`         |
 
 Each directory has a README with the API and the verification commands of that language.
 The Go engine is the canonical source.

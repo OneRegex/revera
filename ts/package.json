@@ -1,5 +1,5 @@
 {
-  "name": "revera",
+  "name": "@oneregex/revera",
   "version": "0.1.0",
   "description": "POSIX.1-2024 extended regular expressions, generated from the Revera Vego engine",
   "license": "MIT",
@@ -18,6 +18,10 @@
     "LICENSE",
     "LICENSES"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "node": ">=22.18"
   },

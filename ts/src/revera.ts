@@ -3,7 +3,7 @@
 // This module is the public surface of the TypeScript instantiation of the revera engine.
 // The engine itself, engine.ts, is generated from a Vego program; this file wraps it in the shape a TypeScript caller expects.
 //
-//     import { Regex } from "revera";
+//     import { Regex } from "@oneregex/revera";
 //     const re = new Regex("([a-z]+)([0-9]*)");
 //     const caps = re.captures("__abc12__");
 //     caps?.get(1)?.text  // "abc"

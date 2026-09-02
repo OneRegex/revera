@@ -1,7 +1,7 @@
 # Revera for TypeScript
 
 Revera is a POSIX.1-2024 extended regular expression engine.
-This directory is the TypeScript instantiation and the source of the `revera` npm package.
+This directory is the TypeScript instantiation and the source of the `@oneregex/revera` npm package.
 
 The same engine exists in Go, Rust, Zig, C, C++ and TypeScript, generated from one Vego source and exercised by one cross-language conformance suite.
 In addition, the Lean development gives Vego machine-checked semantics, and the repository's Lean README states its exact proof coverage.
@@ -12,12 +12,14 @@ Therefore, it is the engine to reach for when a pattern must mean the same thing
 ## Using it
 
 ```ts
-import { Regex } from "revera";
+import { Regex } from "@oneregex/revera";
 
 const re = new Regex("([a-z]+)([0-9]*)");
 const caps = re.captures("__abc12__");
 console.log(caps?.get(1)?.text); // "abc"
 ```
+
+Install it with `npm install @oneregex/revera`.
 
 `src/revera.ts` is the module entry point and the whole public surface.
 
