@@ -91,7 +91,10 @@ go test -run '^$' -fuzz FuzzDifferential -fuzztime 60s ./internal/differential
 
 These differential and cross-language checks cover finite corpora.
 
-By contrast, the Lean development proves universal phase A heap and step bounds under its stated hypotheses.
+Phase A is the first matching stage.
+It scans the subject once, advances every viable automaton path in lockstep, and selects the overall match span before Phase B resolves requested subexpression captures.
+
+By contrast, the Lean development proves universal Phase A heap and step bounds under its stated hypotheses.
 Its full engine-to-specification checks cover a finite corpus and an exhaustive small domain.
 [`../lean/README.md`](../lean/README.md) gives the exact boundary.
 
