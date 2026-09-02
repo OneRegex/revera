@@ -1,11 +1,13 @@
 # Revera for Go
 
 This module is the Go implementation of the Revera POSIX.1-2024 extended regular expression engine.
-The five language implementations are cross-checked on the shared conformance corpus.
+Across the project, the five language implementations are cross-checked on the shared conformance corpus.
+
 The module path is `github.com/oneregex/revera/go`, and it has no dependency.
 
 The engine is written in Vego, the strict Go subset that [`../vego/SPECIFICATION.md`](../vego/SPECIFICATION.md) defines.
-This directory is therefore also the canonical source of every other implementation.
+For that reason, this directory is also the canonical source of every other implementation.
+
 `vegoc export` turns it into `../revera.vego.json`, and the printers of `vegoc emit` turn that file into the Rust, Zig, C++ and C engines.
 
 ## Using it
@@ -53,7 +55,7 @@ Every non-test Go file is in the Vego subset except `revera_host.go`.
 ## The low-level surface
 
 The subset has no methods, no interfaces and no function values.
-Below the host file, the engine therefore has a different shape from an ordinary Go package:
+Consequently, below the host file, the engine has a different shape from an ordinary Go package:
 
 - Functions replace methods: `Exec(&re, subject, pmatch, eflags)` instead of `re.Exec(...)`.
   `Compile` returns the `Regexp` by value.
@@ -91,4 +93,5 @@ These differential and cross-language checks cover finite corpora.
 The Lean development proves universal phase A heap and step bounds under its stated hypotheses, while its full engine-to-specification checks cover a finite corpus and exhaustive small domain; [`../lean/README.md`](../lean/README.md) gives the exact boundary.
 
 An edit to a subset file changes the exported IR.
-Run `make generate` at the repository root afterwards, then `make check-generated`, and the rest of the pipeline follows from [`../README.md`](../README.md).
+Afterwards, run `make generate` at the repository root, followed by `make check-generated`.
+The rest of the pipeline follows from [`../README.md`](../README.md).

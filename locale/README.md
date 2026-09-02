@@ -15,9 +15,12 @@ This directory holds the C locale runtime and the generated CLDR tables that eve
 
 Include `rv_locale.h` and compile or link `rv_locale.c`.
 The API works on Unicode scalar values and explicit scalar sequences; UTF-8 decoding stays at the caller's boundary.
+
 `rv_locale_open` accepts ASCII-case-insensitive CLDR names with `-` or `_` separators, an optional `.UTF-8` suffix, and either a separate collation type or an `@collation=` modifier.
 The `C` and `POSIX` names select the built-in POSIX locale.
-Locale values are small caller-owned structs, lookups allocate no memory, and returned locale names point into static generated data.
+
+Locale values are small structs that the caller owns.
+Moreover, lookups allocate no memory, and returned locale names point into static generated data.
 
 ## Build and test
 
@@ -54,6 +57,7 @@ tools/generate-locale-data.sh cldr-common-48.2.zip cldr-tools-48.2.jar "$JAVA_HO
 
 It verifies the SHA-512 of both inputs, compiles the generator, and writes `rv_locale_data.inc`.
 An optional fourth argument selects a different output path.
+
 Run `cd ../dev && go run ./internal/genlocale` afterwards to rebuild every `data.bin` copy.
 
 ## License

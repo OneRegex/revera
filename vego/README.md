@@ -2,6 +2,7 @@
 
 Vego is the strict Go subset that the Revera engine is written in, built for mechanical translation into other languages.
 This module, `github.com/oneregex/revera/vego`, holds the language specification, its compiler and the `vegoc` command.
+
 It has no dependency, and it does not depend on the engine.
 
 [`SPECIFICATION.md`](SPECIFICATION.md) defines the subset and its JSON form, the Vego IR, in full.
@@ -22,6 +23,7 @@ go run ./cmd/vegoc version
 
 `check` reports every construct outside the subset with a file and a line.
 `export` runs the same check and writes the IR.
+
 `emit` reads the IR and prints it in one target language.
 An output flag left empty sends the text to standard output.
 
@@ -53,7 +55,8 @@ The Lean model in [`../lean`](../lean) gives the subset its formal semantics and
 ## Writing a new backend
 
 A backend starts from `../revera.vego.json`, `probe/probe.vego.json` and a `backend.json` manifest.
-It needs a printer here, a hand-written runtime and public API in its own directory, and the driver, probe, bench and fuzzcase binaries that the manifest names.
+To integrate it, add a printer here, a hand-written runtime and public API in its own directory, and the driver, probe, bench and fuzzcase binaries that the manifest names.
+
 [`../docs/CONFORMANCE-KIT.md`](../docs/CONFORMANCE-KIT.md) describes the manifest and the protocols.
 `make conform` at the repository root runs generation freshness, release build, probe, corpus, stress, fuzz and Lean-data checks, and attempts each configured checked build.
 
