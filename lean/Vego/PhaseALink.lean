@@ -264,6 +264,7 @@ structure LinkCoverage where
   execsNonPosix : Nat := 0
   execsPruned : Nat := 0
   contractsChecked : Nat := 0
+  programsWf : Nat := 0
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- What a run of the link reports: the coverage, and the first disagreement if any. -/
@@ -343,6 +344,9 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
           | .ok (.inl .multi) => multiPattern := true
           | .ok (.inl .captures) => pure ()
           | .ok (.inr x) =>
+            if !x.prog.wfCheck then
+              return { rep with failure := some s!"command {idx} '{cmd}': program fails wfCheck" }
+            rep := { rep with cov := { rep.cov with programsWf := rep.cov.programsWf + 1 } }
             match s.m.call "atomCost" [.ptr s.reCell 0 []] with
             | .ok ([.i a], m') =>
               s := { s with m := m' }
@@ -401,12 +405,14 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
 
 /-- The coverage the theorem pins down. -/
 def linkCoverage : LinkCoverage :=
-  { execsChecked := 47922, execsCaptures := 25974, execsNonPosix := 1160, execsPruned := 0, contractsChecked := 46 }
+  { execsChecked := 47922, execsCaptures := 25974, execsNonPosix := 1160, execsPruned := 0, contractsChecked := 46,
+    programsWf := 6893 }
 
 /--
 The interpreted engine agrees with the phase A model on every covered corpus execution, its heap bytes are
 exactly the model's, its loop count never exceeds the model's step figure, and the contract figures the
-engine reports for NoSub patterns are the figures `PhaseAProofs.lean` proves.
+engine reports for NoSub patterns are the figures `PhaseAProofs.lean` proves. Every extracted program passes
+`Prog.wfCheck`, the decidable form of the program hypotheses of the universal theorems.
 -/
 def linkAgrees (_ : Unit) : Bool :=
   match corpusPairs, reveraChecked with

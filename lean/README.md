@@ -12,7 +12,7 @@ The theorems in `Vego/Theorems.lean` are machine checked.
 The theorems of `Vego/Theorems.lean` are about the embedded copies of `go1/probe.vego.json` and `go1/revera.vego.json`, byte for byte.
 Native evaluation checks them.
 The Lake configuration tracks every embedded JSON, corpus, locale, and probe input, so changing one rebuilds the modules that contain it.
-The theorems of `Vego/CostLemmas.lean` and `Vego/MeterSound.lean` quantify over all inputs and are proved by induction, with no native evaluation.
+The theorems of `Vego/CostLemmas.lean`, `Vego/MeterSound.lean`, `Vego/PhaseAProofs.lean` and `Vego/PhaseARun.lean` quantify over all inputs and are proved by induction, with no native evaluation.
 
 ### 1. The artifacts are well formed
 
@@ -145,7 +145,7 @@ The buffers are bounded through the growth rule: the active list of a slot holds
 `phaseA_link_agrees` ties the model to the engine.
 On every corpus execution that runs phase A alone, which is every `NoSub` pattern and every pattern without a group, the model run on the program read out of the interpreted `Regexp` reproduces the engine's match result, allocates exactly the bytes the interpreter counts, and its step figure dominates the interpreter's loop meter.
 On every `T` command of such a pattern, the heap and step figures the engine reports equal the proven figures.
-`linkCoverage` pins the counts: 47922 executions and 46 contract queries.
+`linkCoverage` pins the counts: 47922 executions, 46 contract queries, and 6893 programs that pass `Prog.wfCheck`.
 `contract.go` now computes exactly `heapFigure` and `stepsFigure` for phase A, so the shipped contract is the proven bound.
 
 Two things led to this.
@@ -154,7 +154,37 @@ The proof then showed what the constants must be, and the per-boundary step budg
 The non-POSIX locales and the multi-character probes are inside the universal theorems but outside the corpus link, which covers the POSIX locale.
 Phase B, the capture solver, keeps its corpus-bound contract check.
 
-### 6. The cost model holds for every input
+### 6. Phase A computes the right match for every input
+
+`phaseA_run_correct`, from `PhaseA.run_correct` of `Vego/PhaseARun.lean`.
+
+The contract theorem of section 5 says what a run costs.
+This one says what it answers.
+`Vego/PhaseACorrect.lean` states the reference the model is judged against, and that reference knows nothing of slots, generations or queues.
+A thread is a boundary index of the subject, an instruction, the start it carries and its counters.
+It steps along an epsilon edge of the program, where `^` and `$` read the anchors from the subject, or it consumes: one character when the single test accepts it, or a collating element of several characters when a bracket probe does.
+Consuming steps bump the counters the way the engine does.
+A thread is reached when a spawn at some boundary of the subject steps to it.
+A candidate is a reached thread at the accept instruction, taken as its start, its counters and its end position.
+The selection order is the engine's: earliest start, then smallest counters, then longest end.
+`run_correct` says that when the model reports a match, its start and end with the counters it kept form a candidate that the order puts at or before every candidate, and that when it reports none, there is no candidate at all.
+
+The proof is an invariant over the boundary loop.
+Every fresh entry of a slot is a thread the reference reached, so the model never invents a match.
+Every productive thread, one that can still reach accept, is covered: the slot of its boundary holds a payload at or below it in the merge order, or the best match already known dominates it.
+The first half is the merge argument.
+A store only replaces a payload with a better one, and a bump preserves the order.
+The second half is why pruning is safe.
+A dominated payload cannot produce a better candidate, because bumps only raise counters and the best only improves.
+The closure at a boundary is proved by the same drain induction as the cost bound, with a queued-or-done invariant per fresh instruction.
+The consuming phase then delivers each arrival to the slot of its target boundary.
+The early stop is justified because no live future slot leaves no path that could beat the best.
+The scan filter's jump is proved under `ScanSound`, an assumption stated against the reference: when the filter is enabled the ring has two slots, and a jump lands on a boundary of the subject, past only boundaries whose spawns cannot accept.
+That assumption is about the compiler's choice of stop bytes, which the model does not contain, so it stays a hypothesis.
+The other hypotheses are the program well-formedness that `Prog.wfCheck` decides, which `phaseA_link_agrees` now checks on every corpus program, and the fit of the multi-character probes in the ring.
+The theorem depends on `propext`, `Classical.choice` and `Quot.sound` only.
+
+### 7. The cost model holds for every input
 
 The lemmas of `Vego/CostLemmas.lean` quantify over all inputs, and ordinary induction proves them.
 They use no native evaluation, so the corpus does not limit them.
@@ -183,8 +213,8 @@ That reading can neither under-count an allocation nor misattribute the call dep
 The corpus theorem and these lemmas meet in the middle.
 The lemmas prove the meter and the growth arithmetic right for all inputs.
 The corpus theorem checks the engine against its contract through that meter, on every recorded execution.
-What remains corpus-bound is only the control flow of the engine itself.
-A fully universal contract theorem would need a verified model of the matcher, walk and solver loops.
+The phase A matcher is modeled and proved universally, for its cost and for its result.
+What remains corpus-bound is the control flow of the walk and of the capture solver.
 
 ## What this means for the pipeline
 
@@ -210,6 +240,8 @@ Vego/Elab.lean      elaborator (checker): raw tree to typed core
 Vego/Interp.lean    operational semantics: heap, traps, fuel, meter
 Vego/PhaseA.lean    the phase A matcher, modeled with its meter
 Vego/PhaseAProofs.lean the phase A contract, proved for every program and subject
+Vego/PhaseACorrect.lean the reference semantics of a program, and the closure of one boundary proved against it
+Vego/PhaseARun.lean the phase A result, proved for every program and subject
 Vego/PhaseALink.lean the model against the interpreted engine on the corpus
 Vego/CostLemmas.lean universal theorems about the cost model
 Vego/MeterSound.lean meter soundness for the whole interpreter

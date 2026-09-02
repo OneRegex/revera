@@ -65,6 +65,7 @@ import Vego.SpecCheck
 import Vego.Exhaustive
 import Vego.PhaseALink
 import Vego.PhaseAProofs
+import Vego.PhaseARun
 
 namespace Vego
 
@@ -161,6 +162,22 @@ phase A are the proven bounds of the algorithm the corpus shows the engine to be
 -/
 theorem phaseA_link_agrees : PhaseA.linkAgrees () = true := by
   native_decide
+
+/--
+Phase A is functionally correct for every program and subject. `PhaseACorrect.lean` states the reference: a
+thread of the program at a boundary of the subject with the start and counters it carries, its epsilon and
+consuming steps, the candidates it accepts, and the selection order of earliest start, smallest counters,
+longest end. The model's `(matched, so, eo)` is that selection: when it reports a match, its start and end with
+the counters it kept form a candidate that the order puts at or before every candidate; when it reports none,
+there is no candidate. The hypotheses are the program well-formedness `Prog.wfCheck` decides, the fit of the
+multi-character probes in the ring, and `ScanSound`, the soundness of the scan filter against the reference.
+-/
+theorem phaseA_run_correct (p : PhaseA.Prog) (atoms : PhaseA.Atoms) (input : PhaseA.Input)
+    (hwf : p.wfCheck = true) (hawf : atoms.wf2 p) (hring : 2 ≤ p.ring) (hscan : PhaseA.ScanSound p atoms input) :
+    ((PhaseA.run p atoms input).matched = true →
+      ∃ c, PhaseA.IsBest p atoms input (PhaseA.run p atoms input).so c (PhaseA.run p atoms input).eo) ∧
+    ((PhaseA.run p atoms input).matched = false → ∀ s c e, ¬ PhaseA.Cand p atoms input s c e) :=
+  PhaseA.run_correct p atoms input (PhaseA.wfCheck_sound p hwf).1 hawf hring hscan
 
 /--
 The two corpus theorems composed: on every corpus command the specification constrains, the interpreted

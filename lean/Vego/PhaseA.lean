@@ -60,6 +60,12 @@ structure Prog where
 
 abbrev Prog.n (p : Prog) : Nat := p.ins.size
 
+/-- The decidable well-formedness the universal theorems assume: the start and every edge target are
+instructions, and the scan filter is only enabled with a ring of two. -/
+def Prog.wfCheck (p : Prog) : Bool :=
+  p.start < p.n && (List.range p.n).all (fun pc => (p.ins.getD pc default).next < p.n && (p.ins.getD pc default).alt < p.n) &&
+  (!p.scan.enabled || p.ring == 2)
+
 def maxElemAhead : Nat := 8
 
 /--

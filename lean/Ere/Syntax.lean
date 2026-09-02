@@ -78,7 +78,7 @@ The interfaces receive NUL-terminated byte strings and decode them in the locale
 A string that is not valid UTF-8, or that holds a NUL, is outside the domain of the interface (section 3.1),
 and `decodeUtf8` reports `none` for it. -/
 
-private def cont (b : UInt8) : Bool := 0x80 ≤ b && b ≤ 0xbf
+def cont (b : UInt8) : Bool := 0x80 ≤ b && b ≤ 0xbf
 
 /-- Decode one scalar at `i`, strict: no overlong forms, no surrogates, nothing above U+10FFFF. -/
 def decodeOne (bs : ByteArray) (i : Nat) : Option (Chr × Nat) :=

@@ -123,6 +123,9 @@
 - [x] `engine_meets_spec_exhaustively`: 42128 compiles and 1576896 executions of the interpreted engine against the specification on an exhaustive small domain
 - [x] `speccheck` and `exhaustcheck` executables for diagnosis
 - [x] `Vego/PhaseA.lean` and `Vego/PhaseAProofs.lean`: the phase A contract proved for every program and subject, `contract.go` updated to the proven figures, and `phaseA_link_agrees` checking the model and the figures against the engine on the corpus
+- [x] `Vego/PhaseACorrect.lean` and `Vego/PhaseARun.lean`: the phase A result proved correct for every program and subject against a reference semantics of the program, under `ScanSound` for the scan filter.
+  The zeroed slots of `prepare` do not satisfy the slot invariant of a current slot, since stamp and generation are both zero, so the run invariant carries `RSlotQ`, the weaker invariant of a slot that is still behind its generation.
+  `phaseA_link_agrees` now also checks `Prog.wfCheck` on every corpus program
 - [x] Meter soundness for the whole interpreter, in Vego/MeterSound.lean.
   One mutual induction on fuel proves that no counter ever decreases.
   It also proves that the call depth balances across every successful call, up to the harness corollary callIdx_meterOK.
