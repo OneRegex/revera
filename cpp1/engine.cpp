@@ -971,13 +971,12 @@ BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
         ring = 9LL;
     }
     int64_t heap = workspaceHeapBound(n, k, ring);
-    int64_t payloads = (n + 1LL);
-    if ((k == 0LL)) {
-        payloads = ([&]{ auto _t1 = (n + 1LL); auto _t2 = cAdd(length, 2LL); return std::min<int64_t>(_t1, _t2); }());
-    }
-    int64_t perPop = cMul(2LL, (k + 3LL));
-    int64_t perBoundary = ([&]{ auto _t3 = ([&]{ auto _t4 = n; auto _t5 = cMul(payloads, perPop); return cMul(_t4, _t5); }()); auto _t6 = ([&]{ auto _t7 = n; auto _t8 = cAdd(atom, (k + 8LL)); return cMul(_t7, _t8); }()); return cAdd(_t3, _t6); }());
-    int64_t steps = ([&]{ auto _t9 = cAdd(length, 2LL); auto _t10 = perBoundary; return cMul(_t9, _t10); }());
+    int64_t weight = cAdd(cMul(4LL, k), 22LL);
+    int64_t perTest = ([&]{ auto _t1 = cAdd(atom, 2LL); auto _t2 = ([&]{ auto _t3 = (ring - 1LL); auto _t4 = cAdd(cMul(4LL, k), 12LL); return cMul(_t3, _t4); }()); return cAdd(_t1, _t2); }());
+    int64_t perBoundary = ([&]{ auto _t5 = weight; auto _t6 = cMul((n + 1LL), (n + 1LL)); return cMul(_t5, _t6); }());
+    perBoundary = ([&]{ auto _t7 = perBoundary; auto _t8 = cMul(n, perTest); return cAdd(_t7, _t8); }());
+    perBoundary = ([&]{ auto _t9 = perBoundary; auto _t10 = ([&]{ auto _t11 = ([&]{ auto _t12 = n; auto _t13 = cMul(2LL, k); return cAdd(_t12, _t13); }()); auto _t14 = cAdd(cMul(4LL, ring), 38LL); return cAdd(_t11, _t14); }()); return cAdd(_t9, _t10); }());
+    int64_t steps = ([&]{ auto _t15 = cAdd((24LL + ring), length); auto _t16 = ([&]{ auto _t17 = cAdd(length, 1LL); auto _t18 = perBoundary; return cMul(_t17, _t18); }()); return cAdd(_t15, _t16); }());
     int64_t stack = 4608LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -1190,10 +1189,19 @@ void prepare(vg::Arena& mem, engineWS& ws, int64_t n, int64_t k, int64_t ring) {
 }
 
 int64_t workspaceHeapBound(int64_t n, int64_t k, int64_t ring) {
-    int64_t heap = ([&]{ auto _t1 = ring; auto _t2 = cMul(n, (16LL + (4LL * k))); return cMul(_t1, _t2); }());
-    heap = cAdd(heap, ((8LL * ((queueCompactFactor * n) + 2LL)) + n));
-    heap = ([&]{ auto _t3 = heap; auto _t4 = (cMul(ring, 112LL) + 256LL); return cAdd(_t3, _t4); }());
-    return cAdd(heap, ((12LL * k) + 32LL));
+    int64_t perSlot = cMul(8LL, n);
+    if ((k > 0LL)) {
+        perSlot = ([&]{ auto _t1 = perSlot; auto _t2 = cMul(4LL, cMul(n, k)); return cAdd(_t1, _t2); }());
+    }
+    int64_t heap = ([&]{ auto _t3 = cMul(ring, 104LL); auto _t4 = cMul(ring, perSlot); return cAdd(_t3, _t4); }());
+    heap = cAdd(heap, n);
+    if ((k > 0LL)) {
+        heap = cAdd(heap, (12LL * k));
+    }
+    heap = cAdd(heap, 64LL);
+    heap = ([&]{ auto _t5 = heap; auto _t6 = ([&]{ auto _t7 = ring; auto _t8 = cAdd(cMul(16LL, n), 64LL); return cMul(_t7, _t8); }()); return cAdd(_t5, _t6); }());
+    heap = ([&]{ auto _t9 = heap; auto _t10 = cAdd(cMul(32LL, n), 272LL); return cAdd(_t9, _t10); }());
+    return heap;
 }
 
 bool ctrLess(vg::Slice<uint32_t> a, vg::Slice<uint32_t> b) {

@@ -1497,13 +1497,12 @@ pub fn matcherContract(re: *Regexp, length: i64, atom: i64) BackendContract {
         ring = (maxElemAhead +% 1);
     }
     const heap: i64 = workspaceHeapBound(n, k, ring);
-    var payloads: i64 = (n +% 1);
-    if ((k == 0)) {
-        payloads = @min((n +% 1), cAdd(length, 2));
-    }
-    const perPop: i64 = cMul(2, (k +% 3));
-    const perBoundary: i64 = cAdd(cMul(n, cMul(payloads, perPop)), cMul(n, cAdd(atom, (k +% 8))));
-    const steps: i64 = cMul(cAdd(length, 2), perBoundary);
+    const weight: i64 = cAdd(cMul(4, k), 22);
+    const perTest: i64 = cAdd(cAdd(atom, 2), cMul((ring -% 1), cAdd(cMul(4, k), 12)));
+    var perBoundary: i64 = cMul(weight, cMul((n +% 1), (n +% 1)));
+    perBoundary = cAdd(perBoundary, cMul(n, perTest));
+    perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2, k)), cAdd(cMul(4, ring), 38)));
+    const steps: i64 = cAdd(cAdd((24 +% ring), length), cMul(cAdd(length, 1), perBoundary));
     const stack: i64 = (vg.cv(i64, matcherStackBytes) +% (equivFrames *% frameBytes));
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -1749,10 +1748,19 @@ pub fn prepare(mem: vg.Allocator, ws: *engineWS, n: i64, k: i64, ring: i64) vg.A
 }
 
 pub fn workspaceHeapBound(n: i64, k: i64, ring: i64) i64 {
-    var heap: i64 = cMul(ring, cMul(n, (16 +% (4 *% k))));
-    heap = cAdd(heap, ((8 *% ((queueCompactFactor *% n) +% 2)) +% n));
-    heap = cAdd(heap, (cMul(ring, 112) +% 256));
-    return cAdd(heap, ((12 *% k) +% (4 *% maxElemAhead)));
+    var perSlot: i64 = cMul(8, n);
+    if ((k > 0)) {
+        perSlot = cAdd(perSlot, cMul(4, cMul(n, k)));
+    }
+    var heap: i64 = cAdd(cMul(ring, 104), cMul(ring, perSlot));
+    heap = cAdd(heap, n);
+    if ((k > 0)) {
+        heap = cAdd(heap, (12 *% k));
+    }
+    heap = cAdd(heap, 64);
+    heap = cAdd(heap, cMul(ring, cAdd(cMul(16, n), 64)));
+    heap = cAdd(heap, cAdd(cMul(32, n), 272));
+    return heap;
 }
 
 pub fn ctrLess(a: vg.Slice(u32), b: vg.Slice(u32)) bool {

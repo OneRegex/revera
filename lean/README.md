@@ -127,7 +127,34 @@ Non-POSIX locales are outside the model, because sections 7.7 and 14.3 leave ran
 The `R`, `I` and `T` commands are engine interfaces without a POSIX counterpart.
 And all three statements are finite: they quantify over the corpus and the enumerated domain, not over every pattern and subject.
 
-### 5. The cost model holds for every input
+### 5. The phase A contract is proved for every input
+
+`PhaseA.run_steps_le`, `PhaseA.run_heap_le` and `phaseA_link_agrees`.
+
+`Vego/PhaseA.lean` is a model of the phase A matcher of `engine.go`: the slot tables and their generation stamps, the relaxation queue and its compaction, the merge order of payloads, the consuming transitions with their counter increments, the scan filter and the early stop, function for function.
+It is parametric in the compiled program, in the atom tests, and in the subject, and it meters its own events.
+`stepFigure` prices those events one unit per loop iteration and per call, the way the interpreter's loop meter prices the Vego code.
+
+`Vego/PhaseAProofs.lean` proves two bounds for every well-formed program, every atom test and every subject, by induction and with no evaluation.
+The step figure of a run stays under `stepsFigure`, and the bytes it allocates stay under `heapFigure`.
+The closure is the hard part.
+Its cost is paid by a potential: the queue length plus, for every instruction of the slot, the rank of its stored payload among the payloads known at the boundary.
+A successful merge stores a strictly better payload and lowers a rank, every pop shortens the queue, and a compaction is paid by the entries it drops.
+The buffers are bounded through the growth rule: the active list of a slot holds distinct instructions, the queue never passes twice the program length plus one, and the geometric argument of `CostLemmas.lean` turns those needs into capacities.
+
+`phaseA_link_agrees` ties the model to the engine.
+On every corpus execution that runs phase A alone, which is every `NoSub` pattern and every pattern without a group, the model run on the program read out of the interpreted `Regexp` reproduces the engine's match result, allocates exactly the bytes the interpreter counts, and its step figure dominates the interpreter's loop meter.
+On every `T` command of such a pattern, the heap and step figures the engine reports equal the proven figures.
+`linkCoverage` pins the counts: 47922 executions and 46 contract queries.
+`contract.go` now computes exactly `heapFigure` and `stepsFigure` for phase A, so the shipped contract is the proven bound.
+
+Two things led to this.
+An adversarial probe found that the previous phase A heap figure was unsound: `(a{0,8}){0,8}b` on `aaaaaaaa` allocated 7546 bytes against a figure of 7290 under the portable growth rule, because the doubling of the active lists and of the queue was folded in too tightly.
+The proof then showed what the constants must be, and the per-boundary step budget grew with them.
+The non-POSIX locales and the multi-character probes are inside the universal theorems but outside the corpus link, which covers the POSIX locale.
+Phase B, the capture solver, keeps its corpus-bound contract check.
+
+### 6. The cost model holds for every input
 
 The lemmas of `Vego/CostLemmas.lean` quantify over all inputs, and ordinary induction proves them.
 They use no native evaluation, so the corpus does not limit them.
@@ -181,6 +208,9 @@ Vego/Data.lean      the two embedded .vego.json artifacts
 Vego/Core.lean      typed core: resolved names, widths, zero fills
 Vego/Elab.lean      elaborator (checker): raw tree to typed core
 Vego/Interp.lean    operational semantics: heap, traps, fuel, meter
+Vego/PhaseA.lean    the phase A matcher, modeled with its meter
+Vego/PhaseAProofs.lean the phase A contract, proved for every program and subject
+Vego/PhaseALink.lean the model against the interpreted engine on the corpus
 Vego/CostLemmas.lean universal theorems about the cost model
 Vego/MeterSound.lean meter soundness for the whole interpreter
 Vego/Machine.lean   host API: init, call, allocate, read back
@@ -194,6 +224,7 @@ Vego/Theorems.lean  the machine-checked statements
 Main.lean           vegocheck: replay any corpus dump from disk
 SpecMain.lean       speccheck: the specification's verdicts on a corpus dump, with mismatches
 ExhMain.lean        exhaustcheck: the exhaustive sweep, naming the first disagreement
+LinkMain.lean       phasealink: the phase A model against the engine on a corpus dump
 data/               probe.expected, corpus.tsv, localedata.hex
 ```
 
@@ -236,4 +267,5 @@ To find where a change broke things, replay a dump with `vegocheck` instead.
 It enforces the same contract bounds and names the first command that diverges.
 `speccheck data/corpus.tsv` walks a dump under the specification and prints the coverage and every mismatch.
 `exhaustcheck` runs the two exhaustive sweeps and names the first disagreement, and `exhaustcheck 500` limits each sweep to its first 500 patterns.
+`phasealink data/corpus.tsv` runs the phase A model against the engine on a dump and reports the worst ratios of the model's figures to the contract.
 `lean-toolchain` pins the toolchain.

@@ -57,19 +57,31 @@ func prepare(ws *engineWS, n int, k int, ring int) {
 	ws.queue = make([]uint32, 0, 16)
 }
 
-// workspaceHeapBound bounds the bytes prepare and the closure queue can allocate.
+// workspaceHeapBound bounds the bytes prepare, the active lists, the closure queue and the lookahead can allocate.
 // It covers a program of n instructions with k counter slots and the given ring size.
 // It uses fixed 64-bit sizes, so the resource contract reports the same figure on every platform.
 // It must change together with prepare and the workspace fields.
+//
+// The figure is heapFigure of lean/Vego/PhaseA.lean, which lean/Vego/PhaseAProofs.lean proves for every
+// program and subject under the portable growth rule: the bytes of prepare, then for every ring slot the
+// active list growing to n entries, the queue growing to 2n+1 entries, and the lookahead.
 func workspaceHeapBound(n int64, k int64, ring int64) int64 {
-	// Each ring slot holds the stamp, start and active arrays, and the counter matrix.
-	// The active array grows by append, and doubling can leave twice the needed room.
-	heap := cMul(ring, cMul(n, 16+4*k))
-	// The queue and its compaction marks.
-	heap = cAdd(heap, 8*(queueCompactFactor*n+2)+n)
-	// The slot structs, the workspace struct, the three counter vectors, and the lookahead buffer.
-	heap = cAdd(heap, cMul(ring, 112)+256)
-	return cAdd(heap, 12*k+4*maxElemAhead)
+	// prepare: the slot structs, the stamp, start and counter arrays, the compaction marks, the counter
+	// vectors, and the queue with its initial capacity of 16.
+	perSlot := cMul(8, n)
+	if k > 0 {
+		perSlot = cAdd(perSlot, cMul(4, cMul(n, k)))
+	}
+	heap := cAdd(cMul(ring, 104), cMul(ring, perSlot))
+	heap = cAdd(heap, n)
+	if k > 0 {
+		heap = cAdd(heap, 12*k)
+	}
+	heap = cAdd(heap, 64)
+	// The growth of every active list, of the queue, and of the lookahead, at twice the final capacity.
+	heap = cAdd(heap, cMul(ring, cAdd(cMul(16, n), 64)))
+	heap = cAdd(heap, cAdd(cMul(32, n), 272))
+	return heap
 }
 
 // ctrLess compares two counter vectors lexicographically.

@@ -74,17 +74,17 @@ The existing drivers in `rust1/src/main.rs`, `zig1/src/main.zig`, `cpp1/driver.c
 
 The kit runs these steps, in this order, and records each outcome with its duration.
 
-| Step             | Scope   | What it checks                                                                                    |
-| ---------------- | ------- | ------------------------------------------------------------------------------------------------- |
-| generated        | repo    | `revera check-generated`: every generated artifact is current.                                    |
-| corpus           | repo    | Builds the corpus, the stress rounds and the fuzz seed pack, and answers them with the Go engine. |
-| build            | backend | The release build commands succeed and produce the named binaries.                                |
-| probe            | backend | The probe output equals the Go probe report, line by line.                                        |
-| corpus           | backend | The driver answers the 86,704 commands of the fixed corpus exactly like the Go engine.            |
-| stress           | backend | The driver answers `-stress` extra random rounds of 500 patterns, from seed `-seed`.              |
-| fuzz             | backend | The fuzzcase binary runs every seed of the pack and reports the count.                            |
-| checked/`name`/* | backend | Each checked build repeats build, probe, corpus and fuzz, on the quick and light corpus.          |
-| lean-data        | repo    | `lean/data/corpus.tsv` and `lean/data/probe.expected` equal the current corpus and probe report.  |
+| Step             | Scope   | What it checks                                                                                                                                                                       |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| generated        | repo    | `revera check-generated`: every generated artifact is current.                                                                                                                       |
+| corpus           | repo    | Builds the corpus, the stress rounds and the fuzz seed pack, and answers them with the Go engine.                                                                                    |
+| build            | backend | The release build commands succeed and produce the named binaries.                                                                                                                   |
+| probe            | backend | The probe output equals the Go probe report, line by line.                                                                                                                           |
+| corpus           | backend | The driver answers the 86,704 commands of the fixed corpus exactly like the Go engine.                                                                                               |
+| stress           | backend | The driver answers `-stress` extra random rounds of 500 patterns, from seed `-seed`.                                                                                                 |
+| fuzz             | backend | The fuzzcase binary runs every seed of the pack and reports the count.                                                                                                               |
+| checked/`name`/* | backend | Each checked build repeats build, probe, corpus and fuzz, on the quick and light corpus.                                                                                             |
+| lean-data        | repo    | `lean/data/corpus.tsv` and `lean/data/probe.expected` equal the current corpus and probe report.                                                                                     |
 | lean             | repo    | With `-lean`: `lake build`, then `vegocheck data/corpus.tsv` replays the corpus under the proofs, and `speccheck data/corpus.tsv` walks it under the model of the ERE specification. |
 
 `-skip` leaves steps out, by name; a name applies to the release build and to every checked build.

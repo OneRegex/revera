@@ -1601,13 +1601,12 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
         ring = 9i64;
     }
     let heap: i64 = workspaceHeapBound(n, k, ring);
-    let mut payloads: i64 = (n + 1i64);
-    if (k == 0i64) {
-        payloads = std::cmp::min((n + 1i64), cAdd(length, 2i64));
-    }
-    let perPop: i64 = cMul(2i64, (k + 3i64));
-    let perBoundary: i64 = cAdd(cMul(n, cMul(payloads, perPop)), cMul(n, cAdd(atom, (k + 8i64))));
-    let steps: i64 = cMul(cAdd(length, 2i64), perBoundary);
+    let weight: i64 = cAdd(cMul(4i64, k), 22i64);
+    let perTest: i64 = cAdd(cAdd(atom, 2i64), cMul((ring - 1i64), cAdd(cMul(4i64, k), 12i64)));
+    let mut perBoundary: i64 = cMul(weight, cMul((n + 1i64), (n + 1i64)));
+    perBoundary = cAdd(perBoundary, cMul(n, perTest));
+    perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2i64, k)), cAdd(cMul(4i64, ring), 38i64)));
+    let steps: i64 = cAdd(cAdd((24i64 + ring), length), cMul(cAdd(length, 1i64), perBoundary));
     let stack: i64 = 4608i64;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -1879,10 +1878,19 @@ pub fn prepare(mem: &vg::Arena, ws: &mut engineWS, n: i64, k: i64, ring: i64) {
 }
 
 pub fn workspaceHeapBound(n: i64, k: i64, ring: i64) -> i64 {
-    let mut heap: i64 = cMul(ring, cMul(n, (16i64 + (4i64 * k))));
-    heap = cAdd(heap, ((8i64 * ((queueCompactFactor * n) + 2i64)) + n));
-    heap = cAdd(heap, (cMul(ring, 112i64) + 256i64));
-    return cAdd(heap, ((12i64 * k) + 32i64));
+    let mut perSlot: i64 = cMul(8i64, n);
+    if (k > 0i64) {
+        perSlot = cAdd(perSlot, cMul(4i64, cMul(n, k)));
+    }
+    let mut heap: i64 = cAdd(cMul(ring, 104i64), cMul(ring, perSlot));
+    heap = cAdd(heap, n);
+    if (k > 0i64) {
+        heap = cAdd(heap, (12i64 * k));
+    }
+    heap = cAdd(heap, 64i64);
+    heap = cAdd(heap, cMul(ring, cAdd(cMul(16i64, n), 64i64)));
+    heap = cAdd(heap, cAdd(cMul(32i64, n), 272i64));
+    return heap;
 }
 
 pub fn ctrLess(a: vg::Slice<u32>, b: vg::Slice<u32>) -> bool {

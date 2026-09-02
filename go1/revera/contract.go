@@ -171,21 +171,20 @@ func matcherContract(re *Regexp, length int64, atom int64) BackendContract {
 		ring = maxElemAhead + 1
 	}
 
-	// The per-call workspace.
+	// The per-call workspace and everything that grows in it.
 	heap := workspaceHeapBound(n, k, ring)
 
-	// One boundary filters the live list, drains the closure, and runs the consuming transitions.
-	// Epsilon relaxation can revisit an instruction once per distinct payload.
-	// Payloads pass through the closure unchanged, so their count is the live thread count plus the spawn.
-	// With no counters, a payload is a start offset alone.
-	payloads := n + 1
-	if k == 0 {
-		payloads = min(n+1, cAdd(length, 2))
-	}
-	perPop := cMul(2, k+3)
-	perBoundary := cAdd(cMul(n, cMul(payloads, perPop)),
-		cMul(n, cAdd(atom, k+8)))
-	steps := cMul(cAdd(length, 2), perBoundary)
+	// The step figure is stepsFigure of lean/Vego/PhaseA.lean, which lean/Vego/PhaseAProofs.lean proves for
+	// every program and subject.
+	// One boundary pays for its closure, priced by a potential of (n+1)^2 units at weight 4k+22 each, which
+	// covers every pop, every relaxation and every compaction; for its consuming transitions, one test and
+	// up to ring-1 arrivals per live instruction; and for its fixed work.
+	weight := cAdd(cMul(4, k), 22)
+	perTest := cAdd(cAdd(atom, 2), cMul(ring-1, cAdd(cMul(4, k), 12)))
+	perBoundary := cMul(weight, cMul(n+1, n+1))
+	perBoundary = cAdd(perBoundary, cMul(n, perTest))
+	perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2, k)), cAdd(cMul(4, ring), 38)))
+	steps := cAdd(cAdd(24+ring, length), cMul(cAdd(length, 1), perBoundary))
 
 	// A multi-character equivalence test recurses once per element character.
 	stack := int64(matcherStackBytes) + equivFrames*frameBytes

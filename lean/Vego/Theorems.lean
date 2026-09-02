@@ -48,6 +48,10 @@ What the theorems say:
    The figures of the extreme cases still compare against the Go reference.
    `Vego.Corpus` records the measurements behind that choice, and the proposition re-checks its own coverage.
 
+6. `phaseA_link_agrees`, with `PhaseA.run_steps_le` and `PhaseA.run_heap_le` of `Vego/PhaseAProofs.lean`.
+   The model of the phase A matcher in `Vego/PhaseA.lean` is bounded for every program and subject by the heap and step figures the contract reports, by ordinary induction and a potential argument on the closure.
+   The link theorem checks the model against the interpreted engine on the corpus, result, bytes and loop meter, and checks the engine's contract figures against the proven ones.
+
 5. `spec_agrees_with_corpus`, `engine_meets_spec_on_corpus` and `engine_meets_spec_exhaustively`.
    The `Ere` library is a model of the ERE specification, written from its text.
    The first theorem says that the recorded output of every corpus command the specification constrains meets the specification's verdict, at a pinned coverage.
@@ -59,6 +63,8 @@ import Vego.Probe
 import Vego.Corpus
 import Vego.SpecCheck
 import Vego.Exhaustive
+import Vego.PhaseALink
+import Vego.PhaseAProofs
 
 namespace Vego
 
@@ -140,6 +146,20 @@ compile flag combinations and all four execution flag combinations on subjects w
 uppercase letters. `coverageStructure` and `coverageFlags` pin the sizes.
 -/
 theorem engine_meets_spec_exhaustively : exhaustiveAgrees () = true := by
+  native_decide
+
+/--
+The phase A model against the interpreted engine, on every corpus execution that runs phase A alone.
+The model reproduces the engine's match result, allocates exactly the bytes the engine allocates, and its
+step figure dominates the engine's loop meter. On every `T` command of such a pattern, the heap and step
+figures the engine reports are the figures `Vego/PhaseAProofs.lean` proves for the model.
+`linkCoverage` pins how many executions and contract queries that is.
+
+With `PhaseA.run_steps_le` and `PhaseA.run_heap_le`, which quantify over every program, atom test and
+subject, this closes the chain from the shipped contract to a proof: the figures `ContractFor` computes for
+phase A are the proven bounds of the algorithm the corpus shows the engine to be running.
+-/
+theorem phaseA_link_agrees : PhaseA.linkAgrees () = true := by
   native_decide
 
 /--

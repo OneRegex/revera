@@ -19675,53 +19675,62 @@
     {
      "k": "define",
      "names": [
-      "payloads"
+      "weight"
      ],
      "value": {
-      "k": "binary",
-      "op": "+",
-      "x": {
-       "k": "ident",
-       "name": "n"
-      },
-      "y": {
-       "k": "int",
-       "value": "1"
-      }
+      "args": [
+       {
+        "args": [
+         {
+          "k": "int",
+          "value": "4"
+         },
+         {
+          "k": "ident",
+          "name": "k"
+         }
+        ],
+        "fn": "cMul",
+        "k": "call"
+       },
+       {
+        "k": "int",
+        "value": "22"
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
      }
     },
     {
-     "cond": {
-      "k": "binary",
-      "op": "==",
-      "x": {
-       "k": "ident",
-       "name": "k"
-      },
-      "y": {
-       "k": "int",
-       "value": "0"
-      }
-     },
-     "else": null,
-     "k": "if",
-     "then": [
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "ident",
-         "name": "payloads"
-        }
-       ],
-       "value": {
+     "k": "define",
+     "names": [
+      "perTest"
+     ],
+     "value": {
+      "args": [
+       {
+        "args": [
+         {
+          "k": "ident",
+          "name": "atom"
+         },
+         {
+          "k": "int",
+          "value": "2"
+         }
+        ],
+        "fn": "cAdd",
+        "k": "call"
+       },
+       {
         "args": [
          {
           "k": "binary",
-          "op": "+",
+          "op": "-",
           "x": {
            "k": "ident",
-           "name": "n"
+           "name": "ring"
           },
           "y": {
            "k": "int",
@@ -19731,108 +19740,22 @@
          {
           "args": [
            {
-            "k": "ident",
-            "name": "length"
+            "args": [
+             {
+              "k": "int",
+              "value": "4"
+             },
+             {
+              "k": "ident",
+              "name": "k"
+             }
+            ],
+            "fn": "cMul",
+            "k": "call"
            },
            {
             "k": "int",
-            "value": "2"
-           }
-          ],
-          "fn": "cAdd",
-          "k": "call"
-         }
-        ],
-        "fn": "min",
-        "k": "builtin",
-        "spread": false,
-        "type": null
-       }
-      }
-     ]
-    },
-    {
-     "k": "define",
-     "names": [
-      "perPop"
-     ],
-     "value": {
-      "args": [
-       {
-        "k": "int",
-        "value": "2"
-       },
-       {
-        "k": "binary",
-        "op": "+",
-        "x": {
-         "k": "ident",
-         "name": "k"
-        },
-        "y": {
-         "k": "int",
-         "value": "3"
-        }
-       }
-      ],
-      "fn": "cMul",
-      "k": "call"
-     }
-    },
-    {
-     "k": "define",
-     "names": [
-      "perBoundary"
-     ],
-     "value": {
-      "args": [
-       {
-        "args": [
-         {
-          "k": "ident",
-          "name": "n"
-         },
-         {
-          "args": [
-           {
-            "k": "ident",
-            "name": "payloads"
-           },
-           {
-            "k": "ident",
-            "name": "perPop"
-           }
-          ],
-          "fn": "cMul",
-          "k": "call"
-         }
-        ],
-        "fn": "cMul",
-        "k": "call"
-       },
-       {
-        "args": [
-         {
-          "k": "ident",
-          "name": "n"
-         },
-         {
-          "args": [
-           {
-            "k": "ident",
-            "name": "atom"
-           },
-           {
-            "k": "binary",
-            "op": "+",
-            "x": {
-             "k": "ident",
-             "name": "k"
-            },
-            "y": {
-             "k": "int",
-             "value": "8"
-            }
+            "value": "12"
            }
           ],
           "fn": "cAdd",
@@ -19850,6 +19773,158 @@
     {
      "k": "define",
      "names": [
+      "perBoundary"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "weight"
+       },
+       {
+        "args": [
+         {
+          "k": "binary",
+          "op": "+",
+          "x": {
+           "k": "ident",
+           "name": "n"
+          },
+          "y": {
+           "k": "int",
+           "value": "1"
+          }
+         },
+         {
+          "k": "binary",
+          "op": "+",
+          "x": {
+           "k": "ident",
+           "name": "n"
+          },
+          "y": {
+           "k": "int",
+           "value": "1"
+          }
+         }
+        ],
+        "fn": "cMul",
+        "k": "call"
+       }
+      ],
+      "fn": "cMul",
+      "k": "call"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "perBoundary"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "perBoundary"
+       },
+       {
+        "args": [
+         {
+          "k": "ident",
+          "name": "n"
+         },
+         {
+          "k": "ident",
+          "name": "perTest"
+         }
+        ],
+        "fn": "cMul",
+        "k": "call"
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "perBoundary"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "perBoundary"
+       },
+       {
+        "args": [
+         {
+          "args": [
+           {
+            "k": "ident",
+            "name": "n"
+           },
+           {
+            "args": [
+             {
+              "k": "int",
+              "value": "2"
+             },
+             {
+              "k": "ident",
+              "name": "k"
+             }
+            ],
+            "fn": "cMul",
+            "k": "call"
+           }
+          ],
+          "fn": "cAdd",
+          "k": "call"
+         },
+         {
+          "args": [
+           {
+            "args": [
+             {
+              "k": "int",
+              "value": "4"
+             },
+             {
+              "k": "ident",
+              "name": "ring"
+             }
+            ],
+            "fn": "cMul",
+            "k": "call"
+           },
+           {
+            "k": "int",
+            "value": "38"
+           }
+          ],
+          "fn": "cAdd",
+          "k": "call"
+         }
+        ],
+        "fn": "cAdd",
+        "k": "call"
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
+     }
+    },
+    {
+     "k": "define",
+     "names": [
       "steps"
      ],
      "value": {
@@ -19857,23 +19932,51 @@
        {
         "args": [
          {
-          "k": "ident",
-          "name": "length"
+          "k": "binary",
+          "op": "+",
+          "x": {
+           "k": "int",
+           "value": "24"
+          },
+          "y": {
+           "k": "ident",
+           "name": "ring"
+          }
          },
          {
-          "k": "int",
-          "value": "2"
+          "k": "ident",
+          "name": "length"
          }
         ],
         "fn": "cAdd",
         "k": "call"
        },
        {
-        "k": "ident",
-        "name": "perBoundary"
+        "args": [
+         {
+          "args": [
+           {
+            "k": "ident",
+            "name": "length"
+           },
+           {
+            "k": "int",
+            "value": "1"
+           }
+          ],
+          "fn": "cAdd",
+          "k": "call"
+         },
+         {
+          "k": "ident",
+          "name": "perBoundary"
+         }
+        ],
+        "fn": "cMul",
+        "k": "call"
        }
       ],
-      "fn": "cMul",
+      "fn": "cAdd",
       "k": "call"
      }
     },
@@ -24518,43 +24621,17 @@
     {
      "k": "define",
      "names": [
-      "heap"
+      "perSlot"
      ],
      "value": {
       "args": [
        {
-        "k": "ident",
-        "name": "ring"
+        "k": "int",
+        "value": "8"
        },
        {
-        "args": [
-         {
-          "k": "ident",
-          "name": "n"
-         },
-         {
-          "k": "binary",
-          "op": "+",
-          "x": {
-           "k": "int",
-           "value": "16"
-          },
-          "y": {
-           "k": "binary",
-           "op": "*",
-           "x": {
-            "k": "int",
-            "value": "4"
-           },
-           "y": {
-            "k": "ident",
-            "name": "k"
-           }
-          }
-         }
-        ],
-        "fn": "cMul",
-        "k": "call"
+        "k": "ident",
+        "name": "n"
        }
       ],
       "fn": "cMul",
@@ -24562,54 +24639,100 @@
      }
     },
     {
-     "k": "assign",
-     "lhs": [
-      {
+     "cond": {
+      "k": "binary",
+      "op": "\u003e",
+      "x": {
        "k": "ident",
-       "name": "heap"
+       "name": "k"
+      },
+      "y": {
+       "k": "int",
+       "value": "0"
       }
-     ],
-     "value": {
-      "args": [
-       {
-        "k": "ident",
-        "name": "heap"
-       },
-       {
-        "k": "binary",
-        "op": "+",
-        "x": {
-         "k": "binary",
-         "op": "*",
-         "x": {
-          "k": "int",
-          "value": "8"
-         },
-         "y": {
-          "k": "binary",
-          "op": "+",
-          "x": {
-           "k": "binary",
-           "op": "*",
-           "x": {
-            "k": "ident",
-            "name": "queueCompactFactor"
-           },
-           "y": {
-            "k": "ident",
-            "name": "n"
-           }
-          },
-          "y": {
-           "k": "int",
-           "value": "2"
-          }
-         }
-        },
-        "y": {
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
          "k": "ident",
-         "name": "n"
+         "name": "perSlot"
         }
+       ],
+       "value": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "perSlot"
+         },
+         {
+          "args": [
+           {
+            "k": "int",
+            "value": "4"
+           },
+           {
+            "args": [
+             {
+              "k": "ident",
+              "name": "n"
+             },
+             {
+              "k": "ident",
+              "name": "k"
+             }
+            ],
+            "fn": "cMul",
+            "k": "call"
+           }
+          ],
+          "fn": "cMul",
+          "k": "call"
+         }
+        ],
+        "fn": "cAdd",
+        "k": "call"
+       }
+      }
+     ]
+    },
+    {
+     "k": "define",
+     "names": [
+      "heap"
+     ],
+     "value": {
+      "args": [
+       {
+        "args": [
+         {
+          "k": "ident",
+          "name": "ring"
+         },
+         {
+          "k": "int",
+          "value": "104"
+         }
+        ],
+        "fn": "cMul",
+        "k": "call"
+       },
+       {
+        "args": [
+         {
+          "k": "ident",
+          "name": "ring"
+         },
+         {
+          "k": "ident",
+          "name": "perSlot"
+         }
+        ],
+        "fn": "cMul",
+        "k": "call"
        }
       ],
       "fn": "cAdd",
@@ -24631,26 +24754,8 @@
         "name": "heap"
        },
        {
-        "k": "binary",
-        "op": "+",
-        "x": {
-         "args": [
-          {
-           "k": "ident",
-           "name": "ring"
-          },
-          {
-           "k": "int",
-           "value": "112"
-          }
-         ],
-         "fn": "cMul",
-         "k": "call"
-        },
-        "y": {
-         "k": "int",
-         "value": "256"
-        }
+        "k": "ident",
+        "name": "n"
        }
       ],
       "fn": "cAdd",
@@ -24658,18 +24763,36 @@
      }
     },
     {
-     "k": "return",
-     "values": [
+     "cond": {
+      "k": "binary",
+      "op": "\u003e",
+      "x": {
+       "k": "ident",
+       "name": "k"
+      },
+      "y": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
       {
-       "args": [
+       "k": "assign",
+       "lhs": [
         {
          "k": "ident",
          "name": "heap"
-        },
-        {
-         "k": "binary",
-         "op": "+",
-         "x": {
+        }
+       ],
+       "value": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "heap"
+         },
+         {
           "k": "binary",
           "op": "*",
           "x": {
@@ -24680,23 +24803,139 @@
            "k": "ident",
            "name": "k"
           }
-         },
-         "y": {
-          "k": "binary",
-          "op": "*",
-          "x": {
-           "k": "int",
-           "value": "4"
-          },
-          "y": {
-           "k": "ident",
-           "name": "maxElemAhead"
-          }
          }
-        }
-       ],
-       "fn": "cAdd",
-       "k": "call"
+        ],
+        "fn": "cAdd",
+        "k": "call"
+       }
+      }
+     ]
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "heap"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "heap"
+       },
+       {
+        "k": "int",
+        "value": "64"
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "heap"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "heap"
+       },
+       {
+        "args": [
+         {
+          "k": "ident",
+          "name": "ring"
+         },
+         {
+          "args": [
+           {
+            "args": [
+             {
+              "k": "int",
+              "value": "16"
+             },
+             {
+              "k": "ident",
+              "name": "n"
+             }
+            ],
+            "fn": "cMul",
+            "k": "call"
+           },
+           {
+            "k": "int",
+            "value": "64"
+           }
+          ],
+          "fn": "cAdd",
+          "k": "call"
+         }
+        ],
+        "fn": "cMul",
+        "k": "call"
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "heap"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "heap"
+       },
+       {
+        "args": [
+         {
+          "args": [
+           {
+            "k": "int",
+            "value": "32"
+           },
+           {
+            "k": "ident",
+            "name": "n"
+           }
+          ],
+          "fn": "cMul",
+          "k": "call"
+         },
+         {
+          "k": "int",
+          "value": "272"
+         }
+        ],
+        "fn": "cAdd",
+        "k": "call"
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "heap"
       }
      ]
     }

@@ -39,6 +39,7 @@ A C locale runtime and its generated CLDR tables supply the character classes, c
   It proves that the shipped JSON artifacts are well formed.
   It checks that the embedded probe and selected corpus executions reproduce the Go reference outputs and stay inside their resource contracts.
   It also states the specification itself as a Lean definition, and proves that the interpreted engine meets it on every covered corpus command and on an exhaustive small domain.
+  The resource contract of the phase A matcher is proved for every program and subject, and the engine computes the proven figures.
 
 Each directory has a README that states its own API and how to verify it.
 

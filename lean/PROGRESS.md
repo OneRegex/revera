@@ -80,6 +80,16 @@
   A closed top-level term is evaluated when its module loads, so an executable that imported `Vego.Corpus` took eight minutes to start; the replay now takes a `Unit` argument, and the corpus data lives in `Vego.CorpusData`.
   A module that is not precompiled runs under the IR interpreter inside `native_decide`, which made the specification walk many times slower than the executable; the `Ere` library and the check modules are now precompiled through the `Vego` root.
 
+- The phase A contract was not sound before this work.
+  An adversarial calibration run with `vegocheck --contracts` found `(a{0,8}){0,8}b` on `aaaaaaaa` allocating 7546 bytes against a heap figure of 7290, because the contract folded the append doubling of the active lists and of the queue in too tightly.
+  The per-pop step budget was also below the interpreted cost of a split pop.
+  The corpus never reached either, which is exactly what a corpus-bound check cannot see.
+- The fix is a proof.
+  `Vego/PhaseA.lean` models phase A with a meter, and `Vego/PhaseAProofs.lean` bounds it for every program and subject.
+  The closure is bounded by a potential over the payloads known at a boundary, the buffers by the growth rule, and `contract.go` now computes exactly the proven figures.
+  The link theorem checks the model against the interpreted engine on 47922 corpus executions, result, bytes and loop meter, and checks the engine's `T` figures against the proven ones.
+- Proof engineering lessons: a `let` inside a definition blocks `split` and `rw`, so the model is written as named steps; `split` uses hypotheses like `pc < n` to reduce `getD`, so clear them first; `omega` treats syntactically different closed terms as different atoms, so equalities between model states need `generalize` or unification through `exact`; `set` is not in core Lean.
+
 ## Status
 
 - [x] AST + total JSON decoder.
@@ -112,6 +122,7 @@
 - [x] `engine_meets_spec_on_corpus`: the composition with the corpus theorem
 - [x] `engine_meets_spec_exhaustively`: 42128 compiles and 1576896 executions of the interpreted engine against the specification on an exhaustive small domain
 - [x] `speccheck` and `exhaustcheck` executables for diagnosis
+- [x] `Vego/PhaseA.lean` and `Vego/PhaseAProofs.lean`: the phase A contract proved for every program and subject, `contract.go` updated to the proven figures, and `phaseA_link_agrees` checking the model and the figures against the engine on the corpus
 - [x] Meter soundness for the whole interpreter, in Vego/MeterSound.lean.
   One mutual induction on fuel proves that no counter ever decreases.
   It also proves that the call depth balances across every successful call, up to the harness corollary callIdx_meterOK.

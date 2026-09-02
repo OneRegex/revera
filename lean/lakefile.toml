@@ -50,3 +50,7 @@ root = "SpecMain"
 [[lean_exe]]
 name = "exhaustcheck"
 root = "ExhMain"
+
+[[lean_exe]]
+name = "phasealink"
+root = "LinkMain"

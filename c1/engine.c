@@ -1085,23 +1085,30 @@ revera_eng_BackendContract revera_eng_matcherContract(revera_eng_Regexp *re, int
         ring = 9LL;
     }
     int64_t heap = revera_eng_workspaceHeapBound(n, k, ring);
-    int64_t payloads = (n + 1LL);
-    if ((k == 0LL)) {
-        int64_t _t1 = (n + 1LL);
-        int64_t _t2 = revera_eng_cAdd(length, 2LL);
-        payloads = vg_min_i64(_t1, _t2);
-    }
-    int64_t perPop = revera_eng_cMul(2LL, (k + 3LL));
-    int64_t _t3 = n;
-    int64_t _t4 = revera_eng_cMul(payloads, perPop);
-    int64_t _t5 = revera_eng_cMul(_t3, _t4);
-    int64_t _t6 = n;
-    int64_t _t7 = revera_eng_cAdd(atom, (k + 8LL));
-    int64_t _t8 = revera_eng_cMul(_t6, _t7);
-    int64_t perBoundary = revera_eng_cAdd(_t5, _t8);
-    int64_t _t9 = revera_eng_cAdd(length, 2LL);
-    int64_t _t10 = perBoundary;
-    int64_t steps = revera_eng_cMul(_t9, _t10);
+    int64_t weight = revera_eng_cAdd(revera_eng_cMul(4LL, k), 22LL);
+    int64_t _t1 = revera_eng_cAdd(atom, 2LL);
+    int64_t _t2 = (ring - 1LL);
+    int64_t _t3 = revera_eng_cAdd(revera_eng_cMul(4LL, k), 12LL);
+    int64_t _t4 = revera_eng_cMul(_t2, _t3);
+    int64_t perTest = revera_eng_cAdd(_t1, _t4);
+    int64_t _t5 = weight;
+    int64_t _t6 = revera_eng_cMul((n + 1LL), (n + 1LL));
+    int64_t perBoundary = revera_eng_cMul(_t5, _t6);
+    int64_t _t7 = perBoundary;
+    int64_t _t8 = revera_eng_cMul(n, perTest);
+    perBoundary = revera_eng_cAdd(_t7, _t8);
+    int64_t _t9 = perBoundary;
+    int64_t _t10 = n;
+    int64_t _t11 = revera_eng_cMul(2LL, k);
+    int64_t _t12 = revera_eng_cAdd(_t10, _t11);
+    int64_t _t13 = revera_eng_cAdd(revera_eng_cMul(4LL, ring), 38LL);
+    int64_t _t14 = revera_eng_cAdd(_t12, _t13);
+    perBoundary = revera_eng_cAdd(_t9, _t14);
+    int64_t _t15 = revera_eng_cAdd((24LL + ring), length);
+    int64_t _t16 = revera_eng_cAdd(length, 1LL);
+    int64_t _t17 = perBoundary;
+    int64_t _t18 = revera_eng_cMul(_t16, _t17);
+    int64_t steps = revera_eng_cAdd(_t15, _t18);
     int64_t stack = 4608LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -1409,14 +1416,29 @@ void revera_eng_prepare(vg_arena *mem, revera_eng_engineWS *ws, int64_t n, int64
 }
 
 int64_t revera_eng_workspaceHeapBound(int64_t n, int64_t k, int64_t ring) {
-    int64_t _t1 = ring;
-    int64_t _t2 = revera_eng_cMul(n, (16LL + (4LL * k)));
-    int64_t heap = revera_eng_cMul(_t1, _t2);
-    heap = revera_eng_cAdd(heap, ((8LL * ((revera_eng_queueCompactFactor * n) + 2LL)) + n));
-    int64_t _t3 = heap;
-    int64_t _t4 = (revera_eng_cMul(ring, 112LL) + 256LL);
-    heap = revera_eng_cAdd(_t3, _t4);
-    return revera_eng_cAdd(heap, ((12LL * k) + 32LL));
+    int64_t perSlot = revera_eng_cMul(8LL, n);
+    if ((k > 0LL)) {
+        int64_t _t1 = perSlot;
+        int64_t _t2 = revera_eng_cMul(4LL, revera_eng_cMul(n, k));
+        perSlot = revera_eng_cAdd(_t1, _t2);
+    }
+    int64_t _t3 = revera_eng_cMul(ring, 104LL);
+    int64_t _t4 = revera_eng_cMul(ring, perSlot);
+    int64_t heap = revera_eng_cAdd(_t3, _t4);
+    heap = revera_eng_cAdd(heap, n);
+    if ((k > 0LL)) {
+        heap = revera_eng_cAdd(heap, (12LL * k));
+    }
+    heap = revera_eng_cAdd(heap, 64LL);
+    int64_t _t5 = heap;
+    int64_t _t6 = ring;
+    int64_t _t7 = revera_eng_cAdd(revera_eng_cMul(16LL, n), 64LL);
+    int64_t _t8 = revera_eng_cMul(_t6, _t7);
+    heap = revera_eng_cAdd(_t5, _t8);
+    int64_t _t9 = heap;
+    int64_t _t10 = revera_eng_cAdd(revera_eng_cMul(32LL, n), 272LL);
+    heap = revera_eng_cAdd(_t9, _t10);
+    return heap;
 }
 
 bool revera_eng_ctrLess(revera_eng_slice_u32 a, revera_eng_slice_u32 b) {
