@@ -4,6 +4,7 @@ This directory is the C++20 port of the Revera engine, a POSIX ERE regex engine 
 
 `engine.hpp` and `engine.cpp` are generated from `revera.vego.json` at the repository root by `vegoc emit cpp`.
 Do not edit them.
+
 The hand-written files are the public API and the minimal runtime that the Vego specification asks every target to supply.
 
 ## Using it
@@ -46,9 +47,11 @@ See `../README.md`.
 
 `revera.cpp` and `host.hpp` carry `data.bin`, the CLDR locale tables, inside the binary.
 `locale_data.hpp` picks how the bytes get there.
+
 When `REVERA_LOCALE_DATA_INC` is defined, it includes that file, which must list the bytes as `0x..,` items.
 Otherwise it uses `#embed`, which needs clang 19 or gcc 15.
 The Makefile relies on `#embed`.
+
 The CMake build writes the byte list at configure time, so it works with any clang or gcc release that speaks C++20.
 The arrays are `unsigned char`, because list-initialization of `char` from a value above 127 is a narrowing error in C++.
 
@@ -90,6 +93,7 @@ The same thing from the repository root is `make generate GENERATION_TARGETS=cpp
 The Makefile invokes `$(CXX)`, normally `c++`, with `-std=c++20 -O2 -fwrapv` and keeps its assertions on.
 Because this build uses `#embed`, `CXX` must resolve to Clang 19 or GCC 15 or later.
 Override it explicitly when necessary, for example `make CXX=clang++-19 all`.
+
 C++20 defines narrowing conversions to signed types as modular, and `-fwrapv` defines signed overflow.
 Integer arithmetic therefore matches Go exactly.
 The printer also casts every result narrower than 64 bits back to its Vego type, which defeats integer promotion.
@@ -111,6 +115,7 @@ printf 'P\nB m match 100 3 0 28617c62292b 616261626162 2d\n' | ./bench
 `dev/internal/protocol/fuzz.go` defines the input format.
 One input selects the locale and the flags, then compiles, executes, replaces, iterates and asks for the contract.
 It ignores every result, because freedom from crashes is the property.
+
 `fuzzcase <packfile>` replays a pack of recorded inputs through the same entry point and prints the input count.
 A record is a 4-byte little-endian length followed by that many bytes.
 

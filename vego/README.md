@@ -64,7 +64,8 @@ To integrate it, add a printer here, a hand-written runtime and public API in it
 
 The Vego toolchain has its own SemVer, starting at 0.1.0, which `vegoc version` prints.
 The IR carries its compatibility major in the `"vego": 1` field.
-The Revera engine releases move on a third axis, shared by the five implementations.
+
+Meanwhile, the Revera engine releases move on a third axis, shared by the five implementations.
 
 ## License
 

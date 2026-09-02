@@ -21,8 +21,9 @@ A C++ project that links `Revera::CXX` does not need `Revera::C`.
 
 The package needs CMake 3.21 or later and either Clang or GCC.
 The CMake build stops on any other compiler.
+
 The engines rely on wrapping signed arithmetic, and the build passes `-fwrapv` to both compilers.
-The generated engines and the locale data are part of the tree, so the build needs no Go toolchain.
+Because the generated engines and locale data are already part of the tree, the build needs no Go toolchain.
 
 ## Build, test, and install
 
@@ -54,9 +55,10 @@ The install puts these files under the prefix:
 
 Both engines carry `data.bin`, the CLDR locale tables, inside the library.
 The plain Makefiles load it with `#embed`, which needs clang 19 or gcc 15.
+
 The CMake build does not depend on that.
 At configure time it turns `data.bin` into a byte list in `build/revera_locale_data.inc` and compiles the two libraries with `REVERA_LOCALE_DATA_INC` set to that file.
-Any clang or gcc release that speaks C11 and C++20 can build the package this way.
+This lets any clang or gcc release that speaks C11 and C++20 build the package.
 
 The option `REVERA_USE_EMBED` turns this off and lets `#embed` do the work:
 
@@ -118,6 +120,8 @@ The port READMEs give the commands.
 
 From the repository root, `make dist` creates `tmp/dist/revera-native-VERSION.tar.gz` from the recorded commit.
 The archive holds this CMake project, both public APIs, the generated engines, `data.bin`, tests, and copies of the MIT and Unicode License v3 texts.
-A consumer unpacks its single top-level directory and runs the CMake commands above.
+
+After unpacking its single top-level directory, a consumer can run the CMake commands above.
 The release command refuses tracked changes, an undated changelog entry, stale license copies, or a version in `CMakeLists.txt` that differs from the Zig or Cargo manifest.
+
 `ReveraConfigVersion.cmake` reports that version to `find_package`, and CMake installs both license files under `share/doc/revera/`.

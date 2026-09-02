@@ -4,6 +4,7 @@ This directory is the C11 port of the Revera engine, a POSIX ERE regex engine wi
 
 `engine.h` and `engine.c` are generated from `revera.vego.json` at the repository root by `vegoc emit c`.
 Do not edit them.
+
 The hand-written files are the public API and the minimal runtime that the Vego specification asks every target to supply.
 
 ## Using it
@@ -30,9 +31,12 @@ The generated engine, its arenas, and its numeric flags stay out of sight.
 
 The API uses opaque locale, regular-expression and iterator handles.
 Functions report engine or input failures through a null pointer or `false`, and the calls that accept a `revera_error` fill it with a status, optional byte offset and static message.
+
 Offsets and string lengths are byte counts.
 A `revera_match` stores offsets into the subject rather than a pointer to it.
-An iterator borrows its regular expression and subject until `revera_iterator_free`, while replacement functions return memory that the caller frees with `free`.
+
+An iterator borrows its regular expression and subject until `revera_iterator_free`.
+By contrast, replacement functions return memory that the caller frees with `free`.
 
 - `revera_matches`, `revera_find` and `revera_captures` perform one search.
 - `revera_iterator_new` and `revera_iterator_next` enumerate non-overlapping matches.
@@ -47,9 +51,11 @@ See `../README.md`.
 
 `revera.c` and `host.h` carry `data.bin`, the CLDR locale tables, inside the binary.
 `locale_data.h` picks how the bytes get there.
+
 When `REVERA_LOCALE_DATA_INC` is defined, it includes that file, which must list the bytes as `0x..,` items.
 Otherwise it uses `#embed`, which needs clang 19 or gcc 15.
 The Makefile relies on `#embed`.
+
 The CMake build writes the byte list at configure time, so it works with any clang or gcc release that speaks C11.
 The arrays are `unsigned char`, so a byte above 127 in the list raises no overflow warning from gcc.
 
@@ -91,6 +97,7 @@ The same thing from the repository root is `make generate GENERATION_TARGETS=c`.
 The Makefile invokes `$(CC)`, normally `cc`, with `-std=c11 -O2 -fwrapv` and keeps its assertions on.
 Because this build uses `#embed`, `CC` must resolve to Clang 19 or GCC 15 or later.
 Override it explicitly when necessary, for example `make CC=clang-19 all`.
+
 The printer casts every result narrower than 64 bits back to its Vego type, which defeats integer promotion.
 It lowers signed division overflow and signed left shifts through defined unsigned arithmetic.
 
@@ -110,6 +117,7 @@ printf 'P\nB m match 100 3 0 28617c62292b 616261626162 2d\n' | ./bench
 `dev/internal/protocol/fuzz.go` defines the input format.
 One input selects the locale and flags, then compiles, executes, replaces, iterates, and asks for the contract.
 It ignores every result because freedom from crashes is the property.
+
 `fuzzcase <packfile>` replays a pack of recorded inputs through the same entry point and prints the input count.
 A record is a 4-byte little-endian length followed by that many bytes.
 
