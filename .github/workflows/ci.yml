@@ -130,6 +130,13 @@ jobs:
       - uses: mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ts/package.json
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - name: The TypeScript type check needs the dev dependencies
+        run: cd ts && npm ci
       - name: Install clang 19, which the native Makefiles need for #embed
         run: |
           wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 19
