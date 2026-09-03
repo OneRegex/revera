@@ -1,188 +1,284 @@
 # Revera for Rust
 
-Revera is a POSIX.1-2024 extended regular expression engine.
-This directory is the Rust instantiation and the source of the `revera` crate for crates.io.
+Revera is a POSIX.1-2024 extended regular expression engine for UTF-8 strings.
+It is useful when you need POSIX matching semantics, including leftmost-longest matching, locale-aware bracket expressions, and consistent behavior across Rust, Go, Zig, C, C++, and TypeScript.
 
-The same engine exists in Go, Rust, Zig, C, C++ and TypeScript, generated from one Vego source and exercised by one cross-language conformance suite.
-In addition, the Lean development gives Vego machine-checked semantics, and the repository's Lean README states its exact proof coverage.
+[API documentation](https://docs.rs/revera) | [Source repository](https://github.com/oneregex/revera)
 
-The engine speaks the POSIX ERE language: leftmost-longest matching, no backreferences, no Perl escapes.
-Therefore, it is the engine to reach for when a pattern must mean the same thing as it does in `regcomp()` and `regexec()`.
-For package discovery, the crate keywords are regex, posix, ere and regular-expressions.
+## Installation
 
-## Using it
+Add Revera to your `Cargo.toml`:
+
+```toml
+[dependencies]
+revera = "0.1"
+```
+
+The crate has no Cargo dependencies or feature flags.
+Its CLDR locale data is embedded, so applications do not need a data file at runtime.
+
+## Quick start
+
+Compile a `Regex` once and reuse it for as many subjects as you need:
 
 ```rust
-let re = revera::Regex::new("([a-z]+)([0-9]*)")?;
-let caps = re.captures("__abc12__")?.expect("a match");
-assert_eq!(&caps[1], "abc");
+use revera::Regex;
+
+fn main() -> revera::Result<()> {
+    let re = Regex::new(r"([[:alpha:]]+)-([[:digit:]]+)")?;
+
+    let caps = re.captures("item-42")?.expect("the example must match");
+    assert_eq!(&caps[0], "item-42");
+    assert_eq!(&caps[1], "item");
+    assert_eq!(&caps[2], "42");
+
+    Ok(())
+}
 ```
 
-`src/lib.rs` is the crate root and the whole public surface.
+`Regex::new` uses the POSIX locale and the default matching options.
 
-- `Regex` compiles a pattern and searches.
-  A search takes `&self` and keeps no state between calls, so a `Regex` is `Send` and `Sync`.
-- `find` and `captures` return `Result<Option<_>>`.
-  A subject that does not match gives `None`, and only a real failure gives `Err`.
-  `Match` borrows the subject and offers `as_str`, `range`, `start` and `end`.
-- `find_iter` and `captures_iter` are lazy iterators over the non-overlapping matches.
-- `Error` implements `std::error::Error`.
-  `Error::kind` returns an `ErrorKind` variant, and `Error::offset` returns an optional byte offset.
-  Compilation offsets refer to the pattern, while replacement syntax offsets refer to the replacement text.
-- `RegexBuilder` carries the options: `RegexBuilder::new("ab+").case_insensitive(true).build()?`.
-- `Locale::open("cs", "")` selects a CLDR locale for bracket expressions.
-  The default is POSIX.
-- `re.contract(max_input)` reports what one search can cost, before it runs.
+Use `RegexBuilder` when you need case-insensitive matching, newline-sensitive anchors, shortest-preferring repetition, a different locale, or a yes-or-no-only expression.
 
-The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not exposed by this crate.
+## Pattern syntax and matching rules
 
-## Layout
+Revera accepts POSIX ERE syntax, including alternation (`a|b`), groups (`(...)`), bracket expressions, anchors, and the `*`, `+`, `?`, and `{m,n}` repetition forms.
+Interval bounds may be no greater than `revera::DUP_MAX`.
 
-The directory is a Cargo workspace with two packages.
-The root package is the library, and it is the only one that ships.
-The second package, `tools`, holds the binaries that the conformance kit and the bench harness drive.
+POSIX.1-2024 shortest-preferring repetition forms such as `*?`, `+?`, `??`, and `{m,n}?` are also supported.
 
-```
-|-------------------------------|-------------------------------------------------|
-| Path                            | Role                                              |
-| ------------------------------- | ------------------------------------------------- |
-| src/lib.rs                      | The public API. It embeds data.bin.               |
-| src/engine.rs                   | The generated engine. Do not edit it.             |
-| src/probe_engine.rs             | The generated probe. Do not edit it.              |
-| src/vg.rs                       | The runtime the Vego specification asks for.      |
-| src/data.bin                    | The CLDR locale blob.                             |
-| tests/api.rs                    | Tests of the public API.                          |
-| tools/src/main.rs               | The differential driver.                          |
-| tools/src/probe_main.rs         | The probe runner.                                 |
-| tools/src/bench_main.rs         | The bench driver.                                 |
-| tools/src/fuzz.rs               | The fuzz entry point.                             |
-| tools/src/fuzzcase_main.rs      | The seed pack runner.                             |
-| tools/src/host.rs               | What the binaries share: blob, loader, hex.       |
-| fuzz/                           | A cargo-fuzz crate over the same entry point.     |
-| backend.json                    | How the conformance kit builds and runs this.     |
-| asan-build.sh                   | The AddressSanitizer build of the tools.          |
-| ------------------------------- | ------------------------------------------------- |
+Patterns and subjects are Rust `str` values, so both are valid UTF-8.
+`Match::start`, `Match::end`, and `Match::range` return byte offsets into the subject, as Rust string slicing expects.
+
+Search methods distinguish a missing match from an engine error:
+
+- `is_match` returns `Result<bool>`.
+- `find` returns `Result<Option<Match>>`.
+- `captures` returns `Result<Option<Captures>>`.
+- `find_iter` and `captures_iter` are lazy iterators whose items are `Result` values.
+
+The iterators return non-overlapping matches from left to right.
+An iterator must still handle errors that occur after iteration begins:
+
+```rust
+use revera::Regex;
+
+fn main() -> revera::Result<()> {
+    let re = Regex::new(r"[[:digit:]]+")?;
+    let found = re
+        .find_iter("12 apples, 30 pears")
+        .map(|result| result.map(|matched| matched.as_str()))
+        .collect::<revera::Result<Vec<_>>>()?;
+
+    assert_eq!(found, ["12", "30"]);
+    Ok(())
+}
 ```
 
-`src/engine.rs` and `src/probe_engine.rs` come from `revera.vego.json` at the repository root.
-The printer is `vegoc emit rust`, the package `vego/compiler/printer/rust`.
+Group 0 is the whole match.
 
-Regenerate them from the repository root:
+`Captures::get` returns `None` when a group did not participate or the index does not exist.
 
-```sh
-make generate GENERATION_TARGETS=rust
+Indexing with `captures[i]` is convenient for a group known to participate, but it panics for an absent group.
+
+`Captures::len` counts group 0, and `Captures::iter` visits every group in order.
+`Regex::captures_len` reports the same group count without running a search.
+
+```rust
+use revera::Regex;
+
+fn main() -> revera::Result<()> {
+    let re = Regex::new(r"(cat)|(dog)")?;
+    let caps = re.captures("cat")?.expect("the example must match");
+
+    assert_eq!(caps.get(1).map(|m| m.as_str()), Some("cat"));
+    assert_eq!(caps.get(2), None);
+    Ok(())
+}
 ```
 
-The same thing runs as `cd ../dev && go run ./cmd/generate -target rust`.
-The output is byte-exact and is not `rustfmt` clean by design, so never format the generated files.
+`Match` and `Captures` borrow the subject string and cannot outlive it.
 
-The `driver`, `bench` and `fuzzcase` binaries include `src/engine.rs` and `src/vg.rs` by path with `#[path]` attributes.
-The `probe` binary includes `src/probe_engine.rs` and `src/vg.rs` the same way.
+The temporary workspace for a search is released before the call returns, and the compiled `Regex` retains no result from earlier searches.
 
-Because those binaries never link the library crate, a driver failure points at the engine or the runtime and not at the API layer.
-`tools/src/host.rs` supplies the embedded locale data and protocol helpers to the engine-based tools.
+## Replacing matches
 
-`src/vg.rs` is the runtime.
-It supplies the `Copy` `Slice<T>` and `Str` header types with Go slice semantics, the conversion and comparison helpers, and the `Arena` allocator.
-The generated modules forbid unsafe code.
-Raw-pointer dereferences and arithmetic stay in this hand-written runtime, behind bounds-checked value and slot operations.
+`replace_all` and `replacen` use replacement syntax similar to `sed`.
 
-`Arena` is `!Sync`, so the compiler refuses to share one between threads.
-A Vego view can alias, which a Rust reference cannot express, so a slice lowers to a raw pointer and a length.
-The Vego specification explicitly permits this lowering, and every access stays bounds-checked.
+`&` inserts the whole match, and `\1` through `\9` insert capturing groups.
 
-`Regex` is `Sync` even though `Arena` is not.
-It never writes to its arena after `build`, and every search copies the header it walks.
-Moreover, every allocation a search makes goes to an arena that the search owns and frees.
-Moreover, every allocation that a search makes goes to an arena that the search owns and frees.
+A backslash escapes the next replacement character, so `\&` inserts a literal ampersand and `\\` inserts a literal backslash.
 
-## Build and verify
+Rust raw strings make these replacements easier to read.
 
-```sh
-cargo test --workspace
-cargo build --release --workspace
-(cd ../dev && go run ./internal/conformance/crosscheck ../rust/target/release/driver)
-(cd ../dev && go run ./internal/conformance/probecheck ../rust/target/release/probe)
+```rust
+use revera::Regex;
+
+fn main() -> revera::Result<()> {
+    let re = Regex::new(r"([[:alpha:]]+)-([[:digit:]]+)")?;
+
+    let out = re.replace_all("id-7 and item-42", r"\1[#\2]")?;
+    assert_eq!(out, "id[#7] and item[#42]");
+
+    let first = re.replacen("id-7 and item-42", 1, "<&>")?;
+    assert_eq!(first, "<id-7> and item-42");
+
+    Ok(())
+}
 ```
 
-`driver` speaks the line protocol that `dev/internal/protocol/driver.go` defines, and `crosscheck` runs the corpus through it.
-`probe` prints the lines of the `vego/probe` package, which covers the subset constructs the engine never uses.
-For comparison, `dev/internal/conformance/proberef` prints the reference lines, and `probecheck` compares the two outputs.
+Use `replace_all_with` when the replacement needs Rust code:
 
-The one-command check is the conformance kit:
+```rust
+use revera::Regex;
 
-```sh
-(cd ../dev && go run ./cmd/conform -backend ../rust)
+fn main() -> revera::Result<()> {
+    let re = Regex::new(r"[[:alpha:]]+")?;
+    let out = re.replace_all_with("one 2 three", |caps| caps[0].to_uppercase())?;
+
+    assert_eq!(out, "ONE 2 THREE");
+    Ok(())
+}
 ```
 
-It reads `backend.json`, builds the release and checked variants, and runs the probe and fuzz seeds against each.
-Specifically, the release build runs the full corpus and the random stress rounds, while checked builds run the smaller checked corpus and omit stress.
+## Compile options
 
-One known limit remains.
-A call that passes the same struct variable through two pointer arguments is valid Vego, but Rust rejects it at compile time with E0499.
-In that case, the failure is loud, not silent.
+`RegexBuilder` provides these options:
 
-Both profiles turn overflow checks off, so integer arithmetic wraps like Go.
-Because the runtime uses `assert!` rather than `debug_assert!`, an out-of-range index aborts in every profile.
-This matches the Go behavior that the specification requires.
+- `case_insensitive(true)` matches upper and lower case alike.
+  Case folding follows the selected locale.
+- `newline_sensitive(true)` gives `^` and `$` line-oriented behavior.
+  It also prevents dot and negated bracket expressions from matching a newline.
+- `shortest_match(true)` makes each repetition shortest-preferring by default.
+  A shortest-preference modifier in the pattern reverses that choice for one repetition.
+- `no_captures(true)` avoids recording match offsets when only a yes-or-no answer is needed.
+  `is_match` remains available, while methods that need match spans report `ErrorKind::NoCaptures`.
+- `locale(locale)` selects the locale used for character classes, case folding, collating elements, and equivalence classes.
 
-Cargo reads profiles from the workspace root, so the two profiles live in the root `Cargo.toml` and apply to the tools as well.
+```rust
+use revera::RegexBuilder;
 
-## Bench, fuzz and checked builds
+fn main() -> revera::Result<()> {
+    let re = RegexBuilder::new(r"^hello[[:space:]]+world$")
+        .case_insensitive(true)
+        .newline_sensitive(true)
+        .build()?;
 
-The release build also produces `bench` and `fuzzcase` under `target/release/`.
-
-`bench` speaks the bench protocol that `dev/internal/protocol/bench.go` defines.
-A `B` line names one operation, compile, match or replace, with its iteration and repetition counts.
-
-The answer gives the arena bytes and allocation requests of one operation, then the wall-clock nanoseconds of each repetition.
-`Arena::stats` in `src/vg.rs` supplies the counts, so they cover engine-level requests only.
-Finally, `dev/cmd/bench` drives every target with the same cases.
-
-```sh
-printf 'P\nB m match 100 3 0 28617c62292b 616261626162 2d\n' | target/release/bench
+    assert!(re.is_match("HELLO WORLD")?);
+    Ok(())
+}
 ```
 
-`tools/src/fuzz.rs` is the fuzz entry point.
-`fuzz_one` decodes one byte string into flags, a locale choice, a pattern, a replacement and a subject.
+`Regex` is `Send` and `Sync`.
 
-It then runs compile, exec, replace, the match iterator and the contract on them, and it ignores every result.
-The input layout is `dev/internal/protocol/fuzz.go`, shared with the other targets, so a corpus transfers between them.
+A compiled expression keeps no per-search state, so it can be shared and searched concurrently.
 
-`fuzzcase <packfile>` replays a pack of seed inputs and prints how many it ran.
-A pack is a sequence of records, each a 4-byte little-endian length followed by that many bytes.
-Therefore, a crash is the only signal.
+## Locales
 
-`fuzz/` is a cargo-fuzz crate over the same entry point.
-It includes the runtime, the engine, `tools/src/host.rs` and `tools/src/fuzz.rs` by path, so it needs no library crate.
+The default is the POSIX locale, also called the C locale.
 
-It declares its own workspace, and the root manifest excludes it.
-With `cargo-fuzz` installed and the nightly toolchain:
+`Locale::open` selects one of the embedded CLDR locales and returns `None` for an unknown locale name or collation type.
 
-```sh
-cd fuzz && cargo +nightly fuzz run engine
+Pass an empty collation type to use the locale's standard collation.
+
+```rust
+use revera::{Locale, RegexBuilder};
+
+fn main() -> revera::Result<()> {
+    let czech = Locale::open("cs", "").expect("the embedded data includes cs");
+    let re = RegexBuilder::new("[[.ch.]]")
+        .locale(czech)
+        .build()?;
+
+    assert!(re.is_match("ch")?);
+    Ok(())
+}
 ```
 
-Two builds keep every check on.
-`cargo build --workspace` is the debug profile.
+`Locale::names()` lists the locale names in the embedded data.
 
-AddressSanitizer needs the nightly toolchain and an explicit target triple.
-`asan-build.sh` reads the host triple from `rustc -vV` and runs that build for the whole workspace:
+`Locale::posix()` returns the default locale explicitly.
 
-```sh
-sh asan-build.sh
+Most applications do not need the underlying bytes, but `embedded_locale_data()` exposes the exact locale blob compiled into the crate.
+
+## Errors
+
+Compilation, searching, iteration, and replacement are fallible.
+An ordinary non-match is not an error: it is `Ok(false)` or `Ok(None)`, depending on the method.
+
+`Error` implements `std::error::Error` and exposes structured information:
+
+- `kind()` returns an `ErrorKind`, such as `Pattern`, `CharacterClass`, `Range`, `Capacity`, or `NoCaptures`.
+- `offset()` returns an optional byte offset.
+  Compilation offsets point into the pattern, while replacement escape and backreference offsets point into the replacement string.
+
+```rust
+use revera::{ErrorKind, Regex};
+
+fn main() {
+    let error = Regex::new("a(").expect_err("the pattern is invalid");
+
+    assert_eq!(error.kind(), ErrorKind::Pattern);
+    assert_eq!(error.offset(), Some(2));
+    assert_eq!(error.to_string(), "invalid regular expression at byte 2");
+}
 ```
 
-The binaries land in `target/asan-bin/`.
+`ErrorKind::Capacity` means the requested work exceeded an engine capacity limit.
 
-## What ships
+Do not treat every `Err` as invalid syntax, and do not discard iterator errors with `filter_map` unless that is an intentional policy.
 
-`Cargo.toml` declares version `0.1.0` and the MIT license.
-`cargo package --list` includes `src/lib.rs`, `src/engine.rs`, `src/vg.rs`, `src/data.bin`, `tests/api.rs` and this README.
-It also includes the Cargo package metadata and `LICENSE`.
-The license for the embedded data ships as `LICENSES/Unicode-3.0.txt`.
+## Resource contracts
 
-`LICENSE` and `LICENSES/` are copies of the repository root files that `make licenses` keeps current.
-Accordingly, the repository's release staging command refuses missing or stale copies.
+`Regex::contract(max_input)` reports the resource cost of one search for subjects up to `max_input` bytes.
 
-By contrast, the tools, the fuzz crate, `backend.json` and `asan-build.sh` stay in the repository.
+The top-level `heap_bytes` and `steps` values are bounds, while `stack_bytes` is an estimate.
+
+The `matcher`, `one_pass`, and `solver` fields provide the backend breakdown.
+
+```rust
+use revera::Regex;
+
+fn main() -> revera::Result<()> {
+    const MAX_SUBJECT_BYTES: usize = 16 * 1024;
+    const HEAP_BUDGET_BYTES: u64 = 8 * 1024 * 1024;
+
+    let re = Regex::new(r"([[:alpha:]]+)([[:digit:]]*)")?;
+    let contract = re.contract(MAX_SUBJECT_BYTES);
+
+    let accepted = contract.max_input == MAX_SUBJECT_BYTES
+        && contract.heap_bytes <= HEAP_BUDGET_BYTES;
+    if !accepted {
+        println!("pattern rejected by the application's resource policy");
+        return Ok(());
+    }
+
+    assert!(re.is_match("item42")?);
+    Ok(())
+}
+```
+
+Every contract figure saturates at `1 << 62` when the computed value is too large to be useful.
+
+The returned `max_input` is also clamped to the engine's subject-size limit, so compare it with the requested value before accepting a contract for unusually large inputs.
+
+A contract covers one search, not the total work of iterating over or replacing every match in a subject.
+
+## Important limitations
+
+- Revera operates on UTF-8 strings and does not accept arbitrary byte strings.
+- Pattern backreferences and Perl-compatible extensions are not part of POSIX ERE and are rejected.
+- The Rust API does not expose the `REG_NOTBOL` and `REG_NOTEOL` execution flags from `regexec()`.
+- Match positions are byte offsets, not character counts.
+- The embedded locale data makes locale-aware behavior self-contained, but it also contributes to the crate and binary size.
+
+## Verification and license
+
+The Rust library wraps the same generated engine used by the other Revera implementations.
+
+The project cross-checks their matches, errors, replacements, iteration, and resource reports with a shared conformance suite.
+
+The Lean development provides machine-checked semantics and proofs with a deliberately narrower scope, documented in the [Lean README](https://github.com/oneregex/revera/blob/main/lean/README.md).
+
+Revera is licensed under the [MIT license](https://github.com/oneregex/revera/blob/main/LICENSE).
+The embedded Unicode and CLDR data is covered by the [Unicode License v3](https://github.com/oneregex/revera/blob/main/LICENSES/Unicode-3.0.txt).

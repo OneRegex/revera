@@ -1,148 +1,310 @@
 # Revera for TypeScript
 
-Revera is a POSIX.1-2024 extended regular expression engine.
-This directory is the TypeScript instantiation and the source of the `@oneregex/revera` npm package.
+Revera is a POSIX.1-2024 extended regular expression engine for JavaScript.
+It uses leftmost-longest matching and accepts the same regular expression language as POSIX `regcomp()` and `regexec()`.
+Use Revera when a pattern needs POSIX ERE behavior instead of JavaScript `RegExp` behavior.
+Patterns do not support backreferences, lookaround, or Perl-style escapes such as `\d` and `\w`.
 
-The same engine exists in Go, Rust, Zig, C, C++ and TypeScript, generated from one Vego source and exercised by one cross-language conformance suite.
-In addition, the Lean development gives Vego machine-checked semantics, and the repository's Lean README states its exact proof coverage.
+[Source repository](https://github.com/oneregex/revera) | [Changelog](https://github.com/oneregex/revera/blob/main/CHANGELOG.md)
 
-The engine speaks the POSIX ERE language: leftmost-longest matching, no backreferences, no Perl escapes.
-Therefore, it is the engine to reach for when a pattern must mean the same thing as it does in `regcomp()` and `regexec()`.
+## Requirements
 
-## Using it
+Revera requires Node.js 22.18 or later and is published as an ES module.
+It is intended for Node.js applications, not browsers.
+Importing the package uses `node:fs` to load its bundled locale data.
+
+## Installation
+
+```sh
+npm install @oneregex/revera
+```
+
+## Quick start
 
 ```ts
 import { Regex } from "@oneregex/revera";
 
-const re = new Regex("([a-z]+)([0-9]*)");
-const caps = re.captures("__abc12__");
-console.log(caps?.get(1)?.text); // "abc"
+const regex = new Regex("([a-z]+)([0-9]*)");
+const captures = regex.captures("__abc12__");
+
+if (captures === null) {
+    throw new Error("expected a match");
+}
+
+console.log(captures.get(0)?.text); // abc12
+console.log(captures.get(1)?.text); // abc
+console.log(captures.get(2)?.text); // 12
 ```
 
-Install it with `npm install @oneregex/revera`.
+A `Regex` is compiled once and can be reused for any number of subjects.
+Searches do not keep state between calls.
 
-`src/revera.ts` is the module entry point and the whole public surface.
+## Matching
 
-- `Regex` compiles a pattern and searches.
-  The constructor throws a `RegexError` when the pattern is invalid.
-  A search keeps no state between calls, so one `Regex` serves any number of subjects.
-- `test` answers yes or no.
-  `find` and `captures` return a `Match` or a `Captures`, or `null` when nothing matches.
-  A group that took no part in the match reads as `null` from `Captures.get`.
-- `matches` and `captureMatches` are generators over the non-overlapping matches.
-- `replaceAll` rewrites the subject the way `sed s///g` does, with `&` and `\1` through `\9` in the replacement, and takes an optional limit.
-  `replaceAllWith` takes a function instead of a replacement text.
-- `RegexError` carries a `kind`, one of the `<regex.h>` error names in kebab case, and a byte `offset` when the failure has one.
-- The options object of the constructor carries `caseInsensitive`, `newlineSensitive`, `noCaptures`, `shortestMatch` and `locale`.
-- `Locale.open("cs")` selects a CLDR locale for bracket expressions and case folding.
-  The default is POSIX.
-- `re.contract(maxInput)` reports what one search can cost, before it runs.
-  Its figures are `bigint`, because the bounds reach 2^62.
+`test` reports whether the pattern matches anywhere in the subject.
 
-Patterns and subjects are UTF-8.
-A `string` is encoded before the engine sees it, and every offset the module reports is a byte offset into that encoding, not a UTF-16 index.
-A `Uint8Array` subject is used as it is, so a subject that is not valid UTF-8 can be searched too.
-`Match.text` decodes the matched bytes, and `Match.bytes` returns them as a view of the subject.
+`find` returns the first leftmost-longest match, while `captures` also returns its capturing groups.
 
-The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not exposed by this package.
+Both result methods return `null` when there is no match.
 
-## Numbers
+```ts
+import { Regex } from "@oneregex/revera";
 
-JavaScript has one number type, a double, which is exact for integers up to 2^53.
-Vego, the language the engine is written in, computes in 64-bit integers.
-The printer maps the two like this:
+const regex = new Regex("(a+)(b*)");
 
-| Vego type                     | TypeScript type | How                                                           |
-| ----------------------------- | --------------- | ------------------------------------------------------------- |
-| `int`, `int32`, `uint32`, ... | `number`        | The narrow types wrap with `\| 0`, `>>> 0` and `& 0xff`.      |
-| `int64`, `uint64`             | `bigint`        | Exact at 64 bits, wrapped with `BigInt.asIntN` and `asUintN`. |
+console.log(regex.test("xxaabyy")); // true
+console.log(regex.find("xxaabyy")?.text); // aab
 
-`int` is the index type, so it is everywhere: lengths, offsets, counters.
-Its values are bounded by the size of a subject, and a subject longer than 2^53 bytes does not exist in practice.
-Every 64-bit add, subtract, multiply and left shift on an `int` still goes through a check, and a result past 2^53 throws a `RangeError` instead of losing precision silently.
-A constant may sit past that limit when a double holds it exactly, such as a power of two that serves as a sentinel; the engine has one.
-
-`int64` carries the resource contracts, whose bounds saturate at 2^62, and `uint64` carries the memo hash and the capture masks.
-Both map to `bigint`, so nothing in the contract or in the matcher is approximated.
-The probe program, which exercises the corners of the language on purpose, reproduces the reference report bit for bit, including the wrap of `MinInt64 / -1`.
-
-## Layout
-
-```
-| Path                           | Role                                                  |
-| ------------------------------ | ----------------------------------------------------- |
-| src/revera.ts                  | The public API. It reads data.bin at load time.       |
-| src/engine.ts                  | The generated engine. Do not edit it.                 |
-| src/probe_engine.ts            | The generated probe. Do not edit it.                  |
-| src/vg.ts                      | The runtime the Vego specification asks for.          |
-| src/data.bin                   | The CLDR locale blob.                                 |
-| test/revera.test.ts            | Tests of the public API, under node --test.           |
-| src/driver.ts                  | The differential driver.                              |
-| src/probe_main.ts              | The probe runner.                                     |
-| src/bench_main.ts              | The bench driver.                                     |
-| src/fuzz.ts                    | The fuzz entry point.                                 |
-| src/fuzzcase_main.ts           | The seed pack runner.                                 |
-| src/host.ts                    | What the hosts share: blob, loader, hex, line reader. |
-| driver, probe, bench, fuzzcase | Shell wrappers that run the hosts under Node.         |
-| backend.json                   | How the conformance kit builds and runs this.         |
-| Makefile                       | The syntax check, the type check and the tests.       |
+const captures = regex.captures("xxaabyy");
+console.log(captures?.get(1)?.text); // aa
+console.log(captures?.get(2)?.text); // b
 ```
 
-`src/engine.ts` and `src/probe_engine.ts` come from `revera.vego.json` at the repository root.
-The printer is `vegoc emit ts`, the package `vego/compiler/printer/ts`.
+Group 0 is the whole match.
+`capturesLength` includes group 0, and `Captures.length` reports the same count for a result.
+`Captures.get(index)` returns `null` if the group did not participate, the index is invalid, or the group does not exist.
+A `Captures` value is iterable in group order.
 
-Regenerate them from the repository root:
+Revera follows POSIX leftmost-longest rules.
 
-```sh
-make generate GENERATION_TARGETS=ts
+For example, the expression below chooses `aa`, even though the first alternative could match `a`:
+
+```ts
+import { Regex } from "@oneregex/revera";
+
+console.log(new Regex("a|aa").find("aa")?.text); // aa
 ```
 
-The same thing runs as `cd ../dev && go run ./cmd/generate -target ts`.
-The output is byte-exact and is not formatter clean by design, so never format the generated files.
+Use `matches` or `captureMatches` to iterate over non-overlapping matches from left to right:
 
-The hosts import `src/engine.ts` and `src/vg.ts` directly and never touch `src/revera.ts`, so a driver failure points at the engine or the runtime and not at the API layer.
+```ts
+import { Regex } from "@oneregex/revera";
 
-`src/vg.ts` is the runtime.
-It supplies `Str`, which is a `Uint8Array` that nothing writes to, `Slice<T>`, a Go slice header over a typed array or a plain array, the buffer operations with the growth rule of the Vego specification, and the integer helpers.
-A slice header never changes after construction, so sharing one is as safe as copying a Go slice header.
-Structs become classes with a `clone` method, and the printer clones at every site where Go copies a struct value: a store from a place expression, and a return of a parameter, a field or an element.
+const regex = new Regex("(a+)(b*)");
 
-The Vego specification describes an explicit memory context that every allocating function receives.
-This target has none: the garbage collector owns every buffer, so the generated functions take no allocator parameter.
-The runtime keeps one pair of counters for the bench host, and nothing else.
+for (const match of regex.matches("aab a aabbb")) {
+    console.log(match.text);
+}
 
-## Build and verify
-
-The hosts and the tests run straight from the TypeScript sources.
-Node 22.18 or later executes `.ts` files directly, so there is no build step for them.
-The type checker is the one thing that `npm install` adds.
-
-```sh
-npm install
-npm run check                 # tsc --noEmit
-npm test                      # node --test test/
-npm run build                 # dist/: the package entry as JavaScript with declarations
-(cd ../dev && go run ./internal/conformance/crosscheck ../ts/driver)
-(cd ../dev && go run ./internal/conformance/probecheck ../ts/probe)
+for (const captures of regex.captureMatches("aab a")) {
+    console.log(captures.get(1)?.text, captures.get(2)?.text);
+}
 ```
 
-The published package is `dist/`, because Node does not strip types from files under `node_modules`.
-`npm run build` compiles `revera.ts` and what it imports with `tsconfig.build.json`, rewrites the import extensions, and copies `data.bin` next to the output; `npm pack` runs it first.
+The iterators perform their searches as they are consumed.
 
-`driver` speaks the line protocol that `dev/internal/protocol/driver.go` defines, and `crosscheck` runs the corpus through it.
-`probe` prints the lines of the `vego/probe` package, which covers the subset constructs the engine never uses.
-For comparison, `dev/internal/conformance/proberef` prints the reference lines, and `probecheck` compares the two outputs.
+## Replacing matches
 
-The one-command check is the conformance kit:
+`replaceAll` replaces non-overlapping matches and returns a string.
 
-```sh
-(cd ../dev && go run ./cmd/conform -backend ../ts)
+In replacement text, `&` means the whole match, `\1` through `\9` refer to capturing groups, and a backslash escapes the next character.
+
+Remember that a backslash must also be escaped inside a normal JavaScript string.
+
+```ts
+import { Regex } from "@oneregex/revera";
+
+const regex = new Regex("(a+)(b*)");
+
+console.log(regex.replaceAll("aab a aabbb", "<\\2\\1>"));
+// <baa> <a> <bbbaa>
+
+console.log(regex.replaceAll("aab a aabbb", "x", 2));
+// x x aabbb
+
+const upper = regex.replaceAllWith("aab a", (captures) =>
+    captures.get(0)!.text.toUpperCase(),
+);
+console.log(upper); // AAB A
 ```
 
-It reads `backend.json`, runs the syntax check of the release build and the type check of the checked build, and runs the probe, the corpus and the fuzz seeds against each.
-Every runtime check of the engine, bounds and integer range alike, is on in both builds; the checked build adds the type checker, and it is skipped when the `typescript` package is not installed.
+The optional `limit` passed to `replaceAll` and `replaceAllBytes` must be an integer.
 
-The generated code compiles patterns about five times slower than the native targets and matches five to ten times slower.
-Every element access carries a bounds check, every slice operation allocates a header, and the memo hash runs on `bigint`.
-The allocation counters agree with the other generated targets request for request, which is a useful check that the runtime follows the same growth rule.
-`docs/BENCHMARKS.md` records the figures.
+A negative value, which is the default, replaces every match.
+A nonnegative value replaces at most that many matches.
+
+`replaceAllBytes` accepts the same arguments as `replaceAll` but returns a `Uint8Array`.
+
+Use it when the subject may not be valid UTF-8 or when the result must remain byte-oriented.
+
+`replaceAllWith` always returns a string and does not take a limit.
+
+## Options
+
+Pass an options object as the second argument to the constructor:
+
+```ts
+import { Regex } from "@oneregex/revera";
+
+const line = new Regex("^world$", {
+    caseInsensitive: true,
+    newlineSensitive: true,
+});
+
+console.log(line.test("Hello\nWORLD")); // true
+```
+
+| Option             | Effect                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `caseInsensitive`  | Matches upper and lower case alike, like `REG_ICASE`.                                                                                 |
+| `newlineSensitive` | Gives `^` and `$` line-oriented behavior. A dot and a negated bracket expression do not match a newline, like `REG_NEWLINE`.          |
+| `noCaptures`       | Compiles for `test` only, like `REG_NOSUB`. Methods that need match offsets or groups throw a `RegexError` with kind `"no-captures"`. |
+| `shortestMatch`    | Makes every repetition prefer the shortest match instead of the usual longest match.                                                  |
+| `locale`           | Selects the locale used for bracket expressions and case folding. The default is the POSIX locale.                                    |
+
+The execution flags `REG_NOTBOL` and `REG_NOTEOL` are not exposed.
+
+## Locales
+
+The package includes CLDR locale data for character classes, case folding, collating elements, and equivalence classes.
+`Locale.open` returns `null` when the locale name or collation type is unknown.
+
+```ts
+import { Locale, Regex } from "@oneregex/revera";
+
+const czech = Locale.open("cs");
+if (czech === null) {
+    throw new Error("Czech locale data is unavailable");
+}
+
+const regex = new Regex("[[.ch.]]", { locale: czech });
+console.log(regex.find("xchx")?.text); // ch
+```
+
+`Locale.open(name, collationType)` selects a named collation type.
+
+Omitting the second argument selects the locale's standard collation.
+
+`Locale.posix()` returns the POSIX locale, and `Locale.names()` lists the locale names in the bundled data.
+
+`embeddedLocaleData()` returns a copy of the bundled locale blob for applications that need to inspect or store it.
+
+Normal matching does not require calling this function.
+
+## Strings, bytes, and offsets
+
+Patterns and subjects accept either a `string` or a `Uint8Array`.
+
+Strings are encoded as UTF-8 before the engine sees them.
+
+A `Uint8Array` is used directly, which allows matching data that is not valid UTF-8.
+
+Every offset is a byte offset, not a JavaScript UTF-16 string index:
+
+```ts
+import { Regex } from "@oneregex/revera";
+
+const match = new Regex("b+").find("éb");
+console.log(match?.start); // 2
+console.log(match?.end); // 3
+```
+
+A `Match` exposes these properties:
+
+| Property  | Meaning                                   |
+| --------- | ----------------------------------------- |
+| `start`   | Byte offset where the match starts.       |
+| `end`     | Byte offset immediately after the match.  |
+| `length`  | Length of the match in bytes.             |
+| `isEmpty` | Whether the match is empty.               |
+| `bytes`   | A `Uint8Array` view of the matched bytes. |
+| `text`    | The matched bytes decoded as UTF-8.       |
+| `subject` | The complete byte-oriented subject.       |
+
+`Match.toString()` returns the same value as `Match.text`.
+
+`Match.bytes` is a view, not a copy.
+Call `match.bytes.slice()` if the bytes need independent storage.
+
+When the input is a `Uint8Array`, matches retain that array as their subject.
+
+Do not modify the array while a search or match result is in use unless that behavior is intentional.
+
+## Errors
+
+Invalid patterns and engine failures throw `RegexError`.
+
+The error message contains a human-readable description and includes a byte offset when one is available.
+
+```ts
+import { Regex, RegexError } from "@oneregex/revera";
+
+try {
+    new Regex("[z-a]");
+} catch (error) {
+    if (error instanceof RegexError) {
+        console.error(error.kind); // range
+        console.error(error.offset);
+    } else {
+        throw error;
+    }
+}
+```
+
+`RegexError` provides:
+
+| Property | Meaning                                                            |
+| -------- | ------------------------------------------------------------------ |
+| `kind`   | A kebab-case error category based on the POSIX `<regex.h>` errors. |
+| `code`   | The engine's numeric error code.                                   |
+| `offset` | The relevant UTF-8 byte offset, or `null` when no offset applies.  |
+
+The possible error kinds are `"pattern"`, `"collating-element"`, `"character-class"`, `"escape"`, `"back-reference"`, `"bracket"`, `"paren"`, `"brace"`, `"interval"`, `"range"`, `"capacity"`, `"repeat"`, `"no-captures"`, and `"unknown"`.
+
+Compilation offsets refer to the pattern.
+
+Escape and backreference errors produced while parsing replacement text refer to the replacement.
+
+A search can fail with a `"capacity"` error if its subject exceeds the engine's capacity for that pattern.
+
+Numeric arguments such as a replacement limit or contract size throw `RangeError` when they are not integers.
+
+## Resource contracts
+
+`contract(maxInput)` reports conservative costs for one search on a subject no longer than `maxInput` bytes.
+
+This lets an application check a pattern before accepting it for use with bounded input.
+
+```ts
+import { Regex } from "@oneregex/revera";
+
+const regex = new Regex("(a|b)*c");
+const contract = regex.contract(64 * 1024);
+
+console.log(contract.hasSolver);
+console.log(contract.heapBytes);
+console.log(contract.stackBytes);
+console.log(contract.steps);
+```
+
+`heapBytes`, `stackBytes`, and `steps` are `bigint` values so their bounds remain exact.
+
+`heapBytes` bounds explicit heap allocation, `stackBytes` estimates the deepest call stack, and `steps` bounds abstract unit-cost operations rather than elapsed time.
+
+`hasSolver` reports whether the capture solver, the engine's slowest matching backend, can be selected.
+
+## API summary
+
+The package exports the following public values and types:
+
+| Export               | Purpose                                                                                            |
+| -------------------- | -------------------------------------------------------------------------------------------------- |
+| `Regex`              | Compiles a POSIX ERE and provides matching, iteration, replacement, and resource-contract methods. |
+| `RegexOptions`       | Constructor options for matching behavior and locale selection.                                    |
+| `RegexError`         | Structured compilation, replacement, and search error.                                             |
+| `ErrorKind`          | Union of the string values used by `RegexError.kind`.                                              |
+| `Match`              | One matched byte span and its decoded text.                                                        |
+| `Captures`           | The whole match and its capturing groups.                                                          |
+| `Contract`           | Resource bounds returned by `Regex.contract`.                                                      |
+| `Locale`             | POSIX and bundled CLDR locale selection.                                                           |
+| `Text`               | Alias for string or `Uint8Array` input.                                                            |
+| `DUP_MAX`            | Largest supported interval bound. It is currently `255`.                                           |
+| `embeddedLocaleData` | Returns a copy of the package's locale data.                                                       |
+
+All matching and replacement methods are synchronous.
+
+## License
+
+Revera is distributed under the MIT license.
+
+The bundled Unicode and CLDR-derived data has its applicable notice in `LICENSES/Unicode-3.0.txt`.

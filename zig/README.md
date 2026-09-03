@@ -1,177 +1,264 @@
 # Revera for Zig
 
-Revera is a POSIX ERE regex engine with leftmost-longest matching, and this directory is the Zig package `revera`.
+Revera is a clean-room implementation of POSIX.1-2024 extended regular expressions for Zig.
+It uses POSIX leftmost-longest matching, so it is useful when a pattern must behave like `regcomp()` and `regexec()` instead of a Perl-style regex engine.
+Patterns and subjects are UTF-8 byte slices.
+Match positions and compile error positions are byte offsets.
 
-`src/engine.zig` is generated from `revera.vego.json` at the repository root by `vegoc emit zig`.
-Do not edit it.
+[Source repository](https://github.com/oneregex/revera) | [Changelog](https://github.com/oneregex/revera/blob/main/CHANGELOG.md)
 
-In contrast, `src/revera.zig` is the hand-written public API, and `src/vg.zig` is the small runtime that the Vego specification asks every target to supply.
-The remaining hand-written source files support tests and development tools.
+## Requirements
 
-## Depend on it
+The package requires Zig `0.17.0` or newer and has no external dependencies.
+Its CLDR locale data is embedded in the module.
 
-Add the package to your project with `zig fetch`:
+## Add the dependency
 
-```sh
-zig fetch --save https://github.com/oneregex/revera/releases/download/v0.1.0/revera-zig-0.1.0.tar.gz
-```
-
-Then wire the module in your `build.zig`:
+To use a source checkout today, point a path dependency at its `zig` directory:
 
 ```zig
-const revera = b.dependency("revera", .{ .target = target, .release = true });
-exe.root_module.addImport("revera", revera.module("revera"));
+.dependencies = .{
+    .revera = .{
+        .path = "revera/zig",
+    },
+},
 ```
 
-The package reads `release`, a boolean, and not `optimize`.
-When `release` is true, the engine builds in ReleaseSafe.
-Otherwise, it builds in Debug.
-Both modes keep every bounds check.
+The path is relative to your project's `build.zig.zon`.
 
-## Use it
+Pass the standard target option to Revera, then import its public module:
+
+```zig
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    const revera_dep = b.dependency("revera", .{
+        .target = target,
+    });
+
+    const exe = b.addExecutable(.{
+        .name = "example",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    exe.root_module.addImport("revera", revera_dep.module("revera"));
+    b.installArtifact(exe);
+}
+```
+
+With this setup, Revera builds in Debug mode by default.
+
+A standard `zig build --release=safe` request selects Revera's preferred `ReleaseSafe` mode.
+
+## Complete example
 
 ```zig
 const std = @import("std");
 const revera = @import("revera");
 
-var re = try revera.Regex.compile(gpa, "([a-z]+)([0-9]*)", .{});
+pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
+    var re = try revera.Regex.compile(allocator, "([a-z]+)([0-9]*)", .{});
+    defer re.deinit();
+
+    const subject = "__abc12__";
+    var captures = (try re.captures(subject)) orelse return error.NoMatch;
+    defer captures.deinit();
+
+    std.debug.print("whole: {s}\nword: {s}\ndigits: {s}\n", .{
+        captures.get(0).?.text(),
+        captures.get(1).?.text(),
+        captures.get(2).?.text(),
+    });
+}
+```
+
+This prints:
+
+```text
+whole: abc12
+word: abc
+digits: 12
+```
+
+Group 0 is always the whole match.
+A group that did not participate is `null`.
+
+## Public API
+
+`@import("revera")` exposes the following main types and values:
+
+| API                                                | Purpose                                                   |
+| -------------------------------------------------- | --------------------------------------------------------- |
+| `Regex.compile(allocator, pattern, options)`       | Compiles a pattern and copies it into owned storage.      |
+| `Regex.deinit()`                                   | Releases the compiled expression.                         |
+| `Regex.groupCount()`                               | Returns the number of reported groups, including group 0. |
+| `Regex.isMatch(subject)`                           | Reports whether the pattern matches anywhere.             |
+| `Regex.find(subject)`                              | Returns the leftmost-longest `Match`, or `null`.          |
+| `Regex.captures(subject)`                          | Returns owned `Captures`, or `null`.                      |
+| `Regex.matches(subject)`                           | Creates an iterator over non-overlapping `Match` values.  |
+| `Regex.captureMatches(subject)`                    | Creates an iterator that returns owned `Captures` values. |
+| `Regex.replaceAll(subject, replacement)`           | Replaces every non-overlapping match.                     |
+| `Regex.replaceFirstN(subject, replacement, limit)` | Replaces at most `limit` matches.                         |
+| `Regex.contract(max_input)`                        | Returns resource bounds for one search.                   |
+| `Locale.posix()`                                   | Returns the default POSIX locale.                         |
+| `Locale.open(allocator, name, collation_type)`     | Looks up a locale in the embedded CLDR data.              |
+| `Locale.names(allocator)`                          | Allocates the outer slice of available locale names.      |
+| `embedded_locale_data`                             | Contains the embedded CLDR locale blob.                   |
+| `dup_max`                                          | Gives the largest accepted interval count.                |
+
+`Match` contains `start` and `end` byte offsets.
+Its `text()`, `len()`, and `isEmpty()` methods provide the matched bytes, byte length, and empty-match status.
+
+`Captures.get(index)` returns a `Match` or `null` when the group did not participate or the index does not exist.
+
+`Captures.len()` includes group 0.
+
+Both iterators use `next()` and return `null` when finished.
+
+They report non-overlapping matches from left to right and make progress after an empty match.
+
+## Compile options
+
+`revera.Options` has these fields:
+
+| Field               | Default | Effect                                                                                              |
+| ------------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `case_insensitive`  | `false` | Matches upper and lower case alike using the selected locale.                                       |
+| `newline_sensitive` | `false` | Gives `^` and `$` their line meaning and prevents dot or a negated bracket from matching a newline. |
+| `no_captures`       | `false` | Compiles for `isMatch()` only. APIs that need match offsets return `error.NoCaptures`.              |
+| `shortest_match`    | `false` | Makes repetitions prefer their shortest match, like POSIX `REG_MINIMAL`.                            |
+| `locale`            | `null`  | Selects bracket, collation, and case behavior. `null` means POSIX.                                  |
+| `error_position`    | `null`  | Receives the byte offset where pattern compilation stopped when that position is available.         |
+
+For example:
+
+```zig
+var at: usize = 0;
+var re = try revera.Regex.compile(allocator, "^hello$", .{
+    .case_insensitive = true,
+    .newline_sensitive = true,
+    .error_position = &at,
+});
 defer re.deinit();
-
-var caps = (try re.captures("__abc12__")).?;
-defer caps.deinit();
-std.debug.print("{s}\n", .{caps.get(1).?.text()});
 ```
 
-`src/revera.zig` is the whole public surface, and `build.zig` exports it as the module `revera`.
+The value behind `error_position` is left unchanged when an error has no position.
 
-- `Regex.compile` takes an allocator, the pattern and an options struct.
-  The Regex owns memory until `deinit`.
-- A search takes a const pointer and keeps no state between calls.
-  One Regex serves any number of threads, as long as the allocator it was compiled with is thread safe.
-  Every search takes its scratch memory from that allocator.
-- `find` and `captures` return an optional.
-  A subject that does not match gives null, and only a real failure gives an error.
-- `matches` and `captureMatches` return iterators with the usual `next` method.
-- Engine failures use a plain error set, such as `error.InvalidPattern` and `error.OutOfCapacity`.
-  Allocator exhaustion returns `error.OutOfMemory` instead of aborting.
-  `Options.error_position` receives the byte offset in the pattern.
-- `Locale.open(gpa, "cs", "")` selects a CLDR locale for bracket expressions.
-  The default is POSIX.
-- `re.contract(max_input)` reports what one search can cost, before it runs.
+## Replacement syntax
 
-The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not exposed by this package.
+Replacement text follows `sed`-style rules:
 
-## Layout
+- `&` inserts the whole match.
+- `\1` through `\9` insert a capturing group.
+- A backslash escapes the next character, so `\&` inserts a literal ampersand and `\\` inserts a literal backslash.
 
-The package itself is the set of files listed in `.paths` of `build.zig.zon`: the API, the engine, the runtime, the data blob, the tests, and the two files that `zig build test` needs for the fuzz seed corpus.
+The returned replacement buffer belongs to the allocator passed to `Regex.compile()`.
+Free it with that allocator.
 
-By contrast, the other files are the tools that the repository uses to verify the engine, and they do not ship with the package.
+```zig
+var pair = try revera.Regex.compile(allocator, "([a-z]+)([0-9]+)", .{});
+defer pair.deinit();
 
-| File                    | Role                                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `src/revera.zig`        | The public API. It embeds `data.bin` with `@embedFile`.                                                       |
-| `src/engine.zig`        | The generated engine.                                                                                         |
-| `src/vg.zig`            | The runtime: `Slice` and `Str` with Go slice semantics, the integer conversion helper, and string comparison. |
-| `src/data.bin`          | The CLDR locale blob, embedded at build time.                                                                 |
-| `src/revera_test.zig`   | The tests of the public API.                                                                                  |
-| `src/host.zig`          | What the tools share: the locale loader and the token helpers of the line protocols.                          |
-| `src/main.zig`          | The differential driver. It speaks the protocol of `dev/internal/protocol/driver.go`.                         |
-| `src/probe_main.zig`    | The probe runner. It prints the lines of `dev/internal/conformance/proberef`.                                 |
-| `src/bench_main.zig`    | The bench binary. It speaks the protocol of `dev/internal/protocol/bench.go`.                                 |
-| `src/fuzz.zig`          | The fuzz entry point, with `dev/internal/protocol/fuzz.go` as the reference.                                  |
-| `src/fuzzcase_main.zig` | The replayer for a pack of fuzz inputs.                                                                       |
-| `src/probe_engine.zig`  | The generated probe engine.                                                                                   |
-
-The runtime holds no state, so each thread can run its own engine instance.
-
-Regenerate `src/engine.zig` and `src/probe_engine.zig` from the repository root:
-
-```sh
-make generate GENERATION_TARGETS=zig
+const out = try pair.replaceAll("abc12", "[&:\\1]");
+defer allocator.free(out);
 ```
 
-## Build and verify
+## Locales
 
-A plain `zig build` compiles nothing and installs nothing.
-It only exposes the module.
+The default locale is POSIX, also known as the C locale.
+Use `Locale.open()` when bracket expressions, collating elements, equivalence classes, or case folding need CLDR locale behavior:
 
-Instead, the driver, probe, bench and fuzzcase tools have their own build file in `tools/`, outside the package.
-That build file reaches the sources through a path dependency on the package:
+```zig
+const cs = (try revera.Locale.open(allocator, "cs", "")) orelse
+    return error.UnknownLocale;
 
-```sh
-zig build test
-zig build --build-file tools/build.zig -Drelease -p zig-out
-(cd ../dev && go run ./internal/conformance/crosscheck ../zig/zig-out/bin/driver)
-(cd ../dev && go run ./internal/conformance/probecheck ../zig/zig-out/bin/probe)
-(cd ../dev && go run ./cmd/conform -backend ../zig)
+var re = try revera.Regex.compile(allocator, "[[.ch.]]", .{ .locale = cs });
+defer re.deinit();
 ```
 
-`zig build test` runs the API tests and the fuzz seed corpus.
-`-Drelease` selects ReleaseSafe, and without it the tools build in Debug.
+An empty collation type selects the locale's standard collation.
 
-The runtime keeps its bounds asserts in every mode.
-As a result, an out-of-range index aborts, which is the Go behavior the specification requires.
+`Locale.open()` returns `null` for an unknown locale or collation type.
+The returned `Locale` points into embedded data, owns no memory, and needs no cleanup.
 
-`probe` is the runner for the `vego/probe` package.
-That package covers the subset constructs the engine never uses.
+`Locale.names()` allocates only the outer slice.
+Free that slice with the same allocator, but do not free the names inside it because they point into embedded data.
 
-## Bench
+## Ownership and threads
 
-`zig-out/bin/bench` times one engine operation per `B` command and reports its allocations.
-Although `dev/cmd/bench` drives it with the shared cases, the bench binary also accepts commands directly:
+The allocator passed to `Regex.compile()` backs the compiled expression, scratch allocations, captures, and replacement results.
+It must remain valid until those values have been released.
 
-```sh
-printf 'P\nB m match 100 3 0 28617c62292b 616261626162 2d\n' | zig-out/bin/bench
+- Call `Regex.deinit()` once for every successfully compiled expression.
+- `Match` does not own memory and borrows its subject.
+- `Captures` owns its group list and must be deinitialized, while its matches still borrow the subject.
+- A match iterator borrows both the `Regex` and its subject for the iterator's lifetime.
+- Every item from `captureMatches()` must be deinitialized separately.
+- Replacement results must be freed directly with the allocator.
+
+A compiled `Regex` keeps no mutable search state and may be searched concurrently.
+Its allocator must be thread safe, and `deinit()` must not run while a search or iterator is active.
+An iterator is mutable and should not itself be shared without synchronization.
+
+## Errors and resource contracts
+
+No match is not an error.
+`find()` and `captures()` return `null`, iterators finish with `null`, and `isMatch()` returns `false`.
+
+Allocation failures return `error.OutOfMemory`.
+Engine failures use `revera.Error`, whose members are:
+
+```text
+InvalidPattern
+InvalidCollatingElement
+InvalidCharacterClass
+InvalidEscape
+InvalidBackReference
+UnbalancedBracket
+UnbalancedParenthesis
+UnbalancedBrace
+InvalidInterval
+InvalidRange
+OutOfCapacity
+MissingRepeatOperand
+NoCaptures
+UnknownFailure
 ```
 
-The answer is `B m 0 <bytes> <allocs> <ns> <ns> <ns>`.
-The bytes and allocations count the requests the engine makes to its allocator during one operation.
+`OutOfCapacity` means an engine capacity limit was exceeded.
+It is distinct from allocator exhaustion.
 
-An untimed pass measures them through a counting allocator that wraps the arena, and the timed passes use the plain arena.
-Timing, in turn, comes from the `awake` clock of `std.Io`, which is monotonic.
+`Regex.contract(max_input)` reports bounds for a search over a subject of at most `max_input` bytes.
+The result includes total `heap_bytes`, `stack_bytes`, and `steps`, plus separate matcher, one-pass capture, and general capture-solver figures.
+Steps are abstract operations, not a time estimate.
+Stack bytes are an estimate.
+Figures saturate at `1 << 62`, which means the bound is too large to be useful.
+The engine clamps `max_input` to `(1 << 31) - 1`.
 
-## Fuzz
+## Regex behavior and limits
 
-`src/fuzz.zig` exposes `fuzzOne`, which runs compile, exec, replace, iteration and the contract on one input.
-Every target reads the same input layout, and the comment at the top of the file describes it.
+Revera implements POSIX ERE syntax and leftmost-longest matching.
 
-The file also holds the test `engine fuzz`, which `zig build test` runs on a small seed corpus.
-In addition, the same binary fuzzes with the built-in fuzzer:
+It does not support backreferences or Perl escapes such as `\d` and `\w`.
 
-```sh
-zig build test --fuzz=10K
-zig build test --fuzz
-```
+`shortest_match` exposes the POSIX `REG_MINIMAL` compilation mode.
 
-The first form runs a bounded number of inputs and prints a coverage report.
-The second form runs until interrupted and serves a coverage web interface on a local port.
+The package does not expose the `REG_NOTBOL` and `REG_NOTEOL` execution flags from `regexec()`.
 
-Both keep their corpus under `.zig-cache/f/`.
-On macOS the fuzzer works with this Zig version, and only Windows and 32-bit targets are excluded.
+Use `newline_sensitive` only when `^`, `$`, dot, and negated brackets should have POSIX `REG_NEWLINE` behavior.
 
-`zig-out/bin/fuzzcase <packfile>` replays a pack of inputs through `fuzzOne`.
-A pack is a sequence of records, each a little-endian `u32` length followed by that many bytes.
+Interval counts cannot exceed `revera.dup_max`.
+Patterns and subjects should be valid UTF-8, and offsets always count bytes rather than Unicode scalar values.
 
-It prints `fuzzcase: <count> inputs` and exits 0, and a crash is the signal.
-However, a missing or truncated pack gives a message on stderr and exit status 1.
+## License
 
-## Checked build
-
-Every safety check stays on in Debug mode, and the Debug binaries go to a separate prefix:
-
-```sh
-zig build --build-file tools/build.zig -p zig-out/debug
-```
-
-That produces `zig-out/debug/bin/driver`, `probe`, `bench` and `fuzzcase`, and leaves `zig-out/bin` alone.
-`zig-out/` is ignored by git, so the extra prefix does not show in `git status`.
-
-## Release archive
-
-The Zig package manager wants `build.zig.zon` at the root of the archive, and this directory is not the root of the repository.
-Therefore, a release attaches `revera-zig-0.1.0.tar.gz`, built from `zig/` with exactly the files selected by `.paths`, including `LICENSE` and `LICENSES/`, under one top-level directory.
-
-`make dist` at the repository root builds this deterministic archive from committed `HEAD`.
-It refuses tracked changes, mismatched Rust, Zig and native package versions, missing or stale license copies, and an undated release changelog.
-
-Run `make licenses` before committing a release when the root license files change.
+Revera is available under the MIT License.
+The embedded Unicode and CLDR-derived data is covered by the Unicode License included in `LICENSES/Unicode-3.0.txt`.
