@@ -8,6 +8,7 @@ MISTAKES.md
 NOTES.md
 PROGRESS.md
 SWIVAL.md
+/build/
 lean/.lake/
 tmp/
 ts/node_modules/

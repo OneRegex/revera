@@ -90,9 +90,12 @@ make test                          # the C locale runtime
 cmake -S native -B tmp/native-build -DBUILD_TESTING=ON \
   && cmake --build tmp/native-build \
   && ctest --test-dir tmp/native-build --output-on-failure
+make clean
 ```
 
 The two Go modules are tested with `GOWORK=off`, because the workspace file would hide a missing dependency.
+`make clean` removes every disposable build tree, cache, staged archive, profile, TypeScript dependency and package output created by these workflows.
+It leaves checked-in generated sources and fuzz findings in place.
 
 Regenerate the IR and every generated engine with one command, and check that they are current with another:
 

@@ -45,4 +45,5 @@ generate:
 	cd ../../dev && go run ./cmd/generate -target c
 
 clean:
-	rm -f driver probe api_test bench fuzzcase driver-asan probe-asan fuzzcase-asan libfuzzer
+	rm -f driver probe api_test bench fuzzcase driver-asan probe-asan fuzzcase-asan libfuzzer *.o
+	rm -rf *.dSYM

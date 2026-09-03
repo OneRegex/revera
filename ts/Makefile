@@ -17,4 +17,4 @@ test:
 	$(NODE) --test test/
 
 clean:
-	rm -rf node_modules
+	rm -rf dist node_modules

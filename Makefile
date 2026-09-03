@@ -52,3 +52,21 @@ dist:
 
 clean:
 	$(MAKE) -C locale clean
+	$(MAKE) -C native/c clean
+	$(MAKE) -C native/cpp clean
+	$(MAKE) -C ts clean
+	rm -rf \
+		build \
+		dev/tmp \
+		go/tmp \
+		lean/.lake \
+		native/build \
+		rust/fuzz/coverage \
+		rust/fuzz/target \
+		rust/target \
+		tmp \
+		ts/tmp \
+		zig/.zig-cache \
+		zig/tools/.zig-cache \
+		zig/zig-out \
+		zig/tmp
