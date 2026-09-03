@@ -1,6 +1,6 @@
 [package]
 name = "revera"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "A POSIX.1-2024 ERE engine with one behavior in Go, Rust, Zig, C, C++ and TypeScript, generated from one Vego source and checked against Lean proofs"
 repository = "https://github.com/oneregex/revera"
