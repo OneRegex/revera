@@ -92,14 +92,7 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Stage the assets from the commit
-        run: |
-          if grep -Eq '^## [0-9]+\.[0-9]+\.[0-9]+ - [0-9]{4}-[0-9]{2}-[0-9]{2}$' CHANGELOG.md; then
-            cd dev && go run ./cmd/dist
-          else
-            echo "CHANGELOG.md has no dated section yet; staging with the date check bypassed"
-            sed -i 's/^\(## [0-9.]*\) - unreleased$/\1 - 1970-01-01/' CHANGELOG.md
-            cd dev && go run ./cmd/dist -allow-dirty
-          fi
+        run: cd dev && go run ./cmd/dist -unreleased
       - name: The Zig archive builds and tests as fetched
         run: |
           mkdir -p build/zig-archive && tar -xzf tmp/dist/revera-zig-*.tar.gz -C build/zig-archive
