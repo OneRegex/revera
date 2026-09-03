@@ -45,6 +45,29 @@ static void find_and_captures() {
     check((*caps)[2]->str() == "12", "group 2");
 }
 
+static void match_text_uses_utf8_byte_boundaries() {
+    revera::Regex re("(é)(β)");
+    const std::string subject = "xéβz";
+
+    auto m = re.find(subject);
+    if (!check(m.has_value(), "UTF-8 find")) {
+        return;
+    }
+    check(m->start() == 1 && m->end() == 5, "UTF-8 byte offsets");
+    check(m->size() == 4 && m->str() == "éβ", "UTF-8 text view");
+
+    auto caps = re.captures(subject);
+    if (!check(caps.has_value(), "UTF-8 captures")) {
+        return;
+    }
+    check((*caps)[1]->start() == 1 && (*caps)[1]->end() == 3 &&
+              (*caps)[1]->str() == "é",
+          "UTF-8 group 1");
+    check((*caps)[2]->start() == 3 && (*caps)[2]->end() == 5 &&
+              (*caps)[2]->str() == "β",
+          "UTF-8 group 2");
+}
+
 static void absent_group_is_empty() {
     revera::Regex re("(a)|(b)");
     auto caps = re.captures("a");
@@ -176,6 +199,7 @@ static void one_regex_serves_several_threads() {
 
 int main() {
     find_and_captures();
+    match_text_uses_utf8_byte_boundaries();
     absent_group_is_empty();
     no_match_is_empty();
     find_all_walks_every_match();

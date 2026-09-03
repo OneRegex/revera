@@ -27,7 +27,7 @@ pub fn vego_eq_Tagged(a: Tagged, b: Tagged) -> bool {
 }
 
 pub fn bump(mem: &vg::Arena, c: &mut Counter, tag: i32) -> i64 {
-    c.n += 1i64;
+    c.n = (c.n).wrapping_add(1i64);
     c.log = vg::append(mem, c.log, tag);
     return ((tag) as i64);
 }
@@ -38,12 +38,12 @@ pub fn logCode(c: &mut Counter) -> i64 {
         let mut i: i64 = 0i64;
         '_b1: while (i < c.log.len) {
             '_c1: {
-                v = ((v * 10i64) + ((c.log.get(i)) as i64));
+                v = ((v).wrapping_mul(10i64)).wrapping_add(((c.log.get(i)) as i64));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
-    return ((v * 100i64) + ((c.n) as i64));
+    return ((v).wrapping_mul(100i64)).wrapping_add(((c.n) as i64));
 }
 
 pub fn DivMod(a: i64, b: i64) -> (i64, i64) {
@@ -64,24 +64,24 @@ pub fn BytesProbe(mem: &vg::Arena, s: vg::Str) -> i64 {
         let mut i: i64 = 0i64;
         '_b1: while (i < b.len) {
             '_c1: {
-                t = ((t * 31i64) + ((b.get(i)) as i64));
+                t = ((t).wrapping_mul(31i64)).wrapping_add(((b.get(i)) as i64));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return t;
 }
 
 pub fn sliceFrom(mem: &vg::Arena, c: &mut Counter, n: i64) -> vg::Slice<i32> {
-    c.n += 1i64;
+    c.n = (c.n).wrapping_add(1i64);
     let out: vg::Slice<i32> = vg::make::<i32>(mem, n);
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < n) {
             '_c1: {
-                out.set(i, (((i + 1i64)) as i32));
+                out.set(i, (((i).wrapping_add(1i64)) as i32));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return out;
@@ -96,13 +96,13 @@ pub fn RangeProbe(mem: &vg::Arena, c: &mut Counter) -> i64 {
             '_c3: {
                 let mut i: i64 = _t2;
                 let v: i32 = _t1.get(_t2);
-                t += (((i) as i64) * ((v) as i64));
+                t = (t).wrapping_add((((i) as i64)).wrapping_mul(((v) as i64)));
                 i = 100i64;
             }
             _t2 += 1;
         }
     }
-    return ((t * 10i64) + ((c.n) as i64));
+    return ((t).wrapping_mul(10i64)).wrapping_add(((c.n) as i64));
 }
 
 pub fn RangeValProbe(xs: vg::Slice<i32>) -> i64 {
@@ -113,8 +113,8 @@ pub fn RangeValProbe(xs: vg::Slice<i32>) -> i64 {
         '_b3: while _t2 < _t1.len {
             '_c3: {
                 let mut v: i32 = _t1.get(_t2);
-                v = (v + 1i32);
-                t += ((v) as i64);
+                v = (v).wrapping_add(1i32);
+                t = (t).wrapping_add(((v) as i64));
             }
             _t2 += 1;
         }
@@ -123,9 +123,9 @@ pub fn RangeValProbe(xs: vg::Slice<i32>) -> i64 {
         let mut i: i64 = 0i64;
         '_b4: while (i < xs.len) {
             '_c4: {
-                t += (((xs.get(i)) as i64) * 100i64);
+                t = (t).wrapping_add((((xs.get(i)) as i64)).wrapping_mul(100i64));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return t;
@@ -139,7 +139,7 @@ pub fn RangeIntProbe(n: i64) -> i64 {
         '_b3: while _t2 < _t1 {
             '_c3: {
                 let i: i64 = _t2;
-                t = ((t * 2i64) + ((i) as i64));
+                t = ((t).wrapping_mul(2i64)).wrapping_add(((i) as i64));
             }
             _t2 += 1;
         }
@@ -155,12 +155,12 @@ pub fn PartialArray() -> i64 {
         let mut i: i64 = 0i64;
         '_b1: while (i < 5i64) {
             '_c1: {
-                t = ((t * 10i64) + a[(i) as usize]);
+                t = ((t).wrapping_mul(10i64)).wrapping_add(a[(i) as usize]);
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
-    return (((t * 10i64) + ((names[(1i64) as usize].len) as i64)) + ((names[(0i64) as usize].len) as i64));
+    return (((t).wrapping_mul(10i64)).wrapping_add(((names[(1i64) as usize].len) as i64))).wrapping_add(((names[(0i64) as usize].len) as i64));
 }
 
 pub fn TaggedEq(a: Tagged, b: Tagged) -> bool {
@@ -168,22 +168,22 @@ pub fn TaggedEq(a: Tagged, b: Tagged) -> bool {
 }
 
 pub fn three(a: i64, b: i64, x: i64) -> i64 {
-    return (((a * 100i64) + (b * 10i64)) + x);
+    return (((a).wrapping_mul(100i64)).wrapping_add((b).wrapping_mul(10i64))).wrapping_add(x);
 }
 
 pub fn OrderArgs(mem: &vg::Arena, c: &mut Counter) -> i64 {
-    return (three({ let _t1 = 1i32; bump(mem, c, _t1) }, { let _t2 = 2i32; bump(mem, c, _t2) }, { let _t3 = 3i32; bump(mem, c, _t3) }) + logCode(c));
+    return (three({ let _t1 = 1i32; bump(mem, c, _t1) }, { let _t2 = 2i32; bump(mem, c, _t2) }, { let _t3 = 3i32; bump(mem, c, _t3) })).wrapping_add(logCode(c));
 }
 
 pub fn OrderBinary(mem: &vg::Arena, c: &mut Counter) -> i64 {
-    let v: i64 = ({ let _t1 = 4i32; bump(mem, c, _t1) } - (2i64 * { let _t2 = 5i32; bump(mem, c, _t2) }));
-    return ((v * 10000i64) + logCode(c));
+    let v: i64 = ({ let _t1 = 4i32; bump(mem, c, _t1) }).wrapping_sub((2i64).wrapping_mul({ let _t2 = 5i32; bump(mem, c, _t2) }));
+    return ((v).wrapping_mul(10000i64)).wrapping_add(logCode(c));
 }
 
 pub fn OrderIndex(mem: &vg::Arena, c: &mut Counter) -> i64 {
     let s: vg::Slice<i32> = { let _t1 = 6i64; sliceFrom(mem, c, _t1) };
     let v: i64 = ((s.get({ let _t2 = 2i32; bump(mem, c, _t2) })) as i64);
-    return ((v * 10000i64) + logCode(c));
+    return ((v).wrapping_mul(10000i64)).wrapping_add(logCode(c));
 }
 
 pub fn SpareProbe(mem: &vg::Arena) -> i64 {
@@ -195,9 +195,9 @@ pub fn SpareProbe(mem: &vg::Arena) -> i64 {
         let mut i: i64 = 0i64;
         '_b1: while (i < s.len) {
             '_c1: {
-                t = (((t * 10i64) + s.get(i)) + 1i64);
+                t = (((t).wrapping_mul(10i64)).wrapping_add(s.get(i))).wrapping_add(1i64);
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     let mut g: vg::Slice<i64> = vg::make_cap::<i64>(mem, 0i64, 2i64);
@@ -211,9 +211,9 @@ pub fn SpareProbe(mem: &vg::Arena) -> i64 {
         let mut i_2: i64 = 0i64;
         '_b2: while (i_2 < 4i64) {
             '_c2: {
-                t = (((t * 10i64) + g.get(i_2)) + 1i64);
+                t = (((t).wrapping_mul(10i64)).wrapping_add(g.get(i_2))).wrapping_add(1i64);
             }
-            i_2 += 1i64;
+            i_2 = (i_2).wrapping_add(1i64);
         }
     }
     return t;
@@ -223,29 +223,29 @@ pub fn NilProbe(mem: &vg::Arena) -> i64 {
     let mut s: vg::Slice<i32> = vg::zero();
     let mut t: i64 = 0i64;
     if (s.p.is_null()) {
-        t += 1i64;
+        t = (t).wrapping_add(1i64);
     }
     let s2: vg::Slice<i32> = vg::make::<i32>(mem, 0i64);
     if (!s2.p.is_null()) {
-        t += 2i64;
+        t = (t).wrapping_add(2i64);
     }
     s = vg::append(mem, s, 5i32);
     if (!s.p.is_null()) {
-        t += 4i64;
+        t = (t).wrapping_add(4i64);
     }
     return t;
 }
 
 pub fn WrapProbe(a: i64, b: i64) -> i64 {
-    return (((a * b) + a) - b);
+    return (((a).wrapping_mul(b)).wrapping_add(a)).wrapping_sub(b);
 }
 
 pub fn Narrow32(a: i32, b: i32) -> i32 {
-    return (((a * b) - (a).wrapping_div(b)) + (a).wrapping_rem(b));
+    return (((a).wrapping_mul(b)).wrapping_sub((a).wrapping_div(b))).wrapping_add((a).wrapping_rem(b));
 }
 
 pub fn WrapU8(a: u8, b: u8) -> u8 {
-    return ((a - b) * 3u8);
+    return ((a).wrapping_sub(b)).wrapping_mul(3u8);
 }
 
 pub fn AndNotProbe(a: u32, b: u32) -> u32 {
@@ -259,7 +259,7 @@ pub fn ShiftProbe(x: u64, n: i64) -> u64 {
 }
 
 pub fn ConvProbe(x: i64) -> u64 {
-    return (((((x) as u8)) as u64) + (((((((x) as i32)) as u32)) as u64) * 1000u64));
+    return (((((x) as u8)) as u64)).wrapping_add((((((((x) as i32)) as u32)) as u64)).wrapping_mul(1000u64));
 }
 
 pub fn SubWrite(mem: &vg::Arena, n: i64) -> i64 {
@@ -271,9 +271,9 @@ pub fn SubWrite(mem: &vg::Arena, n: i64) -> i64 {
         let mut i: i64 = 0i64;
         '_b1: while (i < s.len) {
             '_c1: {
-                t = ((t * 10i64) + s.get(i));
+                t = ((t).wrapping_mul(10i64)).wrapping_add(s.get(i));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return t;
@@ -283,20 +283,20 @@ pub fn AndNotOrder(mem: &vg::Arena, c: &mut Counter) -> i64 {
     let s: vg::Slice<u64> = vg::make::<u64>(mem, 8i64);
     s.set(3i64, 255u64);
     {
-        let _t2 = s.slot(({ let _t3 = 1i32; bump(mem, c, _t3) } + 2i64));
-        let _t4 = !(((({ let _t1 = 2i32; bump(mem, c, _t1) }) as u64) + 15u64));
+        let _t2 = s.slot(({ let _t3 = 1i32; bump(mem, c, _t3) }).wrapping_add(2i64));
+        let _t4 = !(((({ let _t1 = 2i32; bump(mem, c, _t1) }) as u64)).wrapping_add(15u64));
         _t2.update(_t4, |mut _t5, _t4| { _t5 &= _t4; _t5 });
     }
-    return ((((s.get(3i64)) as i64) * 100000i64) + logCode(c));
+    return ((((s.get(3i64)) as i64)).wrapping_mul(100000i64)).wrapping_add(logCode(c));
 }
 
 pub fn ZeroArray() -> i64 {
     let mut a: [i32; (0) as usize] = vg::zero();
     let mut t: i64 = 0i64;
     if (!vg::arr_slice(&raw mut a, 0i64, ((0) as i64)).p.is_null()) {
-        t += 1i64;
+        t = (t).wrapping_add(1i64);
     }
-    t = ((t * 10i64) + ((vg::arr_slice(&raw mut a, 0i64, ((0) as i64)).len) as i64));
+    t = ((t).wrapping_mul(10i64)).wrapping_add(((vg::arr_slice(&raw mut a, 0i64, ((0) as i64)).len) as i64));
     return t;
 }
 
@@ -308,13 +308,13 @@ pub fn MakeU64(mem: &vg::Arena, n: u64) -> i64 {
 pub fn mkTriple(x: i64) -> [i64; (3) as usize] {
     let mut a: [i64; (3) as usize] = vg::zero();
     a[(0i64) as usize] = x;
-    a[(1i64) as usize] = (x + 1i64);
-    a[(2i64) as usize] = (x + 2i64);
+    a[(1i64) as usize] = (x).wrapping_add(1i64);
+    a[(2i64) as usize] = (x).wrapping_add(2i64);
     return a;
 }
 
 pub fn PickArray(mem: &vg::Arena, c: &mut Counter) -> i64 {
     let v: i64 = mkTriple(40i64)[({ let _t1 = 2i32; bump(mem, c, _t1) }) as usize];
-    return ((v * 10000i64) + logCode(c));
+    return ((v).wrapping_mul(10000i64)).wrapping_add(logCode(c));
 }
 

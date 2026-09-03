@@ -264,6 +264,27 @@ static revera_match match_of(revera_eng_Match match) {
     return (revera_match){(size_t)match.So, (size_t)match.Eo, true};
 }
 
+bool revera_match_view(const char *subject, size_t subject_len, revera_match match,
+                       const char **data, size_t *data_len) {
+    if (data != NULL) {
+        *data = NULL;
+    }
+    if (data_len != NULL) {
+        *data_len = 0;
+    }
+    if (!match.participated || match.start > match.end || match.end > subject_len ||
+        (subject == NULL && subject_len != 0)) {
+        return false;
+    }
+    if (data != NULL) {
+        *data = match.start == 0 ? subject : subject + match.start;
+    }
+    if (data_len != NULL) {
+        *data_len = match.end - match.start;
+    }
+    return true;
+}
+
 bool revera_matches(const revera_regex *regex, const char *subject, size_t subject_len,
                     revera_error *error) {
     vg_arena scratch = {0};

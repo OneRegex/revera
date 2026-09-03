@@ -25,6 +25,27 @@ test "find and captures" {
     try testing.expectEqualStrings("12", caps.get(2).?.text());
 }
 
+test "match text uses UTF-8 byte boundaries" {
+    var re = try revera.Regex.compile(gpa, "(é)(β)", .{});
+    defer re.deinit();
+
+    const subject = "xéβz";
+    const m = (try re.find(subject)).?;
+    try testing.expectEqual(1, m.start);
+    try testing.expectEqual(5, m.end);
+    try testing.expectEqual(4, m.len());
+    try testing.expectEqualStrings("éβ", m.text());
+
+    var caps = (try re.captures(subject)).?;
+    defer caps.deinit();
+    try testing.expectEqual(1, caps.get(1).?.start);
+    try testing.expectEqual(3, caps.get(1).?.end);
+    try testing.expectEqualStrings("é", caps.get(1).?.text());
+    try testing.expectEqual(3, caps.get(2).?.start);
+    try testing.expectEqual(5, caps.get(2).?.end);
+    try testing.expectEqualStrings("β", caps.get(2).?.text());
+}
+
 test "a group that took no part reads as null" {
     var re = try revera.Regex.compile(gpa, "(a)|(b)", .{});
     defer re.deinit();

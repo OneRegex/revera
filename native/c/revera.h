@@ -61,6 +61,12 @@ typedef struct {
     bool participated;
 } revera_match;
 
+// revera_match_view returns a borrowed byte view of one match.
+// It validates participation and bounds against the supplied subject.
+// The view is not NUL-terminated and remains valid only as long as the subject does.
+bool revera_match_view(const char *subject, size_t subject_len, revera_match match,
+                       const char **data, size_t *data_len);
+
 // revera_options controls compilation.
 // Its zero value selects the default behavior and the POSIX locale.
 typedef struct {

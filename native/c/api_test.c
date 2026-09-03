@@ -30,9 +30,11 @@ static revera_regex *compile(const char *pattern, const revera_options *options)
 }
 
 static bool text_is(const char *subject, revera_match match, const char *want) {
-    size_t n = strlen(want);
-    return match.participated && match.end - match.start == n &&
-           memcmp(subject + match.start, want, n) == 0;
+    const char *data;
+    size_t data_len;
+    size_t want_len = strlen(want);
+    return revera_match_view(subject, strlen(subject), match, &data, &data_len) &&
+           data_len == want_len && memcmp(data, want, want_len) == 0;
 }
 
 static void find_and_captures(void) {
@@ -56,6 +58,42 @@ static void find_and_captures(void) {
         check(text_is(subject, groups[2], "12"), "group 2");
     }
     revera_regex_free(regex);
+}
+
+static void match_views(void) {
+    const char subject[] = "xéβz";
+    const char *data = (const char *)1;
+    size_t data_len = 99;
+
+    revera_match match = {1, 5, true};
+    check(revera_match_view(subject, sizeof(subject) - 1, match, &data, &data_len) &&
+              data_len == 4 && memcmp(data, "éβ", 4) == 0,
+          "UTF-8 match view");
+
+    match = (revera_match){0, 0, true};
+    check(revera_match_view(NULL, 0, match, &data, &data_len) &&
+              data == NULL && data_len == 0,
+          "empty match view");
+
+    match = (revera_match){0, 0, false};
+    data = (const char *)1;
+    data_len = 99;
+    check(!revera_match_view(subject, sizeof(subject) - 1, match, &data, &data_len) &&
+              data == NULL && data_len == 0,
+          "absent match view");
+
+    match = (revera_match){3, 2, true};
+    check(!revera_match_view(subject, sizeof(subject) - 1, match, NULL, NULL),
+          "reversed match view");
+    match = (revera_match){0, sizeof(subject), true};
+    check(!revera_match_view(subject, sizeof(subject) - 1, match, NULL, NULL),
+          "out-of-bounds match view");
+
+    const char bytes[] = {'a', '\0', 'b'};
+    match = (revera_match){1, 2, true};
+    check(revera_match_view(bytes, sizeof(bytes), match, &data, &data_len) &&
+              data_len == 1 && data[0] == '\0',
+          "embedded NUL match view");
 }
 
 static void absent_and_missing(void) {
@@ -221,6 +259,7 @@ static void errors_and_contract(void) {
 
 int main(void) {
     find_and_captures();
+    match_views();
     absent_and_missing();
     iteration();
     replacement();

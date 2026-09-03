@@ -21,6 +21,30 @@ fn find_and_captures() {
 }
 
 #[test]
+fn match_text_uses_utf8_byte_boundaries() {
+    let re = Regex::new("(é)(β)").unwrap();
+    let subject = "xéβz";
+    let m = re.find(subject).unwrap().unwrap();
+    assert_eq!(m.range(), 1..5);
+    assert_eq!(m.len(), 4);
+    assert_eq!(m.as_str(), "éβ");
+
+    let caps = re.captures(subject).unwrap().unwrap();
+    assert_eq!(caps.get(1).unwrap().range(), 1..3);
+    assert_eq!(caps.get(1).unwrap().as_str(), "é");
+    assert_eq!(caps.get(2).unwrap().range(), 3..5);
+    assert_eq!(caps.get(2).unwrap().as_str(), "β");
+}
+
+#[test]
+fn capture_solver_wraps_hash_arithmetic() {
+    let re = Regex::new("(a*)*").unwrap();
+    let caps = re.captures("").unwrap().unwrap();
+    assert_eq!(caps.get(0).unwrap().as_str(), "");
+    assert_eq!(caps.get(1).unwrap().as_str(), "");
+}
+
+#[test]
 fn absent_group_reads_as_none() {
     let re = Regex::new("(a)|(b)").unwrap();
     let caps = re.captures("a").unwrap().unwrap();

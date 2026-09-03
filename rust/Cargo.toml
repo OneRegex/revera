@@ -29,13 +29,7 @@ path = "src/lib.rs"
 members = ["tools"]
 exclude = ["fuzz"]
 
-# The Vego specification gives integers Go's wrapping semantics, so
-# overflow checks stay off in every profile. The runtime's bounds
-# asserts use assert!, which debug-assertions does not control, but
-# keeping it on also guards the few debug_assert! sites in std.
-[profile.dev]
-overflow-checks = false
-
 [profile.release]
-overflow-checks = false
+# The runtime's bounds asserts use assert!, which debug-assertions does not control.
+# Keeping this on also guards the few debug_assert! sites in std.
 debug-assertions = true

@@ -20,7 +20,11 @@ revera_regex *re = revera_compile(pattern, sizeof(pattern) - 1, NULL, &error);
 if (re != NULL) {
     revera_match groups[3];
     if (revera_captures(re, "__abc12__", 9, groups, 3, &error)) {
-        /* groups[1] names the bytes "abc". */
+        const char *text;
+        size_t text_len;
+        if (revera_match_view("__abc12__", 9, groups[1], &text, &text_len)) {
+            /* text points to text_len bytes containing "abc". */
+        }
     }
     revera_regex_free(re);
 }
@@ -34,6 +38,8 @@ Functions report engine or input failures through a null pointer or `false`, and
 
 Offsets and string lengths are byte counts.
 A `revera_match` stores offsets into the subject rather than a pointer to it.
+`revera_match_view` validates those offsets and returns the matched bytes without copying them.
+The view is not NUL-terminated and remains valid only as long as the subject does.
 
 An iterator borrows its regular expression and subject until `revera_iterator_free`.
 By contrast, replacement functions return memory that the caller frees with `free`.

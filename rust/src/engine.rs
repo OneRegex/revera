@@ -490,13 +490,13 @@ pub fn vego_eq_memoKey(a: memoKey, b: memoKey) -> bool {
 
 pub fn parseBracket(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
     let start: i64 = p.pos;
-    p.pos += 1i64;
+    p.pos = (p.pos).wrapping_add(1i64);
     let mut b: bracketSet = vg::zero();
     b.icase = ((p.flags & FlagICase) != 0u32);
     b.nlMode = ((p.flags & FlagNewline) != 0u32);
     if (peekByte(p) == 94u8) {
         b.negated = true;
-        p.pos += 1i64;
+        p.pos = (p.pos).wrapping_add(1i64);
     }
     let mut empty: bool = true;
     loop {
@@ -504,11 +504,11 @@ pub fn parseBracket(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
             return { let _t1 = ErrEBrack; let _t2 = start; fail(p, _t1, _t2) };
         }
         if ((peekByte(p) == 93u8) && (!empty)) {
-            p.pos += 1i64;
+            p.pos = (p.pos).wrapping_add(1i64);
             finalizeBracket(mem, &mut b, loc);
             p.brackets = vg::append(mem, p.brackets, b);
             let n: i32 = { let _t3 = opBracket; addNode(mem, p, _t3) };
-            p.nodes.update(((n) as i64), (((p.brackets.len - 1i64)) as i32), |mut _t5, _t4| { _t5.br = _t4; _t5 });
+            p.nodes.update(((n) as i64), (((p.brackets.len).wrapping_sub(1i64)) as i32), |mut _t5, _t4| { _t5.br = _t4; _t5 });
             return n;
         }
         let _t6 = { let _t7 = start; parseBracketItem(mem, p, loc, _t7) };
@@ -518,9 +518,9 @@ pub fn parseBracket(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
             return (1i32).wrapping_neg();
         }
         empty = false;
-        if ((((item.kind == itemChar) && (peekByte(p) == 45u8)) && ({ let _t8 = 1i64; peekByteAt(p, _t8) } != 93u8)) && ((p.pos + 1i64) < p.src.len)) {
+        if ((((item.kind == itemChar) && (peekByte(p) == 45u8)) && ({ let _t8 = 1i64; peekByteAt(p, _t8) } != 93u8)) && ((p.pos).wrapping_add(1i64) < p.src.len)) {
             let rangeStart: i64 = p.pos;
-            p.pos += 1i64;
+            p.pos = (p.pos).wrapping_add(1i64);
             let _t9 = { let _t10 = start; parseBracketItem(mem, p, loc, _t10) };
             let end: bracketItem = _t9.0;
             let ok2: bool = _t9.1;
@@ -545,7 +545,7 @@ pub fn parseBracket(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
             }
             continue;
         }
-        if ((((item.kind != itemChar) && (peekByte(p) == 45u8)) && ({ let _t20 = 1i64; peekByteAt(p, _t20) } != 93u8)) && ((p.pos + 1i64) < p.src.len)) {
+        if ((((item.kind != itemChar) && (peekByte(p) == 45u8)) && ({ let _t20 = 1i64; peekByteAt(p, _t20) } != 93u8)) && ((p.pos).wrapping_add(1i64) < p.src.len)) {
             return { let _t21 = ErrERange; let _t22 = p.pos; fail(p, _t21, _t22) };
         }
         {
@@ -656,7 +656,7 @@ pub fn runesToString(mem: &vg::Arena, seq: vg::Slice<i32>) -> vg::Str {
                     }
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return vg::str_from_bytes(mem, out);
@@ -664,18 +664,18 @@ pub fn runesToString(mem: &vg::Arena, seq: vg::Slice<i32>) -> vg::Str {
 
 pub fn scanInner(mem: &vg::Arena, p: &mut parser, closer: vg::Str, emptyCode: i32) -> (vg::Slice<i32>, bool) {
     let start: i64 = p.pos;
-    p.pos += 2i64;
+    p.pos = (p.pos).wrapping_add(2i64);
     let mut end: i64 = (1i64).wrapping_neg();
     {
         let mut i: i64 = p.pos;
-        '_b1: while ((i + 1i64) < p.src.len) {
+        '_b1: while ((i).wrapping_add(1i64) < p.src.len) {
             '_c1: {
-                if ((p.src.byte(i) == closer.byte(0i64)) && (p.src.byte((i + 1i64)) == closer.byte(1i64))) {
+                if ((p.src.byte(i) == closer.byte(0i64)) && (p.src.byte((i).wrapping_add(1i64)) == closer.byte(1i64))) {
                     end = i;
                     break '_b1;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if (end < 0i64) {
@@ -686,7 +686,7 @@ pub fn scanInner(mem: &vg::Arena, p: &mut parser, closer: vg::Str, emptyCode: i3
         let _ = { let _t4 = emptyCode; let _t5 = start; fail(p, _t4, _t5) };
         return (vg::zero::<vg::Slice<i32>>(), false);
     }
-    let mut content: vg::Slice<i32> = vg::make_cap::<i32>(mem, 0i64, (end - p.pos));
+    let mut content: vg::Slice<i32> = vg::make_cap::<i32>(mem, 0i64, (end).wrapping_sub(p.pos));
     let mut at: i64 = p.pos;
     while (at < end) {
         let _t6 = decodeRuneAt(p.src, at);
@@ -697,9 +697,9 @@ pub fn scanInner(mem: &vg::Arena, p: &mut parser, closer: vg::Str, emptyCode: i3
             return (vg::zero::<vg::Slice<i32>>(), false);
         }
         content = vg::append(mem, content, r);
-        at += size;
+        at = (at).wrapping_add(size);
     }
-    p.pos = (end + 2i64);
+    p.pos = (end).wrapping_add(2i64);
     return (content, true);
 }
 
@@ -717,8 +717,8 @@ pub fn sortRanges(mem: &vg::Arena, rr: vg::Slice<runeRange>) {
                     let mut lo: i64 = 0i64;
                     '_b2: while (lo < n) {
                         '_c2: {
-                            let mid: i64 = std::cmp::min((lo + width), n);
-                            let hi: i64 = std::cmp::min((lo + (2i64 * width)), n);
+                            let mid: i64 = std::cmp::min((lo).wrapping_add(width), n);
+                            let hi: i64 = std::cmp::min((lo).wrapping_add((2i64).wrapping_mul(width)), n);
                             let mut i: i64 = lo;
                             let mut j: i64 = mid;
                             let mut w: i64 = lo;
@@ -726,30 +726,30 @@ pub fn sortRanges(mem: &vg::Arena, rr: vg::Slice<runeRange>) {
                                 let less: bool = ((rr.get(i).lo < rr.get(j).lo) || ((rr.get(i).lo == rr.get(j).lo) && (rr.get(i).hi <= rr.get(j).hi)));
                                 if less {
                                     tmp.set(w, rr.get(i));
-                                    i += 1i64;
+                                    i = (i).wrapping_add(1i64);
                                 } else {
                                     tmp.set(w, rr.get(j));
-                                    j += 1i64;
+                                    j = (j).wrapping_add(1i64);
                                 }
-                                w += 1i64;
+                                w = (w).wrapping_add(1i64);
                             }
                             while (i < mid) {
                                 tmp.set(w, rr.get(i));
-                                i += 1i64;
-                                w += 1i64;
+                                i = (i).wrapping_add(1i64);
+                                w = (w).wrapping_add(1i64);
                             }
                             while (j < hi) {
                                 tmp.set(w, rr.get(j));
-                                j += 1i64;
-                                w += 1i64;
+                                j = (j).wrapping_add(1i64);
+                                w = (w).wrapping_add(1i64);
                             }
                         }
-                        lo += (2i64 * width);
+                        lo = (lo).wrapping_add((2i64).wrapping_mul(width));
                     }
                 }
                 let _ = vg::vcopy(rr, tmp);
             }
-            width *= 2i64;
+            width = (width).wrapping_mul(2i64);
         }
     }
 }
@@ -762,7 +762,7 @@ pub fn finalizeBracket(mem: &vg::Arena, b: &mut bracketSet, loc: &mut Locale) {
                 '_c1: {
                     b.multiLens |= (1u16 << b.elems.get(i).len);
                 }
-                i += 1i64;
+                i = (i).wrapping_add(1i64);
             }
         }
         if (b.equivs.len > 0i64) {
@@ -772,7 +772,7 @@ pub fn finalizeBracket(mem: &vg::Arena, b: &mut bracketSet, loc: &mut Locale) {
                     '_c2: {
                         b.multiLens |= (1u16 << length);
                     }
-                    length += 1i64;
+                    length = (length).wrapping_add(1i64);
                 }
             }
         }
@@ -786,28 +786,28 @@ pub fn finalizeBracket(mem: &vg::Arena, b: &mut bracketSet, loc: &mut Locale) {
         let mut i_2: i64 = 1i64;
         '_b3: while (i_2 < b.ranges.len) {
             '_c3: {
-                if (b.ranges.get(i_2).lo <= (b.ranges.get(w).hi + 1i32)) {
+                if (b.ranges.get(i_2).lo <= (b.ranges.get(w).hi).wrapping_add(1i32)) {
                     if (b.ranges.get(i_2).hi > b.ranges.get(w).hi) {
                         b.ranges.update(w, b.ranges.get(i_2).hi, |mut _t5, _t4| { _t5.hi = _t4; _t5 });
                     }
                 } else {
-                    w += 1i64;
+                    w = (w).wrapping_add(1i64);
                     b.ranges.set(w, b.ranges.get(i_2));
                 }
             }
-            i_2 += 1i64;
+            i_2 = (i_2).wrapping_add(1i64);
         }
     }
-    b.ranges = b.ranges.head((w + 1i64));
+    b.ranges = b.ranges.head((w).wrapping_add(1i64));
 }
 
 pub fn bracketInRanges(brs: vg::Slice<bracketSet>, bi: i32, c: i32) -> bool {
     let mut low: i64 = 0i64;
     let mut high: i64 = brs.get(((bi) as i64)).ranges.len;
     while (low < high) {
-        let middle: i64 = (low + ((high - low)).wrapping_div(2i64));
+        let middle: i64 = (low).wrapping_add(((high).wrapping_sub(low)).wrapping_div(2i64));
         if (brs.get(((bi) as i64)).ranges.get(middle).hi < c) {
-            low = (middle + 1i64);
+            low = (middle).wrapping_add(1i64);
         } else {
             if (brs.get(((bi) as i64)).ranges.get(middle).lo > c) {
                 high = middle;
@@ -836,7 +836,7 @@ pub fn bracketPositiveSingle(brs: vg::Slice<bracketSet>, bi: i32, loc: &mut Loca
                     return true;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return false;
@@ -866,7 +866,7 @@ pub fn bracketMatchesOne(brs: vg::Slice<bracketSet>, bi: i32, loc: &mut Locale, 
                     return true;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return false;
@@ -907,14 +907,14 @@ pub fn bracketMatchesMulti(brs: vg::Slice<bracketSet>, bi: i32, loc: &mut Locale
                                 break '_b2;
                             }
                         }
-                        k += 1i64;
+                        k = (k).wrapping_add(1i64);
                     }
                 }
                 if all {
                     return true;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if (brs.get(((bi) as i64)).equivs.len == 0i64) {
@@ -937,13 +937,13 @@ pub fn equivCandidate(brs: vg::Slice<bracketSet>, bi: i32, loc: &mut Locale, t: 
                         return true;
                     }
                 }
-                i += 1i64;
+                i = (i).wrapping_add(1i64);
             }
         }
         return false;
     }
     candidate.r[(at) as usize] = t.get(at);
-    if { let _t5 = brs; let _t6 = bi; let _t7 = t; let _t8 = (at + 1i64); equivCandidate(_t5, _t6, loc, _t7, candidate, _t8) } {
+    if { let _t5 = brs; let _t6 = bi; let _t7 = t; let _t8 = (at).wrapping_add(1i64); equivCandidate(_t5, _t6, loc, _t7, candidate, _t8) } {
         return true;
     }
     if (!brs.get(((bi) as i64)).icase) {
@@ -956,18 +956,18 @@ pub fn equivCandidate(brs: vg::Slice<bracketSet>, bi: i32, loc: &mut Locale, t: 
         '_b10: while (i_2 < buf.n) {
             '_c10: {
                 candidate.r[(at) as usize] = buf.r[(i_2) as usize];
-                if { let _t11 = brs; let _t12 = bi; let _t13 = t; let _t14 = (at + 1i64); equivCandidate(_t11, _t12, loc, _t13, candidate, _t14) } {
+                if { let _t11 = brs; let _t12 = bi; let _t13 = t; let _t14 = (at).wrapping_add(1i64); equivCandidate(_t11, _t12, loc, _t13, candidate, _t14) } {
                     return true;
                 }
             }
-            i_2 += 1i64;
+            i_2 = (i_2).wrapping_add(1i64);
         }
     }
     return false;
 }
 
 pub fn bracketMatchesSpan(brs: vg::Slice<bracketSet>, bi: i32, loc: &mut Locale, runes: vg::Slice<i32>, i: i64, j: i64) -> bool {
-    let k: i64 = (j - i);
+    let k: i64 = (j).wrapping_sub(i);
     if (k < 1i64) {
         return false;
     }
@@ -991,7 +991,7 @@ pub fn bracketMinChars(brs: vg::Slice<bracketSet>, bi: i32, loc: &mut Locale) ->
             '_c1: {
                 best = std::cmp::min(best, brs.get(((bi) as i64)).elems.get(i).len);
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     {
@@ -1000,14 +1000,14 @@ pub fn bracketMinChars(brs: vg::Slice<bracketSet>, bi: i32, loc: &mut Locale) ->
             '_c2: {
                 best = std::cmp::min(best, { let _t3 = brs.get(((bi) as i64)).equivs.get(i_2); localeMinEquivLength(loc, _t3) });
             }
-            i_2 += 1i64;
+            i_2 = (i_2).wrapping_add(1i64);
         }
     }
     return best;
 }
 
 pub fn capStep(s: &mut capSolver) -> bool {
-    s.work += 1i64;
+    s.work = (s.work).wrapping_add(1i64);
     if (s.work > capWorkLimit) {
         s.failed = true;
     }
@@ -1027,11 +1027,11 @@ pub fn newTree(mem: &vg::Arena, s: &mut capSolver, t: ptree) -> i32 {
         return 0i32;
     }
     s.trees = vg::append(mem, s.trees, t);
-    return (((s.trees.len - 1i64)) as i32);
+    return (((s.trees.len).wrapping_sub(1i64)) as i32);
 }
 
 pub fn kidAlloc(mem: &vg::Arena, s: &mut capSolver, length: i64) -> i64 {
-    if (s.failed || ((s.kidStore.len + length) > solverArenaLimit)) {
+    if (s.failed || ((s.kidStore.len).wrapping_add(length) > solverArenaLimit)) {
         s.failed = true;
         while (s.kidStore.len < length) {
             s.kidStore = vg::append(mem, s.kidStore, (1i32).wrapping_neg());
@@ -1039,8 +1039,8 @@ pub fn kidAlloc(mem: &vg::Arena, s: &mut capSolver, length: i64) -> i64 {
         return 0i64;
     }
     let off: i64 = s.kidStore.len;
-    if ((off + length) <= s.kidStore.cap) {
-        s.kidStore = s.kidStore.head((off + length));
+    if ((off).wrapping_add(length) <= s.kidStore.cap) {
+        s.kidStore = s.kidStore.head((off).wrapping_add(length));
         return off;
     }
     {
@@ -1049,7 +1049,7 @@ pub fn kidAlloc(mem: &vg::Arena, s: &mut capSolver, length: i64) -> i64 {
             '_c1: {
                 s.kidStore = vg::append(mem, s.kidStore, (1i32).wrapping_neg());
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return off;
@@ -1062,9 +1062,9 @@ pub fn kidAlloc1(mem: &vg::Arena, s: &mut capSolver, t: i32) -> i64 {
 }
 
 pub fn kidPrepend(mem: &vg::Arena, s: &mut capSolver, head: i32, tailOff: i64, tailLen: i64) -> i64 {
-    let off: i64 = { let _t1 = (tailLen + 1i64); kidAlloc(mem, s, _t1) };
+    let off: i64 = { let _t1 = (tailLen).wrapping_add(1i64); kidAlloc(mem, s, _t1) };
     s.kidStore.set(off, head);
-    let _ = vg::vcopy(s.kidStore.sub((off + 1i64), ((off + 1i64) + tailLen)), s.kidStore.sub(tailOff, (tailOff + tailLen)));
+    let _ = vg::vcopy(s.kidStore.sub((off).wrapping_add(1i64), ((off).wrapping_add(1i64)).wrapping_add(tailLen)), s.kidStore.sub(tailOff, (tailOff).wrapping_add(tailLen)));
     return off;
 }
 
@@ -1076,7 +1076,7 @@ pub fn setMatch(caps: vg::Slice<Match>, idx: i64, so: i64, eo: i64) {
 pub fn addCounters(s: &mut capSolver, re: &mut Regexp, t: i32, out: vg::Slice<i64>) {
     let ni: i32 = s.trees.get(((t) as i64)).n;
     if ((re.nodes.get(((ni) as i64)).op == opRepeat) && re.nodes.get(((ni) as i64)).minimal) {
-        out.update(re.nodes.get(((ni) as i64)).index, (((s.trees.get(((t) as i64)).j - s.trees.get(((t) as i64)).i)) as i64), |mut _t2, _t1| { _t2 += _t1; _t2 });
+        out.update(re.nodes.get(((ni) as i64)).index, (((s.trees.get(((t) as i64)).j).wrapping_sub(s.trees.get(((t) as i64)).i)) as i64), |mut _t2, _t1| { _t2 = (_t2).wrapping_add(_t1); _t2 });
     }
     let off: i64 = ((s.trees.get(((t) as i64)).kidsOff) as i64);
     let count: i64 = ((s.trees.get(((t) as i64)).kidsLen) as i64);
@@ -1084,22 +1084,22 @@ pub fn addCounters(s: &mut capSolver, re: &mut Regexp, t: i32, out: vg::Slice<i6
         let mut k: i64 = 0i64;
         '_b3: while (k < count) {
             '_c3: {
-                { let _t4 = s.kidStore.get((off + k)); let _t5 = out; addCounters(s, re, _t4, _t5) };
+                { let _t4 = s.kidStore.get((off).wrapping_add(k)); let _t5 = out; addCounters(s, re, _t4, _t5) };
             }
-            k += 1i64;
+            k = (k).wrapping_add(1i64);
         }
     }
 }
 
 pub fn structCmp(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
-    let spanA: i64 = (((s.trees.get(((a) as i64)).j - s.trees.get(((a) as i64)).i)) as i64);
-    let spanB: i64 = (((s.trees.get(((b) as i64)).j - s.trees.get(((b) as i64)).i)) as i64);
+    let spanA: i64 = (((s.trees.get(((a) as i64)).j).wrapping_sub(s.trees.get(((a) as i64)).i)) as i64);
+    let spanB: i64 = (((s.trees.get(((b) as i64)).j).wrapping_sub(s.trees.get(((b) as i64)).i)) as i64);
     let ni: i32 = s.trees.get(((a) as i64)).n;
     if (spanA != spanB) {
         if ((re.nodes.get(((ni) as i64)).op == opRepeat) && re.nodes.get(((ni) as i64)).minimal) {
-            return (spanA - spanB);
+            return (spanA).wrapping_sub(spanB);
         }
-        return (spanB - spanA);
+        return (spanB).wrapping_sub(spanA);
     }
     let offA: i64 = ((s.trees.get(((a) as i64)).kidsOff) as i64);
     let offB: i64 = ((s.trees.get(((b) as i64)).kidsOff) as i64);
@@ -1109,7 +1109,7 @@ pub fn structCmp(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
         let _t1 = re.nodes.get(((ni) as i64)).op;
         if _t1 == opAlt {
             if (s.trees.get(((a) as i64)).branch != s.trees.get(((b) as i64)).branch) {
-                return (((s.trees.get(((a) as i64)).branch - s.trees.get(((b) as i64)).branch)) as i64);
+                return (((s.trees.get(((a) as i64)).branch).wrapping_sub(s.trees.get(((b) as i64)).branch)) as i64);
             }
             return { let _t2 = s.kidStore.get(offA); let _t3 = s.kidStore.get(offB); structCmp(s, re, _t2, _t3) };
         } else if _t1 == opConcat || _t1 == opGroup {
@@ -1117,12 +1117,12 @@ pub fn structCmp(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
                 let mut idx: i64 = 0i64;
                 '_b4: while (idx < lenA) {
                     '_c4: {
-                        let c: i64 = { let _t5 = s.kidStore.get((offA + idx)); let _t6 = s.kidStore.get((offB + idx)); structCmp(s, re, _t5, _t6) };
+                        let c: i64 = { let _t5 = s.kidStore.get((offA).wrapping_add(idx)); let _t6 = s.kidStore.get((offB).wrapping_add(idx)); structCmp(s, re, _t5, _t6) };
                         if (c != 0i64) {
                             return c;
                         }
                     }
-                    idx += 1i64;
+                    idx = (idx).wrapping_add(1i64);
                 }
             }
         } else if _t1 == opRepeat {
@@ -1131,33 +1131,33 @@ pub fn structCmp(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
                 let mut idx_2: i64 = 0i64;
                 '_b7: while (idx_2 < limit) {
                     '_c7: {
-                        let ka: i32 = s.kidStore.get((offA + idx_2));
-                        let kb: i32 = s.kidStore.get((offB + idx_2));
-                        let sa: i64 = (((s.trees.get(((ka) as i64)).j - s.trees.get(((ka) as i64)).i)) as i64);
-                        let sb: i64 = (((s.trees.get(((kb) as i64)).j - s.trees.get(((kb) as i64)).i)) as i64);
+                        let ka: i32 = s.kidStore.get((offA).wrapping_add(idx_2));
+                        let kb: i32 = s.kidStore.get((offB).wrapping_add(idx_2));
+                        let sa: i64 = (((s.trees.get(((ka) as i64)).j).wrapping_sub(s.trees.get(((ka) as i64)).i)) as i64);
+                        let sb: i64 = (((s.trees.get(((kb) as i64)).j).wrapping_sub(s.trees.get(((kb) as i64)).i)) as i64);
                         if (sa != sb) {
                             if re.nodes.get(((ni) as i64)).minimal {
-                                return (sa - sb);
+                                return (sa).wrapping_sub(sb);
                             }
-                            return (sb - sa);
+                            return (sb).wrapping_sub(sa);
                         }
                     }
-                    idx_2 += 1i64;
+                    idx_2 = (idx_2).wrapping_add(1i64);
                 }
             }
             if (lenA != lenB) {
-                return (lenA - lenB);
+                return (lenA).wrapping_sub(lenB);
             }
             {
                 let mut idx_3: i64 = 0i64;
                 '_b8: while (idx_3 < lenA) {
                     '_c8: {
-                        let c_2: i64 = { let _t9 = s.kidStore.get((offA + idx_3)); let _t10 = s.kidStore.get((offB + idx_3)); structCmp(s, re, _t9, _t10) };
+                        let c_2: i64 = { let _t9 = s.kidStore.get((offA).wrapping_add(idx_3)); let _t10 = s.kidStore.get((offB).wrapping_add(idx_3)); structCmp(s, re, _t9, _t10) };
                         if (c_2 != 0i64) {
                             return c_2;
                         }
                     }
-                    idx_3 += 1i64;
+                    idx_3 = (idx_3).wrapping_add(1i64);
                 }
             }
         }
@@ -1177,7 +1177,7 @@ pub fn cmpCand(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
                     s.ctrA.set(idx, 0i64);
                     s.ctrB.set(idx, 0i64);
                 }
-                idx += 1i64;
+                idx = (idx).wrapping_add(1i64);
             }
         }
         { let _t2 = a; let _t3 = s.ctrA; addCounters(s, re, _t2, _t3) };
@@ -1187,10 +1187,10 @@ pub fn cmpCand(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
             '_b6: while (idx_2 < re.minSlots) {
                 '_c6: {
                     if (s.ctrA.get(idx_2) != s.ctrB.get(idx_2)) {
-                        return (s.ctrA.get(idx_2) - s.ctrB.get(idx_2));
+                        return (s.ctrA.get(idx_2)).wrapping_sub(s.ctrB.get(idx_2));
                     }
                 }
-                idx_2 += 1i64;
+                idx_2 = (idx_2).wrapping_add(1i64);
             }
         }
     }
@@ -1198,7 +1198,7 @@ pub fn cmpCand(s: &mut capSolver, re: &mut Regexp, a: i32, b: i32) -> i64 {
 }
 
 pub fn bestParse(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64) -> i32 {
-    let span: i64 = (j - i);
+    let span: i64 = (j).wrapping_sub(i);
     if ((span < re.nodes.get(((ni) as i64)).minL) || ((re.nodes.get(((ni) as i64)).maxL < lenInf) && (span > re.nodes.get(((ni) as i64)).maxL))) {
         return (1i32).wrapping_neg();
     }
@@ -1219,11 +1219,11 @@ pub fn bestParse(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut de
     {
         let _t3 = re.nodes.get(((ni) as i64)).op;
         if _t3 == opChar {
-            if ((j == (i + 1i64)) && { let _t4 = ni; let _t5 = d.runes.get(i); charMatches(re, _t4, _t5) }) {
+            if ((j == (i).wrapping_add(1i64)) && { let _t4 = ni; let _t5 = d.runes.get(i); charMatches(re, _t4, _t5) }) {
                 best = { let _t6 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(mem, s, _t6) };
             }
         } else if _t3 == opAny {
-            if ((j == (i + 1i64)) && { let _t7 = d.runes.get(i); anyMatches(re, _t7) }) {
+            if ((j == (i).wrapping_add(1i64)) && { let _t7 = d.runes.get(i); anyMatches(re, _t7) }) {
                 best = { let _t8 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), ..vg::zero() }; newTree(mem, s, _t8) };
             }
         } else if _t3 == opBracket {
@@ -1259,7 +1259,7 @@ pub fn bestParse(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut de
                             best = candidate;
                         }
                     }
-                    bi += 1i64;
+                    bi = (bi).wrapping_add(1i64);
                 }
             }
         } else if _t3 == opConcat {
@@ -1296,7 +1296,7 @@ pub fn bestParse(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut de
 }
 
 pub fn bestConcat(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut decoded, ni: i32, idx: i64, i: i64, j: i64) -> (i64, i64) {
-    if (idx == (re.nodes.get(((ni) as i64)).ch.len - 1i64)) {
+    if (idx == (re.nodes.get(((ni) as i64)).ch.len).wrapping_sub(1i64)) {
         let sub: i32 = { let _t1 = re.nodes.get(((ni) as i64)).ch.get(idx); let _t2 = i; let _t3 = j; bestParse(mem, s, re, d, _t1, _t2, _t3) };
         if (sub < 0i32) {
             return ((1i64).wrapping_neg(), 0i64);
@@ -1321,13 +1321,13 @@ pub fn bestConcat(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut d
     let mut bestLen: i64 = 0i64;
     let mut bestTree: i32 = (1i32).wrapping_neg();
     let head0: i32 = re.nodes.get(((ni) as i64)).ch.get(idx);
-    let mut lo: i64 = (i + re.nodes.get(((head0) as i64)).minL);
-    if (re.nodes.get(((ni) as i64)).sufMax.get((idx + 1i64)) < lenInf) {
-        lo = std::cmp::max(lo, (j - re.nodes.get(((ni) as i64)).sufMax.get((idx + 1i64))));
+    let mut lo: i64 = (i).wrapping_add(re.nodes.get(((head0) as i64)).minL);
+    if (re.nodes.get(((ni) as i64)).sufMax.get((idx).wrapping_add(1i64)) < lenInf) {
+        lo = std::cmp::max(lo, (j).wrapping_sub(re.nodes.get(((ni) as i64)).sufMax.get((idx).wrapping_add(1i64))));
     }
-    let mut hi: i64 = (j - re.nodes.get(((ni) as i64)).sufMin.get((idx + 1i64)));
+    let mut hi: i64 = (j).wrapping_sub(re.nodes.get(((ni) as i64)).sufMin.get((idx).wrapping_add(1i64)));
     if (re.nodes.get(((head0) as i64)).maxL < lenInf) {
-        hi = std::cmp::min(hi, (i + re.nodes.get(((head0) as i64)).maxL));
+        hi = std::cmp::min(hi, (i).wrapping_add(re.nodes.get(((head0) as i64)).maxL));
     }
     {
         let mut m: i64 = lo;
@@ -1340,21 +1340,21 @@ pub fn bestConcat(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut d
                 if (head < 0i32) {
                     break '_c7;
                 }
-                let _t11 = { let _t12 = ni; let _t13 = (idx + 1i64); let _t14 = m; let _t15 = j; bestConcat(mem, s, re, d, _t12, _t13, _t14, _t15) };
+                let _t11 = { let _t12 = ni; let _t13 = (idx).wrapping_add(1i64); let _t14 = m; let _t15 = j; bestConcat(mem, s, re, d, _t12, _t13, _t14, _t15) };
                 let tailOff: i64 = _t11.0;
                 let tailLen: i64 = _t11.1;
                 if (tailOff < 0i64) {
                     break '_c7;
                 }
                 let off: i64 = { let _t16 = head; let _t17 = tailOff; let _t18 = tailLen; kidPrepend(mem, s, _t16, _t17, _t18) };
-                let candidate: i32 = { let _t19 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off) as i32), kidsLen: (((tailLen + 1i64)) as i32), ..vg::zero() }; newTree(mem, s, _t19) };
+                let candidate: i32 = { let _t19 = ptree { n: ni, i: ((i) as i32), j: ((j) as i32), kidsOff: ((off) as i32), kidsLen: (((tailLen).wrapping_add(1i64)) as i32), ..vg::zero() }; newTree(mem, s, _t19) };
                 if ((bestTree < 0i32) || ({ let _t20 = candidate; let _t21 = bestTree; cmpCand(s, re, _t20, _t21) } < 0i64)) {
                     bestTree = candidate;
                     bestOff = off;
-                    bestLen = (tailLen + 1i64);
+                    bestLen = (tailLen).wrapping_add(1i64);
                 }
             }
-            m += 1i64;
+            m = (m).wrapping_add(1i64);
         }
     }
     let mut val: memoVal = vg::zero();
@@ -1408,22 +1408,22 @@ pub fn bestRep(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut deco
     let canTake: bool = ((re.nodes.get(((ni) as i64)).max == infinite) || (done_v < re.nodes.get(((ni) as i64)).max));
     if (canTake && (!(hasEmpty && (done_v >= re.nodes.get(((ni) as i64)).min)))) {
         let child: i32 = re.nodes.get(((ni) as i64)).ch.get(0i64);
-        let tailMin: i64 = satMul(std::cmp::max(((re.nodes.get(((ni) as i64)).min - done_v) - 1i64), 0i64), re.nodes.get(((child) as i64)).minL);
+        let tailMin: i64 = satMul(std::cmp::max(((re.nodes.get(((ni) as i64)).min).wrapping_sub(done_v)).wrapping_sub(1i64), 0i64), re.nodes.get(((child) as i64)).minL);
         let mut tailMax: i64 = lenInf;
         if (re.nodes.get(((ni) as i64)).max != infinite) {
-            tailMax = satMul(((re.nodes.get(((ni) as i64)).max - done_v) - 1i64), re.nodes.get(((child) as i64)).maxL);
+            tailMax = satMul(((re.nodes.get(((ni) as i64)).max).wrapping_sub(done_v)).wrapping_sub(1i64), re.nodes.get(((child) as i64)).maxL);
         } else {
             if (re.nodes.get(((child) as i64)).maxL == 0i64) {
                 tailMax = 0i64;
             }
         }
-        let mut lo: i64 = (i + re.nodes.get(((child) as i64)).minL);
+        let mut lo: i64 = (i).wrapping_add(re.nodes.get(((child) as i64)).minL);
         if (tailMax < lenInf) {
-            lo = std::cmp::max(lo, (j - tailMax));
+            lo = std::cmp::max(lo, (j).wrapping_sub(tailMax));
         }
-        let mut hi: i64 = (j - tailMin);
+        let mut hi: i64 = (j).wrapping_sub(tailMin);
         if (re.nodes.get(((child) as i64)).maxL < lenInf) {
-            hi = std::cmp::min(hi, (i + re.nodes.get(((child) as i64)).maxL));
+            hi = std::cmp::min(hi, (i).wrapping_add(re.nodes.get(((child) as i64)).maxL));
         }
         {
             let mut m: i64 = lo;
@@ -1440,14 +1440,14 @@ pub fn bestRep(mem: &vg::Arena, s: &mut capSolver, re: &mut Regexp, d: &mut deco
                     if (head < 0i32) {
                         break '_c8;
                     }
-                    let tail: repWin = { let _t12 = ni; let _t13 = m; let _t14 = j; let _t15 = (done_v + 1i64); let _t16 = (hasEmpty || (m == i)); bestRep(mem, s, re, d, _t12, _t13, _t14, _t15, _t16) };
+                    let tail: repWin = { let _t12 = ni; let _t13 = m; let _t14 = j; let _t15 = (done_v).wrapping_add(1i64); let _t16 = (hasEmpty || (m == i)); bestRep(mem, s, re, d, _t12, _t13, _t14, _t15, _t16) };
                     if (!tail.ok) {
                         break '_c8;
                     }
                     let off: i64 = { let _t17 = head; let _t18 = tail.off; let _t19 = tail.length; kidPrepend(mem, s, _t17, _t18, _t19) };
-                    { let _t20 = ni; let _t21 = i; let _t22 = j; let _t23 = off; let _t24 = (tail.length + 1i64); repTry(mem, s, re, _t20, _t21, _t22, _t23, _t24, &mut best) };
+                    { let _t20 = ni; let _t21 = i; let _t22 = j; let _t23 = off; let _t24 = (tail.length).wrapping_add(1i64); repTry(mem, s, re, _t20, _t21, _t22, _t23, _t24, &mut best) };
                 }
-                m += 1i64;
+                m = (m).wrapping_add(1i64);
             }
         }
     }
@@ -1474,7 +1474,7 @@ pub fn solveCaptures(mem: &vg::Arena, re: &mut Regexp, d: &mut decoded, so: i64,
                 '_c1: {
                     setMatch(caps, idx, (1i64).wrapping_neg(), (1i64).wrapping_neg());
                 }
-                idx += 1i64;
+                idx = (idx).wrapping_add(1i64);
             }
         }
         setMatch(caps, 0i64, so, eo);
@@ -1501,7 +1501,7 @@ pub fn solveCaptures(mem: &vg::Arena, re: &mut Regexp, d: &mut decoded, so: i64,
             '_c10: {
                 setMatch(caps, idx_2, (1i64).wrapping_neg(), (1i64).wrapping_neg());
             }
-            idx_2 += 1i64;
+            idx_2 = (idx_2).wrapping_add(1i64);
         }
     }
     setMatch(caps, 0i64, so, eo);
@@ -1519,7 +1519,7 @@ pub fn assignCaps(re: &mut Regexp, s: &mut capSolver, t: i32, caps: vg::Slice<Ma
                 '_c1: {
                     setMatch(caps, ((re.nested.get(gi).get(k)) as i64), (1i64).wrapping_neg(), (1i64).wrapping_neg());
                 }
-                k += 1i64;
+                k = (k).wrapping_add(1i64);
             }
         }
         setMatch(caps, gi, ((s.trees.get(((t) as i64)).i) as i64), ((s.trees.get(((t) as i64)).j) as i64));
@@ -1530,18 +1530,18 @@ pub fn assignCaps(re: &mut Regexp, s: &mut capSolver, t: i32, caps: vg::Slice<Ma
         let mut k_2: i64 = 0i64;
         '_b2: while (k_2 < count) {
             '_c2: {
-                { let _t3 = s.kidStore.get((off + k_2)); let _t4 = caps; assignCaps(re, s, _t3, _t4) };
+                { let _t3 = s.kidStore.get((off).wrapping_add(k_2)); let _t4 = caps; assignCaps(re, s, _t3, _t4) };
             }
-            k_2 += 1i64;
+            k_2 = (k_2).wrapping_add(1i64);
         }
     }
 }
 
 pub fn cAdd(a: i64, b: i64) -> i64 {
-    if (a > (contractCap - b)) {
+    if (a > (contractCap).wrapping_sub(b)) {
         return contractCap;
     }
-    return (a + b);
+    return (a).wrapping_add(b);
 }
 
 pub fn cMul(a: i64, b: i64) -> i64 {
@@ -1551,7 +1551,7 @@ pub fn cMul(a: i64, b: i64) -> i64 {
     if (a > (contractCap).wrapping_div(b)) {
         return contractCap;
     }
-    return (a * b);
+    return (a).wrapping_mul(b);
 }
 
 pub fn ContractHeapBytes(c: &mut Contract) -> i64 {
@@ -1620,15 +1620,15 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
     }
     let heap: i64 = workspaceHeapBound(n, k, ring);
     let weight: i64 = cAdd(cMul(4i64, k), 22i64);
-    let perTest: i64 = cAdd(cAdd(atom, 2i64), cMul((ring - 1i64), cAdd(cMul(4i64, k), 12i64)));
-    let mut perBoundary: i64 = cMul(weight, cMul((n + 1i64), (n + 1i64)));
+    let perTest: i64 = cAdd(cAdd(atom, 2i64), cMul((ring).wrapping_sub(1i64), cAdd(cMul(4i64, k), 12i64)));
+    let mut perBoundary: i64 = cMul(weight, cMul((n).wrapping_add(1i64), (n).wrapping_add(1i64)));
     perBoundary = cAdd(perBoundary, cMul(n, perTest));
     perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2i64, k)), cAdd(cMul(4i64, ring), 38i64)));
     let mut boundaries: i64 = cAdd(length, 1i64);
     if (re.prog.depth >= 0i64) {
-        boundaries = std::cmp::min(boundaries, (((re.prog.depth) as i64) + 3i64));
+        boundaries = std::cmp::min(boundaries, (((re.prog.depth) as i64)).wrapping_add(3i64));
     }
-    let steps: i64 = cAdd(cAdd((24i64 + ring), length), cMul(boundaries, perBoundary));
+    let steps: i64 = cAdd(cAdd((24i64).wrapping_add(ring), length), cMul(boundaries, perBoundary));
     let stack: i64 = 6144i64;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -1646,7 +1646,7 @@ pub fn captureHeap(re: &mut Regexp, length: i64) -> i64 {
 
 pub fn onePassContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContract {
     let mut b: BackendContract = vg::zero();
-    let perVisit: i64 = cAdd(atom, (((re.nsub) as i64) + 1i64));
+    let perVisit: i64 = cAdd(atom, (((re.nsub) as i64)).wrapping_add(1i64));
     b.HeapBytes = { let _t1 = length; captureHeap(re, _t1) };
     b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 10i64), frameBytes);
     b.Steps = cMul(cMul(astSize(re.nodes, re.root), cAdd(length, 2i64)), perVisit);
@@ -1658,8 +1658,8 @@ pub fn solverContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContrac
     let depth: i64 = solverDepth(re.nodes, re.root, length);
     let structural: i64 = std::cmp::min(solverSteps(re.nodes, re.root, length), cAdd(capWorkLimit, depth));
     let tree: i64 = treeNodes(re.nodes, re.root, length);
-    let perStep: i64 = cAdd(atom, cAdd(cMul(2i64, tree), (cMul(2i64, ((re.minSlots) as i64)) + 4i64)));
-    let steps: i64 = cAdd(cMul(structural, perStep), cMul(tree, (((re.nsub) as i64) + 2i64)));
+    let perStep: i64 = cAdd(atom, cAdd(cMul(2i64, tree), (cMul(2i64, ((re.minSlots) as i64))).wrapping_add(4i64)));
+    let steps: i64 = cAdd(cMul(structural, perStep), cMul(tree, (((re.nsub) as i64)).wrapping_add(2i64)));
     let perAlloc: i64 = cAdd(224i64, cMul(kidBytes, cAdd(solverFanout(re.nodes, re.root, length), 1i64)));
     let mut heap: i64 = cAdd(cMul(structural, perAlloc), cMul(16i64, ((re.minSlots) as i64)));
     heap = cAdd(heap, 4096i64);
@@ -1679,7 +1679,7 @@ pub fn astSize(nodes: vg::Slice<node>, ni: i32) -> i64 {
             '_c1: {
                 total = cAdd(total, astSize(nodes, nodes.get(((ni) as i64)).ch.get(i)));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return total;
@@ -1693,10 +1693,10 @@ pub fn astHeight(nodes: vg::Slice<node>, ni: i32) -> i64 {
             '_c1: {
                 deepest = std::cmp::max(deepest, astHeight(nodes, nodes.get(((ni) as i64)).ch.get(i)));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
-    return (deepest + 1i64);
+    return (deepest).wrapping_add(1i64);
 }
 
 pub fn atomCost(re: &mut Regexp) -> i64 {
@@ -1709,7 +1709,7 @@ pub fn atomCostNode(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, lc: &mut
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opChar {
-            cost = (((nodes.get(((ni) as i64)).fold.len) as i64) + 1i64);
+            cost = (((nodes.get(((ni) as i64)).fold.len) as i64)).wrapping_add(1i64);
         } else if _t1 == opBracket {
             cost = { let _t2 = brs; let _t3 = nodes.get(((ni) as i64)).br; bracketAtomCost(_t2, _t3, lc) };
         }
@@ -1720,7 +1720,7 @@ pub fn atomCostNode(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, lc: &mut
             '_c4: {
                 cost = std::cmp::max(cost, { let _t5 = nodes; let _t6 = brs; let _t7 = nodes.get(((ni) as i64)).ch.get(i); atomCostNode(_t5, _t6, lc, _t7) });
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return cost;
@@ -1730,30 +1730,30 @@ pub fn searchSteps(count: i64) -> i64 {
     let mut count_v: i64 = count;
     let mut steps: i64 = 0i64;
     while (count_v > 0i64) {
-        count_v /= 2i64;
-        steps += 1i64;
+        count_v = (count_v).wrapping_div(2i64);
+        steps = (steps).wrapping_add(1i64);
     }
     return steps;
 }
 
 pub fn u32ContainsCost(count: i64) -> i64 {
-    return (1i64 + (3i64 * searchSteps(count)));
+    return (1i64).wrapping_add((3i64).wrapping_mul(searchSteps(count)));
 }
 
 pub fn findPairCost(count: i64) -> i64 {
-    return (3i64 + (3i64 * searchSteps(count)));
+    return (3i64).wrapping_add((3i64).wrapping_mul(searchSteps(count)));
 }
 
 pub fn findCaseCost(count: i64) -> i64 {
-    return (6i64 + (3i64 * searchSteps(count)));
+    return (6i64).wrapping_add((3i64).wrapping_mul(searchSteps(count)));
 }
 
 pub fn pairSourcesRunCost(count: i64, preimages: i64) -> i64 {
-    return ((5i64 + (3i64 * searchSteps(count))) + (5i64 * preimages));
+    return ((5i64).wrapping_add((3i64).wrapping_mul(searchSteps(count)))).wrapping_add((5i64).wrapping_mul(preimages));
 }
 
 pub fn compareSequenceCost(length: i64) -> i64 {
-    return (5i64 + (3i64 * length));
+    return (5i64).wrapping_add((3i64).wrapping_mul(length));
 }
 
 pub fn localeLookupCosts(l: &mut Locale) -> lookupCosts {
@@ -1768,19 +1768,19 @@ pub fn localeLookupCosts(l: &mut Locale) -> lookupCosts {
     }
     lc.sequenceSearch = searchSteps(({ let _t1 = secSequences; sectionLen(l, _t1) }).wrapping_div(8i64));
     let row: CollProfile = { let _t2 = ((l.collationProfile) as i64); collationProfileRow(l, _t2) };
-    lc.contraction = ((((14i64 + u32ContainsCost(row.AddCount)) + 1i64) + u32ContainsCost(({ let _t3 = secRootContractions; sectionLen(l, _t3) }).wrapping_div(4i64))) + u32ContainsCost(row.RemoveCount));
-    lc.primaryToken = (((14i64 + findPairCost(row.OverrideCount)) + 1i64) + findPairCost(({ let _t4 = secRootEquivalences; sectionLen(l, _t4) }).wrapping_div(8i64)));
+    lc.contraction = ((((14i64).wrapping_add(u32ContainsCost(row.AddCount))).wrapping_add(1i64)).wrapping_add(u32ContainsCost(({ let _t3 = secRootContractions; sectionLen(l, _t3) }).wrapping_div(4i64)))).wrapping_add(u32ContainsCost(row.RemoveCount));
+    lc.primaryToken = (((14i64).wrapping_add(findPairCost(row.OverrideCount))).wrapping_add(1i64)).wrapping_add(findPairCost(({ let _t4 = secRootEquivalences; sectionLen(l, _t4) }).wrapping_div(8i64)));
     lc.classMask = 4i64;
     lc.preimages = ((localeMaxPreimages(l)) as i64);
-    lc.caseConvert = (2i64 + findCaseCost(({ let _t5 = secCaseDefault; sectionLen(l, _t5) }).wrapping_div(12i64)));
+    lc.caseConvert = (2i64).wrapping_add(findCaseCost(({ let _t5 = secCaseDefault; sectionLen(l, _t5) }).wrapping_div(12i64)));
     let mut upper: i64 = secInvUpperDefault;
     let mut lower: i64 = secInvLowerDefault;
     if (l.caseProfile == 1u8) {
-        lc.caseConvert += findCaseCost(({ let _t6 = secCaseTurkic; sectionLen(l, _t6) }).wrapping_div(12i64));
+        lc.caseConvert = (lc.caseConvert).wrapping_add(findCaseCost(({ let _t6 = secCaseTurkic; sectionLen(l, _t6) }).wrapping_div(12i64)));
         upper = secInvUpperTurkic;
         lower = secInvLowerTurkic;
     }
-    lc.casePreimages = (((2i64 + pairSourcesRunCost(({ let _t7 = upper; sectionLen(l, _t7) }).wrapping_div(8i64), lc.preimages)) + pairSourcesRunCost(({ let _t8 = lower; sectionLen(l, _t8) }).wrapping_div(8i64), lc.preimages)) + (lc.preimages * (2i64 + lc.preimages)));
+    lc.casePreimages = (((2i64).wrapping_add(pairSourcesRunCost(({ let _t7 = upper; sectionLen(l, _t7) }).wrapping_div(8i64), lc.preimages))).wrapping_add(pairSourcesRunCost(({ let _t8 = lower; sectionLen(l, _t8) }).wrapping_div(8i64), lc.preimages))).wrapping_add((lc.preimages).wrapping_mul((2i64).wrapping_add(lc.preimages)));
     return lc;
 }
 
@@ -1788,19 +1788,19 @@ pub fn elementIDCost(lc: &mut lookupCosts, length: i64) -> i64 {
     if (length == 1i64) {
         return 3i64;
     }
-    return ((2i64 + (2i64 * length)) + (lc.sequenceSearch * (1i64 + compareSequenceCost(length))));
+    return ((2i64).wrapping_add((2i64).wrapping_mul(length))).wrapping_add((lc.sequenceSearch).wrapping_mul((1i64).wrapping_add(compareSequenceCost(length))));
 }
 
 pub fn collatingElementIDCost(lc: &mut lookupCosts, length: i64) -> i64 {
-    let mut cost: i64 = (1i64 + { let _t1 = length; elementIDCost(lc, _t1) });
+    let mut cost: i64 = (1i64).wrapping_add({ let _t1 = length; elementIDCost(lc, _t1) });
     if (length > 1i64) {
-        cost += lc.contraction;
+        cost = (cost).wrapping_add(lc.contraction);
     }
     return cost;
 }
 
 pub fn primaryEqualCost(lc: &mut lookupCosts, left: i64, right: i64) -> i64 {
-    return (((1i64 + { let _t1 = left; collatingElementIDCost(lc, _t1) }) + { let _t2 = right; collatingElementIDCost(lc, _t2) }) + (2i64 * lc.primaryToken));
+    return (((1i64).wrapping_add({ let _t1 = left; collatingElementIDCost(lc, _t1) })).wrapping_add({ let _t2 = right; collatingElementIDCost(lc, _t2) })).wrapping_add((2i64).wrapping_mul(lc.primaryToken));
 }
 
 pub fn equivsCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, length: i64) -> i64 {
@@ -1809,18 +1809,18 @@ pub fn equivsCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, len
         let mut i: i64 = 0i64;
         '_b1: while (i < brs.get(((bi) as i64)).equivs.len) {
             '_c1: {
-                cost = cAdd(cost, (1i64 + { let _t2 = length; let _t3 = ((brs.get(((bi) as i64)).equivs.get(i).len) as i64); primaryEqualCost(lc, _t2, _t3) }));
+                cost = cAdd(cost, (1i64).wrapping_add({ let _t2 = length; let _t3 = ((brs.get(((bi) as i64)).equivs.get(i).len) as i64); primaryEqualCost(lc, _t2, _t3) }));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return cost;
 }
 
 pub fn positiveSingleCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts) -> i64 {
-    let mut cost: i64 = (2i64 + searchSteps(brs.get(((bi) as i64)).ranges.len));
+    let mut cost: i64 = (2i64).wrapping_add(searchSteps(brs.get(((bi) as i64)).ranges.len));
     if (brs.get(((bi) as i64)).classMask != 0u16) {
-        cost += lc.classMask;
+        cost = (cost).wrapping_add(lc.classMask);
     }
     return cAdd(cost, { let _t1 = brs; let _t2 = bi; let _t3 = 1i64; equivsCost(_t1, _t2, lc, _t3) });
 }
@@ -1835,14 +1835,14 @@ pub fn matchesOneCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts)
 }
 
 pub fn candidateLeafCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, length: i64) -> i64 {
-    return cAdd((1i64 + { let _t1 = length; collatingElementIDCost(lc, _t1) }), { let _t2 = brs; let _t3 = bi; let _t4 = length; equivsCost(_t2, _t3, lc, _t4) });
+    return cAdd((1i64).wrapping_add({ let _t1 = length; collatingElementIDCost(lc, _t1) }), { let _t2 = brs; let _t3 = bi; let _t4 = length; equivsCost(_t2, _t3, lc, _t4) });
 }
 
 pub fn probeCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, length: i64) -> i64 {
     let mut cost: i64 = cAdd(2i64, ((brs.get(((bi) as i64)).elems.len) as i64));
     let mut counterpart: i64 = 1i64;
     if brs.get(((bi) as i64)).icase {
-        counterpart = (1i64 + (2i64 * lc.caseConvert));
+        counterpart = (1i64).wrapping_add((2i64).wrapping_mul(lc.caseConvert));
     }
     {
         let mut i: i64 = 0i64;
@@ -1852,7 +1852,7 @@ pub fn probeCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, leng
                     cost = cAdd(cost, cMul(length, counterpart));
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if (brs.get(((bi) as i64)).equivs.len == 0i64) {
@@ -1860,19 +1860,19 @@ pub fn probeCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, leng
     }
     let leaf: i64 = { let _t2 = brs; let _t3 = bi; let _t4 = length; candidateLeafCost(_t2, _t3, lc, _t4) };
     if (!brs.get(((bi) as i64)).icase) {
-        return cAdd(cost, cAdd((length + 1i64), leaf));
+        return cAdd(cost, cAdd((length).wrapping_add(1i64), leaf));
     }
     let mut candidates: i64 = 1i64;
     {
         let mut i_2: i64 = 0i64;
         '_b5: while (i_2 < length) {
             '_c5: {
-                candidates = cMul(candidates, (lc.preimages + 1i64));
+                candidates = cMul(candidates, (lc.preimages).wrapping_add(1i64));
             }
-            i_2 += 1i64;
+            i_2 = (i_2).wrapping_add(1i64);
         }
     }
-    return cAdd(cost, cMul(candidates, cAdd((2i64 + lc.preimages), cAdd(lc.casePreimages, leaf))));
+    return cAdd(cost, cMul(candidates, cAdd((2i64).wrapping_add(lc.preimages), cAdd(lc.casePreimages, leaf))));
 }
 
 pub fn bracketAtomCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts) -> i64 {
@@ -1889,7 +1889,7 @@ pub fn bracketAtomCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts
                     cost = cAdd(cost, { let _t4 = brs; let _t5 = bi; let _t6 = ((length) as i64); probeCost(_t4, _t5, lc, _t6) });
                 }
             }
-            length += 1i64;
+            length = (length).wrapping_add(1i64);
         }
     }
     return cost;
@@ -1901,13 +1901,13 @@ pub fn solverSteps(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opConcat {
-            total = cAdd(total, cMul((((nodes.get(((ni) as i64)).ch.len - 1i64)) as i64), cMul(spans, cAdd(length, 2i64))));
+            total = cAdd(total, cMul((((nodes.get(((ni) as i64)).ch.len).wrapping_sub(1i64)) as i64), cMul(spans, cAdd(length, 2i64))));
         } else if _t1 == opAlt {
             total = cAdd(total, cMul(((nodes.get(((ni) as i64)).ch.len) as i64), spans));
         } else if _t1 == opRepeat {
-            let mut states: i64 = (((nodes.get(((ni) as i64)).min) as i64) + 1i64);
+            let mut states: i64 = (((nodes.get(((ni) as i64)).min) as i64)).wrapping_add(1i64);
             if (nodes.get(((ni) as i64)).max != infinite) {
-                states = (((nodes.get(((ni) as i64)).max) as i64) + 1i64);
+                states = (((nodes.get(((ni) as i64)).max) as i64)).wrapping_add(1i64);
             }
             total = cAdd(total, cMul(cMul(2i64, states), cMul(spans, cAdd(length, 2i64))));
         }
@@ -1918,14 +1918,14 @@ pub fn solverSteps(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
             '_c2: {
                 total = cAdd(total, solverSteps(nodes, nodes.get(((ni) as i64)).ch.get(i), length));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return total;
 }
 
 pub fn repInstances(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
-    let mut instances: i64 = cAdd(length, (((nodes.get(((ni) as i64)).min) as i64) + 1i64));
+    let mut instances: i64 = cAdd(length, (((nodes.get(((ni) as i64)).min) as i64)).wrapping_add(1i64));
     if (nodes.get(((ni) as i64)).max != infinite) {
         instances = std::cmp::min(instances, ((nodes.get(((ni) as i64)).max) as i64));
     }
@@ -1943,15 +1943,15 @@ pub fn solverDepth(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
                     '_c2: {
                         deepest = std::cmp::max(deepest, solverDepth(nodes, nodes.get(((ni) as i64)).ch.get(i), length));
                     }
-                    i += 1i64;
+                    i = (i).wrapping_add(1i64);
                 }
             }
             if (nodes.get(((ni) as i64)).op == opConcat) {
-                return cAdd(deepest, (((nodes.get(((ni) as i64)).ch.len) as i64) + 1i64));
+                return cAdd(deepest, (((nodes.get(((ni) as i64)).ch.len) as i64)).wrapping_add(1i64));
             }
-            return (deepest + 1i64);
+            return (deepest).wrapping_add(1i64);
         } else if _t1 == opRepeat {
-            return cAdd((repInstances(nodes, ni, length) + 1i64), solverDepth(nodes, nodes.get(((ni) as i64)).ch.get(0i64), length));
+            return cAdd((repInstances(nodes, ni, length)).wrapping_add(1i64), solverDepth(nodes, nodes.get(((ni) as i64)).ch.get(0i64), length));
         }
     }
     return 1i64;
@@ -1968,7 +1968,7 @@ pub fn treeNodes(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
                     '_c2: {
                         widest = std::cmp::max(widest, treeNodes(nodes, nodes.get(((ni) as i64)).ch.get(i), length));
                     }
-                    i += 1i64;
+                    i = (i).wrapping_add(1i64);
                 }
             }
             return cAdd(widest, 1i64);
@@ -1980,7 +1980,7 @@ pub fn treeNodes(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
                     '_c3: {
                         total = cAdd(total, treeNodes(nodes, nodes.get(((ni) as i64)).ch.get(i_2), length));
                     }
-                    i_2 += 1i64;
+                    i_2 = (i_2).wrapping_add(1i64);
                 }
             }
             return total;
@@ -2007,7 +2007,7 @@ pub fn solverFanout(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
             '_c2: {
                 widest = std::cmp::max(widest, solverFanout(nodes, nodes.get(((ni) as i64)).ch.get(i), length));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return widest;
@@ -2022,10 +2022,10 @@ pub fn prepare(mem: &vg::Arena, ws: &mut engineWS, n: i64, k: i64, ring: i64) {
                 ws.slots.update(i, vg::make::<u32>(mem, n), |mut _t3, _t2| { _t3.stamp = _t2; _t3 });
                 ws.slots.update(i, vg::make::<i32>(mem, n), |mut _t5, _t4| { _t5.starts = _t4; _t5 });
                 if (k > 0i64) {
-                    ws.slots.update(i, vg::make::<u32>(mem, (n * k)), |mut _t7, _t6| { _t7.ctr = _t6; _t7 });
+                    ws.slots.update(i, vg::make::<u32>(mem, (n).wrapping_mul(k)), |mut _t7, _t6| { _t7.ctr = _t6; _t7 });
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     ws.onq = vg::make::<u8>(mem, n);
@@ -2045,7 +2045,7 @@ pub fn workspaceHeapBound(n: i64, k: i64, ring: i64) -> i64 {
     let mut heap: i64 = cAdd(cMul(ring, 104i64), cMul(ring, perSlot));
     heap = cAdd(heap, n);
     if (k > 0i64) {
-        heap = cAdd(heap, (12i64 * k));
+        heap = cAdd(heap, (12i64).wrapping_mul(k));
     }
     heap = cAdd(heap, 64i64);
     heap = cAdd(heap, cMul(ring, cAdd(cMul(16i64, n), 64i64)));
@@ -2062,7 +2062,7 @@ pub fn ctrLess(a: vg::Slice<u32>, b: vg::Slice<u32>) -> bool {
                     return (a.get(i) < b.get(i));
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return false;
@@ -2072,27 +2072,27 @@ pub fn trailingZeros64(x: u64) -> i64 {
     let mut x_v: u64 = x;
     let mut n: i64 = 0i64;
     if ((x_v & 4294967295u64) == 0u64) {
-        n += 32i64;
+        n = (n).wrapping_add(32i64);
         x_v >>= 32i64;
     }
     if ((x_v & 65535u64) == 0u64) {
-        n += 16i64;
+        n = (n).wrapping_add(16i64);
         x_v >>= 16i64;
     }
     if ((x_v & 255u64) == 0u64) {
-        n += 8i64;
+        n = (n).wrapping_add(8i64);
         x_v >>= 8i64;
     }
     if ((x_v & 15u64) == 0u64) {
-        n += 4i64;
+        n = (n).wrapping_add(4i64);
         x_v >>= 4i64;
     }
     if ((x_v & 3u64) == 0u64) {
-        n += 2i64;
+        n = (n).wrapping_add(2i64);
         x_v >>= 2i64;
     }
     if ((x_v & 1u64) == 0u64) {
-        n += 1i64;
+        n = (n).wrapping_add(1i64);
     }
     return n;
 }
@@ -2118,7 +2118,7 @@ pub fn runPhaseA(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, eflags: u32
 }
 
 pub fn paGen(boundary: i64) -> u32 {
-    return (((boundary) as u32) + 1u32);
+    return (((boundary) as u32)).wrapping_add(1u32);
 }
 
 pub fn paConsider(e: &mut phaseAState, ws: &mut engineWS, start: i32, ctr: vg::Slice<u32>, end: i64) {
@@ -2173,8 +2173,8 @@ pub fn paStore(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, si: i64,
             if (e.k == 0i64) {
                 return false;
             }
-            let base: i64 = (((pc) as i64) * e.k);
-            if (!ctrLess(ctr, ws.slots.get(si).ctr.sub(base, (base + e.k)))) {
+            let base: i64 = (((pc) as i64)).wrapping_mul(e.k);
+            if (!ctrLess(ctr, ws.slots.get(si).ctr.sub(base, (base).wrapping_add(e.k)))) {
                 return false;
             }
         }
@@ -2184,8 +2184,8 @@ pub fn paStore(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, si: i64,
     }
     ws.slots.get(si).starts.set(((pc) as i64), start);
     if (e.k > 0i64) {
-        let base_2: i64 = (((pc) as i64) * e.k);
-        let _ = vg::vcopy(ws.slots.get(si).ctr.sub(base_2, (base_2 + e.k)), ctr);
+        let base_2: i64 = (((pc) as i64)).wrapping_mul(e.k);
+        let _ = vg::vcopy(ws.slots.get(si).ctr.sub(base_2, (base_2).wrapping_add(e.k)), ctr);
     }
     return true;
 }
@@ -2206,10 +2206,10 @@ pub fn compactQueue(ws: &mut engineWS) {
                 if (ws.onq.get(((pc) as i64)) == 0u8) {
                     ws.onq.set(((pc) as i64), 1u8);
                     ws.queue.set(w, pc);
-                    w += 1i64;
+                    w = (w).wrapping_add(1i64);
                 }
             }
-            r += 1i64;
+            r = (r).wrapping_add(1i64);
         }
     }
     ws.queue = ws.queue.head(w);
@@ -2219,25 +2219,25 @@ pub fn compactQueue(ws: &mut engineWS) {
             '_c2: {
                 ws.onq.set(((ws.queue.get(i)) as i64), 0u8);
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
 }
 
 pub fn paClosure(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, si: i64) {
-    let limit: i64 = (queueCompactFactor * re.prog.ins.len);
+    let limit: i64 = (queueCompactFactor).wrapping_mul(re.prog.ins.len);
     while (ws.queue.len > 0i64) {
         if (ws.queue.len > limit) {
             compactQueue(ws);
         }
-        let pc: u32 = ws.queue.get((ws.queue.len - 1i64));
-        ws.queue = ws.queue.head((ws.queue.len - 1i64));
+        let pc: u32 = ws.queue.get((ws.queue.len).wrapping_sub(1i64));
+        ws.queue = ws.queue.head((ws.queue.len).wrapping_sub(1i64));
         if (ws.slots.get(si).stamp.get(((pc) as i64)) != ws.slots.get(si).r#gen) {
             continue;
         }
         let start: i32 = ws.slots.get(si).starts.get(((pc) as i64));
-        let base: i64 = (((pc) as i64) * e.k);
-        let ctr: vg::Slice<u32> = ws.slots.get(si).ctr.sub(base, (base + e.k));
+        let base: i64 = (((pc) as i64)).wrapping_mul(e.k);
+        let ctr: vg::Slice<u32> = ws.slots.get(si).ctr.sub(base, (base).wrapping_add(e.k));
         {
             let _t1 = re.prog.ins.get(((pc) as i64)).op;
             if _t1 == iSplit {
@@ -2261,8 +2261,8 @@ pub fn paClosure(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &m
 }
 
 pub fn paArrive(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut Regexp, pc: u32, delta: i64, start: i32, ctr: vg::Slice<u32>) {
-    let fi: i64 = ((e.ci + delta)).wrapping_rem(e.ring);
-    let g: u32 = paGen((e.ci + delta));
+    let fi: i64 = ((e.ci).wrapping_add(delta)).wrapping_rem(e.ring);
+    let g: u32 = paGen((e.ci).wrapping_add(delta));
     if (ws.slots.get(fi).r#gen != g) {
         ws.slots.update(fi, g, |mut _t2, _t1| { _t2.r#gen = _t1; _t2 });
         ws.slots.update(fi, ws.slots.get(fi).active.head(0i64), |mut _t4, _t3| { _t4.active = _t3; _t4 });
@@ -2280,19 +2280,19 @@ pub fn paArrive(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mu
                     {
                         let _t6 = buffer.slot(trailingZeros64(m));
                         let _t7 = ((delta) as u32);
-                        _t6.update(_t7, |mut _t8, _t7| { _t8 += _t7; _t8 });
+                        _t6.update(_t7, |mut _t8, _t7| { _t8 = (_t8).wrapping_add(_t7); _t8 });
                     }
                 }
-                m &= (m - 1u64);
+                m &= (m).wrapping_sub(1u64);
             }
         }
         {
             let mut i: i64 = 0i64;
             '_b9: while (i < re.prog.ins.get(((pc) as i64)).extra.len) {
                 '_c9: {
-                    buffer.update(((re.prog.ins.get(((pc) as i64)).extra.get(i)) as i64), ((delta) as u32), |mut _t11, _t10| { _t11 += _t10; _t11 });
+                    buffer.update(((re.prog.ins.get(((pc) as i64)).extra.get(i)) as i64), ((delta) as u32), |mut _t11, _t10| { _t11 = (_t11).wrapping_add(_t10); _t11 });
                 }
-                i += 1i64;
+                i = (i).wrapping_add(1i64);
             }
         }
         newCtr = buffer;
@@ -2311,8 +2311,8 @@ pub fn paConsume(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &m
                     break '_c1;
                 }
                 let start: i32 = ws.slots.get(si).starts.get(((pc) as i64));
-                let base: i64 = (((pc) as i64) * e.k);
-                let ctr: vg::Slice<u32> = ws.slots.get(si).ctr.sub(base, (base + e.k));
+                let base: i64 = (((pc) as i64)).wrapping_mul(e.k);
+                let ctr: vg::Slice<u32> = ws.slots.get(si).ctr.sub(base, (base).wrapping_add(e.k));
                 {
                     let _t2 = re.prog.ins.get(((pc) as i64)).op;
                     if _t2 == iRune {
@@ -2350,13 +2350,13 @@ pub fn paConsume(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &m
                                         { let _t27 = pc; let _t28 = length; let _t29 = start; let _t30 = ctr; paArrive(mem, e, ws, re, _t27, _t28, _t29, _t30) };
                                     }
                                 }
-                                length += 1i64;
+                                length = (length).wrapping_add(1i64);
                             }
                         }
                     }
                 }
             }
-            ai += 1i64;
+            ai = (ai).wrapping_add(1i64);
         }
     }
 }
@@ -2369,7 +2369,7 @@ pub fn decodeAhead(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS) {
         let r: i32 = _t1.0;
         let size: i64 = _t1.1;
         ws.ahead = vg::append(mem, ws.ahead, r);
-        at += size;
+        at = (at).wrapping_add(size);
     }
 }
 
@@ -2379,7 +2379,7 @@ pub fn scanAhead(e: &mut phaseAState, re: &mut Regexp) -> i64 {
         if (idx < 0i64) {
             return e.subject.len;
         }
-        return (e.pos + idx);
+        return (e.pos).wrapping_add(idx);
     }
     {
         let mut i: i64 = e.pos;
@@ -2389,7 +2389,7 @@ pub fn scanAhead(e: &mut phaseAState, re: &mut Regexp) -> i64 {
                     return i;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return e.subject.len;
@@ -2403,7 +2403,7 @@ pub fn continuationFlags(re: &mut Regexp, subject: vg::Str, pos: i64, eflags: u3
     if (pos == 0i64) {
         return eflags;
     }
-    if (((re.flags & FlagNewline) != 0u32) && (subject.byte((pos - 1i64)) == 10u8)) {
+    if (((re.flags & FlagNewline) != 0u32) && (subject.byte((pos).wrapping_sub(1i64)) == 10u8)) {
         return (eflags & !(ExecNotBOL));
     }
     return (eflags | ExecNotBOL);
@@ -2424,10 +2424,10 @@ pub fn paRun(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut R
                     let pc: u32 = ws.slots.get(si).active.get(r);
                     if (ws.slots.get(si).stamp.get(((pc) as i64)) == g) {
                         ws.slots.get(si).active.set(w, pc);
-                        w += 1i64;
+                        w = (w).wrapping_add(1i64);
                     }
                 }
-                r += 1i64;
+                r = (r).wrapping_add(1i64);
             }
         }
         ws.slots.update(si, ws.slots.get(si).active.head(w), |mut _t5, _t4| { _t5.active = _t4; _t5 });
@@ -2436,9 +2436,9 @@ pub fn paRun(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut R
                 let next: i64 = scanAhead(e, re);
                 if (next > e.pos) {
                     e.pos = next;
-                    e.ci += 1i64;
+                    e.ci = (e.ci).wrapping_add(1i64);
                     prev = 120i32;
-                    if ((e.pos > 0i64) && (e.subject.byte((e.pos - 1i64)) == 10u8)) {
+                    if ((e.pos > 0i64) && (e.subject.byte((e.pos).wrapping_sub(1i64)) == 10u8)) {
                         prev = 10i32;
                     }
                     continue;
@@ -2472,13 +2472,13 @@ pub fn paRun(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut R
                 let mut delta: i64 = 1i64;
                 '_b15: while (delta < e.ring) {
                     '_c15: {
-                        let fi: i64 = ((e.ci + delta)).wrapping_rem(e.ring);
-                        if ((ws.slots.get(fi).r#gen == paGen((e.ci + delta))) && (ws.slots.get(fi).active.len > 0i64)) {
+                        let fi: i64 = ((e.ci).wrapping_add(delta)).wrapping_rem(e.ring);
+                        if ((ws.slots.get(fi).r#gen == paGen((e.ci).wrapping_add(delta))) && (ws.slots.get(fi).active.len > 0i64)) {
                             pendingWork = true;
                             break '_b15;
                         }
                     }
-                    delta += 1i64;
+                    delta = (delta).wrapping_add(1i64);
                 }
             }
             if (!pendingWork) {
@@ -2486,8 +2486,8 @@ pub fn paRun(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &mut R
             }
         }
         prev = e.cur;
-        e.pos += e.size;
-        e.ci += 1i64;
+        e.pos = (e.pos).wrapping_add(e.size);
+        e.ci = (e.ci).wrapping_add(1i64);
     }
 }
 
@@ -2545,11 +2545,11 @@ pub fn ErrorText(code: i32) -> vg::Str {
 }
 
 pub fn memoHash(k: memoKey) -> u64 {
-    let mut h: u64 = ((((((k.a) as u32)) as u64) * 2654435761u64) ^ (((((k.b) as u32)) as u64) * 2246822519u64));
-    h ^= (((((k.c) as u32)) as u64) * 3266489917u64);
-    h ^= (((((k.d) as u32)) as u64) * 668265263u64);
+    let mut h: u64 = ((((((k.a) as u32)) as u64)).wrapping_mul(2654435761u64) ^ (((((k.b) as u32)) as u64)).wrapping_mul(2246822519u64));
+    h ^= (((((k.c) as u32)) as u64)).wrapping_mul(3266489917u64);
+    h ^= (((((k.d) as u32)) as u64)).wrapping_mul(668265263u64);
     h ^= (h >> 29i64);
-    h *= 13787848793156543929u64;
+    h = (h).wrapping_mul(13787848793156543929u64);
     h ^= (h >> 32i64);
     return h;
 }
@@ -2559,31 +2559,31 @@ pub fn memoGet(t: &mut memoTab, k: memoKey) -> (memoVal, bool) {
     if (t.keys.len == 0i64) {
         return (none, false);
     }
-    let mask: u64 = (((t.keys.len - 1i64)) as u64);
+    let mask: u64 = (((t.keys.len).wrapping_sub(1i64)) as u64);
     let mut at: u64 = (memoHash(k) & mask);
     while (t.used.get(((at) as i64)) != 0u8) {
         if vego_eq_memoKey(t.keys.get(((at) as i64)), k) {
             return (t.vals.get(((at) as i64)), true);
         }
-        at = ((at + 1u64) & mask);
+        at = ((at).wrapping_add(1u64) & mask);
     }
     return (none, false);
 }
 
 pub fn memoInsert(t: &mut memoTab, k: memoKey, v: memoVal) {
-    let mask: u64 = (((t.keys.len - 1i64)) as u64);
+    let mask: u64 = (((t.keys.len).wrapping_sub(1i64)) as u64);
     let mut at: u64 = (memoHash(k) & mask);
     while (t.used.get(((at) as i64)) != 0u8) {
         if vego_eq_memoKey(t.keys.get(((at) as i64)), k) {
             t.vals.set(((at) as i64), v);
             return;
         }
-        at = ((at + 1u64) & mask);
+        at = ((at).wrapping_add(1u64) & mask);
     }
     t.used.set(((at) as i64), 1u8);
     t.keys.set(((at) as i64), k);
     t.vals.set(((at) as i64), v);
-    t.count += 1i64;
+    t.count = (t.count).wrapping_add(1i64);
 }
 
 pub fn memoGrow(mem: &vg::Arena, t: &mut memoTab) {
@@ -2592,7 +2592,7 @@ pub fn memoGrow(mem: &vg::Arena, t: &mut memoTab) {
     let oldUsed: vg::Slice<u8> = t.used;
     let mut size: i64 = 64i64;
     if (oldKeys.len > 0i64) {
-        size = (2i64 * oldKeys.len);
+        size = (2i64).wrapping_mul(oldKeys.len);
     }
     t.keys = vg::make::<memoKey>(mem, size);
     t.vals = vg::make::<memoVal>(mem, size);
@@ -2606,13 +2606,13 @@ pub fn memoGrow(mem: &vg::Arena, t: &mut memoTab) {
                     { let _t2 = oldKeys.get(i); let _t3 = oldVals.get(i); memoInsert(t, _t2, _t3) };
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
 }
 
 pub fn memoPut(mem: &vg::Arena, t: &mut memoTab, k: memoKey, v: memoVal) {
-    if ((4i64 * (t.count + 1i64)) >= (3i64 * t.keys.len)) {
+    if ((4i64).wrapping_mul((t.count).wrapping_add(1i64)) >= (3i64).wrapping_mul(t.keys.len)) {
         memoGrow(mem, t);
     }
     { let _t1 = k; let _t2 = v; memoInsert(t, _t1, _t2) };
@@ -2633,27 +2633,27 @@ pub fn LocaleValid(l: &mut Locale) -> bool {
 }
 
 pub fn u32Raw(blob: vg::Str, off: i64) -> u32 {
-    return (((((blob.byte(off)) as u32) | (((blob.byte((off + 1i64))) as u32) << 8i64)) | (((blob.byte((off + 2i64))) as u32) << 16i64)) | (((blob.byte((off + 3i64))) as u32) << 24i64));
+    return (((((blob.byte(off)) as u32) | (((blob.byte((off).wrapping_add(1i64))) as u32) << 8i64)) | (((blob.byte((off).wrapping_add(2i64))) as u32) << 16i64)) | (((blob.byte((off).wrapping_add(3i64))) as u32) << 24i64));
 }
 
 pub fn u16At(l: &mut Locale, sec: i64, index: i64) -> u16 {
-    let off: i64 = (l.sec[(sec) as usize].Off + (2i64 * index));
-    return (((l.blob.byte(off)) as u16) | (((l.blob.byte((off + 1i64))) as u16) << 8i64));
+    let off: i64 = (l.sec[(sec) as usize].Off).wrapping_add((2i64).wrapping_mul(index));
+    return (((l.blob.byte(off)) as u16) | (((l.blob.byte((off).wrapping_add(1i64))) as u16) << 8i64));
 }
 
 pub fn u32At(l: &mut Locale, sec: i64, index: i64) -> u32 {
-    return u32Raw(l.blob, (l.sec[(sec) as usize].Off + (4i64 * index)));
+    return u32Raw(l.blob, (l.sec[(sec) as usize].Off).wrapping_add((4i64).wrapping_mul(index)));
 }
 
 pub fn sectionLen(l: &mut Locale, sec: i64) -> i64 {
-    return (l.sec[(sec) as usize].End - l.sec[(sec) as usize].Off);
+    return (l.sec[(sec) as usize].End).wrapping_sub(l.sec[(sec) as usize].Off);
 }
 
 pub fn byteString(l: &mut Locale, sec: i64, off: i64) -> vg::Str {
-    let start: i64 = (l.sec[(sec) as usize].Off + off);
+    let start: i64 = (l.sec[(sec) as usize].Off).wrapping_add(off);
     let mut end: i64 = start;
     while ((end < l.sec[(sec) as usize].End) && (l.blob.byte(end) != 0u8)) {
-        end += 1i64;
+        end = (end).wrapping_add(1i64);
     }
     return l.blob.sub(start, end);
 }
@@ -2669,19 +2669,19 @@ pub fn localeLoad(l: &mut Locale, blob: vg::Str) -> bool {
         let mut i: i64 = 0i64;
         '_b1: while (i < numSections) {
             '_c1: {
-                if ((cursor + 4i64) > blob.len) {
+                if ((cursor).wrapping_add(4i64) > blob.len) {
                     return false;
                 }
                 let length: i64 = ((u32Raw(blob, cursor)) as i64);
-                cursor += 4i64;
-                if ((cursor + length) > blob.len) {
+                cursor = (cursor).wrapping_add(4i64);
+                if ((cursor).wrapping_add(length) > blob.len) {
                     return false;
                 }
                 l.sec[(i) as usize].Off = cursor;
-                l.sec[(i) as usize].End = (cursor + length);
-                cursor += length;
+                l.sec[(i) as usize].End = (cursor).wrapping_add(length);
+                cursor = (cursor).wrapping_add(length);
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if (cursor != blob.len) {
@@ -2697,8 +2697,8 @@ pub fn localeLoad(l: &mut Locale, blob: vg::Str) -> bool {
     if (!localeValidate(l)) {
         return false;
     }
-    l.preimagesDefault = ({ let _t5 = secInvUpperDefault; maxPairRun(l, _t5) } + { let _t6 = secInvLowerDefault; maxPairRun(l, _t6) });
-    l.preimagesTurkic = ({ let _t7 = secInvUpperTurkic; maxPairRun(l, _t7) } + { let _t8 = secInvLowerTurkic; maxPairRun(l, _t8) });
+    l.preimagesDefault = ({ let _t5 = secInvUpperDefault; maxPairRun(l, _t5) }).wrapping_add({ let _t6 = secInvLowerDefault; maxPairRun(l, _t6) });
+    l.preimagesTurkic = ({ let _t7 = secInvUpperTurkic; maxPairRun(l, _t7) }).wrapping_add({ let _t8 = secInvLowerTurkic; maxPairRun(l, _t8) });
     if ((l.preimagesDefault > maxPreimages) || (l.preimagesTurkic > maxPreimages)) {
         return false;
     }
@@ -2715,11 +2715,11 @@ pub fn localeValidate(l: &mut Locale) -> bool {
         '_b3: while (i < ctypeStage1Entries) {
             '_c3: {
                 let block: i64 = (({ let _t4 = secCtypeStage1; let _t5 = i; u16At(l, _t4, _t5) }) as i64);
-                if ((512i64 * (block + 1i64)) > blocksLen) {
+                if ((512i64).wrapping_mul((block).wrapping_add(1i64)) > blocksLen) {
                     return false;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if ((({ let _t6 = secCaseDefault; sectionLen(l, _t6) }).wrapping_rem(12i64) != 0i64) || (({ let _t7 = secCaseTurkic; sectionLen(l, _t7) }).wrapping_rem(12i64) != 0i64)) {
@@ -2737,13 +2737,13 @@ pub fn localeValidate(l: &mut Locale) -> bool {
         let mut i_2: i64 = 0i64;
         '_b16: while (i_2 < seqCount) {
             '_c16: {
-                let off: i64 = (({ let _t17 = secSequences; let _t18 = (2i64 * i_2); u32At(l, _t17, _t18) }) as i64);
-                let length: i64 = (({ let _t19 = secSequences; let _t20 = ((2i64 * i_2) + 1i64); u32At(l, _t19, _t20) }) as i64);
-                if ((length < 1i64) || ((off + length) > codepointCount)) {
+                let off: i64 = (({ let _t17 = secSequences; let _t18 = (2i64).wrapping_mul(i_2); u32At(l, _t17, _t18) }) as i64);
+                let length: i64 = (({ let _t19 = secSequences; let _t20 = ((2i64).wrapping_mul(i_2)).wrapping_add(1i64); u32At(l, _t19, _t20) }) as i64);
+                if ((length < 1i64) || ((off).wrapping_add(length) > codepointCount)) {
                     return false;
                 }
             }
-            i_2 += 1i64;
+            i_2 = (i_2).wrapping_add(1i64);
         }
     }
     if (((((({ let _t21 = secRootContractions; sectionLen(l, _t21) }).wrapping_rem(4i64) != 0i64) || (({ let _t22 = secContractionAdds; sectionLen(l, _t22) }).wrapping_rem(4i64) != 0i64)) || (({ let _t23 = secContractionRemoves; sectionLen(l, _t23) }).wrapping_rem(4i64) != 0i64)) || (({ let _t24 = secRootEquivalences; sectionLen(l, _t24) }).wrapping_rem(8i64) != 0i64)) || (({ let _t25 = secCollationOverrides; sectionLen(l, _t25) }).wrapping_rem(8i64) != 0i64)) {
@@ -2767,11 +2767,11 @@ pub fn localeValidate(l: &mut Locale) -> bool {
         '_b35: while (i_3 < profileCount) {
             '_c35: {
                 let row: CollProfile = { let _t36 = i_3; collationProfileRow(l, _t36) };
-                if ((((row.OverrideFirst + row.OverrideCount) > overrideCount) || ((row.AddFirst + row.AddCount) > addCount)) || ((row.RemoveFirst + row.RemoveCount) > removeCount)) {
+                if ((((row.OverrideFirst).wrapping_add(row.OverrideCount) > overrideCount) || ((row.AddFirst).wrapping_add(row.AddCount) > addCount)) || ((row.RemoveFirst).wrapping_add(row.RemoveCount) > removeCount)) {
                     return false;
                 }
             }
-            i_3 += 1i64;
+            i_3 = (i_3).wrapping_add(1i64);
         }
     }
     if (({ let _t37 = secTypeNameOffsets; sectionLen(l, _t37) }).wrapping_rem(4i64) != 0i64) {
@@ -2786,7 +2786,7 @@ pub fn localeValidate(l: &mut Locale) -> bool {
                     return false;
                 }
             }
-            i_4 += 1i64;
+            i_4 = (i_4).wrapping_add(1i64);
         }
     }
     if (((({ let _t43 = secLocales; sectionLen(l, _t43) }).wrapping_rem(20i64) != 0i64) || (({ let _t44 = secLocaleNameOffsets; sectionLen(l, _t44) }).wrapping_rem(4i64) != 0i64)) || (({ let _t45 = secLocaleTypes; sectionLen(l, _t45) }).wrapping_rem(4i64) != 0i64)) {
@@ -2804,7 +2804,7 @@ pub fn localeValidate(l: &mut Locale) -> bool {
                     return false;
                 }
             }
-            i_5 += 1i64;
+            i_5 = (i_5).wrapping_add(1i64);
         }
     }
     let typeRowCount: i64 = ({ let _t51 = secLocaleTypes; sectionLen(l, _t51) }).wrapping_div(4i64);
@@ -2813,22 +2813,22 @@ pub fn localeValidate(l: &mut Locale) -> bool {
         '_b52: while (i_6 < count) {
             '_c52: {
                 let row_2: LocaleRow = { let _t53 = i_6; localeRowAt(l, _t53) };
-                if (((row_2.TypeFirst + row_2.TypeCount) > typeRowCount) || (((row_2.DefaultCollation) as i64) >= profileCount)) {
+                if (((row_2.TypeFirst).wrapping_add(row_2.TypeCount) > typeRowCount) || (((row_2.DefaultCollation) as i64) >= profileCount)) {
                     return false;
                 }
             }
-            i_6 += 1i64;
+            i_6 = (i_6).wrapping_add(1i64);
         }
     }
     {
         let mut i_7: i64 = 0i64;
         '_b54: while (i_7 < typeRowCount) {
             '_c54: {
-                if ((({ let _t55 = secLocaleTypes; let _t56 = ((2i64 * i_7) + 1i64); u16At(l, _t55, _t56) }) as i64) >= profileCount) {
+                if ((({ let _t55 = secLocaleTypes; let _t56 = ((2i64).wrapping_mul(i_7)).wrapping_add(1i64); u16At(l, _t55, _t56) }) as i64) >= profileCount) {
                     return false;
                 }
             }
-            i_7 += 1i64;
+            i_7 = (i_7).wrapping_add(1i64);
         }
     }
     return true;
@@ -2841,11 +2841,11 @@ pub fn contractionIDsValid(l: &mut Locale, sec: i64, seqCount: i64) -> bool {
         '_b2: while (i < count) {
             '_c2: {
                 let id: u32 = { let _t3 = sec; let _t4 = i; u32At(l, _t3, _t4) };
-                if ((id >= ((firstSequenceID) as u32)) && ((((id - ((firstSequenceID) as u32))) as i64) >= seqCount)) {
+                if ((id >= ((firstSequenceID) as u32)) && ((((id).wrapping_sub(((firstSequenceID) as u32))) as i64) >= seqCount)) {
                     return false;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return true;
@@ -2861,7 +2861,7 @@ pub fn validScalar(r: i32) -> bool {
 
 pub fn asciiLower(c: u8) -> u8 {
     if ((c >= 65u8) && (c <= 90u8)) {
-        return (c + 32u8);
+        return (c).wrapping_add(32u8);
     }
     return c;
 }
@@ -2883,14 +2883,14 @@ pub fn normalizeName(mem: &vg::Arena, input: vg::Str) -> (vg::Str, bool) {
             c = asciiLower(c);
         }
         out = vg::append(mem, out, c);
-        i += 1i64;
+        i = (i).wrapping_add(1i64);
     }
     if ((i < input.len) && (input.byte(i) == 46u8)) {
-        i += 1i64;
+        i = (i).wrapping_add(1i64);
         let mut codeset: vg::Slice<u8> = vg::make_cap::<u8>(mem, 0i64, 5i64);
         while ((i < input.len) && (input.byte(i) != 64u8)) {
             let c_2: u8 = asciiLower(input.byte(i));
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
             if ((codeset.len == 5i64) || (c_2 >= 128u8)) {
                 return (vg::lit(b""), false);
             }
@@ -2908,7 +2908,7 @@ pub fn embeddedModifier(name: vg::Str) -> (vg::Str, bool) {
     if (at < 0i64) {
         return (vg::lit(b""), false);
     }
-    let modifier: vg::Str = name.tail((at + 1i64));
+    let modifier: vg::Str = name.tail((at).wrapping_add(1i64));
     let keyword: vg::Str = vg::lit(b"collation=");
     if (modifier.len <= keyword.len) {
         return (vg::lit(b""), false);
@@ -2921,7 +2921,7 @@ pub fn embeddedModifier(name: vg::Str) -> (vg::Str, bool) {
                     return (vg::lit(b""), false);
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return (modifier.tail(keyword.len), true);
@@ -2955,7 +2955,7 @@ pub fn normalizeType(mem: &vg::Arena, input: vg::Str) -> (vg::Str, bool) {
                 }
                 out = vg::append(mem, out, asciiLower(c));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return (longTypeAlias(vg::str_from_bytes(mem, out)), true);
@@ -2965,7 +2965,7 @@ pub fn findName(l: &mut Locale, name: vg::Str, poolSec: i64, offsetsSec: i64, co
     let mut low: i64 = 0i64;
     let mut high: i64 = count;
     while (low < high) {
-        let middle: i64 = (low + ((high - low)).wrapping_div(2i64));
+        let middle: i64 = (low).wrapping_add(((high).wrapping_sub(low)).wrapping_div(2i64));
         let entry: vg::Str = { let _t1 = poolSec; let _t2 = (({ let _t3 = offsetsSec; let _t4 = middle; u32At(l, _t3, _t4) }) as i64); byteString(l, _t1, _t2) };
         if vg::streq(name, entry) {
             return middle;
@@ -2973,7 +2973,7 @@ pub fn findName(l: &mut Locale, name: vg::Str, poolSec: i64, offsetsSec: i64, co
         if (vg::strcmp3(name, entry) < 0) {
             high = middle;
         } else {
-            low = (middle + 1i64);
+            low = (middle).wrapping_add(1i64);
         }
     }
     return (1i64).wrapping_neg();
@@ -2984,12 +2984,12 @@ pub fn localesCount(l: &mut Locale) -> i64 {
 }
 
 pub fn localeRowAt(l: &mut Locale, index: i64) -> LocaleRow {
-    let base: i64 = (5i64 * index);
+    let base: i64 = (5i64).wrapping_mul(index);
     let mut row: LocaleRow = vg::zero();
-    row.TypeFirst = (({ let _t1 = secLocales; let _t2 = (base + 1i64); u32At(l, _t1, _t2) }) as i64);
-    row.TypeCount = (({ let _t3 = secLocales; let _t4 = (base + 2i64); u32At(l, _t3, _t4) }) as i64);
-    row.CaseProfile = (({ let _t5 = secLocales; let _t6 = (base + 3i64); u32At(l, _t5, _t6) }) as u8);
-    row.DefaultCollation = (({ let _t7 = secLocales; let _t8 = (base + 4i64); u32At(l, _t7, _t8) }) as u16);
+    row.TypeFirst = (({ let _t1 = secLocales; let _t2 = (base).wrapping_add(1i64); u32At(l, _t1, _t2) }) as i64);
+    row.TypeCount = (({ let _t3 = secLocales; let _t4 = (base).wrapping_add(2i64); u32At(l, _t3, _t4) }) as i64);
+    row.CaseProfile = (({ let _t5 = secLocales; let _t6 = (base).wrapping_add(3i64); u32At(l, _t5, _t6) }) as u8);
+    row.DefaultCollation = (({ let _t7 = secLocales; let _t8 = (base).wrapping_add(4i64); u32At(l, _t7, _t8) }) as u16);
     return row;
 }
 
@@ -3068,18 +3068,18 @@ pub fn resolveLocale(data: &mut Locale, req: localeRequest) -> (Locale, bool) {
         return (invalid, false);
     }
     let mut low: i64 = row.TypeFirst;
-    let mut high: i64 = (row.TypeFirst + row.TypeCount);
+    let mut high: i64 = (row.TypeFirst).wrapping_add(row.TypeCount);
     while (low < high) {
-        let middle: i64 = (low + ((high - low)).wrapping_div(2i64));
-        let rowTypeID: i64 = (({ let _t11 = secLocaleTypes; let _t12 = (2i64 * middle); u16At(&mut result, _t11, _t12) }) as i64);
+        let middle: i64 = (low).wrapping_add(((high).wrapping_sub(low)).wrapping_div(2i64));
+        let rowTypeID: i64 = (({ let _t11 = secLocaleTypes; let _t12 = (2i64).wrapping_mul(middle); u16At(&mut result, _t11, _t12) }) as i64);
         if (rowTypeID == typeID) {
-            result.collationProfile = { let _t13 = secLocaleTypes; let _t14 = ((2i64 * middle) + 1i64); u16At(&mut result, _t13, _t14) };
+            result.collationProfile = { let _t13 = secLocaleTypes; let _t14 = ((2i64).wrapping_mul(middle)).wrapping_add(1i64); u16At(&mut result, _t13, _t14) };
             return (result, true);
         }
         if (rowTypeID > typeID) {
             high = middle;
         } else {
-            low = (middle + 1i64);
+            low = (middle).wrapping_add(1i64);
         }
     }
     return (invalid, false);
@@ -3128,7 +3128,7 @@ pub fn classByName(name: vg::Str) -> (u8, bool) {
                     return (((i) as u8), true);
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return (0u8, false);
@@ -3195,7 +3195,7 @@ pub fn localeClassMask(l: &mut Locale, r: i32) -> u16 {
         return posixMask(r);
     }
     let block: i64 = (({ let _t1 = secCtypeStage1; let _t2 = (((r >> 8i64)) as i64); u16At(l, _t1, _t2) }) as i64);
-    return { let _t3 = secCtypeBlocks; let _t4 = ((block * 256i64) + (((r & 255i32)) as i64)); u16At(l, _t3, _t4) };
+    return { let _t3 = secCtypeBlocks; let _t4 = ((block).wrapping_mul(256i64)).wrapping_add((((r & 255i32)) as i64)); u16At(l, _t3, _t4) };
 }
 
 pub fn findCase(l: &mut Locale, sec: i64, r: i32) -> (CasePair, bool) {
@@ -3204,17 +3204,17 @@ pub fn findCase(l: &mut Locale, sec: i64, r: i32) -> (CasePair, bool) {
     let mut low: i64 = 0i64;
     let mut high: i64 = count;
     while (low < high) {
-        let middle: i64 = (low + ((high - low)).wrapping_div(2i64));
-        let cp: i32 = (({ let _t2 = sec; let _t3 = (3i64 * middle); u32At(l, _t2, _t3) }) as i32);
+        let middle: i64 = (low).wrapping_add(((high).wrapping_sub(low)).wrapping_div(2i64));
+        let cp: i32 = (({ let _t2 = sec; let _t3 = (3i64).wrapping_mul(middle); u32At(l, _t2, _t3) }) as i32);
         if (cp == r) {
-            pair.Upper = (({ let _t4 = sec; let _t5 = ((3i64 * middle) + 1i64); u32At(l, _t4, _t5) }) as i32);
-            pair.Lower = (({ let _t6 = sec; let _t7 = ((3i64 * middle) + 2i64); u32At(l, _t6, _t7) }) as i32);
+            pair.Upper = (({ let _t4 = sec; let _t5 = ((3i64).wrapping_mul(middle)).wrapping_add(1i64); u32At(l, _t4, _t5) }) as i32);
+            pair.Lower = (({ let _t6 = sec; let _t7 = ((3i64).wrapping_mul(middle)).wrapping_add(2i64); u32At(l, _t6, _t7) }) as i32);
             return (pair, true);
         }
         if (cp > r) {
             high = middle;
         } else {
-            low = (middle + 1i64);
+            low = (middle).wrapping_add(1i64);
         }
     }
     return (pair, false);
@@ -3226,10 +3226,10 @@ pub fn caseConvert(l: &mut Locale, r: i32, toUpper: bool) -> i32 {
     }
     if l.posix {
         if ((toUpper && (r >= 97i32)) && (r <= 122i32)) {
-            return (r - 32i32);
+            return (r).wrapping_sub(32i32);
         }
         if (((!toUpper) && (r >= 65i32)) && (r <= 90i32)) {
-            return (r + 32i32);
+            return (r).wrapping_add(32i32);
         }
         return r;
     }
@@ -3261,20 +3261,20 @@ pub fn pairSourcesRun(l: &mut Locale, buf: &mut preimageBuf, sec: i64, r: i32) {
     let mut low: i64 = 0i64;
     let mut high: i64 = count;
     while (low < high) {
-        let middle: i64 = (low + ((high - low)).wrapping_div(2i64));
-        if ((({ let _t2 = sec; let _t3 = (2i64 * middle); u32At(l, _t2, _t3) }) as i32) < r) {
-            low = (middle + 1i64);
+        let middle: i64 = (low).wrapping_add(((high).wrapping_sub(low)).wrapping_div(2i64));
+        if ((({ let _t2 = sec; let _t3 = (2i64).wrapping_mul(middle); u32At(l, _t2, _t3) }) as i32) < r) {
+            low = (middle).wrapping_add(1i64);
         } else {
             high = middle;
         }
     }
     while (low < count) {
-        if ((({ let _t4 = sec; let _t5 = (2i64 * low); u32At(l, _t4, _t5) }) as i32) != r) {
+        if ((({ let _t4 = sec; let _t5 = (2i64).wrapping_mul(low); u32At(l, _t4, _t5) }) as i32) != r) {
             break;
         }
-        buf.r[(buf.n) as usize] = (({ let _t6 = sec; let _t7 = ((2i64 * low) + 1i64); u32At(l, _t6, _t7) }) as i32);
-        buf.n += 1i64;
-        low += 1i64;
+        buf.r[(buf.n) as usize] = (({ let _t6 = sec; let _t7 = ((2i64).wrapping_mul(low)).wrapping_add(1i64); u32At(l, _t6, _t7) }) as i32);
+        buf.n = (buf.n).wrapping_add(1i64);
+        low = (low).wrapping_add(1i64);
     }
 }
 
@@ -3287,16 +3287,16 @@ pub fn maxPairRun(l: &mut Locale, sec: i64) -> i64 {
         let mut i: i64 = 0i64;
         '_b2: while (i < count) {
             '_c2: {
-                let target: u32 = { let _t3 = sec; let _t4 = (2i64 * i); u32At(l, _t3, _t4) };
+                let target: u32 = { let _t3 = sec; let _t4 = (2i64).wrapping_mul(i); u32At(l, _t3, _t4) };
                 if ((i > 0i64) && (target == last)) {
-                    run += 1i64;
+                    run = (run).wrapping_add(1i64);
                 } else {
                     run = 1i64;
                     last = target;
                 }
                 longest = std::cmp::max(longest, run);
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return longest;
@@ -3316,11 +3316,11 @@ pub fn localeCasePreimages(l: &mut Locale, buf: &mut preimageBuf, r: i32) {
     }
     if l.posix {
         if ((r >= 65i32) && (r <= 90i32)) {
-            buf.r[(0i64) as usize] = (r + 32i32);
+            buf.r[(0i64) as usize] = (r).wrapping_add(32i32);
             buf.n = 1i64;
         }
         if ((r >= 97i32) && (r <= 122i32)) {
-            buf.r[(0i64) as usize] = (r - 32i32);
+            buf.r[(0i64) as usize] = (r).wrapping_sub(32i32);
             buf.n = 1i64;
         }
         return;
@@ -3341,10 +3341,10 @@ pub fn localeCasePreimages(l: &mut Locale, buf: &mut preimageBuf, r: i32) {
                 let candidate: i32 = buf.r[(i) as usize];
                 if ((candidate != r) && (!runesContain(vg::arr_slice(&raw mut buf.r, 0i64, w), candidate))) {
                     buf.r[(w) as usize] = candidate;
-                    w += 1i64;
+                    w = (w).wrapping_add(1i64);
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     buf.n = w;
@@ -3359,14 +3359,14 @@ pub fn localeToLower(l: &mut Locale, r: i32) -> i32 {
 }
 
 pub fn compareSequence(l: &mut Locale, seq: vg::Slice<i32>, index: i64) -> i64 {
-    let off: i64 = (({ let _t1 = secSequences; let _t2 = (2i64 * index); u32At(l, _t1, _t2) }) as i64);
-    let length: i64 = (({ let _t3 = secSequences; let _t4 = ((2i64 * index) + 1i64); u32At(l, _t3, _t4) }) as i64);
+    let off: i64 = (({ let _t1 = secSequences; let _t2 = (2i64).wrapping_mul(index); u32At(l, _t1, _t2) }) as i64);
+    let length: i64 = (({ let _t3 = secSequences; let _t4 = ((2i64).wrapping_mul(index)).wrapping_add(1i64); u32At(l, _t3, _t4) }) as i64);
     let common: i64 = std::cmp::min(length, seq.len);
     {
         let mut i: i64 = 0i64;
         '_b5: while (i < common) {
             '_c5: {
-                let stored: i32 = (({ let _t6 = secSeqCodepoints; let _t7 = (off + i); u32At(l, _t6, _t7) }) as i32);
+                let stored: i32 = (({ let _t6 = secSeqCodepoints; let _t7 = (off).wrapping_add(i); u32At(l, _t6, _t7) }) as i32);
                 if (seq.get(i) < stored) {
                     return (1i64).wrapping_neg();
                 }
@@ -3374,7 +3374,7 @@ pub fn compareSequence(l: &mut Locale, seq: vg::Slice<i32>, index: i64) -> i64 {
                     return 1i64;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if (seq.len < length) {
@@ -3398,7 +3398,7 @@ pub fn elementID(l: &mut Locale, seq: vg::Slice<i32>) -> (u32, bool) {
                     return (0u32, false);
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if (seq.len == 1i64) {
@@ -3408,15 +3408,15 @@ pub fn elementID(l: &mut Locale, seq: vg::Slice<i32>) -> (u32, bool) {
     let mut low: i64 = 0i64;
     let mut high: i64 = count;
     while (low < high) {
-        let middle: i64 = (low + ((high - low)).wrapping_div(2i64));
+        let middle: i64 = (low).wrapping_add(((high).wrapping_sub(low)).wrapping_div(2i64));
         let comparison: i64 = { let _t3 = seq; let _t4 = middle; compareSequence(l, _t3, _t4) };
         if (comparison == 0i64) {
-            return ((((firstSequenceID + middle)) as u32), true);
+            return ((((firstSequenceID).wrapping_add(middle)) as u32), true);
         }
         if (comparison < 0i64) {
             high = middle;
         } else {
-            low = (middle + 1i64);
+            low = (middle).wrapping_add(1i64);
         }
     }
     return (0u32, false);
@@ -3424,9 +3424,9 @@ pub fn elementID(l: &mut Locale, seq: vg::Slice<i32>) -> (u32, bool) {
 
 pub fn u32Contains(l: &mut Locale, sec: i64, first: i64, count: i64, needle: u32) -> bool {
     let mut low: i64 = first;
-    let mut high: i64 = (first + count);
+    let mut high: i64 = (first).wrapping_add(count);
     while (low < high) {
-        let middle: i64 = (low + ((high - low)).wrapping_div(2i64));
+        let middle: i64 = (low).wrapping_add(((high).wrapping_sub(low)).wrapping_div(2i64));
         let value: u32 = { let _t1 = sec; let _t2 = middle; u32At(l, _t1, _t2) };
         if (value == needle) {
             return true;
@@ -3434,21 +3434,21 @@ pub fn u32Contains(l: &mut Locale, sec: i64, first: i64, count: i64, needle: u32
         if (value > needle) {
             high = middle;
         } else {
-            low = (middle + 1i64);
+            low = (middle).wrapping_add(1i64);
         }
     }
     return false;
 }
 
 pub fn collationProfileRow(l: &mut Locale, index: i64) -> CollProfile {
-    let base: i64 = (6i64 * index);
+    let base: i64 = (6i64).wrapping_mul(index);
     let mut row: CollProfile = vg::zero();
     row.OverrideFirst = (({ let _t1 = secCollationProfiles; let _t2 = base; u32At(l, _t1, _t2) }) as i64);
-    row.OverrideCount = (({ let _t3 = secCollationProfiles; let _t4 = (base + 1i64); u32At(l, _t3, _t4) }) as i64);
-    row.AddFirst = (({ let _t5 = secCollationProfiles; let _t6 = (base + 2i64); u32At(l, _t5, _t6) }) as i64);
-    row.AddCount = (({ let _t7 = secCollationProfiles; let _t8 = (base + 3i64); u32At(l, _t7, _t8) }) as i64);
-    row.RemoveFirst = (({ let _t9 = secCollationProfiles; let _t10 = (base + 4i64); u32At(l, _t9, _t10) }) as i64);
-    row.RemoveCount = (({ let _t11 = secCollationProfiles; let _t12 = (base + 5i64); u32At(l, _t11, _t12) }) as i64);
+    row.OverrideCount = (({ let _t3 = secCollationProfiles; let _t4 = (base).wrapping_add(1i64); u32At(l, _t3, _t4) }) as i64);
+    row.AddFirst = (({ let _t5 = secCollationProfiles; let _t6 = (base).wrapping_add(2i64); u32At(l, _t5, _t6) }) as i64);
+    row.AddCount = (({ let _t7 = secCollationProfiles; let _t8 = (base).wrapping_add(3i64); u32At(l, _t7, _t8) }) as i64);
+    row.RemoveFirst = (({ let _t9 = secCollationProfiles; let _t10 = (base).wrapping_add(4i64); u32At(l, _t9, _t10) }) as i64);
+    row.RemoveCount = (({ let _t11 = secCollationProfiles; let _t12 = (base).wrapping_add(5i64); u32At(l, _t11, _t12) }) as i64);
     return row;
 }
 
@@ -3502,7 +3502,7 @@ pub fn LocaleCollatingPrefix(l: &mut Locale, seq: vg::Slice<i32>) -> i64 {
                     return candidate;
                 }
             }
-            candidate -= 1i64;
+            candidate = (candidate).wrapping_sub(1i64);
         }
     }
     if { let _t3 = seq.sub(0i64, 1i64); localeIsCollatingElement(l, _t3) } {
@@ -3513,17 +3513,17 @@ pub fn LocaleCollatingPrefix(l: &mut Locale, seq: vg::Slice<i32>) -> i64 {
 
 pub fn findPair(l: &mut Locale, sec: i64, first: i64, count: i64, element: u32) -> (u32, bool) {
     let mut low: i64 = first;
-    let mut high: i64 = (first + count);
+    let mut high: i64 = (first).wrapping_add(count);
     while (low < high) {
-        let middle: i64 = (low + ((high - low)).wrapping_div(2i64));
-        let key: u32 = { let _t1 = sec; let _t2 = (2i64 * middle); u32At(l, _t1, _t2) };
+        let middle: i64 = (low).wrapping_add(((high).wrapping_sub(low)).wrapping_div(2i64));
+        let key: u32 = { let _t1 = sec; let _t2 = (2i64).wrapping_mul(middle); u32At(l, _t1, _t2) };
         if (key == element) {
-            return ({ let _t3 = sec; let _t4 = ((2i64 * middle) + 1i64); u32At(l, _t3, _t4) }, true);
+            return ({ let _t3 = sec; let _t4 = ((2i64).wrapping_mul(middle)).wrapping_add(1i64); u32At(l, _t3, _t4) }, true);
         }
         if (key > element) {
             high = middle;
         } else {
-            low = (middle + 1i64);
+            low = (middle).wrapping_add(1i64);
         }
     }
     return (0u32, false);
@@ -3605,9 +3605,9 @@ pub fn minTokenLength(l: &mut Locale, sec: i64, first: i64, count: i64, token: u
     let mut best_v: i64 = best;
     {
         let mut i: i64 = first;
-        '_b1: while (i < (first + count)) {
+        '_b1: while (i < (first).wrapping_add(count)) {
             '_c1: {
-                let candidate: u32 = { let _t2 = sec; let _t3 = (2i64 * i); u32At(l, _t2, _t3) };
+                let candidate: u32 = { let _t2 = sec; let _t3 = (2i64).wrapping_mul(i); u32At(l, _t2, _t3) };
                 if ({ let _t4 = candidate; primaryToken(l, _t4) } != token) {
                     break '_c1;
                 }
@@ -3617,10 +3617,10 @@ pub fn minTokenLength(l: &mut Locale, sec: i64, first: i64, count: i64, token: u
                 if (!{ let _t5 = candidate; isContraction(l, _t5) }) {
                     break '_c1;
                 }
-                let index: i64 = (((candidate - ((firstSequenceID) as u32))) as i64);
-                best_v = std::cmp::min(best_v, (({ let _t6 = secSequences; let _t7 = ((2i64 * index) + 1i64); u32At(l, _t6, _t7) }) as i64));
+                let index: i64 = (((candidate).wrapping_sub(((firstSequenceID) as u32))) as i64);
+                best_v = std::cmp::min(best_v, (({ let _t6 = secSequences; let _t7 = ((2i64).wrapping_mul(index)).wrapping_add(1i64); u32At(l, _t6, _t7) }) as i64));
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return best_v;
@@ -3643,11 +3643,11 @@ pub fn LocaleName(l: &mut Locale, index: i64) -> vg::Str {
 
 pub fn decodeWindow(mem: &vg::Arena, s: vg::Str, so: i64, eo: i64) -> decoded {
     let mut d: decoded = vg::zero();
-    d.runes = vg::make_cap::<i32>(mem, 0i64, (eo - so));
-    d.byteAt = vg::make_cap::<i64>(mem, 0i64, ((eo - so) + 1i64));
+    d.runes = vg::make_cap::<i32>(mem, 0i64, (eo).wrapping_sub(so));
+    d.byteAt = vg::make_cap::<i64>(mem, 0i64, ((eo).wrapping_sub(so)).wrapping_add(1i64));
     d.atSubjectStart = (so == 0i64);
     d.atSubjectEnd = (eo == s.len);
-    d.prevIsNewline = ((so > 0i64) && (s.byte((so - 1i64)) == 10u8));
+    d.prevIsNewline = ((so > 0i64) && (s.byte((so).wrapping_sub(1i64)) == 10u8));
     d.nextIsNewline = ((eo < s.len) && (s.byte(eo) == 10u8));
     let mut i: i64 = so;
     while (i < eo) {
@@ -3656,7 +3656,7 @@ pub fn decodeWindow(mem: &vg::Arena, s: vg::Str, so: i64, eo: i64) -> decoded {
         let r: i32 = _t1.0;
         let size: i64 = _t1.1;
         d.runes = vg::append(mem, d.runes, r);
-        i += size;
+        i = (i).wrapping_add(size);
     }
     d.byteAt = vg::append(mem, d.byteAt, eo);
     return d;
@@ -3671,7 +3671,7 @@ pub fn indexOfByte(s: vg::Str, c: u8) -> i64 {
                     return i;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return (1i64).wrapping_neg();
@@ -3686,7 +3686,7 @@ pub fn runesContain(runes: vg::Slice<i32>, r: i32) -> bool {
                     return true;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return false;
@@ -3719,7 +3719,7 @@ pub fn atBOL(re: &mut Regexp, d: &mut decoded, i: i64, eflags: u32) -> bool {
         }
         return (((re.flags & FlagNewline) != 0u32) && d.prevIsNewline);
     }
-    return (((re.flags & FlagNewline) != 0u32) && (d.runes.get((i - 1i64)) == 10i32));
+    return (((re.flags & FlagNewline) != 0u32) && (d.runes.get((i).wrapping_sub(1i64)) == 10i32));
 }
 
 pub fn atEOL(re: &mut Regexp, d: &mut decoded, i: i64, eflags: u32) -> bool {
@@ -3748,7 +3748,7 @@ pub fn fillMatches(re: &mut Regexp, d: &mut decoded, caps: vg::Slice<Match>, pma
                     pmatch.update(idx, (1i64).wrapping_neg(), |mut _t9, _t8| { _t9.Eo = _t8; _t9 });
                 }
             }
-            idx += 1i64;
+            idx = (idx).wrapping_add(1i64);
         }
     }
 }
@@ -3773,10 +3773,10 @@ pub fn onePassAnalyze(mem: &vg::Arena, nodes: vg::Slice<node>, brs: vg::Slice<br
                             return false;
                         }
                         if (!fixedLength(nodes, child)) {
-                            variable += 1i64;
+                            variable = (variable).wrapping_add(1i64);
                         }
                     }
-                    i += 1i64;
+                    i = (i).wrapping_add(1i64);
                 }
             }
             return (variable <= 1i64);
@@ -3795,7 +3795,7 @@ pub fn onePassAnalyze(mem: &vg::Arena, nodes: vg::Slice<node>, brs: vg::Slice<br
                             return false;
                         }
                     }
-                    i_2 += 1i64;
+                    i_2 = (i_2).wrapping_add(1i64);
                 }
             }
             if disjointLengths(nodes, ni) {
@@ -3819,7 +3819,7 @@ pub fn disjointLengths(nodes: vg::Slice<node>, ni: i32) -> bool {
             '_c1: {
                 let a: i32 = nodes.get(((ni) as i64)).ch.get(i);
                 {
-                    let mut k: i64 = (i + 1i64);
+                    let mut k: i64 = (i).wrapping_add(1i64);
                     '_b2: while (k < count) {
                         '_c2: {
                             let b: i32 = nodes.get(((ni) as i64)).ch.get(k);
@@ -3827,11 +3827,11 @@ pub fn disjointLengths(nodes: vg::Slice<node>, ni: i32) -> bool {
                                 return false;
                             }
                         }
-                        k += 1i64;
+                        k = (k).wrapping_add(1i64);
                     }
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return true;
@@ -3841,7 +3841,7 @@ pub fn firstSet(mem: &vg::Arena, nodes: vg::Slice<node>, ni: i32) -> (vg::Slice<
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opChar {
-            let mut out: vg::Slice<i32> = vg::make_cap::<i32>(mem, 0i64, (nodes.get(((ni) as i64)).fold.len + 1i64));
+            let mut out: vg::Slice<i32> = vg::make_cap::<i32>(mem, 0i64, (nodes.get(((ni) as i64)).fold.len).wrapping_add(1i64));
             if (nodes.get(((ni) as i64)).fold.len > 0i64) {
                 out = vg::append_slice(mem, out, nodes.get(((ni) as i64)).fold);
                 return (out, true);
@@ -3875,11 +3875,11 @@ pub fn firstSet(mem: &vg::Arena, nodes: vg::Slice<node>, ni: i32) -> (vg::Slice<
                                 '_c4: {
                                     out_2 = appendUnique(mem, out_2, sub.get(k));
                                 }
-                                k += 1i64;
+                                k = (k).wrapping_add(1i64);
                             }
                         }
                     }
-                    i += 1i64;
+                    i = (i).wrapping_add(1i64);
                 }
             }
             return (out_2, true);
@@ -3902,14 +3902,14 @@ pub fn firstSet(mem: &vg::Arena, nodes: vg::Slice<node>, ni: i32) -> (vg::Slice<
                                 '_c7: {
                                     out_3 = appendUnique(mem, out_3, sub_2.get(k_2));
                                 }
-                                k_2 += 1i64;
+                                k_2 = (k_2).wrapping_add(1i64);
                             }
                         }
                         if (nodes.get(((child) as i64)).minL > 0i64) {
                             break '_b5;
                         }
                     }
-                    i_2 += 1i64;
+                    i_2 = (i_2).wrapping_add(1i64);
                 }
             }
             return (out_3, true);
@@ -3934,11 +3934,11 @@ pub fn disjointFirsts(mem: &vg::Arena, nodes: vg::Slice<node>, ni: i32) -> bool 
                     return false;
                 }
                 if (nodes.get(((branch) as i64)).minL == 0i64) {
-                    nullable += 1i64;
+                    nullable = (nullable).wrapping_add(1i64);
                 }
                 firsts.set(i, set);
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if (nullable > 1i64) {
@@ -3949,7 +3949,7 @@ pub fn disjointFirsts(mem: &vg::Arena, nodes: vg::Slice<node>, ni: i32) -> bool 
         '_b3: while (i_2 < count) {
             '_c3: {
                 {
-                    let mut k: i64 = (i_2 + 1i64);
+                    let mut k: i64 = (i_2).wrapping_add(1i64);
                     '_b4: while (k < count) {
                         '_c4: {
                             {
@@ -3960,15 +3960,15 @@ pub fn disjointFirsts(mem: &vg::Arena, nodes: vg::Slice<node>, ni: i32) -> bool 
                                             return false;
                                         }
                                     }
-                                    m += 1i64;
+                                    m = (m).wrapping_add(1i64);
                                 }
                             }
                         }
-                        k += 1i64;
+                        k = (k).wrapping_add(1i64);
                     }
                 }
             }
-            i_2 += 1i64;
+            i_2 = (i_2).wrapping_add(1i64);
         }
     }
     nodes.update(((ni) as i64), firsts, |mut _t7, _t6| { _t7.firsts = _t6; _t7 });
@@ -3976,7 +3976,7 @@ pub fn disjointFirsts(mem: &vg::Arena, nodes: vg::Slice<node>, ni: i32) -> bool 
 }
 
 pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, eflags: u32, caps: vg::Slice<Match>) -> bool {
-    let span: i64 = (j - i);
+    let span: i64 = (j).wrapping_sub(i);
     if ((span < re.nodes.get(((ni) as i64)).minL) || (span > re.nodes.get(((ni) as i64)).maxL)) {
         return false;
     }
@@ -4000,7 +4000,7 @@ pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, ef
                     '_c12: {
                         setMatch(caps, ((re.nested.get(gi).get(k)) as i64), (1i64).wrapping_neg(), (1i64).wrapping_neg());
                     }
-                    k += 1i64;
+                    k = (k).wrapping_add(1i64);
                 }
             }
             setMatch(caps, gi, i, j);
@@ -4011,9 +4011,9 @@ pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, ef
                 let mut k_2: i64 = 0i64;
                 '_b18: while (k_2 < re.nodes.get(((ni) as i64)).ch.len) {
                     '_c18: {
-                        rest -= re.nodes.get(((re.nodes.get(((ni) as i64)).ch.get(k_2)) as i64)).minL;
+                        rest = (rest).wrapping_sub(re.nodes.get(((re.nodes.get(((ni) as i64)).ch.get(k_2)) as i64)).minL);
                     }
-                    k_2 += 1i64;
+                    k_2 = (k_2).wrapping_add(1i64);
                 }
             }
             let mut at: i64 = i;
@@ -4024,14 +4024,14 @@ pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, ef
                         let child: i32 = re.nodes.get(((ni) as i64)).ch.get(k_3);
                         let mut length: i64 = re.nodes.get(((child) as i64)).minL;
                         if (!fixedLength(re.nodes, child)) {
-                            length += rest;
+                            length = (length).wrapping_add(rest);
                         }
-                        if ((length < 0i64) || (!{ let _t20 = child; let _t21 = at; let _t22 = (at + length); let _t23 = eflags; let _t24 = caps; onePassCaps(re, d, _t20, _t21, _t22, _t23, _t24) })) {
+                        if ((length < 0i64) || (!{ let _t20 = child; let _t21 = at; let _t22 = (at).wrapping_add(length); let _t23 = eflags; let _t24 = caps; onePassCaps(re, d, _t20, _t21, _t22, _t23, _t24) })) {
                             return false;
                         }
-                        at += length;
+                        at = (at).wrapping_add(length);
                     }
-                    k_3 += 1i64;
+                    k_3 = (k_3).wrapping_add(1i64);
                 }
             }
             return (at == j);
@@ -4050,12 +4050,12 @@ pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, ef
                 let mut k_4: i64 = 0i64;
                 '_b25: while (k_4 < count) {
                     '_c25: {
-                        if (!{ let _t26 = child_2; let _t27 = at_2; let _t28 = (at_2 + size); let _t29 = eflags; let _t30 = caps; onePassCaps(re, d, _t26, _t27, _t28, _t29, _t30) }) {
+                        if (!{ let _t26 = child_2; let _t27 = at_2; let _t28 = (at_2).wrapping_add(size); let _t29 = eflags; let _t30 = caps; onePassCaps(re, d, _t26, _t27, _t28, _t29, _t30) }) {
                             return false;
                         }
-                        at_2 += size;
+                        at_2 = (at_2).wrapping_add(size);
                     }
-                    k_4 += 1i64;
+                    k_4 = (k_4).wrapping_add(1i64);
                 }
             }
             return true;
@@ -4075,7 +4075,7 @@ pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, ef
                         }
                         chosen = idx;
                     }
-                    idx += 1i64;
+                    idx = (idx).wrapping_add(1i64);
                 }
             }
             if ((chosen < 0i64) && (!re.nodes.get(((ni) as i64)).firsts.p.is_null())) {
@@ -4089,7 +4089,7 @@ pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, ef
                                     break '_b32;
                                 }
                             }
-                            idx_2 += 1i64;
+                            idx_2 = (idx_2).wrapping_add(1i64);
                         }
                     }
                 } else {
@@ -4102,7 +4102,7 @@ pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, ef
                                     break '_b33;
                                 }
                             }
-                            idx_3 += 1i64;
+                            idx_3 = (idx_3).wrapping_add(1i64);
                         }
                     }
                 }
@@ -4123,8 +4123,8 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) -> 
     let mut stack: vg::Slice<u32> = vg::make_cap::<u32>(mem, 0i64, 16i64);
     stack = vg::append(mem, stack, pr.start);
     while (stack.len > 0i64) {
-        let pc: u32 = stack.get((stack.len - 1i64));
-        stack = stack.head((stack.len - 1i64));
+        let pc: u32 = stack.get((stack.len).wrapping_sub(1i64));
+        stack = stack.head((stack.len).wrapping_sub(1i64));
         if seen.get(((pc) as i64)) {
             continue;
         }
@@ -4158,7 +4158,7 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) -> 
                                 pr.scan.stop[_t5] = _t6;
                             }
                         }
-                        i += 1i64;
+                        i = (i).wrapping_add(1i64);
                     }
                 }
             } else {
@@ -4181,11 +4181,11 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) -> 
         '_b7: while (b < 256i64) {
             '_c7: {
                 if pr.scan.stop[(b) as usize] {
-                    count += 1i64;
+                    count = (count).wrapping_add(1i64);
                     pr.scan.b = ((b) as u8);
                 }
             }
-            b += 1i64;
+            b = (b).wrapping_add(1i64);
         }
     }
     pr.scan.single = (count == 1i64);
@@ -4204,12 +4204,12 @@ pub fn instrEstimate(nodes: vg::Slice<node>, ni: i32) -> i64 {
                 let mut i: i64 = 0i64;
                 '_b2: while (i < nodes.get(((ni) as i64)).ch.len) {
                     '_c2: {
-                        total += instrEstimate(nodes, nodes.get(((ni) as i64)).ch.get(i));
+                        total = (total).wrapping_add(instrEstimate(nodes, nodes.get(((ni) as i64)).ch.get(i)));
                         if (total > estimateCap) {
                             return estimateCap;
                         }
                     }
-                    i += 1i64;
+                    i = (i).wrapping_add(1i64);
                 }
             }
             return total;
@@ -4219,25 +4219,25 @@ pub fn instrEstimate(nodes: vg::Slice<node>, ni: i32) -> i64 {
                 let mut i_2: i64 = 0i64;
                 '_b3: while (i_2 < nodes.get(((ni) as i64)).ch.len) {
                     '_c3: {
-                        total += instrEstimate(nodes, nodes.get(((ni) as i64)).ch.get(i_2));
+                        total = (total).wrapping_add(instrEstimate(nodes, nodes.get(((ni) as i64)).ch.get(i_2)));
                         if (total > estimateCap) {
                             return estimateCap;
                         }
                     }
-                    i_2 += 1i64;
+                    i_2 = (i_2).wrapping_add(1i64);
                 }
             }
             return total;
         } else if _t1 == opRepeat {
             let mut copies: i64 = nodes.get(((ni) as i64)).max;
             if (nodes.get(((ni) as i64)).max == infinite) {
-                copies = (nodes.get(((ni) as i64)).min + 1i64);
+                copies = (nodes.get(((ni) as i64)).min).wrapping_add(1i64);
             }
             if (copies == 0i64) {
                 return 1i64;
             }
             let child: i64 = instrEstimate(nodes, nodes.get(((ni) as i64)).ch.get(0i64));
-            total = (((copies * child) + copies) + 2i64);
+            total = (((copies).wrapping_mul(child)).wrapping_add(copies)).wrapping_add(2i64);
             if ((total > estimateCap) || (total < 0i64)) {
                 return estimateCap;
             }
@@ -4311,16 +4311,16 @@ pub fn progDepth(mem: &vg::Arena, pr: &mut program) -> i64 {
                                         let _t4 = { let _t5 = ((pc) as u32); let _t6 = e; progEdge(pr, _t5, _t6) };
                                         let target: u32 = _t4.0;
                                         let has: bool = _t4.1;
-                                        if (has && (depth.get(((target) as i64)) < (depth.get(pc) + weight))) {
-                                            depth.set(((target) as i64), (depth.get(pc) + weight));
+                                        if (has && (depth.get(((target) as i64)) < (depth.get(pc)).wrapping_add(weight))) {
+                                            depth.set(((target) as i64), (depth.get(pc)).wrapping_add(weight));
                                             changed = true;
                                         }
                                     }
-                                    e += 1i64;
+                                    e = (e).wrapping_add(1i64);
                                 }
                             }
                         }
-                        pc += 1i64;
+                        pc = (pc).wrapping_add(1i64);
                     }
                 }
                 if (!changed) {
@@ -4331,13 +4331,13 @@ pub fn progDepth(mem: &vg::Arena, pr: &mut program) -> i64 {
                             '_c7: {
                                 best = std::cmp::max(best, depth.get(pc_2));
                             }
-                            pc_2 += 1i64;
+                            pc_2 = (pc_2).wrapping_add(1i64);
                         }
                     }
                     return ((best) as i64);
                 }
             }
-            round += 1i64;
+            round = (round).wrapping_add(1i64);
         }
     }
     return (1i64).wrapping_neg();
@@ -4352,7 +4352,7 @@ pub fn addInstr(mem: &vg::Arena, b: &mut progBuilder, ins: instr) -> u32 {
         return 0u32;
     }
     b.prog.ins = vg::append(mem, b.prog.ins, ins);
-    return (((b.prog.ins.len - 1i64)) as u32);
+    return (((b.prog.ins.len).wrapping_sub(1i64)) as u32);
 }
 
 pub fn patch(b: &mut progBuilder, slots: vg::Slice<patchSlot>, target: u32) {
@@ -4369,7 +4369,7 @@ pub fn patch(b: &mut progBuilder, slots: vg::Slice<patchSlot>, target: u32) {
                     b.prog.ins.update(((slots.get(i).idx) as i64), target, |mut _t5, _t4| { _t5.next = _t4; _t5 });
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
 }
@@ -4453,7 +4453,7 @@ pub fn emit(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, ni: i3
                         { let _t39 = result.out; let _t40 = next.start; patch(b, _t39, _t40) };
                         result.out = next.out;
                     }
-                    i += 1i64;
+                    i = (i).wrapping_add(1i64);
                 }
             }
             return result;
@@ -4476,7 +4476,7 @@ pub fn emitAlt(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, ni:
         let mut i: i64 = 0i64;
         '_b1: while (i < count) {
             '_c1: {
-                if (i < (count - 1i64)) {
+                if (i < (count).wrapping_sub(1i64)) {
                     let mut s: instr = vg::zero();
                     s.op = iSplit;
                     splits = vg::append(mem, splits, { let _t2 = s; addInstr(mem, b, _t2) });
@@ -4485,17 +4485,17 @@ pub fn emitAlt(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, ni:
                 if ((b.errCode != ErrNone) || b.tooBig) {
                     return none;
                 }
-                if (i < (count - 1i64)) {
+                if (i < (count).wrapping_sub(1i64)) {
                     b.prog.ins.update(((splits.get(i)) as i64), sub.start, |mut _t8, _t7| { _t8.next = _t7; _t8 });
                 } else {
-                    b.prog.ins.update(((splits.get((i - 1i64))) as i64), sub.start, |mut _t10, _t9| { _t10.alt = _t9; _t10 });
+                    b.prog.ins.update(((splits.get((i).wrapping_sub(1i64))) as i64), sub.start, |mut _t10, _t9| { _t10.alt = _t9; _t10 });
                 }
-                if ((i > 0i64) && (i < (count - 1i64))) {
-                    b.prog.ins.update(((splits.get((i - 1i64))) as i64), splits.get(i), |mut _t12, _t11| { _t12.alt = _t11; _t12 });
+                if ((i > 0i64) && (i < (count).wrapping_sub(1i64))) {
+                    b.prog.ins.update(((splits.get((i).wrapping_sub(1i64))) as i64), splits.get(i), |mut _t12, _t11| { _t12.alt = _t11; _t12 });
                 }
                 result.out = vg::append_slice(mem, result.out, sub.out);
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     result.start = splits.get(0i64);
@@ -4517,7 +4517,7 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
     let mut mask_v: u64 = mask;
     let mut extra_v: vg::Slice<u32> = extra;
     let none: frag = vg::zero();
-    if (instrEstimate(nodes, ni) > (maxProgram - b.prog.ins.len)) {
+    if (instrEstimate(nodes, ni) > (maxProgram).wrapping_sub(b.prog.ins.len)) {
         let mut fi: instr = vg::zero();
         fi.op = iFail;
         let idx: u32 = { let _t1 = fi; addInstr(mem, b, _t1) };
@@ -4531,7 +4531,7 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
         if (slot < maskWidth) {
             mask_v |= (1u64 << slot);
         } else {
-            let grown: vg::Slice<u32> = vg::make::<u32>(mem, (extra_v.len + 1i64));
+            let grown: vg::Slice<u32> = vg::make::<u32>(mem, (extra_v.len).wrapping_add(1i64));
             let _ = vg::vcopy(grown, extra_v);
             grown.set(extra_v.len, ((slot) as u32));
             extra_v = grown;
@@ -4552,20 +4552,20 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
                 if ((b.errCode != ErrNone) || b.tooBig) {
                     return none;
                 }
-                if ((i == (lo - 1i64)) && (hi == infinite)) {
+                if ((i == (lo).wrapping_sub(1i64)) && (hi == infinite)) {
                     let _ = { let _t3 = haveResult; let _t4 = { let _t5 = nodes; let _t6 = child; let _t7 = mask_v; let _t8 = extra_v; emitPlus(mem, b, _t5, _t6, _t7, _t8) }; fragAppend(b, &mut result, _t3, _t4) };
                     return result;
                 }
                 haveResult = { let _t9 = haveResult; let _t10 = { let _t11 = nodes; let _t12 = child; let _t13 = mask_v; let _t14 = extra_v; emit(mem, b, _t11, _t12, _t13, _t14) }; fragAppend(b, &mut result, _t9, _t10) };
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if (hi == infinite) {
         let _ = { let _t15 = haveResult; let _t16 = { let _t17 = nodes; let _t18 = child; let _t19 = mask_v; let _t20 = extra_v; emitStar(mem, b, _t17, _t18, _t19, _t20) }; fragAppend(b, &mut result, _t15, _t16) };
         return result;
     }
-    let mut skips: vg::Slice<patchSlot> = vg::make_cap::<patchSlot>(mem, 0i64, std::cmp::max((hi - lo), 1i64));
+    let mut skips: vg::Slice<patchSlot> = vg::make_cap::<patchSlot>(mem, 0i64, std::cmp::max((hi).wrapping_sub(lo), 1i64));
     {
         let mut i_2: i64 = lo;
         '_b21: while (i_2 < hi) {
@@ -4590,7 +4590,7 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
                 piece.out = sub.out;
                 haveResult = { let _t29 = haveResult; let _t30 = piece; fragAppend(b, &mut result, _t29, _t30) };
             }
-            i_2 += 1i64;
+            i_2 = (i_2).wrapping_add(1i64);
         }
     }
     result.out = vg::append_slice(mem, result.out, skips);
@@ -4640,7 +4640,7 @@ pub fn compileScan(re: &mut Regexp, ni: i32) {
         if _t1 == opRepeat {
             if re.nodes.get(((ni) as i64)).minimal {
                 re.nodes.update(((ni) as i64), re.minSlots, |mut _t3, _t2| { _t3.index = _t2; _t3 });
-                re.minSlots += 1i64;
+                re.minSlots = (re.minSlots).wrapping_add(1i64);
             }
         } else if _t1 == opBracket {
             if bracketHasMultiMembers(re.brackets, re.nodes.get(((ni) as i64)).br) {
@@ -4656,7 +4656,7 @@ pub fn compileScan(re: &mut Regexp, ni: i32) {
             '_c4: {
                 { let _t5 = re.nodes.get(((ni) as i64)).ch.get(i); compileScan(re, _t5) };
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
 }
@@ -4672,7 +4672,7 @@ pub fn collectNested(mem: &vg::Arena, re: &mut Regexp, ni: i32, stack: &mut grou
                     let outer: i32 = stack.g.get(k);
                     re.nested.set(((outer) as i64), vg::append(mem, re.nested.get(((outer) as i64)), gi));
                 }
-                k += 1i64;
+                k = (k).wrapping_add(1i64);
             }
         }
         stack.g = vg::append(mem, stack.g, gi);
@@ -4683,11 +4683,11 @@ pub fn collectNested(mem: &vg::Arena, re: &mut Regexp, ni: i32, stack: &mut grou
             '_c2: {
                 { let _t3 = re.nodes.get(((ni) as i64)).ch.get(i); collectNested(mem, re, _t3, stack) };
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     if isGroup {
-        stack.g = stack.g.head((stack.g.len - 1i64));
+        stack.g = stack.g.head((stack.g.len).wrapping_sub(1i64));
     }
 }
 
@@ -4708,12 +4708,12 @@ pub fn minMatchChars(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, loc: &m
                 let mut i: i64 = 0i64;
                 '_b7: while (i < nodes.get(((ni) as i64)).ch.len) {
                     '_c7: {
-                        total += { let _t8 = nodes; let _t9 = brs; let _t10 = nodes.get(((ni) as i64)).ch.get(i); minMatchChars(_t8, _t9, loc, _t10) };
+                        total = (total).wrapping_add({ let _t8 = nodes; let _t9 = brs; let _t10 = nodes.get(((ni) as i64)).ch.get(i); minMatchChars(_t8, _t9, loc, _t10) });
                         if (total > lengthCap) {
                             return lengthCap;
                         }
                     }
-                    i += 1i64;
+                    i = (i).wrapping_add(1i64);
                 }
             }
             return total;
@@ -4725,7 +4725,7 @@ pub fn minMatchChars(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, loc: &m
                     '_c11: {
                         best = std::cmp::min(best, { let _t12 = nodes; let _t13 = brs; let _t14 = nodes.get(((ni) as i64)).ch.get(i_2); minMatchChars(_t12, _t13, loc, _t14) });
                     }
-                    i_2 += 1i64;
+                    i_2 = (i_2).wrapping_add(1i64);
                 }
             }
             return best;
@@ -4733,7 +4733,7 @@ pub fn minMatchChars(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, loc: &m
             if (nodes.get(((ni) as i64)).min == 0i64) {
                 return 0i64;
             }
-            let product: i64 = (nodes.get(((ni) as i64)).min * { let _t15 = nodes; let _t16 = brs; let _t17 = nodes.get(((ni) as i64)).ch.get(0i64); minMatchChars(_t15, _t16, loc, _t17) });
+            let product: i64 = (nodes.get(((ni) as i64)).min).wrapping_mul({ let _t15 = nodes; let _t16 = brs; let _t17 = nodes.get(((ni) as i64)).ch.get(0i64); minMatchChars(_t15, _t16, loc, _t17) });
             return std::cmp::min(product, lengthCap);
         }
     }
@@ -4757,7 +4757,7 @@ pub fn Compile(mem: &vg::Arena, pattern: vg::Str, loc: Locale, flags: u32) -> (R
     re.root = root;
     re.flags = flags;
     re.loc = loc_v;
-    re.nested = vg::make::<vg::Slice<i32>>(mem, (re.nsub + 1i64));
+    re.nested = vg::make::<vg::Slice<i32>>(mem, (re.nsub).wrapping_add(1i64));
     { let _t3 = root; compileScan(&mut re, _t3) };
     let mut stack: groupStack = vg::zero();
     { let _t4 = root; collectNested(mem, &mut re, _t4, &mut stack) };
@@ -4828,14 +4828,14 @@ pub fn Exec(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, pmatch: vg::Slic
             '_c7: {
                 setMatch(pmatch, idx, (1i64).wrapping_neg(), (1i64).wrapping_neg());
             }
-            idx += 1i64;
+            idx = (idx).wrapping_add(1i64);
         }
     }
     if ((pmatch.len == 1i64) || (re.nsub == 0i64)) {
         return (true, noError());
     }
     let mut d: decoded = decodeWindow(mem, subject, result.so, result.eo);
-    let caps: vg::Slice<Match> = vg::make::<Match>(mem, (re.nsub + 1i64));
+    let caps: vg::Slice<Match> = vg::make::<Match>(mem, (re.nsub).wrapping_add(1i64));
     let serr: Error = { let _t8 = 0i64; let _t9 = d.runes.len; let _t10 = eflags; let _t11 = caps; solveCaptures(mem, re, &mut d, _t8, _t9, _t10, _t11) };
     if (serr.Code != ErrNone) {
         return (false, serr);
@@ -4862,7 +4862,7 @@ pub fn MatchIterNext(mem: &vg::Arena, re: &mut Regexp, it: &mut MatchIter, subje
     if it.done {
         return (false, noError());
     }
-    if (pmatch.len < (re.nsub + 1i64)) {
+    if (pmatch.len < (re.nsub).wrapping_add(1i64)) {
         it.done = true;
         return (false, compileError(ErrESpace, (1i64).wrapping_neg()));
     }
@@ -4884,11 +4884,11 @@ pub fn MatchIterNext(mem: &vg::Arena, re: &mut Regexp, it: &mut MatchIter, subje
             '_b8: while (idx < pmatch.len) {
                 '_c8: {
                     if (pmatch.get(idx).So >= 0i64) {
-                        pmatch.update(idx, it.pos, |mut _t10, _t9| { _t10.So += _t9; _t10 });
-                        pmatch.update(idx, it.pos, |mut _t12, _t11| { _t12.Eo += _t11; _t12 });
+                        pmatch.update(idx, it.pos, |mut _t10, _t9| { _t10.So = (_t10.So).wrapping_add(_t9); _t10 });
+                        pmatch.update(idx, it.pos, |mut _t12, _t11| { _t12.Eo = (_t12.Eo).wrapping_add(_t11); _t12 });
                     }
                 }
-                idx += 1i64;
+                idx = (idx).wrapping_add(1i64);
             }
         }
         let so: i64 = pmatch.get(0i64).So;
@@ -4905,12 +4905,12 @@ pub fn MatchIterNext(mem: &vg::Arena, re: &mut Regexp, it: &mut MatchIter, subje
             } else {
                 let _t13 = decodeRuneAt(subject, so);
                 let size: i64 = _t13.1;
-                it.pos = (so + size);
+                it.pos = (so).wrapping_add(size);
             }
         }
         if report {
             it.lastEnd = eo;
-            it.limit -= 1i64;
+            it.limit = (it.limit).wrapping_sub(1i64);
             if (it.limit == 0i64) {
                 it.done = true;
             }
@@ -4940,15 +4940,15 @@ pub fn parseReplacement(mem: &vg::Arena, replacement: vg::Str, nsub: i64) -> (vg
                 if (c == 38u8) {
                     let whole: replPart = vg::zero();
                     parts = vg::append(mem, parts, whole);
-                    start = (idx + 1i64);
+                    start = (idx).wrapping_add(1i64);
                     break '_c1;
                 }
-                if ((idx + 1i64) == replacement.len) {
+                if ((idx).wrapping_add(1i64) == replacement.len) {
                     return (vg::zero::<vg::Slice<replPart>>(), compileError(ErrEEscape, idx));
                 }
-                let next: u8 = replacement.byte((idx + 1i64));
+                let next: u8 = replacement.byte((idx).wrapping_add(1i64));
                 if ((next >= 48u8) && (next <= 57u8)) {
-                    let group: i64 = (((next - 48u8)) as i64);
+                    let group: i64 = (((next).wrapping_sub(48u8)) as i64);
                     if ((group == 0i64) || (group > nsub)) {
                         return (vg::zero::<vg::Slice<replPart>>(), compileError(ErrESubReg, idx));
                     }
@@ -4957,13 +4957,13 @@ pub fn parseReplacement(mem: &vg::Arena, replacement: vg::Str, nsub: i64) -> (vg
                     parts = vg::append(mem, parts, r#ref);
                 } else {
                     let mut esc: replPart = vg::zero();
-                    esc.lit = replacement.sub((idx + 1i64), (idx + 2i64));
+                    esc.lit = replacement.sub((idx).wrapping_add(1i64), (idx).wrapping_add(2i64));
                     parts = vg::append(mem, parts, esc);
                 }
-                idx += 1i64;
-                start = (idx + 1i64);
+                idx = (idx).wrapping_add(1i64);
+                start = (idx).wrapping_add(1i64);
             }
-            idx += 1i64;
+            idx = (idx).wrapping_add(1i64);
         }
     }
     if (start < replacement.len) {
@@ -4990,7 +4990,7 @@ pub fn ReplaceAll(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, replacemen
     if (ierr.Code != ErrNone) {
         return (vg::lit(b""), ierr);
     }
-    let pmatch: vg::Slice<Match> = vg::make::<Match>(mem, (re.nsub + 1i64));
+    let pmatch: vg::Slice<Match> = vg::make::<Match>(mem, (re.nsub).wrapping_add(1i64));
     let mut out: vg::Slice<u8> = vg::zero();
     let mut last: i64 = 0i64;
     let mut any: bool = false;
@@ -5005,7 +5005,7 @@ pub fn ReplaceAll(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, replacemen
             break;
         }
         if (!any) {
-            out = vg::make_cap::<u8>(mem, 0i64, (subject.len + (subject.len).wrapping_div(8i64)));
+            out = vg::make_cap::<u8>(mem, 0i64, (subject.len).wrapping_add((subject.len).wrapping_div(8i64)));
             any = true;
         }
         out = vg::append_str(mem, out, subject.sub(last, pmatch.get(0i64).So));
@@ -5022,7 +5022,7 @@ pub fn ReplaceAll(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, replacemen
                         out = vg::append_str(mem, out, subject.sub(r#ref.So, r#ref.Eo));
                     }
                 }
-                i += 1i64;
+                i = (i).wrapping_add(1i64);
             }
         }
         last = pmatch.get(0i64).Eo;
@@ -5045,7 +5045,7 @@ pub fn addNode(mem: &vg::Arena, p: &mut parser, op: u8) -> i32 {
     let mut n: node = vg::zero();
     n.op = op;
     p.nodes = vg::append(mem, p.nodes, n);
-    return (((p.nodes.len - 1i64)) as i32);
+    return (((p.nodes.len).wrapping_sub(1i64)) as i32);
 }
 
 pub fn eof(p: &mut parser) -> bool {
@@ -5060,10 +5060,10 @@ pub fn peekByte(p: &mut parser) -> u8 {
 }
 
 pub fn peekByteAt(p: &mut parser, ahead: i64) -> u8 {
-    if ((p.pos + ahead) >= p.src.len) {
+    if ((p.pos).wrapping_add(ahead) >= p.src.len) {
         return 0u8;
     }
-    return p.src.byte((p.pos + ahead));
+    return p.src.byte((p.pos).wrapping_add(ahead));
 }
 
 pub fn nextRune(p: &mut parser) -> i32 {
@@ -5074,7 +5074,7 @@ pub fn nextRune(p: &mut parser) -> i32 {
         let _ = { let _t2 = ErrBadPat; let _t3 = p.pos; fail(p, _t2, _t3) };
         return invalidRune;
     }
-    p.pos += size;
+    p.pos = (p.pos).wrapping_add(size);
     return r;
 }
 
@@ -5102,7 +5102,7 @@ pub fn parseAlt(mem: &vg::Arena, p: &mut parser, loc: &mut Locale, inGroup: bool
     let alt: i32 = { let _t2 = opAlt; addNode(mem, p, _t2) };
     p.nodes.update(((alt) as i64), vg::append(mem, p.nodes.get(((alt) as i64)).ch, first), |mut _t4, _t3| { _t4.ch = _t3; _t4 });
     while (peekByte(p) == 124u8) {
-        p.pos += 1i64;
+        p.pos = (p.pos).wrapping_add(1i64);
         let branch: i32 = { let _t5 = inGroup; parseBranch(mem, p, loc, _t5) };
         if (branch < 0i32) {
             return (1i32).wrapping_neg();
@@ -5150,7 +5150,7 @@ pub fn parseExpr(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
     let start: i64 = p.pos;
     let c: u8 = peekByte(p);
     if ((c == 94u8) || (c == 36u8)) {
-        p.pos += 1i64;
+        p.pos = (p.pos).wrapping_add(1i64);
         if isDupByte(peekByte(p)) {
             return { let _t1 = ErrBadRpt; let _t2 = p.pos; fail(p, _t1, _t2) };
         }
@@ -5166,8 +5166,8 @@ pub fn parseExpr(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
     {
         let _t7 = c;
         if _t7 == 40u8 {
-            p.pos += 1i64;
-            p.groups += 1i64;
+            p.pos = (p.pos).wrapping_add(1i64);
+            p.groups = (p.groups).wrapping_add(1i64);
             let index: i64 = p.groups;
             let sub: i32 = { let _t8 = true; parseAlt(mem, p, loc, _t8) };
             if (sub < 0i32) {
@@ -5176,7 +5176,7 @@ pub fn parseExpr(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
             if (peekByte(p) != 41u8) {
                 return { let _t9 = ErrEParen; let _t10 = start; fail(p, _t9, _t10) };
             }
-            p.pos += 1i64;
+            p.pos = (p.pos).wrapping_add(1i64);
             primary = { let _t11 = opGroup; addNode(mem, p, _t11) };
             p.nodes.update(((primary) as i64), vg::append(mem, p.nodes.get(((primary) as i64)).ch, sub), |mut _t13, _t12| { _t13.ch = _t12; _t13 });
             p.nodes.update(((primary) as i64), index, |mut _t15, _t14| { _t15.index = _t14; _t15 });
@@ -5186,7 +5186,7 @@ pub fn parseExpr(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
                 return (1i32).wrapping_neg();
             }
         } else if _t7 == 92u8 {
-            p.pos += 1i64;
+            p.pos = (p.pos).wrapping_add(1i64);
             if eof(p) {
                 return { let _t16 = ErrEEscape; let _t17 = start; fail(p, _t16, _t17) };
             }
@@ -5200,7 +5200,7 @@ pub fn parseExpr(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
                 return { let _t19 = ErrBadPat; let _t20 = start; fail(p, _t19, _t20) };
             }
         } else if _t7 == 46u8 {
-            p.pos += 1i64;
+            p.pos = (p.pos).wrapping_add(1i64);
             primary = { let _t21 = opAny; addNode(mem, p, _t21) };
         } else {
             let r_2: i32 = nextRune(p);
@@ -5235,7 +5235,7 @@ pub fn appendUnique(mem: &vg::Arena, runes: vg::Slice<i32>, r: i32) -> vg::Slice
                     return runes;
                 }
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     return vg::append(mem, runes, r);
@@ -5248,15 +5248,15 @@ pub fn parseDup(mem: &vg::Arena, p: &mut parser, operand: i32) -> i32 {
     {
         let _t1 = c;
         if _t1 == 42u8 {
-            p.pos += 1i64;
+            p.pos = (p.pos).wrapping_add(1i64);
             lo = 0i64;
             hi = infinite;
         } else if _t1 == 43u8 {
-            p.pos += 1i64;
+            p.pos = (p.pos).wrapping_add(1i64);
             lo = 1i64;
             hi = infinite;
         } else if _t1 == 63u8 {
-            p.pos += 1i64;
+            p.pos = (p.pos).wrapping_add(1i64);
             lo = 0i64;
             hi = 1i64;
         } else if _t1 == 123u8 {
@@ -5274,7 +5274,7 @@ pub fn parseDup(mem: &vg::Arena, p: &mut parser, operand: i32) -> i32 {
     }
     let mut minimal: bool = ((p.flags & FlagMinimal) != 0u32);
     if (peekByte(p) == 63u8) {
-        p.pos += 1i64;
+        p.pos = (p.pos).wrapping_add(1i64);
         minimal = (!minimal);
     }
     if isDupByte(peekByte(p)) {
@@ -5291,7 +5291,7 @@ pub fn parseDup(mem: &vg::Arena, p: &mut parser, operand: i32) -> i32 {
 pub fn parseInterval(p: &mut parser) -> (interval, bool) {
     let mut iv: interval = vg::zero();
     let start: i64 = p.pos;
-    p.pos += 1i64;
+    p.pos = (p.pos).wrapping_add(1i64);
     let _t1 = parseCount(p);
     let lo: i64 = _t1.0;
     let ok: bool = _t1.1;
@@ -5301,7 +5301,7 @@ pub fn parseInterval(p: &mut parser) -> (interval, bool) {
     }
     let c: u8 = peekByte(p);
     if (c == 125u8) {
-        p.pos += 1i64;
+        p.pos = (p.pos).wrapping_add(1i64);
         iv.lo = lo;
         iv.hi = lo;
         return (iv, true);
@@ -5310,9 +5310,9 @@ pub fn parseInterval(p: &mut parser) -> (interval, bool) {
         { let _t3 = start; intervalError(p, _t3) };
         return (iv, false);
     }
-    p.pos += 1i64;
+    p.pos = (p.pos).wrapping_add(1i64);
     if (peekByte(p) == 125u8) {
-        p.pos += 1i64;
+        p.pos = (p.pos).wrapping_add(1i64);
         iv.lo = lo;
         iv.hi = infinite;
         return (iv, true);
@@ -5324,7 +5324,7 @@ pub fn parseInterval(p: &mut parser) -> (interval, bool) {
         { let _t5 = start; intervalError(p, _t5) };
         return (iv, false);
     }
-    p.pos += 1i64;
+    p.pos = (p.pos).wrapping_add(1i64);
     if (hi < lo) {
         let _ = { let _t6 = ErrBadBR; let _t7 = start; fail(p, _t6, _t7) };
         return (iv, false);
@@ -5348,21 +5348,21 @@ pub fn parseCount(p: &mut parser) -> (i64, bool) {
     }
     let mut value: i64 = 0i64;
     while (((!eof(p)) && (p.src.byte(p.pos) >= 48u8)) && (p.src.byte(p.pos) <= 57u8)) {
-        value = ((value * 10i64) + (((p.src.byte(p.pos) - 48u8)) as i64));
+        value = ((value).wrapping_mul(10i64)).wrapping_add((((p.src.byte(p.pos)).wrapping_sub(48u8)) as i64));
         if (value > dupMax) {
             return (0i64, false);
         }
-        p.pos += 1i64;
+        p.pos = (p.pos).wrapping_add(1i64);
     }
     return (value, true);
 }
 
 pub fn satAdd(a: i64, b: i64) -> i64 {
-    return std::cmp::min((a + b), lenInf);
+    return std::cmp::min((a).wrapping_add(b), lenInf);
 }
 
 pub fn satMul(a: i64, b: i64) -> i64 {
-    let product: i64 = (a * b);
+    let product: i64 = (a).wrapping_mul(b);
     if (product > lenInf) {
         return lenInf;
     }
@@ -5376,7 +5376,7 @@ pub fn computeLengths(mem: &vg::Arena, nodes: vg::Slice<node>, loc: &mut Locale,
             '_c1: {
                 { let _t2 = nodes; let _t3 = brackets; let _t4 = nodes.get(((ni) as i64)).ch.get(i); computeLengths(mem, _t2, loc, _t3, _t4) };
             }
-            i += 1i64;
+            i = (i).wrapping_add(1i64);
         }
     }
     {
@@ -5399,17 +5399,17 @@ pub fn computeLengths(mem: &vg::Arena, nodes: vg::Slice<node>, loc: &mut Locale,
             nodes.update(((ni) as i64), nodes.get(((child) as i64)).maxL, |mut _t25, _t24| { _t25.maxL = _t24; _t25 });
         } else if _t5 == opConcat {
             let count: i64 = nodes.get(((ni) as i64)).ch.len;
-            nodes.update(((ni) as i64), vg::make::<i64>(mem, (count + 1i64)), |mut _t27, _t26| { _t27.sufMin = _t26; _t27 });
-            nodes.update(((ni) as i64), vg::make::<i64>(mem, (count + 1i64)), |mut _t29, _t28| { _t29.sufMax = _t28; _t29 });
+            nodes.update(((ni) as i64), vg::make::<i64>(mem, (count).wrapping_add(1i64)), |mut _t27, _t26| { _t27.sufMin = _t26; _t27 });
+            nodes.update(((ni) as i64), vg::make::<i64>(mem, (count).wrapping_add(1i64)), |mut _t29, _t28| { _t29.sufMax = _t28; _t29 });
             {
-                let mut k: i64 = (count - 1i64);
+                let mut k: i64 = (count).wrapping_sub(1i64);
                 '_b30: while (k >= 0i64) {
                     '_c30: {
                         let child_2: i32 = nodes.get(((ni) as i64)).ch.get(k);
-                        nodes.get(((ni) as i64)).sufMin.set(k, satAdd(nodes.get(((ni) as i64)).sufMin.get((k + 1i64)), nodes.get(((child_2) as i64)).minL));
-                        nodes.get(((ni) as i64)).sufMax.set(k, satAdd(nodes.get(((ni) as i64)).sufMax.get((k + 1i64)), nodes.get(((child_2) as i64)).maxL));
+                        nodes.get(((ni) as i64)).sufMin.set(k, satAdd(nodes.get(((ni) as i64)).sufMin.get((k).wrapping_add(1i64)), nodes.get(((child_2) as i64)).minL));
+                        nodes.get(((ni) as i64)).sufMax.set(k, satAdd(nodes.get(((ni) as i64)).sufMax.get((k).wrapping_add(1i64)), nodes.get(((child_2) as i64)).maxL));
                     }
-                    k -= 1i64;
+                    k = (k).wrapping_sub(1i64);
                 }
             }
             nodes.update(((ni) as i64), nodes.get(((ni) as i64)).sufMin.get(0i64), |mut _t32, _t31| { _t32.minL = _t31; _t32 });
@@ -5425,7 +5425,7 @@ pub fn computeLengths(mem: &vg::Arena, nodes: vg::Slice<node>, loc: &mut Locale,
                         nodes.update(((ni) as i64), std::cmp::min(nodes.get(((ni) as i64)).minL, nodes.get(((child_3) as i64)).minL), |mut _t41, _t40| { _t41.minL = _t40; _t41 });
                         nodes.update(((ni) as i64), std::cmp::max(nodes.get(((ni) as i64)).maxL, nodes.get(((child_3) as i64)).maxL), |mut _t43, _t42| { _t43.maxL = _t42; _t43 });
                     }
-                    i_2 += 1i64;
+                    i_2 = (i_2).wrapping_add(1i64);
                 }
             }
         } else if _t5 == opRepeat {
@@ -5457,43 +5457,43 @@ pub fn decodeRuneAt(s: vg::Str, at: i64) -> (i32, i64) {
         return (invalidRune, 1i64);
     }
     if (c0 < 224u8) {
-        if (((at + 1i64) >= s.len) || (!utf8Cont(s.byte((at + 1i64))))) {
+        if (((at).wrapping_add(1i64) >= s.len) || (!utf8Cont(s.byte((at).wrapping_add(1i64))))) {
             return (invalidRune, 1i64);
         }
-        return ((((((c0 & 31u8)) as i32) << 6i64) | (((s.byte((at + 1i64)) & 63u8)) as i32)), 2i64);
+        return ((((((c0 & 31u8)) as i32) << 6i64) | (((s.byte((at).wrapping_add(1i64)) & 63u8)) as i32)), 2i64);
     }
     if (c0 < 240u8) {
-        if (((at + 1i64) >= s.len) || (!utf8Cont(s.byte((at + 1i64))))) {
+        if (((at).wrapping_add(1i64) >= s.len) || (!utf8Cont(s.byte((at).wrapping_add(1i64))))) {
             return (invalidRune, 1i64);
         }
-        if ((c0 == 224u8) && (s.byte((at + 1i64)) < 160u8)) {
+        if ((c0 == 224u8) && (s.byte((at).wrapping_add(1i64)) < 160u8)) {
             return (invalidRune, 1i64);
         }
-        if ((c0 == 237u8) && (s.byte((at + 1i64)) > 159u8)) {
+        if ((c0 == 237u8) && (s.byte((at).wrapping_add(1i64)) > 159u8)) {
             return (invalidRune, 1i64);
         }
-        if (((at + 2i64) >= s.len) || (!utf8Cont(s.byte((at + 2i64))))) {
+        if (((at).wrapping_add(2i64) >= s.len) || (!utf8Cont(s.byte((at).wrapping_add(2i64))))) {
             return (invalidRune, 1i64);
         }
-        return (((((((c0 & 15u8)) as i32) << 12i64) | ((((s.byte((at + 1i64)) & 63u8)) as i32) << 6i64)) | (((s.byte((at + 2i64)) & 63u8)) as i32)), 3i64);
+        return (((((((c0 & 15u8)) as i32) << 12i64) | ((((s.byte((at).wrapping_add(1i64)) & 63u8)) as i32) << 6i64)) | (((s.byte((at).wrapping_add(2i64)) & 63u8)) as i32)), 3i64);
     }
     if (c0 < 245u8) {
-        if (((at + 1i64) >= s.len) || (!utf8Cont(s.byte((at + 1i64))))) {
+        if (((at).wrapping_add(1i64) >= s.len) || (!utf8Cont(s.byte((at).wrapping_add(1i64))))) {
             return (invalidRune, 1i64);
         }
-        if ((c0 == 240u8) && (s.byte((at + 1i64)) < 144u8)) {
+        if ((c0 == 240u8) && (s.byte((at).wrapping_add(1i64)) < 144u8)) {
             return (invalidRune, 1i64);
         }
-        if ((c0 == 244u8) && (s.byte((at + 1i64)) > 143u8)) {
+        if ((c0 == 244u8) && (s.byte((at).wrapping_add(1i64)) > 143u8)) {
             return (invalidRune, 1i64);
         }
-        if (((at + 2i64) >= s.len) || (!utf8Cont(s.byte((at + 2i64))))) {
+        if (((at).wrapping_add(2i64) >= s.len) || (!utf8Cont(s.byte((at).wrapping_add(2i64))))) {
             return (invalidRune, 1i64);
         }
-        if (((at + 3i64) >= s.len) || (!utf8Cont(s.byte((at + 3i64))))) {
+        if (((at).wrapping_add(3i64) >= s.len) || (!utf8Cont(s.byte((at).wrapping_add(3i64))))) {
             return (invalidRune, 1i64);
         }
-        return ((((((((c0 & 7u8)) as i32) << 18i64) | ((((s.byte((at + 1i64)) & 63u8)) as i32) << 12i64)) | ((((s.byte((at + 2i64)) & 63u8)) as i32) << 6i64)) | (((s.byte((at + 3i64)) & 63u8)) as i32)), 4i64);
+        return ((((((((c0 & 7u8)) as i32) << 18i64) | ((((s.byte((at).wrapping_add(1i64)) & 63u8)) as i32) << 12i64)) | ((((s.byte((at).wrapping_add(2i64)) & 63u8)) as i32) << 6i64)) | (((s.byte((at).wrapping_add(3i64)) & 63u8)) as i32)), 4i64);
     }
     return (invalidRune, 1i64);
 }
@@ -5504,8 +5504,8 @@ pub fn runeCount(s: vg::Str) -> i64 {
     while (at < s.len) {
         let _t1 = decodeRuneAt(s, at);
         let size: i64 = _t1.1;
-        at += size;
-        count += 1i64;
+        at = (at).wrapping_add(size);
+        count = (count).wrapping_add(1i64);
     }
     return count;
 }

@@ -140,11 +140,43 @@ func TestSliceOperationAssignmentUsesOwnedValue(t *testing.T) {
 	assertInOrder(t, out,
 		"let _t1 = values.slot(mark(1i64));",
 		"let _t2 = mark(2i64);",
-		"_t1.update(_t2, |mut _t3, _t2| { _t3 += _t2; _t3 });")
+		"_t1.update(_t2, |mut _t3, _t2| { _t3 = (_t3).wrapping_add(_t2); _t3 });")
 	for _, bad := range []string{"unsafe {", "addr_of_mut", ".ptr("} {
 		if strings.Contains(out, bad) {
 			t.Fatalf("safe operation assignment contains %q:\n%s", bad, out)
 		}
+	}
+}
+
+func TestArithmeticUsesWrappingOperations(t *testing.T) {
+	g := &gen{p: &compiler.Program{}, fn: &compiler.FuncDecl{Info: map[string]*compiler.LocalInfo{}}}
+	for _, test := range []struct {
+		op   string
+		typ  *compiler.Type
+		want string
+	}{
+		{"+", compiler.TI64, "(a).wrapping_add(b)"},
+		{"-", compiler.TI64, "(a).wrapping_sub(b)"},
+		{"*", compiler.TU64, "(a).wrapping_mul(b)"},
+		{"/", compiler.TI64, "(a).wrapping_div(b)"},
+		{"%", compiler.TI64, "(a).wrapping_rem(b)"},
+		{"/", compiler.TU64, "(a / b)"},
+	} {
+		a := &compiler.Expr{K: "ident", Name: "a", Typ: test.typ}
+		b := &compiler.Expr{K: "ident", Name: "b", Typ: test.typ}
+		expr := &compiler.Expr{K: "binary", Op: test.op, X: a, Y: b, Typ: test.typ}
+		if got := g.binary(expr); got != test.want {
+			t.Errorf("%s expression = %q, want %q", test.op, got, test.want)
+		}
+	}
+
+	g.stmt(&compiler.Stmt{
+		K: "op_assign", Op: "*=",
+		Lhs:   []*compiler.Expr{{K: "ident", Name: "a", Typ: compiler.TU64}},
+		Value: &compiler.Expr{K: "ident", Name: "b", Typ: compiler.TU64},
+	}, 0)
+	if got, want := g.b.String(), "a = (a).wrapping_mul(b);\n"; got != want {
+		t.Fatalf("multiplication assignment = %q, want %q", got, want)
 	}
 }
 

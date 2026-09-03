@@ -454,15 +454,16 @@ func (g *gen) assignOperation(depth int, lhs *compiler.Expr, rhs, op string) {
 			g.wf("%s.set(%s, %s);\n", g.expr(p.slice), g.idx(p.sliceIndex), rhs)
 		} else {
 			value, elem := g.newTmp(), g.newTmp()
-			g.wf("%s.update(%s, %s, |mut %s, %s| { %s %s %s; %s });\n",
+			place := renderDirectPlace(g, elem, p.steps)
+			g.wf("%s.update(%s, %s, |mut %s, %s| { %s; %s });\n",
 				g.expr(p.slice), g.idx(p.sliceIndex), rhs, elem, value,
-				renderDirectPlace(g, elem, p.steps), op, value, elem)
+				assignmentExpr(place, value, op, lhs.Typ), elem)
 		}
 		return
 	}
 	if p.slice == nil && !compiler.Impure(lhs) {
 		g.indent(depth)
-		g.wf("%s %s %s;\n", g.place(lhs), op, rhs)
+		g.wf("%s;\n", assignmentExpr(g.place(lhs), rhs, op, lhs.Typ))
 		return
 	}
 
@@ -490,18 +491,47 @@ func (g *gen) assignOperation(depth int, lhs *compiler.Expr, rhs, op string) {
 	g.wf("let %s = %s;\n", value, rhs)
 	if slot == "" {
 		g.indent(inner)
-		g.wf("%s %s %s;\n", renderPlace(p.root, p.steps, indexes), op, value)
+		place := renderPlace(p.root, p.steps, indexes)
+		g.wf("%s;\n", assignmentExpr(place, value, op, lhs.Typ))
 	} else if len(p.steps) == 0 && op == "=" {
 		g.indent(inner)
 		g.wf("%s.set(%s);\n", slot, value)
 	} else {
 		elem := g.newTmp()
 		g.indent(inner)
-		g.wf("%s.update(%s, |mut %s, %s| { %s %s %s; %s });\n",
-			slot, value, elem, value, renderPlace(elem, p.steps, indexes), op, value, elem)
+		place := renderPlace(elem, p.steps, indexes)
+		g.wf("%s.update(%s, |mut %s, %s| { %s; %s });\n",
+			slot, value, elem, value, assignmentExpr(place, value, op, lhs.Typ), elem)
 	}
 	g.indent(depth)
 	g.wf("}\n")
+}
+
+func assignmentExpr(lhs, rhs, op string, typ *compiler.Type) string {
+	if method := wrappingMethod(strings.TrimSuffix(op, "="), typ); method != "" {
+		return fmt.Sprintf("%s = (%s).%s(%s)", lhs, lhs, method, rhs)
+	}
+	return fmt.Sprintf("%s %s %s", lhs, op, rhs)
+}
+
+func wrappingMethod(op string, typ *compiler.Type) string {
+	switch op {
+	case "+":
+		return "wrapping_add"
+	case "-":
+		return "wrapping_sub"
+	case "*":
+		return "wrapping_mul"
+	case "/":
+		if typ != nil && typ.Signed() {
+			return "wrapping_div"
+		}
+	case "%":
+		if typ != nil && typ.Signed() {
+			return "wrapping_rem"
+		}
+	}
+	return ""
 }
 
 func hasArrayStep(steps []placeStep) bool {
@@ -1029,22 +1059,17 @@ func (g *gen) binary(e *compiler.Expr) string {
 		}
 	}
 	x, y := g.expr(e.X), g.expr(e.Y)
+	if method := wrappingMethod(e.Op, e.Typ); method != "" {
+		return fmt.Sprintf("(%s).%s(%s)", x, method, y)
+	}
 	switch e.Op {
 	case "&^":
 		return fmt.Sprintf("(%s & !(%s))", x, y)
 	case "/":
-		// Go defines MinInt / -1 as MinInt.
-		// The plain operator panics on that pair, whatever the overflow-checks setting is.
-		if e.Typ.Signed() {
-			return fmt.Sprintf("(%s).wrapping_div(%s)", x, y)
-		}
 		return fmt.Sprintf("(%s / %s)", x, y)
 	case "%":
-		if e.Typ.Signed() {
-			return fmt.Sprintf("(%s).wrapping_rem(%s)", x, y)
-		}
 		return fmt.Sprintf("(%s %% %s)", x, y)
-	case "+", "-", "*", "&", "|", "^", "==", "!=",
+	case "&", "|", "^", "==", "!=",
 		"<", "<=", ">", ">=", "&&", "||", "<<", ">>":
 		return fmt.Sprintf("(%s %s %s)", x, e.Op, y)
 	}

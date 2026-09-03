@@ -1,6 +1,5 @@
 # The conformance and bench binaries of the Rust target.
 # They include the generated engine and the runtime from ../src by path and never link the library.
-# Cargo reads profiles from the workspace root only, so the wrapping-arithmetic profiles live in ../Cargo.toml.
 [package]
 name = "revera-tools"
 version = "0.0.0"
