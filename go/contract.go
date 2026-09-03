@@ -61,9 +61,11 @@ const (
 	frameBytes = 256
 	// matcherStackBytes covers the fixed frames of the iterative phase A executor.
 	matcherStackBytes = 2048
-	// equivFrames bounds the equivCandidate recursion.
-	// It allows one frame per character of a multi-character collating element, plus slack.
-	equivFrames = maxElemAhead + 2
+	// singleLookupFrames is the call depth below a single-character bracket test.
+	singleLookupFrames = 8
+	// multiLookupFrames is the call depth below a multi-character probe, which recurses once per lookahead
+	// character.
+	multiLookupFrames = maxElemAhead + 8
 	// ptreeBytes is one solver parse-tree record of 24 bytes, with arena doubling folded in.
 	ptreeBytes = 48
 	// kidBytes is one child-list entry of 4 bytes, with doubling folded in.
@@ -73,9 +75,6 @@ const (
 	mapEntryBytes = 128
 	// matchBytes is the size of one Match.
 	matchBytes = 16
-	// bracketFixedChecks pays for the fixed parts of one bracket membership test.
-	// Those parts are the sixteen class bits and the negation check.
-	bracketFixedChecks = 17
 )
 
 func cAdd(a int64, b int64) int64 {
@@ -186,8 +185,8 @@ func matcherContract(re *Regexp, length int64, atom int64) BackendContract {
 	perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2, k)), cAdd(cMul(4, ring), 38)))
 	steps := cAdd(cAdd(24+ring, length), cMul(cAdd(length, 1), perBoundary))
 
-	// A multi-character equivalence test recurses once per element character.
-	stack := int64(matcherStackBytes) + equivFrames*frameBytes
+	// A bracket probe can start the deepest lookup below the fixed frames.
+	stack := int64(matcherStackBytes) + multiLookupFrames*frameBytes
 
 	b.HeapBytes = heap
 	b.StackBytes = stack
@@ -209,7 +208,9 @@ func onePassContract(re *Regexp, length int64, atom int64) BackendContract {
 	var b BackendContract
 	perVisit := cAdd(atom, int64(re.nsub)+1)
 	b.HeapBytes = captureHeap(re, length)
-	b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 4), frameBytes)
+	// Two entry frames sit above the walk, and a bracket test can start a lookup below it.
+	b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 2+singleLookupFrames),
+		frameBytes)
 	b.Steps = cMul(cMul(astSize(re.nodes, re.root), cAdd(length, 2)),
 		perVisit)
 	return b
@@ -241,9 +242,8 @@ func solverContract(re *Regexp, length int64, atom int64) BackendContract {
 	heap = cAdd(heap, 4096)
 	heap = cAdd(heap, captureHeap(re, length))
 
-	// This is the parse search recursion.
-	// It adds the equivalence recursion that one multi-character bracket test can start below it.
-	stack := cMul(cAdd(depth, equivFrames+4), frameBytes)
+	// Two entry frames sit above the parse search, and a span test can start a probe below it.
+	stack := cMul(cAdd(depth, 3+multiLookupFrames), frameBytes)
 
 	b.HeapBytes = heap
 	b.StackBytes = stack
@@ -271,50 +271,204 @@ func astHeight(nodes []node, ni int32) int64 {
 
 // atomCost bounds the operations one atom test can perform.
 func atomCost(re *Regexp) int64 {
-	return atomCostNode(re.nodes, re.brackets, re.root)
+	lc := localeLookupCosts(&re.loc)
+	return atomCostNode(re.nodes, re.brackets, &lc, re.root)
 }
 
-func atomCostNode(nodes []node, brs []bracketSet, ni int32) int64 {
+func atomCostNode(nodes []node, brs []bracketSet, lc *lookupCosts, ni int32) int64 {
 	cost := int64(1)
 	switch nodes[ni].op {
 	case opChar:
 		cost = int64(len(nodes[ni].fold)) + 1
 	case opBracket:
-		cost = bracketAtomCost(brs, nodes[ni].br)
+		cost = bracketAtomCost(brs, nodes[ni].br, lc)
 	}
 	for i := 0; i < len(nodes[ni].ch); i++ {
-		cost = max(cost, atomCostNode(nodes, brs, nodes[ni].ch[i]))
+		cost = max(cost, atomCostNode(nodes, brs, lc, nodes[ni].ch[i]))
 	}
 	return cost
 }
 
-// bracketAtomCost bounds one bracket membership test.
-// The single test scans the member lists once per case preimage.
-// A positive list with multi-character members also probes every candidate length.
-// Under ICase, the equivalence test enumerates the preimages of each position.
-func bracketAtomCost(brs []bracketSet, bi int32) int64 {
-	members := int64(len(brs[bi].ranges)+len(brs[bi].elems)+
-		len(brs[bi].equivs)) + bracketFixedChecks
-	cost := cMul(maxPreimages+1, members)
-	if !bracketHasMultiMembers(brs, bi) {
+// The bracket figures count loop-meter units, one per call and one per loop iteration, so that the contract
+// stays above the meter of the interpreted engine.
+// Each helper prices the engine function it is named after.
+
+// searchSteps bounds the probes of a binary search over count entries.
+func searchSteps(count int) int64 {
+	steps := int64(0)
+	for count > 0 {
+		count /= 2
+		steps++
+	}
+	return steps
+}
+
+const profileRowCost = 13
+
+func u32ContainsCost(count int) int64 {
+	return 1 + 3*searchSteps(count)
+}
+
+func findPairCost(count int) int64 {
+	return 3 + 3*searchSteps(count)
+}
+
+func findCaseCost(count int) int64 {
+	return 6 + 3*searchSteps(count)
+}
+
+func pairSourcesRunCost(count int, preimages int64) int64 {
+	return 5 + 3*searchSteps(count) + 5*preimages
+}
+
+func compareSequenceCost(length int64) int64 {
+	return 5 + 3*length
+}
+
+// lookupCosts holds the prices of the locale lookups a bracket test can call, one per function it names.
+type lookupCosts struct {
+	sequenceSearch int64
+	contraction    int64
+	primaryToken   int64
+	classMask      int64
+	casePreimages  int64
+	caseConvert    int64
+	// preimages is the most case preimages one character can have.
+	preimages int64
+}
+
+// localeLookupCosts derives the lookup prices from the tables of one locale.
+func localeLookupCosts(l *Locale) lookupCosts {
+	var lc lookupCosts
+	if l.posix {
+		// POSIX searches no table.
+		lc.contraction = 1
+		lc.classMask = 3
+		lc.casePreimages = 2
+		lc.caseConvert = 2
+		lc.preimages = 1
+		return lc
+	}
+	lc.sequenceSearch = searchSteps(sectionLen(l, secSequences) / 8)
+	row := collationProfileRow(l, int(l.collationProfile))
+	lc.contraction = 1 + profileRowCost + u32ContainsCost(row.AddCount) + 1 +
+		u32ContainsCost(sectionLen(l, secRootContractions)/4) +
+		u32ContainsCost(row.RemoveCount)
+	lc.primaryToken = 1 + profileRowCost + findPairCost(row.OverrideCount) + 1 +
+		findPairCost(sectionLen(l, secRootEquivalences)/8)
+	lc.classMask = 4
+	lc.preimages = int64(localeMaxPreimages(l))
+	lc.caseConvert = 2 + findCaseCost(sectionLen(l, secCaseDefault)/12)
+	upper := secInvUpperDefault
+	lower := secInvLowerDefault
+	if l.caseProfile == 1 {
+		lc.caseConvert += findCaseCost(sectionLen(l, secCaseTurkic) / 12)
+		upper = secInvUpperTurkic
+		lower = secInvLowerTurkic
+	}
+	lc.casePreimages = 2 + pairSourcesRunCost(sectionLen(l, upper)/8, lc.preimages) +
+		pairSourcesRunCost(sectionLen(l, lower)/8, lc.preimages) +
+		lc.preimages*(2+lc.preimages)
+	return lc
+}
+
+// elementIDCost prices one elementID call over a sequence of length characters.
+func elementIDCost(lc *lookupCosts, length int64) int64 {
+	if length == 1 {
+		return 3
+	}
+	return 2 + 2*length + lc.sequenceSearch*(1+compareSequenceCost(length))
+}
+
+func collatingElementIDCost(lc *lookupCosts, length int64) int64 {
+	cost := 1 + elementIDCost(lc, length)
+	if length > 1 {
+		cost += lc.contraction
+	}
+	return cost
+}
+
+// primaryEqualCost prices one localePrimaryEqual call over sequences of the two lengths.
+func primaryEqualCost(lc *lookupCosts, left int64, right int64) int64 {
+	return 1 + collatingElementIDCost(lc, left) + collatingElementIDCost(lc, right) +
+		2*lc.primaryToken
+}
+
+// equivsCost prices the comparison of a sequence of length characters with every equivalence class.
+func equivsCost(brs []bracketSet, bi int32, lc *lookupCosts, length int64) int64 {
+	cost := int64(0)
+	for i := 0; i < len(brs[bi].equivs); i++ {
+		cost = cAdd(cost, 1+primaryEqualCost(lc, length, int64(len(brs[bi].equivs[i]))))
+	}
+	return cost
+}
+
+func positiveSingleCost(brs []bracketSet, bi int32, lc *lookupCosts) int64 {
+	cost := 2 + searchSteps(len(brs[bi].ranges))
+	if brs[bi].classMask != 0 {
+		cost += lc.classMask
+	}
+	return cAdd(cost, equivsCost(brs, bi, lc, 1))
+}
+
+func matchesOneCost(brs []bracketSet, bi int32, lc *lookupCosts) int64 {
+	positive := positiveSingleCost(brs, bi, lc)
+	cost := cAdd(1, positive)
+	if brs[bi].icase {
+		cost = cAdd(cost, cAdd(lc.casePreimages,
+			cMul(lc.preimages, cAdd(1, positive))))
+	}
+	return cost
+}
+
+// candidateLeafCost prices the membership test of one candidate sequence in equivCandidate.
+func candidateLeafCost(brs []bracketSet, bi int32, lc *lookupCosts, length int64) int64 {
+	return cAdd(1+collatingElementIDCost(lc, length), equivsCost(brs, bi, lc, length))
+}
+
+// probeCost prices one bracketMatchesMulti call over a lookahead of length characters.
+func probeCost(brs []bracketSet, bi int32, lc *lookupCosts, length int64) int64 {
+	cost := cAdd(2, int64(len(brs[bi].elems)))
+	counterpart := int64(1)
+	if brs[bi].icase {
+		counterpart = 1 + 2*lc.caseConvert
+	}
+	for i := 0; i < len(brs[bi].elems); i++ {
+		if int64(len(brs[bi].elems[i])) == length {
+			cost = cAdd(cost, cMul(length, counterpart))
+		}
+	}
+	if len(brs[bi].equivs) == 0 {
 		return cost
 	}
-	var elemChars int64
-	for i := 0; i < len(brs[bi].elems); i++ {
-		elemChars += int64(len(brs[bi].elems[i]))
+	leaf := candidateLeafCost(brs, bi, lc, length)
+	if !brs[bi].icase {
+		return cAdd(cost, cAdd(length+1, leaf))
 	}
-	multi := elemChars
-	if len(brs[bi].equivs) > 0 {
-		candidates := int64(1)
-		if brs[bi].icase {
-			for i := 0; i < maxElemAhead; i++ {
-				candidates *= maxPreimages + 1
-			}
+	// ICase tries every case candidate of the lookahead, so the recursion has (preimages+1)^length leaves and
+	// fewer inner nodes.
+	candidates := int64(1)
+	for i := int64(0); i < length; i++ {
+		candidates = cMul(candidates, lc.preimages+1)
+	}
+	return cAdd(cost, cMul(candidates,
+		cAdd(2+lc.preimages, cAdd(lc.casePreimages, leaf))))
+}
+
+// bracketAtomCost bounds the work of one live bracket instruction at one boundary: the single-character test
+// and the multi-character probes.
+func bracketAtomCost(brs []bracketSet, bi int32, lc *lookupCosts) int64 {
+	cost := matchesOneCost(brs, bi, lc)
+	if brs[bi].multiLens == 0 {
+		return cost
+	}
+	cost = cAdd(cost, maxElemAhead-1)
+	for length := 2; length <= maxElemAhead; length++ {
+		if brs[bi].multiLens&(1<<length) != 0 {
+			cost = cAdd(cost, probeCost(brs, bi, lc, int64(length)))
 		}
-		multi = cAdd(multi,
-			cMul(candidates, cMul(int64(len(brs[bi].equivs))+1, maxElemAhead)))
 	}
-	return cAdd(cost, cMul(maxElemAhead-1, multi))
+	return cost
 }
 
 // solverSteps bounds the counted work of the parse search over any span of at most length characters.

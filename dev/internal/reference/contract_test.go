@@ -305,3 +305,37 @@ func TestContractQueueStaysLinear(t *testing.T) {
 		}
 	}
 }
+
+// The POSIX bracket figures are fixed.
+// A full locale's depend on its tables, so only their order is checked.
+func TestBracketAtomCost(t *testing.T) {
+	czech, ok := locale.Open("cs", "")
+	if !ok {
+		t.Fatal("locale.Open(cs) failed")
+	}
+	atom := func(pattern string, loc locale.Locale, flags CompileFlags) int64 {
+		re, err := Compile(pattern, loc, flags)
+		if err != nil {
+			t.Fatalf("Compile(%q) failed: %v", pattern, err)
+		}
+		return atomCost(re.root)
+	}
+	if got := atom("[a-z]", locale.POSIX(), 0); got != 4 {
+		t.Errorf("atomCost([a-z]) = %d, want 4", got)
+	}
+	if got := atom("[a-z]", locale.POSIX(), ICase); got != 10 {
+		t.Errorf("atomCost([a-z], ICase) = %d, want 10", got)
+	}
+	plain := atom("[[=a=]]", czech, 0)
+	if plain <= atom("[[=a=]]", locale.POSIX(), 0) || plain < 1000 {
+		t.Errorf("atomCost([[=a=]], cs) = %d, expected the locale searches to show", plain)
+	}
+	if folded := atom("[[=a=]]", czech, ICase); folded <= plain {
+		t.Errorf("atomCost([[=a=]], cs, ICase) = %d, not above %d", folded, plain)
+	}
+	two := atom("[[=a=][=b=]]", czech, 0)
+	three := atom("[[=a=][=b=][=c=]]", czech, 0)
+	if two-plain != three-two {
+		t.Errorf("equivalence classes cost %d then %d", two-plain, three-two)
+	}
+}

@@ -1109,7 +1109,7 @@ revera_eng_BackendContract revera_eng_matcherContract(revera_eng_Regexp *re, int
     int64_t _t17 = perBoundary;
     int64_t _t18 = revera_eng_cMul(_t16, _t17);
     int64_t steps = revera_eng_cAdd(_t15, _t18);
-    int64_t stack = 4608LL;
+    int64_t stack = 6144LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1129,7 +1129,7 @@ revera_eng_BackendContract revera_eng_onePassContract(revera_eng_Regexp *re, int
     revera_eng_BackendContract b = {0};
     int64_t perVisit = revera_eng_cAdd(atom, (((int64_t)(re->nsub)) + 1LL));
     b.HeapBytes = revera_eng_captureHeap(re, length);
-    b.StackBytes = revera_eng_cMul(revera_eng_cAdd(revera_eng_astHeight(re->nodes, re->root), 4LL), revera_eng_frameBytes);
+    b.StackBytes = revera_eng_cMul(revera_eng_cAdd(revera_eng_astHeight(re->nodes, re->root), 10LL), revera_eng_frameBytes);
     int64_t _t1 = revera_eng_astSize(re->nodes, re->root);
     int64_t _t2 = revera_eng_cAdd(length, 2LL);
     int64_t _t3 = revera_eng_cMul(_t1, _t2);
@@ -1161,7 +1161,7 @@ revera_eng_BackendContract revera_eng_solverContract(revera_eng_Regexp *re, int6
     int64_t _t11 = heap;
     int64_t _t12 = revera_eng_captureHeap(re, length);
     heap = revera_eng_cAdd(_t11, _t12);
-    int64_t stack = revera_eng_cMul(revera_eng_cAdd(depth, 14LL), revera_eng_frameBytes);
+    int64_t stack = revera_eng_cMul(revera_eng_cAdd(depth, 19LL), revera_eng_frameBytes);
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1195,17 +1195,18 @@ int64_t revera_eng_astHeight(revera_eng_slice_node nodes, int32_t ni) {
 }
 
 int64_t revera_eng_atomCost(revera_eng_Regexp *re) {
-    return revera_eng_atomCostNode(re->nodes, re->brackets, re->root);
+    revera_eng_lookupCosts lc = revera_eng_localeLookupCosts(&(re->loc));
+    return revera_eng_atomCostNode(re->nodes, re->brackets, &(lc), re->root);
 }
 
-int64_t revera_eng_atomCostNode(revera_eng_slice_node nodes, revera_eng_slice_bracketSet brs, int32_t ni) {
+int64_t revera_eng_atomCostNode(revera_eng_slice_node nodes, revera_eng_slice_bracketSet brs, revera_eng_lookupCosts *lc, int32_t ni) {
     int64_t cost = 1LL;
     switch ((*revera_eng_slice_node_at(nodes, ni)).op) {
     case revera_eng_opChar: {
         cost = (((int64_t)(((*revera_eng_slice_node_at(nodes, ni)).fold).len)) + 1LL);
     } break;
     case revera_eng_opBracket: {
-        cost = revera_eng_bracketAtomCost(brs, (*revera_eng_slice_node_at(nodes, ni)).br);
+        cost = revera_eng_bracketAtomCost(brs, (*revera_eng_slice_node_at(nodes, ni)).br, lc);
     } break;
     default: break;
     }
@@ -1213,46 +1214,216 @@ int64_t revera_eng_atomCostNode(revera_eng_slice_node nodes, revera_eng_slice_br
         int64_t i = 0LL;
         for (; (i < ((*revera_eng_slice_node_at(nodes, ni)).ch).len); i += 1LL) {
             int64_t _t1 = cost;
-            int64_t _t2 = revera_eng_atomCostNode(nodes, brs, (*revera_eng_slice_i32_at((*revera_eng_slice_node_at(nodes, ni)).ch, i)));
+            int64_t _t2 = revera_eng_atomCostNode(nodes, brs, lc, (*revera_eng_slice_i32_at((*revera_eng_slice_node_at(nodes, ni)).ch, i)));
             cost = vg_max_i64(_t1, _t2);
         }
     }
     return cost;
 }
 
-int64_t revera_eng_bracketAtomCost(revera_eng_slice_bracketSet brs, int32_t bi) {
-    int64_t members = (((int64_t)(((((*revera_eng_slice_bracketSet_at(brs, bi)).ranges).len + ((*revera_eng_slice_bracketSet_at(brs, bi)).elems).len) + ((*revera_eng_slice_bracketSet_at(brs, bi)).equivs).len))) + revera_eng_bracketFixedChecks);
-    int64_t cost = revera_eng_cMul(17LL, members);
-    if ((!(revera_eng_bracketHasMultiMembers(brs, bi)))) {
-        return cost;
+int64_t revera_eng_searchSteps(int64_t count) {
+    int64_t count_v = count;
+    int64_t steps = 0LL;
+    while ((count_v > 0LL)) {
+        count_v = vg_sdiv_i64(count_v, 2LL);
+        steps += 1LL;
     }
-    int64_t elemChars = {0};
+    return steps;
+}
+
+int64_t revera_eng_u32ContainsCost(int64_t count) {
+    return (1LL + (3LL * revera_eng_searchSteps(count)));
+}
+
+int64_t revera_eng_findPairCost(int64_t count) {
+    return (3LL + (3LL * revera_eng_searchSteps(count)));
+}
+
+int64_t revera_eng_findCaseCost(int64_t count) {
+    return (6LL + (3LL * revera_eng_searchSteps(count)));
+}
+
+int64_t revera_eng_pairSourcesRunCost(int64_t count, int64_t preimages) {
+    int64_t _t1 = (5LL + (3LL * revera_eng_searchSteps(count)));
+    int64_t _t2 = (5LL * preimages);
+    return (_t1 + _t2);
+}
+
+int64_t revera_eng_compareSequenceCost(int64_t length) {
+    return (5LL + (3LL * length));
+}
+
+revera_eng_lookupCosts revera_eng_localeLookupCosts(revera_eng_Locale *l) {
+    revera_eng_lookupCosts lc = {0};
+    if (l->posix) {
+        lc.contraction = 1LL;
+        lc.classMask = 3LL;
+        lc.casePreimages = 2LL;
+        lc.caseConvert = 2LL;
+        lc.preimages = 1LL;
+        return lc;
+    }
+    lc.sequenceSearch = revera_eng_searchSteps(vg_sdiv_i64(revera_eng_sectionLen(l, revera_eng_secSequences), 8LL));
+    revera_eng_CollProfile row = revera_eng_collationProfileRow(l, ((int64_t)(l->collationProfile)));
+    int64_t _t1 = ((14LL + revera_eng_u32ContainsCost(row.AddCount)) + 1LL);
+    int64_t _t2 = revera_eng_u32ContainsCost(vg_sdiv_i64(revera_eng_sectionLen(l, revera_eng_secRootContractions), 4LL));
+    int64_t _t3 = (_t1 + _t2);
+    int64_t _t4 = revera_eng_u32ContainsCost(row.RemoveCount);
+    lc.contraction = (_t3 + _t4);
+    int64_t _t5 = ((14LL + revera_eng_findPairCost(row.OverrideCount)) + 1LL);
+    int64_t _t6 = revera_eng_findPairCost(vg_sdiv_i64(revera_eng_sectionLen(l, revera_eng_secRootEquivalences), 8LL));
+    lc.primaryToken = (_t5 + _t6);
+    lc.classMask = 4LL;
+    lc.preimages = ((int64_t)(revera_eng_localeMaxPreimages(l)));
+    lc.caseConvert = (2LL + revera_eng_findCaseCost(vg_sdiv_i64(revera_eng_sectionLen(l, revera_eng_secCaseDefault), 12LL)));
+    int64_t upper = revera_eng_secInvUpperDefault;
+    int64_t lower = revera_eng_secInvLowerDefault;
+    if ((l->caseProfile == 1)) {
+        lc.caseConvert += revera_eng_findCaseCost(vg_sdiv_i64(revera_eng_sectionLen(l, revera_eng_secCaseTurkic), 12LL));
+        upper = revera_eng_secInvUpperTurkic;
+        lower = revera_eng_secInvLowerTurkic;
+    }
+    int64_t _t7 = vg_sdiv_i64(revera_eng_sectionLen(l, upper), 8LL);
+    int64_t _t8 = lc.preimages;
+    int64_t _t9 = (2LL + revera_eng_pairSourcesRunCost(_t7, _t8));
+    int64_t _t10 = vg_sdiv_i64(revera_eng_sectionLen(l, lower), 8LL);
+    int64_t _t11 = lc.preimages;
+    int64_t _t12 = revera_eng_pairSourcesRunCost(_t10, _t11);
+    int64_t _t13 = (_t9 + _t12);
+    int64_t _t14 = (lc.preimages * (2LL + lc.preimages));
+    lc.casePreimages = (_t13 + _t14);
+    return lc;
+}
+
+int64_t revera_eng_elementIDCost(revera_eng_lookupCosts *lc, int64_t length) {
+    if ((length == 1LL)) {
+        return 3LL;
+    }
+    int64_t _t1 = (2LL + (2LL * length));
+    int64_t _t2 = lc->sequenceSearch;
+    int64_t _t3 = (1LL + revera_eng_compareSequenceCost(length));
+    int64_t _t4 = (_t2 * _t3);
+    return (_t1 + _t4);
+}
+
+int64_t revera_eng_collatingElementIDCost(revera_eng_lookupCosts *lc, int64_t length) {
+    int64_t cost = (1LL + revera_eng_elementIDCost(lc, length));
+    if ((length > 1LL)) {
+        cost += lc->contraction;
+    }
+    return cost;
+}
+
+int64_t revera_eng_primaryEqualCost(revera_eng_lookupCosts *lc, int64_t left, int64_t right) {
+    int64_t _t1 = (1LL + revera_eng_collatingElementIDCost(lc, left));
+    int64_t _t2 = revera_eng_collatingElementIDCost(lc, right);
+    int64_t _t3 = (_t1 + _t2);
+    int64_t _t4 = (2LL * lc->primaryToken);
+    return (_t3 + _t4);
+}
+
+int64_t revera_eng_equivsCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc, int64_t length) {
+    int64_t cost = 0LL;
+    {
+        int64_t i = 0LL;
+        for (; (i < ((*revera_eng_slice_bracketSet_at(brs, bi)).equivs).len); i += 1LL) {
+            int64_t _t1 = cost;
+            int64_t _t2 = (1LL + revera_eng_primaryEqualCost(lc, length, ((int64_t)(((*revera_eng_slice_slice_i32_at((*revera_eng_slice_bracketSet_at(brs, bi)).equivs, i))).len))));
+            cost = revera_eng_cAdd(_t1, _t2);
+        }
+    }
+    return cost;
+}
+
+int64_t revera_eng_positiveSingleCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc) {
+    int64_t cost = (2LL + revera_eng_searchSteps(((*revera_eng_slice_bracketSet_at(brs, bi)).ranges).len));
+    if (((*revera_eng_slice_bracketSet_at(brs, bi)).classMask != 0)) {
+        cost += lc->classMask;
+    }
+    int64_t _t1 = cost;
+    int64_t _t2 = revera_eng_equivsCost(brs, bi, lc, 1LL);
+    return revera_eng_cAdd(_t1, _t2);
+}
+
+int64_t revera_eng_matchesOneCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc) {
+    int64_t positive = revera_eng_positiveSingleCost(brs, bi, lc);
+    int64_t cost = revera_eng_cAdd(1LL, positive);
+    if ((*revera_eng_slice_bracketSet_at(brs, bi)).icase) {
+        int64_t _t1 = cost;
+        int64_t _t2 = lc->casePreimages;
+        int64_t _t3 = lc->preimages;
+        int64_t _t4 = revera_eng_cAdd(1LL, positive);
+        int64_t _t5 = revera_eng_cMul(_t3, _t4);
+        int64_t _t6 = revera_eng_cAdd(_t2, _t5);
+        cost = revera_eng_cAdd(_t1, _t6);
+    }
+    return cost;
+}
+
+int64_t revera_eng_candidateLeafCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc, int64_t length) {
+    int64_t _t1 = (1LL + revera_eng_collatingElementIDCost(lc, length));
+    int64_t _t2 = revera_eng_equivsCost(brs, bi, lc, length);
+    return revera_eng_cAdd(_t1, _t2);
+}
+
+int64_t revera_eng_probeCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc, int64_t length) {
+    int64_t cost = revera_eng_cAdd(2LL, ((int64_t)(((*revera_eng_slice_bracketSet_at(brs, bi)).elems).len)));
+    int64_t counterpart = 1LL;
+    if ((*revera_eng_slice_bracketSet_at(brs, bi)).icase) {
+        counterpart = (1LL + (2LL * lc->caseConvert));
+    }
     {
         int64_t i = 0LL;
         for (; (i < ((*revera_eng_slice_bracketSet_at(brs, bi)).elems).len); i += 1LL) {
-            elemChars += ((int64_t)(((*revera_eng_slice_slice_i32_at((*revera_eng_slice_bracketSet_at(brs, bi)).elems, i))).len));
-        }
-    }
-    int64_t multi = elemChars;
-    if ((((*revera_eng_slice_bracketSet_at(brs, bi)).equivs).len > 0LL)) {
-        int64_t candidates = 1LL;
-        if ((*revera_eng_slice_bracketSet_at(brs, bi)).icase) {
-            {
-                int64_t i_2 = 0LL;
-                for (; (i_2 < revera_eng_maxElemAhead); i_2 += 1LL) {
-                    candidates *= 17LL;
-                }
+            if ((((int64_t)(((*revera_eng_slice_slice_i32_at((*revera_eng_slice_bracketSet_at(brs, bi)).elems, i))).len)) == length)) {
+                int64_t _t1 = cost;
+                int64_t _t2 = revera_eng_cMul(length, counterpart);
+                cost = revera_eng_cAdd(_t1, _t2);
             }
         }
-        int64_t _t1 = multi;
-        int64_t _t2 = candidates;
-        int64_t _t3 = revera_eng_cMul((((int64_t)(((*revera_eng_slice_bracketSet_at(brs, bi)).equivs).len)) + 1LL), revera_eng_maxElemAhead);
-        int64_t _t4 = revera_eng_cMul(_t2, _t3);
-        multi = revera_eng_cAdd(_t1, _t4);
+    }
+    if ((((*revera_eng_slice_bracketSet_at(brs, bi)).equivs).len == 0LL)) {
+        return cost;
+    }
+    int64_t leaf = revera_eng_candidateLeafCost(brs, bi, lc, length);
+    if ((!((*revera_eng_slice_bracketSet_at(brs, bi)).icase))) {
+        int64_t _t3 = cost;
+        int64_t _t4 = revera_eng_cAdd((length + 1LL), leaf);
+        return revera_eng_cAdd(_t3, _t4);
+    }
+    int64_t candidates = 1LL;
+    {
+        int64_t i_2 = 0LL;
+        for (; (i_2 < length); i_2 += 1LL) {
+            candidates = revera_eng_cMul(candidates, (lc->preimages + 1LL));
+        }
     }
     int64_t _t5 = cost;
-    int64_t _t6 = revera_eng_cMul(7LL, multi);
-    return revera_eng_cAdd(_t5, _t6);
+    int64_t _t6 = candidates;
+    int64_t _t7 = (2LL + lc->preimages);
+    int64_t _t8 = revera_eng_cAdd(lc->casePreimages, leaf);
+    int64_t _t9 = revera_eng_cAdd(_t7, _t8);
+    int64_t _t10 = revera_eng_cMul(_t6, _t9);
+    return revera_eng_cAdd(_t5, _t10);
+}
+
+int64_t revera_eng_bracketAtomCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc) {
+    int64_t cost = revera_eng_matchesOneCost(brs, bi, lc);
+    if (((*revera_eng_slice_bracketSet_at(brs, bi)).multiLens == 0)) {
+        return cost;
+    }
+    cost = revera_eng_cAdd(cost, 7LL);
+    {
+        int64_t length = 2LL;
+        for (; (length <= revera_eng_maxElemAhead); length += 1LL) {
+            if ((((uint16_t)((*revera_eng_slice_bracketSet_at(brs, bi)).multiLens & (uint16_t)((uint32_t)(1) << (length)))) != 0)) {
+                int64_t _t1 = cost;
+                int64_t _t2 = revera_eng_probeCost(brs, bi, lc, ((int64_t)(length)));
+                cost = revera_eng_cAdd(_t1, _t2);
+            }
+        }
+    }
+    return cost;
 }
 
 int64_t revera_eng_solverSteps(revera_eng_slice_node nodes, int32_t ni, int64_t length) {
@@ -1999,6 +2170,8 @@ void revera_eng_memoPut(vg_arena *mem, revera_eng_memoTab *t, revera_eng_memoKey
 revera_eng_Locale revera_eng_LocalePOSIX(void) {
     revera_eng_Locale l = {0};
     l.maxSeq = 1LL;
+    l.preimagesDefault = 1LL;
+    l.preimagesTurkic = 1LL;
     l.posix = true;
     l.valid = true;
     return l;
@@ -2070,7 +2243,13 @@ bool revera_eng_localeLoad(revera_eng_Locale *l, vg_str blob) {
     if ((!(revera_eng_localeValidate(l)))) {
         return false;
     }
-    if ((!(revera_eng_preimageRunsFit(l)))) {
+    int64_t _t1 = revera_eng_maxPairRun(l, revera_eng_secInvUpperDefault);
+    int64_t _t2 = revera_eng_maxPairRun(l, revera_eng_secInvLowerDefault);
+    l->preimagesDefault = (_t1 + _t2);
+    int64_t _t3 = revera_eng_maxPairRun(l, revera_eng_secInvUpperTurkic);
+    int64_t _t4 = revera_eng_maxPairRun(l, revera_eng_secInvLowerTurkic);
+    l->preimagesTurkic = (_t3 + _t4);
+    if (((l->preimagesDefault > revera_eng_maxPreimages) || (l->preimagesTurkic > revera_eng_maxPreimages))) {
         return false;
     }
     return true;
@@ -2404,6 +2583,8 @@ revera_eng_Tup_t4c6f63616c65x_bool revera_eng_resolveLocale(revera_eng_Locale *d
     result.blob = data->blob;
     result.sec = data->sec;
     result.maxSeq = data->maxSeq;
+    result.preimagesDefault = data->preimagesDefault;
+    result.preimagesTurkic = data->preimagesTurkic;
     vg_str _t1 = req.name;
     int64_t _t2 = revera_eng_localesCount(&(result));
     int64_t vego_index = revera_eng_findName(&(result), _t1, revera_eng_secLocaleNames, revera_eng_secLocaleNameOffsets, _t2);
@@ -2655,14 +2836,11 @@ int64_t revera_eng_maxPairRun(revera_eng_Locale *l, int64_t sec) {
     return longest;
 }
 
-bool revera_eng_preimageRunsFit(revera_eng_Locale *l) {
-    int64_t _t1 = revera_eng_maxPairRun(l, revera_eng_secInvUpperDefault);
-    int64_t _t2 = revera_eng_maxPairRun(l, revera_eng_secInvLowerDefault);
-    int64_t def = (_t1 + _t2);
-    int64_t _t3 = revera_eng_maxPairRun(l, revera_eng_secInvUpperTurkic);
-    int64_t _t4 = revera_eng_maxPairRun(l, revera_eng_secInvLowerTurkic);
-    int64_t turkic = (_t3 + _t4);
-    return ((def <= revera_eng_maxPreimages) && (turkic <= revera_eng_maxPreimages));
+int64_t revera_eng_localeMaxPreimages(revera_eng_Locale *l) {
+    if ((l->caseProfile == 1)) {
+        return l->preimagesTurkic;
+    }
+    return l->preimagesDefault;
 }
 
 void revera_eng_localeCasePreimages(revera_eng_Locale *l, revera_eng_preimageBuf *buf, int32_t r) {

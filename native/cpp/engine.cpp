@@ -977,7 +977,7 @@ BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
     perBoundary = ([&]{ auto _t7 = perBoundary; auto _t8 = cMul(n, perTest); return cAdd(_t7, _t8); }());
     perBoundary = ([&]{ auto _t9 = perBoundary; auto _t10 = ([&]{ auto _t11 = ([&]{ auto _t12 = n; auto _t13 = cMul(2LL, k); return cAdd(_t12, _t13); }()); auto _t14 = cAdd(cMul(4LL, ring), 38LL); return cAdd(_t11, _t14); }()); return cAdd(_t9, _t10); }());
     int64_t steps = ([&]{ auto _t15 = cAdd((24LL + ring), length); auto _t16 = ([&]{ auto _t17 = cAdd(length, 1LL); auto _t18 = perBoundary; return cMul(_t17, _t18); }()); return cAdd(_t15, _t16); }());
-    int64_t stack = 4608LL;
+    int64_t stack = 6144LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -993,7 +993,7 @@ BackendContract onePassContract(Regexp& re, int64_t length, int64_t atom) {
     BackendContract b{};
     int64_t perVisit = cAdd(atom, (int64_t(re.nsub) + 1LL));
     b.HeapBytes = captureHeap(re, length);
-    b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 4LL), frameBytes);
+    b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 10LL), frameBytes);
     b.Steps = ([&]{ auto _t1 = ([&]{ auto _t2 = astSize(re.nodes, re.root); auto _t3 = cAdd(length, 2LL); return cMul(_t2, _t3); }()); auto _t4 = perVisit; return cMul(_t1, _t4); }());
     return b;
 }
@@ -1009,7 +1009,7 @@ BackendContract solverContract(Regexp& re, int64_t length, int64_t atom) {
     int64_t heap = ([&]{ auto _t9 = cMul(structural, perAlloc); auto _t10 = cMul(16LL, int64_t(re.minSlots)); return cAdd(_t9, _t10); }());
     heap = cAdd(heap, 4096LL);
     heap = ([&]{ auto _t11 = heap; auto _t12 = captureHeap(re, length); return cAdd(_t11, _t12); }());
-    int64_t stack = cMul(cAdd(depth, 14LL), frameBytes);
+    int64_t stack = cMul(cAdd(depth, 19LL), frameBytes);
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1033,47 +1033,170 @@ int64_t astHeight(vg::Slice<node> nodes, int32_t ni) {
 }
 
 int64_t atomCost(Regexp& re) {
-    return atomCostNode(re.nodes, re.brackets, re.root);
+    lookupCosts lc = localeLookupCosts(re.loc);
+    return atomCostNode(re.nodes, re.brackets, lc, re.root);
 }
 
-int64_t atomCostNode(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, int32_t ni) {
+int64_t atomCostNode(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, lookupCosts& lc, int32_t ni) {
     int64_t cost = 1LL;
     switch (nodes[ni].op) {
     case opChar: {
         cost = (int64_t(vg::len(nodes[ni].fold)) + 1LL);
     } break;
     case opBracket: {
-        cost = bracketAtomCost(brs, nodes[ni].br);
+        cost = bracketAtomCost(brs, nodes[ni].br, lc);
     } break;
     default: break;
     }
     for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
-        cost = ([&]{ auto _t1 = cost; auto _t2 = atomCostNode(nodes, brs, nodes[ni].ch[i]); return std::max<int64_t>(_t1, _t2); }());
+        cost = ([&]{ auto _t1 = cost; auto _t2 = atomCostNode(nodes, brs, lc, nodes[ni].ch[i]); return std::max<int64_t>(_t1, _t2); }());
     }
     return cost;
 }
 
-int64_t bracketAtomCost(vg::Slice<bracketSet> brs, int32_t bi) {
-    int64_t members = (int64_t(((vg::len(brs[bi].ranges) + vg::len(brs[bi].elems)) + vg::len(brs[bi].equivs))) + bracketFixedChecks);
-    int64_t cost = cMul(17LL, members);
-    if ((!bracketHasMultiMembers(brs, bi))) {
+int64_t searchSteps(int64_t count) {
+    int64_t count_v = count;
+    int64_t steps = 0LL;
+    while ((count_v > 0LL)) {
+        count_v = vg::sdiv<int64_t>(count_v, 2LL);
+        steps += 1LL;
+    }
+    return steps;
+}
+
+int64_t u32ContainsCost(int64_t count) {
+    return (1LL + (3LL * searchSteps(count)));
+}
+
+int64_t findPairCost(int64_t count) {
+    return (3LL + (3LL * searchSteps(count)));
+}
+
+int64_t findCaseCost(int64_t count) {
+    return (6LL + (3LL * searchSteps(count)));
+}
+
+int64_t pairSourcesRunCost(int64_t count, int64_t preimages) {
+    return ([&]{ auto _t1 = (5LL + (3LL * searchSteps(count))); auto _t2 = (5LL * preimages); return (_t1 + _t2); }());
+}
+
+int64_t compareSequenceCost(int64_t length) {
+    return (5LL + (3LL * length));
+}
+
+lookupCosts localeLookupCosts(Locale& l) {
+    lookupCosts lc{};
+    if (l.posix) {
+        lc.contraction = 1LL;
+        lc.classMask = 3LL;
+        lc.casePreimages = 2LL;
+        lc.caseConvert = 2LL;
+        lc.preimages = 1LL;
+        return lc;
+    }
+    lc.sequenceSearch = searchSteps(vg::sdiv<int64_t>(sectionLen(l, secSequences), 8LL));
+    CollProfile row = collationProfileRow(l, int64_t(l.collationProfile));
+    lc.contraction = ([&]{ auto _t1 = ([&]{ auto _t3 = ((14LL + u32ContainsCost(row.AddCount)) + 1LL); auto _t4 = u32ContainsCost(vg::sdiv<int64_t>(sectionLen(l, secRootContractions), 4LL)); return (_t3 + _t4); }()); auto _t2 = u32ContainsCost(row.RemoveCount); return (_t1 + _t2); }());
+    lc.primaryToken = ([&]{ auto _t5 = ((14LL + findPairCost(row.OverrideCount)) + 1LL); auto _t6 = findPairCost(vg::sdiv<int64_t>(sectionLen(l, secRootEquivalences), 8LL)); return (_t5 + _t6); }());
+    lc.classMask = 4LL;
+    lc.preimages = int64_t(localeMaxPreimages(l));
+    lc.caseConvert = (2LL + findCaseCost(vg::sdiv<int64_t>(sectionLen(l, secCaseDefault), 12LL)));
+    int64_t upper = secInvUpperDefault;
+    int64_t lower = secInvLowerDefault;
+    if ((l.caseProfile == 1)) {
+        lc.caseConvert += findCaseCost(vg::sdiv<int64_t>(sectionLen(l, secCaseTurkic), 12LL));
+        upper = secInvUpperTurkic;
+        lower = secInvLowerTurkic;
+    }
+    lc.casePreimages = ([&]{ auto _t7 = ([&]{ auto _t9 = (2LL + ([&]{ auto _t11 = vg::sdiv<int64_t>(sectionLen(l, upper), 8LL); auto _t12 = lc.preimages; return pairSourcesRunCost(_t11, _t12); }())); auto _t10 = ([&]{ auto _t13 = vg::sdiv<int64_t>(sectionLen(l, lower), 8LL); auto _t14 = lc.preimages; return pairSourcesRunCost(_t13, _t14); }()); return (_t9 + _t10); }()); auto _t8 = (lc.preimages * (2LL + lc.preimages)); return (_t7 + _t8); }());
+    return lc;
+}
+
+int64_t elementIDCost(lookupCosts& lc, int64_t length) {
+    if ((length == 1LL)) {
+        return 3LL;
+    }
+    return ([&]{ auto _t1 = (2LL + (2LL * length)); auto _t2 = ([&]{ auto _t3 = lc.sequenceSearch; auto _t4 = (1LL + compareSequenceCost(length)); return (_t3 * _t4); }()); return (_t1 + _t2); }());
+}
+
+int64_t collatingElementIDCost(lookupCosts& lc, int64_t length) {
+    int64_t cost = (1LL + elementIDCost(lc, length));
+    if ((length > 1LL)) {
+        cost += lc.contraction;
+    }
+    return cost;
+}
+
+int64_t primaryEqualCost(lookupCosts& lc, int64_t left, int64_t right) {
+    return ([&]{ auto _t1 = ([&]{ auto _t3 = (1LL + collatingElementIDCost(lc, left)); auto _t4 = collatingElementIDCost(lc, right); return (_t3 + _t4); }()); auto _t2 = (2LL * lc.primaryToken); return (_t1 + _t2); }());
+}
+
+int64_t equivsCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc, int64_t length) {
+    int64_t cost = 0LL;
+    for (int64_t i = 0LL; (i < vg::len(brs[bi].equivs)); i += 1LL) {
+        cost = ([&]{ auto _t1 = cost; auto _t2 = (1LL + primaryEqualCost(lc, length, int64_t(vg::len(brs[bi].equivs[i])))); return cAdd(_t1, _t2); }());
+    }
+    return cost;
+}
+
+int64_t positiveSingleCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc) {
+    int64_t cost = (2LL + searchSteps(vg::len(brs[bi].ranges)));
+    if ((brs[bi].classMask != 0)) {
+        cost += lc.classMask;
+    }
+    return ([&]{ auto _t1 = cost; auto _t2 = equivsCost(brs, bi, lc, 1LL); return cAdd(_t1, _t2); }());
+}
+
+int64_t matchesOneCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc) {
+    int64_t positive = positiveSingleCost(brs, bi, lc);
+    int64_t cost = cAdd(1LL, positive);
+    if (brs[bi].icase) {
+        cost = ([&]{ auto _t1 = cost; auto _t2 = ([&]{ auto _t3 = lc.casePreimages; auto _t4 = ([&]{ auto _t5 = lc.preimages; auto _t6 = cAdd(1LL, positive); return cMul(_t5, _t6); }()); return cAdd(_t3, _t4); }()); return cAdd(_t1, _t2); }());
+    }
+    return cost;
+}
+
+int64_t candidateLeafCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc, int64_t length) {
+    return ([&]{ auto _t1 = (1LL + collatingElementIDCost(lc, length)); auto _t2 = equivsCost(brs, bi, lc, length); return cAdd(_t1, _t2); }());
+}
+
+int64_t probeCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc, int64_t length) {
+    int64_t cost = cAdd(2LL, int64_t(vg::len(brs[bi].elems)));
+    int64_t counterpart = 1LL;
+    if (brs[bi].icase) {
+        counterpart = (1LL + (2LL * lc.caseConvert));
+    }
+    for (int64_t i = 0LL; (i < vg::len(brs[bi].elems)); i += 1LL) {
+        if ((int64_t(vg::len(brs[bi].elems[i])) == length)) {
+            cost = ([&]{ auto _t1 = cost; auto _t2 = cMul(length, counterpart); return cAdd(_t1, _t2); }());
+        }
+    }
+    if ((vg::len(brs[bi].equivs) == 0LL)) {
         return cost;
     }
-    int64_t elemChars{};
-    for (int64_t i = 0LL; (i < vg::len(brs[bi].elems)); i += 1LL) {
-        elemChars += int64_t(vg::len(brs[bi].elems[i]));
+    int64_t leaf = candidateLeafCost(brs, bi, lc, length);
+    if ((!brs[bi].icase)) {
+        return ([&]{ auto _t3 = cost; auto _t4 = cAdd((length + 1LL), leaf); return cAdd(_t3, _t4); }());
     }
-    int64_t multi = elemChars;
-    if ((vg::len(brs[bi].equivs) > 0LL)) {
-        int64_t candidates = 1LL;
-        if (brs[bi].icase) {
-            for (int64_t i_2 = 0LL; (i_2 < maxElemAhead); i_2 += 1LL) {
-                candidates *= 17LL;
-            }
+    int64_t candidates = 1LL;
+    for (int64_t i_2 = 0LL; (i_2 < length); i_2 += 1LL) {
+        candidates = cMul(candidates, (lc.preimages + 1LL));
+    }
+    return ([&]{ auto _t5 = cost; auto _t6 = ([&]{ auto _t7 = candidates; auto _t8 = ([&]{ auto _t9 = (2LL + lc.preimages); auto _t10 = cAdd(lc.casePreimages, leaf); return cAdd(_t9, _t10); }()); return cMul(_t7, _t8); }()); return cAdd(_t5, _t6); }());
+}
+
+int64_t bracketAtomCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc) {
+    int64_t cost = matchesOneCost(brs, bi, lc);
+    if ((brs[bi].multiLens == 0)) {
+        return cost;
+    }
+    cost = cAdd(cost, 7LL);
+    for (int64_t length = 2LL; (length <= maxElemAhead); length += 1LL) {
+        if ((uint16_t(brs[bi].multiLens & uint16_t(1 << length)) != 0)) {
+            cost = ([&]{ auto _t1 = cost; auto _t2 = probeCost(brs, bi, lc, int64_t(length)); return cAdd(_t1, _t2); }());
         }
-        multi = ([&]{ auto _t1 = multi; auto _t2 = ([&]{ auto _t3 = candidates; auto _t4 = cMul((int64_t(vg::len(brs[bi].equivs)) + 1LL), maxElemAhead); return cMul(_t3, _t4); }()); return cAdd(_t1, _t2); }());
     }
-    return ([&]{ auto _t5 = cost; auto _t6 = cMul(7LL, multi); return cAdd(_t5, _t6); }());
+    return cost;
 }
 
 int64_t solverSteps(vg::Slice<node> nodes, int32_t ni, int64_t length) {
@@ -1722,6 +1845,8 @@ void memoPut(vg::Arena& mem, memoTab& t, memoKey k, memoVal v) {
 Locale LocalePOSIX() {
     Locale l{};
     l.maxSeq = 1LL;
+    l.preimagesDefault = 1LL;
+    l.preimagesTurkic = 1LL;
     l.posix = true;
     l.valid = true;
     return l;
@@ -1790,7 +1915,9 @@ bool localeLoad(Locale& l, vg::Str blob) {
     if ((!localeValidate(l))) {
         return false;
     }
-    if ((!preimageRunsFit(l))) {
+    l.preimagesDefault = ([&]{ auto _t1 = maxPairRun(l, secInvUpperDefault); auto _t2 = maxPairRun(l, secInvLowerDefault); return (_t1 + _t2); }());
+    l.preimagesTurkic = ([&]{ auto _t3 = maxPairRun(l, secInvUpperTurkic); auto _t4 = maxPairRun(l, secInvLowerTurkic); return (_t3 + _t4); }());
+    if (((l.preimagesDefault > maxPreimages) || (l.preimagesTurkic > maxPreimages))) {
         return false;
     }
     return true;
@@ -2080,6 +2207,8 @@ Tup_t4c6f63616c65x_bool resolveLocale(Locale& data, localeRequest req) {
     result.blob = data.blob;
     result.sec = data.sec;
     result.maxSeq = data.maxSeq;
+    result.preimagesDefault = data.preimagesDefault;
+    result.preimagesTurkic = data.preimagesTurkic;
     int64_t vego_index = ([&]{ auto _t1 = req.name; auto _t2 = localesCount(result); return findName(result, _t1, secLocaleNames, secLocaleNameOffsets, _t2); }());
     if ((vego_index < 0LL)) {
         return Tup_t4c6f63616c65x_bool{invalid, false};
@@ -2319,10 +2448,11 @@ int64_t maxPairRun(Locale& l, int64_t sec) {
     return longest;
 }
 
-bool preimageRunsFit(Locale& l) {
-    int64_t def = ([&]{ auto _t1 = maxPairRun(l, secInvUpperDefault); auto _t2 = maxPairRun(l, secInvLowerDefault); return (_t1 + _t2); }());
-    int64_t turkic = ([&]{ auto _t3 = maxPairRun(l, secInvUpperTurkic); auto _t4 = maxPairRun(l, secInvLowerTurkic); return (_t3 + _t4); }());
-    return ((def <= maxPreimages) && (turkic <= maxPreimages));
+int64_t localeMaxPreimages(Locale& l) {
+    if ((l.caseProfile == 1)) {
+        return l.preimagesTurkic;
+    }
+    return l.preimagesDefault;
 }
 
 void localeCasePreimages(Locale& l, preimageBuf& buf, int32_t r) {

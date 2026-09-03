@@ -18,7 +18,7 @@ It needs over an hour on a 120 byte one.
 `((a*){4}){4}` needs minutes on the empty subject.
 Replaying all twelve blocks would take days.
 
-What the theorem drops is exactly the X commands of those blocks, 1056 of 86704.
+What the theorem drops is exactly the X commands of those blocks, 1056 of 87415.
 It keeps their compile commands, so every pattern in the corpus is still compiled and checked.
 It keeps their T commands, so the contract figures of those patterns are still compared against the Go reference.
 That matters most for these patterns, because their figures are the largest the corpus produces.

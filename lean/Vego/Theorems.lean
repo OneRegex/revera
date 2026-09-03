@@ -43,7 +43,7 @@ What the theorems say:
    Metering them needs a delta around the inner call rather than a reset around the outer one.
 
    The corpus holds two patterns that cannot run under the interpreter in any reasonable time.
-   The theorem leaves their 1056 executions out of the 86704 commands.
+   The theorem leaves their 1056 executions out of the 87415 commands.
    It keeps their compiles and their contract queries, so no pattern escapes the check.
    The figures of the extreme cases still compare against the Go reference.
    `Vego.Corpus` records the measurements behind that choice, and the proposition re-checks its own coverage.

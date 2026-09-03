@@ -30,12 +30,13 @@ pub const solverArenaLimit = (1 << 26);
 pub const contractCap = (vg.cv(i64, 1) << 62);
 pub const frameBytes = 256;
 pub const matcherStackBytes = 2048;
-pub const equivFrames = (maxElemAhead +% 2);
+pub const singleLookupFrames = 8;
+pub const multiLookupFrames = (maxElemAhead +% 8);
 pub const ptreeBytes = 48;
 pub const kidBytes = 8;
 pub const mapEntryBytes = 128;
 pub const matchBytes = 16;
-pub const bracketFixedChecks = 17;
+pub const profileRowCost = 13;
 pub const maxElemAhead = 8;
 pub const queueCompactFactor = 2;
 pub const ErrNone: i32 = 0;
@@ -208,6 +209,16 @@ pub const Contract = struct {
     HasSolver: bool = false,
 };
 
+pub const lookupCosts = struct {
+    sequenceSearch: i64 = 0,
+    contraction: i64 = 0,
+    primaryToken: i64 = 0,
+    classMask: i64 = 0,
+    casePreimages: i64 = 0,
+    caseConvert: i64 = 0,
+    preimages: i64 = 0,
+};
+
 pub const slotTable = struct {
     stamp: vg.Slice(u32) = .{},
     starts: vg.Slice(i32) = .{},
@@ -283,6 +294,8 @@ pub const Locale = struct {
     blob: vg.Str = .{},
     sec: [numSections]SecRange = @splat(.{}),
     maxSeq: i64 = 0,
+    preimagesDefault: i64 = 0,
+    preimagesTurkic: i64 = 0,
     collationProfile: u16 = 0,
     caseProfile: u8 = 0,
     posix: bool = false,
@@ -1503,7 +1516,7 @@ pub fn matcherContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     perBoundary = cAdd(perBoundary, cMul(n, perTest));
     perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2, k)), cAdd(cMul(4, ring), 38)));
     const steps: i64 = cAdd(cAdd((24 +% ring), length), cMul(cAdd(length, 1), perBoundary));
-    const stack: i64 = (vg.cv(i64, matcherStackBytes) +% (equivFrames *% frameBytes));
+    const stack: i64 = (vg.cv(i64, matcherStackBytes) +% (multiLookupFrames *% frameBytes));
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1519,7 +1532,7 @@ pub fn onePassContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     var b: BackendContract = .{};
     const perVisit: i64 = cAdd(atom, (vg.cv(i64, re.nsub) +% 1));
     b.HeapBytes = captureHeap(re, length);
-    b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 4), frameBytes);
+    b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), (2 +% singleLookupFrames)), frameBytes);
     b.Steps = cMul(cMul(astSize(re.nodes, re.root), cAdd(length, 2)), perVisit);
     return b;
 }
@@ -1535,7 +1548,7 @@ pub fn solverContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     var heap: i64 = cAdd(cMul(structural, perAlloc), cMul(16, vg.cv(i64, re.minSlots)));
     heap = cAdd(heap, 4096);
     heap = cAdd(heap, captureHeap(re, length));
-    const stack: i64 = cMul(cAdd(depth, (equivFrames +% 4)), frameBytes);
+    const stack: i64 = cMul(cAdd(depth, (3 +% multiLookupFrames)), frameBytes);
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1565,56 +1578,185 @@ pub fn astHeight(nodes: vg.Slice(node), ni: i32) i64 {
 }
 
 pub fn atomCost(re: *Regexp) i64 {
-    return atomCostNode(re.nodes, re.brackets, re.root);
+    var lc: lookupCosts = localeLookupCosts(&re.loc);
+    return atomCostNode(re.nodes, re.brackets, &lc, re.root);
 }
 
-pub fn atomCostNode(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), ni: i32) i64 {
+pub fn atomCostNode(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), lc: *lookupCosts, ni: i32) i64 {
     var cost: i64 = vg.cv(i64, 1);
     switch (nodes.at(ni).*.op) {
         opChar => {
             cost = (vg.cv(i64, nodes.at(ni).*.fold.len) +% 1);
         },
         opBracket => {
-            cost = bracketAtomCost(brs, nodes.at(ni).*.br);
+            cost = bracketAtomCost(brs, nodes.at(ni).*.br, lc);
         },
         else => {},
     }
     {
         var i: i64 = 0;
         while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-            cost = @max(cost, atomCostNode(nodes, brs, nodes.at(ni).*.ch.at(i).*));
+            cost = @max(cost, atomCostNode(nodes, brs, lc, nodes.at(ni).*.ch.at(i).*));
         }
     }
     return cost;
 }
 
-pub fn bracketAtomCost(brs: vg.Slice(bracketSet), bi: i32) i64 {
-    const members: i64 = (vg.cv(i64, ((brs.at(bi).*.ranges.len +% brs.at(bi).*.elems.len) +% brs.at(bi).*.equivs.len)) +% bracketFixedChecks);
-    const cost: i64 = cMul((maxPreimages +% 1), members);
-    if ((!bracketHasMultiMembers(brs, bi))) {
-        return cost;
+pub fn searchSteps(count: i64) i64 {
+    var count_v: i64 = count;
+    var steps: i64 = vg.cv(i64, 0);
+    while ((count_v > 0)) {
+        count_v = vg.divT(count_v, 2);
+        steps +%= 1;
     }
-    var elemChars: i64 = 0;
+    return steps;
+}
+
+pub fn u32ContainsCost(count: i64) i64 {
+    return (1 +% (3 *% searchSteps(count)));
+}
+
+pub fn findPairCost(count: i64) i64 {
+    return (3 +% (3 *% searchSteps(count)));
+}
+
+pub fn findCaseCost(count: i64) i64 {
+    return (6 +% (3 *% searchSteps(count)));
+}
+
+pub fn pairSourcesRunCost(count: i64, preimages: i64) i64 {
+    return ((5 +% (3 *% searchSteps(count))) +% (5 *% preimages));
+}
+
+pub fn compareSequenceCost(length: i64) i64 {
+    return (5 +% (3 *% length));
+}
+
+pub fn localeLookupCosts(l: *Locale) lookupCosts {
+    var lc: lookupCosts = .{};
+    if (l.posix) {
+        lc.contraction = 1;
+        lc.classMask = 3;
+        lc.casePreimages = 2;
+        lc.caseConvert = 2;
+        lc.preimages = 1;
+        return lc;
+    }
+    lc.sequenceSearch = searchSteps(vg.divT(sectionLen(l, secSequences), 8));
+    const row: CollProfile = collationProfileRow(l, vg.cv(i64, l.collationProfile));
+    lc.contraction = (((((1 +% profileRowCost) +% u32ContainsCost(row.AddCount)) +% 1) +% u32ContainsCost(vg.divT(sectionLen(l, secRootContractions), 4))) +% u32ContainsCost(row.RemoveCount));
+    lc.primaryToken = ((((1 +% profileRowCost) +% findPairCost(row.OverrideCount)) +% 1) +% findPairCost(vg.divT(sectionLen(l, secRootEquivalences), 8)));
+    lc.classMask = 4;
+    lc.preimages = vg.cv(i64, localeMaxPreimages(l));
+    lc.caseConvert = (2 +% findCaseCost(vg.divT(sectionLen(l, secCaseDefault), 12)));
+    var upper: i64 = secInvUpperDefault;
+    var lower: i64 = secInvLowerDefault;
+    if ((l.caseProfile == 1)) {
+        lc.caseConvert +%= findCaseCost(vg.divT(sectionLen(l, secCaseTurkic), 12));
+        upper = secInvUpperTurkic;
+        lower = secInvLowerTurkic;
+    }
+    lc.casePreimages = (((2 +% pairSourcesRunCost(vg.divT(sectionLen(l, upper), 8), lc.preimages)) +% pairSourcesRunCost(vg.divT(sectionLen(l, lower), 8), lc.preimages)) +% (lc.preimages *% (2 +% lc.preimages)));
+    return lc;
+}
+
+pub fn elementIDCost(lc: *lookupCosts, length: i64) i64 {
+    if ((length == 1)) {
+        return 3;
+    }
+    return ((2 +% (2 *% length)) +% (lc.sequenceSearch *% (1 +% compareSequenceCost(length))));
+}
+
+pub fn collatingElementIDCost(lc: *lookupCosts, length: i64) i64 {
+    var cost: i64 = (1 +% elementIDCost(lc, length));
+    if ((length > 1)) {
+        cost +%= lc.contraction;
+    }
+    return cost;
+}
+
+pub fn primaryEqualCost(lc: *lookupCosts, left: i64, right: i64) i64 {
+    return (((1 +% collatingElementIDCost(lc, left)) +% collatingElementIDCost(lc, right)) +% (2 *% lc.primaryToken));
+}
+
+pub fn equivsCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts, length: i64) i64 {
+    var cost: i64 = vg.cv(i64, 0);
+    {
+        var i: i64 = 0;
+        while ((i < brs.at(bi).*.equivs.len)) : (i +%= 1) {
+            cost = cAdd(cost, (1 +% primaryEqualCost(lc, length, vg.cv(i64, brs.at(bi).*.equivs.at(i).*.len))));
+        }
+    }
+    return cost;
+}
+
+pub fn positiveSingleCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts) i64 {
+    var cost: i64 = (2 +% searchSteps(brs.at(bi).*.ranges.len));
+    if ((brs.at(bi).*.classMask != 0)) {
+        cost +%= lc.classMask;
+    }
+    return cAdd(cost, equivsCost(brs, bi, lc, 1));
+}
+
+pub fn matchesOneCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts) i64 {
+    const positive: i64 = positiveSingleCost(brs, bi, lc);
+    var cost: i64 = cAdd(1, positive);
+    if (brs.at(bi).*.icase) {
+        cost = cAdd(cost, cAdd(lc.casePreimages, cMul(lc.preimages, cAdd(1, positive))));
+    }
+    return cost;
+}
+
+pub fn candidateLeafCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts, length: i64) i64 {
+    return cAdd((1 +% collatingElementIDCost(lc, length)), equivsCost(brs, bi, lc, length));
+}
+
+pub fn probeCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts, length: i64) i64 {
+    var cost: i64 = cAdd(2, vg.cv(i64, brs.at(bi).*.elems.len));
+    var counterpart: i64 = vg.cv(i64, 1);
+    if (brs.at(bi).*.icase) {
+        counterpart = (1 +% (2 *% lc.caseConvert));
+    }
     {
         var i: i64 = 0;
         while ((i < brs.at(bi).*.elems.len)) : (i +%= 1) {
-            elemChars +%= vg.cv(i64, brs.at(bi).*.elems.at(i).*.len);
-        }
-    }
-    var multi: i64 = elemChars;
-    if ((brs.at(bi).*.equivs.len > 0)) {
-        var candidates: i64 = vg.cv(i64, 1);
-        if (brs.at(bi).*.icase) {
-            {
-                var i_2: i64 = 0;
-                while ((i_2 < maxElemAhead)) : (i_2 +%= 1) {
-                    candidates *%= (maxPreimages +% 1);
-                }
+            if ((vg.cv(i64, brs.at(bi).*.elems.at(i).*.len) == length)) {
+                cost = cAdd(cost, cMul(length, counterpart));
             }
         }
-        multi = cAdd(multi, cMul(candidates, cMul((vg.cv(i64, brs.at(bi).*.equivs.len) +% 1), maxElemAhead)));
     }
-    return cAdd(cost, cMul((maxElemAhead -% 1), multi));
+    if ((brs.at(bi).*.equivs.len == 0)) {
+        return cost;
+    }
+    const leaf: i64 = candidateLeafCost(brs, bi, lc, length);
+    if ((!brs.at(bi).*.icase)) {
+        return cAdd(cost, cAdd((length +% 1), leaf));
+    }
+    var candidates: i64 = vg.cv(i64, 1);
+    {
+        var i_2: i64 = vg.cv(i64, 0);
+        while ((i_2 < length)) : (i_2 +%= 1) {
+            candidates = cMul(candidates, (lc.preimages +% 1));
+        }
+    }
+    return cAdd(cost, cMul(candidates, cAdd((2 +% lc.preimages), cAdd(lc.casePreimages, leaf))));
+}
+
+pub fn bracketAtomCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts) i64 {
+    var cost: i64 = matchesOneCost(brs, bi, lc);
+    if ((brs.at(bi).*.multiLens == 0)) {
+        return cost;
+    }
+    cost = cAdd(cost, (maxElemAhead -% 1));
+    {
+        var length: i64 = 2;
+        while ((length <= maxElemAhead)) : (length +%= 1) {
+            if (((brs.at(bi).*.multiLens & (@as(u16, 1) << @intCast(length))) != 0)) {
+                cost = cAdd(cost, probeCost(brs, bi, lc, vg.cv(i64, length)));
+            }
+        }
+    }
+    return cost;
 }
 
 pub fn solverSteps(nodes: vg.Slice(node), ni: i32, length: i64) i64 {
@@ -2314,6 +2456,8 @@ pub fn memoPut(mem: vg.Allocator, t: *memoTab, k: memoKey, v: memoVal) vg.Alloca
 pub fn LocalePOSIX() Locale {
     var l: Locale = .{};
     l.maxSeq = 1;
+    l.preimagesDefault = 1;
+    l.preimagesTurkic = 1;
     l.posix = true;
     l.valid = true;
     return l;
@@ -2385,7 +2529,9 @@ pub fn localeLoad(l: *Locale, blob: vg.Str) bool {
     if ((!localeValidate(l))) {
         return false;
     }
-    if ((!preimageRunsFit(l))) {
+    l.preimagesDefault = (maxPairRun(l, secInvUpperDefault) +% maxPairRun(l, secInvLowerDefault));
+    l.preimagesTurkic = (maxPairRun(l, secInvUpperTurkic) +% maxPairRun(l, secInvLowerTurkic));
+    if (((l.preimagesDefault > maxPreimages) or (l.preimagesTurkic > maxPreimages))) {
         return false;
     }
     return true;
@@ -2705,6 +2851,8 @@ pub fn resolveLocale(data: *Locale, req: localeRequest) Tup_t4c6f63616c65x_bool 
     result.blob = data.blob;
     result.sec = data.sec;
     result.maxSeq = data.maxSeq;
+    result.preimagesDefault = data.preimagesDefault;
+    result.preimagesTurkic = data.preimagesTurkic;
     const index: i64 = findName(&result, req.name, secLocaleNames, secLocaleNameOffsets, localesCount(&result));
     if ((index < 0)) {
         return .{ invalid, false };
@@ -2950,10 +3098,11 @@ pub fn maxPairRun(l: *Locale, sec: i64) i64 {
     return longest;
 }
 
-pub fn preimageRunsFit(l: *Locale) bool {
-    const def: i64 = (maxPairRun(l, secInvUpperDefault) +% maxPairRun(l, secInvLowerDefault));
-    const turkic: i64 = (maxPairRun(l, secInvUpperTurkic) +% maxPairRun(l, secInvLowerTurkic));
-    return ((def <= maxPreimages) and (turkic <= maxPreimages));
+pub fn localeMaxPreimages(l: *Locale) i64 {
+    if ((l.caseProfile == 1)) {
+        return l.preimagesTurkic;
+    }
+    return l.preimagesDefault;
 }
 
 pub fn localeCasePreimages(l: *Locale, buf: *preimageBuf, r: i32) void {

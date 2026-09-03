@@ -118,7 +118,16 @@
   },
   {
    "k": "const",
-   "name": "equivFrames",
+   "name": "singleLookupFrames",
+   "type": null,
+   "value": {
+    "k": "int",
+    "value": "8"
+   }
+  },
+  {
+   "k": "const",
+   "name": "multiLookupFrames",
    "type": null,
    "value": {
     "k": "binary",
@@ -129,7 +138,7 @@
     },
     "y": {
      "k": "int",
-     "value": "2"
+     "value": "8"
     }
    }
   },
@@ -171,11 +180,11 @@
   },
   {
    "k": "const",
-   "name": "bracketFixedChecks",
+   "name": "profileRowCost",
    "type": null,
    "value": {
     "k": "int",
-    "value": "17"
+    "value": "13"
    }
   },
   {
@@ -20024,7 +20033,7 @@
        "op": "*",
        "x": {
         "k": "ident",
-        "name": "equivFrames"
+        "name": "multiLookupFrames"
        },
        "y": {
         "k": "ident",
@@ -20376,8 +20385,16 @@
           "k": "call"
          },
          {
-          "k": "int",
-          "value": "4"
+          "k": "binary",
+          "op": "+",
+          "x": {
+           "k": "int",
+           "value": "2"
+          },
+          "y": {
+           "k": "ident",
+           "name": "singleLookupFrames"
+          }
          }
         ],
         "fn": "cAdd",
@@ -20958,12 +20975,12 @@
           "k": "binary",
           "op": "+",
           "x": {
-           "k": "ident",
-           "name": "equivFrames"
+           "k": "int",
+           "value": "3"
           },
           "y": {
-           "k": "int",
-           "value": "4"
+           "k": "ident",
+           "name": "multiLookupFrames"
           }
          }
         ],
@@ -21409,6 +21426,30 @@
   {
    "body": [
     {
+     "k": "define",
+     "names": [
+      "lc"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "unary",
+        "op": "\u0026",
+        "x": {
+         "k": "field",
+         "name": "loc",
+         "x": {
+          "k": "ident",
+          "name": "re"
+         }
+        }
+       }
+      ],
+      "fn": "localeLookupCosts",
+      "k": "call"
+     }
+    },
+    {
      "k": "return",
      "values": [
       {
@@ -21427,6 +21468,14 @@
          "x": {
           "k": "ident",
           "name": "re"
+         }
+        },
+        {
+         "k": "unary",
+         "op": "\u0026",
+         "x": {
+          "k": "ident",
+          "name": "lc"
          }
         },
         {
@@ -21570,6 +21619,10 @@
               "name": "nodes"
              }
             }
+           },
+           {
+            "k": "ident",
+            "name": "lc"
            }
           ],
           "fn": "bracketAtomCost",
@@ -21628,6 +21681,10 @@
            {
             "k": "ident",
             "name": "brs"
+           },
+           {
+            "k": "ident",
+            "name": "lc"
            },
            {
             "index": {
@@ -21748,6 +21805,13 @@
      }
     },
     {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
+     }
+    },
+    {
      "name": "ni",
      "type": {
       "k": "named",
@@ -21767,17 +21831,573 @@
     {
      "k": "define",
      "names": [
-      "members"
+      "steps"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "ident",
+        "name": "count"
+       },
+       "op": "/=",
+       "value": {
+        "k": "int",
+        "value": "2"
+       }
+      },
+      {
+       "k": "incdec",
+       "lhs": {
+        "k": "ident",
+        "name": "steps"
+       },
+       "op": "++"
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003e",
+      "x": {
+       "k": "ident",
+       "name": "count"
+      },
+      "y": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "init": null,
+     "k": "for",
+     "post": null
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "steps"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "searchSteps",
+   "params": [
+    {
+     "name": "count",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "int",
+        "value": "1"
+       },
+       "y": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "int",
+         "value": "3"
+        },
+        "y": {
+         "args": [
+          {
+           "k": "ident",
+           "name": "count"
+          }
+         ],
+         "fn": "searchSteps",
+         "k": "call"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "u32ContainsCost",
+   "params": [
+    {
+     "name": "count",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "int",
+        "value": "3"
+       },
+       "y": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "int",
+         "value": "3"
+        },
+        "y": {
+         "args": [
+          {
+           "k": "ident",
+           "name": "count"
+          }
+         ],
+         "fn": "searchSteps",
+         "k": "call"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "findPairCost",
+   "params": [
+    {
+     "name": "count",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "int",
+        "value": "6"
+       },
+       "y": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "int",
+         "value": "3"
+        },
+        "y": {
+         "args": [
+          {
+           "k": "ident",
+           "name": "count"
+          }
+         ],
+         "fn": "searchSteps",
+         "k": "call"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "findCaseCost",
+   "params": [
+    {
+     "name": "count",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "int",
+         "value": "5"
+        },
+        "y": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "int",
+          "value": "3"
+         },
+         "y": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "count"
+           }
+          ],
+          "fn": "searchSteps",
+          "k": "call"
+         }
+        }
+       },
+       "y": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "int",
+         "value": "5"
+        },
+        "y": {
+         "k": "ident",
+         "name": "preimages"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "pairSourcesRunCost",
+   "params": [
+    {
+     "name": "count",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    },
+    {
+     "name": "preimages",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "int",
+        "value": "5"
+       },
+       "y": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "int",
+         "value": "3"
+        },
+        "y": {
+         "k": "ident",
+         "name": "length"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "compareSequenceCost",
+   "params": [
+    {
+     "name": "length",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "var_decl",
+     "name": "lc",
+     "type": {
+      "k": "struct_ref",
+      "name": "lookupCosts"
+     },
+     "value": null
+    },
+    {
+     "cond": {
+      "k": "field",
+      "name": "posix",
+      "x": {
+       "k": "ident",
+       "name": "l"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "field",
+         "name": "contraction",
+         "x": {
+          "k": "ident",
+          "name": "lc"
+         }
+        }
+       ],
+       "value": {
+        "k": "int",
+        "value": "1"
+       }
+      },
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "field",
+         "name": "classMask",
+         "x": {
+          "k": "ident",
+          "name": "lc"
+         }
+        }
+       ],
+       "value": {
+        "k": "int",
+        "value": "3"
+       }
+      },
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "field",
+         "name": "casePreimages",
+         "x": {
+          "k": "ident",
+          "name": "lc"
+         }
+        }
+       ],
+       "value": {
+        "k": "int",
+        "value": "2"
+       }
+      },
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "field",
+         "name": "caseConvert",
+         "x": {
+          "k": "ident",
+          "name": "lc"
+         }
+        }
+       ],
+       "value": {
+        "k": "int",
+        "value": "2"
+       }
+      },
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "field",
+         "name": "preimages",
+         "x": {
+          "k": "ident",
+          "name": "lc"
+         }
+        }
+       ],
+       "value": {
+        "k": "int",
+        "value": "1"
+       }
+      },
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "ident",
+         "name": "lc"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "sequenceSearch",
+       "x": {
+        "k": "ident",
+        "name": "lc"
+       }
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "binary",
+        "op": "/",
+        "x": {
+         "args": [
+          {
+           "k": "ident",
+           "name": "l"
+          },
+          {
+           "k": "ident",
+           "name": "secSequences"
+          }
+         ],
+         "fn": "sectionLen",
+         "k": "call"
+        },
+        "y": {
+         "k": "int",
+         "value": "8"
+        }
+       }
+      ],
+      "fn": "searchSteps",
+      "k": "call"
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "row"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "l"
+       },
+       {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int"
+        },
+        "x": {
+         "k": "field",
+         "name": "collationProfile",
+         "x": {
+          "k": "ident",
+          "name": "l"
+         }
+        }
+       }
+      ],
+      "fn": "collationProfileRow",
+      "k": "call"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "contraction",
+       "x": {
+        "k": "ident",
+        "name": "lc"
+       }
+      }
      ],
      "value": {
       "k": "binary",
       "op": "+",
       "x": {
-       "k": "conv",
-       "type": {
-        "k": "named",
-        "name": "int64"
-       },
+       "k": "binary",
+       "op": "+",
        "x": {
         "k": "binary",
         "op": "+",
@@ -21785,57 +22405,1502 @@
          "k": "binary",
          "op": "+",
          "x": {
-          "args": [
-           {
-            "k": "field",
-            "name": "ranges",
-            "x": {
-             "index": {
-              "k": "ident",
-              "name": "bi"
-             },
-             "k": "index",
-             "x": {
-              "k": "ident",
-              "name": "brs"
-             }
-            }
-           }
-          ],
-          "fn": "len",
-          "k": "builtin",
-          "spread": false,
-          "type": null
+          "k": "binary",
+          "op": "+",
+          "x": {
+           "k": "int",
+           "value": "1"
+          },
+          "y": {
+           "k": "ident",
+           "name": "profileRowCost"
+          }
          },
          "y": {
           "args": [
            {
             "k": "field",
-            "name": "elems",
+            "name": "AddCount",
             "x": {
-             "index": {
-              "k": "ident",
-              "name": "bi"
-             },
-             "k": "index",
-             "x": {
-              "k": "ident",
-              "name": "brs"
-             }
+             "k": "ident",
+             "name": "row"
             }
            }
           ],
-          "fn": "len",
-          "k": "builtin",
-          "spread": false,
-          "type": null
+          "fn": "u32ContainsCost",
+          "k": "call"
+         }
+        },
+        "y": {
+         "k": "int",
+         "value": "1"
+        }
+       },
+       "y": {
+        "args": [
+         {
+          "k": "binary",
+          "op": "/",
+          "x": {
+           "args": [
+            {
+             "k": "ident",
+             "name": "l"
+            },
+            {
+             "k": "ident",
+             "name": "secRootContractions"
+            }
+           ],
+           "fn": "sectionLen",
+           "k": "call"
+          },
+          "y": {
+           "k": "int",
+           "value": "4"
+          }
+         }
+        ],
+        "fn": "u32ContainsCost",
+        "k": "call"
+       }
+      },
+      "y": {
+       "args": [
+        {
+         "k": "field",
+         "name": "RemoveCount",
+         "x": {
+          "k": "ident",
+          "name": "row"
+         }
+        }
+       ],
+       "fn": "u32ContainsCost",
+       "k": "call"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "primaryToken",
+       "x": {
+        "k": "ident",
+        "name": "lc"
+       }
+      }
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "+",
+         "x": {
+          "k": "int",
+          "value": "1"
+         },
+         "y": {
+          "k": "ident",
+          "name": "profileRowCost"
          }
         },
         "y": {
          "args": [
           {
            "k": "field",
-           "name": "equivs",
+           "name": "OverrideCount",
+           "x": {
+            "k": "ident",
+            "name": "row"
+           }
+          }
+         ],
+         "fn": "findPairCost",
+         "k": "call"
+        }
+       },
+       "y": {
+        "k": "int",
+        "value": "1"
+       }
+      },
+      "y": {
+       "args": [
+        {
+         "k": "binary",
+         "op": "/",
+         "x": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "l"
+           },
+           {
+            "k": "ident",
+            "name": "secRootEquivalences"
+           }
+          ],
+          "fn": "sectionLen",
+          "k": "call"
+         },
+         "y": {
+          "k": "int",
+          "value": "8"
+         }
+        }
+       ],
+       "fn": "findPairCost",
+       "k": "call"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "classMask",
+       "x": {
+        "k": "ident",
+        "name": "lc"
+       }
+      }
+     ],
+     "value": {
+      "k": "int",
+      "value": "4"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "preimages",
+       "x": {
+        "k": "ident",
+        "name": "lc"
+       }
+      }
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "l"
+        }
+       ],
+       "fn": "localeMaxPreimages",
+       "k": "call"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "caseConvert",
+       "x": {
+        "k": "ident",
+        "name": "lc"
+       }
+      }
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "k": "int",
+       "value": "2"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "binary",
+         "op": "/",
+         "x": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "l"
+           },
+           {
+            "k": "ident",
+            "name": "secCaseDefault"
+           }
+          ],
+          "fn": "sectionLen",
+          "k": "call"
+         },
+         "y": {
+          "k": "int",
+          "value": "12"
+         }
+        }
+       ],
+       "fn": "findCaseCost",
+       "k": "call"
+      }
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "upper"
+     ],
+     "value": {
+      "k": "ident",
+      "name": "secInvUpperDefault"
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "lower"
+     ],
+     "value": {
+      "k": "ident",
+      "name": "secInvLowerDefault"
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "==",
+      "x": {
+       "k": "field",
+       "name": "caseProfile",
+       "x": {
+        "k": "ident",
+        "name": "l"
+       }
+      },
+      "y": {
+       "k": "int",
+       "value": "1"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "field",
+        "name": "caseConvert",
+        "x": {
+         "k": "ident",
+         "name": "lc"
+        }
+       },
+       "op": "+=",
+       "value": {
+        "args": [
+         {
+          "k": "binary",
+          "op": "/",
+          "x": {
+           "args": [
+            {
+             "k": "ident",
+             "name": "l"
+            },
+            {
+             "k": "ident",
+             "name": "secCaseTurkic"
+            }
+           ],
+           "fn": "sectionLen",
+           "k": "call"
+          },
+          "y": {
+           "k": "int",
+           "value": "12"
+          }
+         }
+        ],
+        "fn": "findCaseCost",
+        "k": "call"
+       }
+      },
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "upper"
+        }
+       ],
+       "value": {
+        "k": "ident",
+        "name": "secInvUpperTurkic"
+       }
+      },
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "lower"
+        }
+       ],
+       "value": {
+        "k": "ident",
+        "name": "secInvLowerTurkic"
+       }
+      }
+     ]
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "casePreimages",
+       "x": {
+        "k": "ident",
+        "name": "lc"
+       }
+      }
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "int",
+         "value": "2"
+        },
+        "y": {
+         "args": [
+          {
+           "k": "binary",
+           "op": "/",
+           "x": {
+            "args": [
+             {
+              "k": "ident",
+              "name": "l"
+             },
+             {
+              "k": "ident",
+              "name": "upper"
+             }
+            ],
+            "fn": "sectionLen",
+            "k": "call"
+           },
+           "y": {
+            "k": "int",
+            "value": "8"
+           }
+          },
+          {
+           "k": "field",
+           "name": "preimages",
+           "x": {
+            "k": "ident",
+            "name": "lc"
+           }
+          }
+         ],
+         "fn": "pairSourcesRunCost",
+         "k": "call"
+        }
+       },
+       "y": {
+        "args": [
+         {
+          "k": "binary",
+          "op": "/",
+          "x": {
+           "args": [
+            {
+             "k": "ident",
+             "name": "l"
+            },
+            {
+             "k": "ident",
+             "name": "lower"
+            }
+           ],
+           "fn": "sectionLen",
+           "k": "call"
+          },
+          "y": {
+           "k": "int",
+           "value": "8"
+          }
+         },
+         {
+          "k": "field",
+          "name": "preimages",
+          "x": {
+           "k": "ident",
+           "name": "lc"
+          }
+         }
+        ],
+        "fn": "pairSourcesRunCost",
+        "k": "call"
+       }
+      },
+      "y": {
+       "k": "binary",
+       "op": "*",
+       "x": {
+        "k": "field",
+        "name": "preimages",
+        "x": {
+         "k": "ident",
+         "name": "lc"
+        }
+       },
+       "y": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "int",
+         "value": "2"
+        },
+        "y": {
+         "k": "field",
+         "name": "preimages",
+         "x": {
+          "k": "ident",
+          "name": "lc"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "lc"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "localeLookupCosts",
+   "params": [
+    {
+     "name": "l",
+     "type": {
+      "k": "ptr",
+      "name": "Locale"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "struct_ref",
+     "name": "lookupCosts"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "cond": {
+      "k": "binary",
+      "op": "==",
+      "x": {
+       "k": "ident",
+       "name": "length"
+      },
+      "y": {
+       "k": "int",
+       "value": "1"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "int",
+         "value": "3"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "int",
+         "value": "2"
+        },
+        "y": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "int",
+          "value": "2"
+         },
+         "y": {
+          "k": "ident",
+          "name": "length"
+         }
+        }
+       },
+       "y": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "field",
+         "name": "sequenceSearch",
+         "x": {
+          "k": "ident",
+          "name": "lc"
+         }
+        },
+        "y": {
+         "k": "binary",
+         "op": "+",
+         "x": {
+          "k": "int",
+          "value": "1"
+         },
+         "y": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "length"
+           }
+          ],
+          "fn": "compareSequenceCost",
+          "k": "call"
+         }
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "elementIDCost",
+   "params": [
+    {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
+     }
+    },
+    {
+     "name": "length",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "cost"
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "k": "int",
+       "value": "1"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "lc"
+        },
+        {
+         "k": "ident",
+         "name": "length"
+        }
+       ],
+       "fn": "elementIDCost",
+       "k": "call"
+      }
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "\u003e",
+      "x": {
+       "k": "ident",
+       "name": "length"
+      },
+      "y": {
+       "k": "int",
+       "value": "1"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "ident",
+        "name": "cost"
+       },
+       "op": "+=",
+       "value": {
+        "k": "field",
+        "name": "contraction",
+        "x": {
+         "k": "ident",
+         "name": "lc"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "cost"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "collatingElementIDCost",
+   "params": [
+    {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
+     }
+    },
+    {
+     "name": "length",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "binary",
+         "op": "+",
+         "x": {
+          "k": "int",
+          "value": "1"
+         },
+         "y": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "lc"
+           },
+           {
+            "k": "ident",
+            "name": "left"
+           }
+          ],
+          "fn": "collatingElementIDCost",
+          "k": "call"
+         }
+        },
+        "y": {
+         "args": [
+          {
+           "k": "ident",
+           "name": "lc"
+          },
+          {
+           "k": "ident",
+           "name": "right"
+          }
+         ],
+         "fn": "collatingElementIDCost",
+         "k": "call"
+        }
+       },
+       "y": {
+        "k": "binary",
+        "op": "*",
+        "x": {
+         "k": "int",
+         "value": "2"
+        },
+        "y": {
+         "k": "field",
+         "name": "primaryToken",
+         "x": {
+          "k": "ident",
+          "name": "lc"
+         }
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "primaryEqualCost",
+   "params": [
+    {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
+     }
+    },
+    {
+     "name": "left",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "right",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "cost"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "0"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "cost"
+        }
+       ],
+       "value": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "cost"
+         },
+         {
+          "k": "binary",
+          "op": "+",
+          "x": {
+           "k": "int",
+           "value": "1"
+          },
+          "y": {
+           "args": [
+            {
+             "k": "ident",
+             "name": "lc"
+            },
+            {
+             "k": "ident",
+             "name": "length"
+            },
+            {
+             "k": "conv",
+             "type": {
+              "k": "named",
+              "name": "int64"
+             },
+             "x": {
+              "args": [
+               {
+                "index": {
+                 "k": "ident",
+                 "name": "i"
+                },
+                "k": "index",
+                "x": {
+                 "k": "field",
+                 "name": "equivs",
+                 "x": {
+                  "index": {
+                   "k": "ident",
+                   "name": "bi"
+                  },
+                  "k": "index",
+                  "x": {
+                   "k": "ident",
+                   "name": "brs"
+                  }
+                 }
+                }
+               }
+              ],
+              "fn": "len",
+              "k": "builtin",
+              "spread": false,
+              "type": null
+             }
+            }
+           ],
+           "fn": "primaryEqualCost",
+           "k": "call"
+          }
+         }
+        ],
+        "fn": "cAdd",
+        "k": "call"
+       }
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "field",
+         "name": "equivs",
+         "x": {
+          "index": {
+           "k": "ident",
+           "name": "bi"
+          },
+          "k": "index",
+          "x": {
+           "k": "ident",
+           "name": "brs"
+          }
+         }
+        }
+       ],
+       "fn": "len",
+       "k": "builtin",
+       "spread": false,
+       "type": null
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "cost"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "equivsCost",
+   "params": [
+    {
+     "name": "brs",
+     "type": {
+      "elem": {
+       "k": "struct_ref",
+       "name": "bracketSet"
+      },
+      "k": "slice"
+     }
+    },
+    {
+     "name": "bi",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    },
+    {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
+     }
+    },
+    {
+     "name": "length",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "cost"
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "k": "int",
+       "value": "2"
+      },
+      "y": {
+       "args": [
+        {
+         "args": [
+          {
+           "k": "field",
+           "name": "ranges",
+           "x": {
+            "index": {
+             "k": "ident",
+             "name": "bi"
+            },
+            "k": "index",
+            "x": {
+             "k": "ident",
+             "name": "brs"
+            }
+           }
+          }
+         ],
+         "fn": "len",
+         "k": "builtin",
+         "spread": false,
+         "type": null
+        }
+       ],
+       "fn": "searchSteps",
+       "k": "call"
+      }
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "!=",
+      "x": {
+       "k": "field",
+       "name": "classMask",
+       "x": {
+        "index": {
+         "k": "ident",
+         "name": "bi"
+        },
+        "k": "index",
+        "x": {
+         "k": "ident",
+         "name": "brs"
+        }
+       }
+      },
+      "y": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "ident",
+        "name": "cost"
+       },
+       "op": "+=",
+       "value": {
+        "k": "field",
+        "name": "classMask",
+        "x": {
+         "k": "ident",
+         "name": "lc"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "args": [
+        {
+         "k": "ident",
+         "name": "cost"
+        },
+        {
+         "args": [
+          {
+           "k": "ident",
+           "name": "brs"
+          },
+          {
+           "k": "ident",
+           "name": "bi"
+          },
+          {
+           "k": "ident",
+           "name": "lc"
+          },
+          {
+           "k": "int",
+           "value": "1"
+          }
+         ],
+         "fn": "equivsCost",
+         "k": "call"
+        }
+       ],
+       "fn": "cAdd",
+       "k": "call"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "positiveSingleCost",
+   "params": [
+    {
+     "name": "brs",
+     "type": {
+      "elem": {
+       "k": "struct_ref",
+       "name": "bracketSet"
+      },
+      "k": "slice"
+     }
+    },
+    {
+     "name": "bi",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    },
+    {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "positive"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "brs"
+       },
+       {
+        "k": "ident",
+        "name": "bi"
+       },
+       {
+        "k": "ident",
+        "name": "lc"
+       }
+      ],
+      "fn": "positiveSingleCost",
+      "k": "call"
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "cost"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "int",
+        "value": "1"
+       },
+       {
+        "k": "ident",
+        "name": "positive"
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
+     }
+    },
+    {
+     "cond": {
+      "k": "field",
+      "name": "icase",
+      "x": {
+       "index": {
+        "k": "ident",
+        "name": "bi"
+       },
+       "k": "index",
+       "x": {
+        "k": "ident",
+        "name": "brs"
+       }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "cost"
+        }
+       ],
+       "value": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "cost"
+         },
+         {
+          "args": [
+           {
+            "k": "field",
+            "name": "casePreimages",
+            "x": {
+             "k": "ident",
+             "name": "lc"
+            }
+           },
+           {
+            "args": [
+             {
+              "k": "field",
+              "name": "preimages",
+              "x": {
+               "k": "ident",
+               "name": "lc"
+              }
+             },
+             {
+              "args": [
+               {
+                "k": "int",
+                "value": "1"
+               },
+               {
+                "k": "ident",
+                "name": "positive"
+               }
+              ],
+              "fn": "cAdd",
+              "k": "call"
+             }
+            ],
+            "fn": "cMul",
+            "k": "call"
+           }
+          ],
+          "fn": "cAdd",
+          "k": "call"
+         }
+        ],
+        "fn": "cAdd",
+        "k": "call"
+       }
+      }
+     ]
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "cost"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "matchesOneCost",
+   "params": [
+    {
+     "name": "brs",
+     "type": {
+      "elem": {
+       "k": "struct_ref",
+       "name": "bracketSet"
+      },
+      "k": "slice"
+     }
+    },
+    {
+     "name": "bi",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    },
+    {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "args": [
+        {
+         "k": "binary",
+         "op": "+",
+         "x": {
+          "k": "int",
+          "value": "1"
+         },
+         "y": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "lc"
+           },
+           {
+            "k": "ident",
+            "name": "length"
+           }
+          ],
+          "fn": "collatingElementIDCost",
+          "k": "call"
+         }
+        },
+        {
+         "args": [
+          {
+           "k": "ident",
+           "name": "brs"
+          },
+          {
+           "k": "ident",
+           "name": "bi"
+          },
+          {
+           "k": "ident",
+           "name": "lc"
+          },
+          {
+           "k": "ident",
+           "name": "length"
+          }
+         ],
+         "fn": "equivsCost",
+         "k": "call"
+        }
+       ],
+       "fn": "cAdd",
+       "k": "call"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "candidateLeafCost",
+   "params": [
+    {
+     "name": "brs",
+     "type": {
+      "elem": {
+       "k": "struct_ref",
+       "name": "bracketSet"
+      },
+      "k": "slice"
+     }
+    },
+    {
+     "name": "bi",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    },
+    {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
+     }
+    },
+    {
+     "name": "length",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "cost"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "int",
+        "value": "2"
+       },
+       {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int64"
+        },
+        "x": {
+         "args": [
+          {
+           "k": "field",
+           "name": "elems",
            "x": {
             "index": {
              "k": "ident",
@@ -21855,129 +23920,167 @@
          "type": null
         }
        }
-      },
-      "y": {
-       "k": "ident",
-       "name": "bracketFixedChecks"
-      }
+      ],
+      "fn": "cAdd",
+      "k": "call"
      }
     },
     {
      "k": "define",
      "names": [
-      "cost"
+      "counterpart"
      ],
      "value": {
-      "args": [
-       {
-        "k": "binary",
-        "op": "+",
-        "x": {
-         "k": "ident",
-         "name": "maxPreimages"
-        },
-        "y": {
-         "k": "int",
-         "value": "1"
-        }
-       },
-       {
-        "k": "ident",
-        "name": "members"
-       }
-      ],
-      "fn": "cMul",
-      "k": "call"
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "int",
+       "value": "1"
+      }
      }
     },
     {
      "cond": {
-      "k": "unary",
-      "op": "!",
+      "k": "field",
+      "name": "icase",
       "x": {
-       "args": [
-        {
-         "k": "ident",
-         "name": "brs"
-        },
-        {
-         "k": "ident",
-         "name": "bi"
-        }
-       ],
-       "fn": "bracketHasMultiMembers",
-       "k": "call"
+       "index": {
+        "k": "ident",
+        "name": "bi"
+       },
+       "k": "index",
+       "x": {
+        "k": "ident",
+        "name": "brs"
+       }
       }
      },
      "else": null,
      "k": "if",
      "then": [
       {
-       "k": "return",
-       "values": [
+       "k": "assign",
+       "lhs": [
         {
          "k": "ident",
-         "name": "cost"
+         "name": "counterpart"
         }
-       ]
+       ],
+       "value": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "int",
+         "value": "1"
+        },
+        "y": {
+         "k": "binary",
+         "op": "*",
+         "x": {
+          "k": "int",
+          "value": "2"
+         },
+         "y": {
+          "k": "field",
+          "name": "caseConvert",
+          "x": {
+           "k": "ident",
+           "name": "lc"
+          }
+         }
+        }
+       }
       }
      ]
     },
     {
-     "k": "var_decl",
-     "name": "elemChars",
-     "type": {
-      "k": "named",
-      "name": "int64"
-     },
-     "value": null
-    },
-    {
      "body": [
       {
-       "k": "op_assign",
-       "lhs": {
-        "k": "ident",
-        "name": "elemChars"
-       },
-       "op": "+=",
-       "value": {
-        "k": "conv",
-        "type": {
-         "k": "named",
-         "name": "int64"
-        },
+       "cond": {
+        "k": "binary",
+        "op": "==",
         "x": {
-         "args": [
-          {
-           "index": {
-            "k": "ident",
-            "name": "i"
-           },
-           "k": "index",
-           "x": {
-            "k": "field",
-            "name": "elems",
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "args": [
+           {
+            "index": {
+             "k": "ident",
+             "name": "i"
+            },
+            "k": "index",
             "x": {
-             "index": {
-              "k": "ident",
-              "name": "bi"
-             },
-             "k": "index",
+             "k": "field",
+             "name": "elems",
              "x": {
-              "k": "ident",
-              "name": "brs"
+              "index": {
+               "k": "ident",
+               "name": "bi"
+              },
+              "k": "index",
+              "x": {
+               "k": "ident",
+               "name": "brs"
+              }
              }
             }
            }
+          ],
+          "fn": "len",
+          "k": "builtin",
+          "spread": false,
+          "type": null
+         }
+        },
+        "y": {
+         "k": "ident",
+         "name": "length"
+        }
+       },
+       "else": null,
+       "k": "if",
+       "then": [
+        {
+         "k": "assign",
+         "lhs": [
+          {
+           "k": "ident",
+           "name": "cost"
           }
          ],
-         "fn": "len",
-         "k": "builtin",
-         "spread": false,
-         "type": null
+         "value": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "cost"
+           },
+           {
+            "args": [
+             {
+              "k": "ident",
+              "name": "length"
+             },
+             {
+              "k": "ident",
+              "name": "counterpart"
+             }
+            ],
+            "fn": "cMul",
+            "k": "call"
+           }
+          ],
+          "fn": "cAdd",
+          "k": "call"
+         }
         }
-       }
+       ]
       }
      ],
      "cond": {
@@ -22032,19 +24135,9 @@
      }
     },
     {
-     "k": "define",
-     "names": [
-      "multi"
-     ],
-     "value": {
-      "k": "ident",
-      "name": "elemChars"
-     }
-    },
-    {
      "cond": {
       "k": "binary",
-      "op": "\u003e",
+      "op": "==",
       "x": {
        "args": [
         {
@@ -22077,176 +24170,199 @@
      "k": "if",
      "then": [
       {
-       "k": "define",
-       "names": [
-        "candidates"
-       ],
-       "value": {
-        "k": "conv",
-        "type": {
-         "k": "named",
-         "name": "int64"
-        },
-        "x": {
-         "k": "int",
-         "value": "1"
-        }
-       }
-      },
-      {
-       "cond": {
-        "k": "field",
-        "name": "icase",
-        "x": {
-         "index": {
-          "k": "ident",
-          "name": "bi"
-         },
-         "k": "index",
-         "x": {
-          "k": "ident",
-          "name": "brs"
-         }
-        }
-       },
-       "else": null,
-       "k": "if",
-       "then": [
+       "k": "return",
+       "values": [
         {
-         "body": [
-          {
-           "k": "op_assign",
-           "lhs": {
-            "k": "ident",
-            "name": "candidates"
-           },
-           "op": "*=",
-           "value": {
-            "k": "binary",
-            "op": "+",
-            "x": {
-             "k": "ident",
-             "name": "maxPreimages"
-            },
-            "y": {
-             "k": "int",
-             "value": "1"
-            }
-           }
-          }
-         ],
-         "cond": {
-          "k": "binary",
-          "op": "\u003c",
-          "x": {
-           "k": "ident",
-           "name": "i"
-          },
-          "y": {
-           "k": "ident",
-           "name": "maxElemAhead"
-          }
-         },
-         "init": {
-          "k": "define",
-          "names": [
-           "i"
-          ],
-          "value": {
-           "k": "int",
-           "value": "0"
-          }
-         },
-         "k": "for",
-         "post": {
-          "k": "incdec",
-          "lhs": {
-           "k": "ident",
-           "name": "i"
-          },
-          "op": "++"
-         }
+         "k": "ident",
+         "name": "cost"
         }
        ]
+      }
+     ]
+    },
+    {
+     "k": "define",
+     "names": [
+      "leaf"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "brs"
+       },
+       {
+        "k": "ident",
+        "name": "bi"
+       },
+       {
+        "k": "ident",
+        "name": "lc"
+       },
+       {
+        "k": "ident",
+        "name": "length"
+       }
+      ],
+      "fn": "candidateLeafCost",
+      "k": "call"
+     }
+    },
+    {
+     "cond": {
+      "k": "unary",
+      "op": "!",
+      "x": {
+       "k": "field",
+       "name": "icase",
+       "x": {
+        "index": {
+         "k": "ident",
+         "name": "bi"
+        },
+        "k": "index",
+        "x": {
+         "k": "ident",
+         "name": "brs"
+        }
+       }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "args": [
+          {
+           "k": "ident",
+           "name": "cost"
+          },
+          {
+           "args": [
+            {
+             "k": "binary",
+             "op": "+",
+             "x": {
+              "k": "ident",
+              "name": "length"
+             },
+             "y": {
+              "k": "int",
+              "value": "1"
+             }
+            },
+            {
+             "k": "ident",
+             "name": "leaf"
+            }
+           ],
+           "fn": "cAdd",
+           "k": "call"
+          }
+         ],
+         "fn": "cAdd",
+         "k": "call"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "k": "define",
+     "names": [
+      "candidates"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
       },
+      "x": {
+       "k": "int",
+       "value": "1"
+      }
+     }
+    },
+    {
+     "body": [
       {
        "k": "assign",
        "lhs": [
         {
          "k": "ident",
-         "name": "multi"
+         "name": "candidates"
         }
        ],
        "value": {
         "args": [
          {
           "k": "ident",
-          "name": "multi"
+          "name": "candidates"
          },
          {
-          "args": [
-           {
+          "k": "binary",
+          "op": "+",
+          "x": {
+           "k": "field",
+           "name": "preimages",
+           "x": {
             "k": "ident",
-            "name": "candidates"
-           },
-           {
-            "args": [
-             {
-              "k": "binary",
-              "op": "+",
-              "x": {
-               "k": "conv",
-               "type": {
-                "k": "named",
-                "name": "int64"
-               },
-               "x": {
-                "args": [
-                 {
-                  "k": "field",
-                  "name": "equivs",
-                  "x": {
-                   "index": {
-                    "k": "ident",
-                    "name": "bi"
-                   },
-                   "k": "index",
-                   "x": {
-                    "k": "ident",
-                    "name": "brs"
-                   }
-                  }
-                 }
-                ],
-                "fn": "len",
-                "k": "builtin",
-                "spread": false,
-                "type": null
-               }
-              },
-              "y": {
-               "k": "int",
-               "value": "1"
-              }
-             },
-             {
-              "k": "ident",
-              "name": "maxElemAhead"
-             }
-            ],
-            "fn": "cMul",
-            "k": "call"
+            "name": "lc"
            }
-          ],
-          "fn": "cMul",
-          "k": "call"
+          },
+          "y": {
+           "k": "int",
+           "value": "1"
+          }
          }
         ],
-        "fn": "cAdd",
+        "fn": "cMul",
         "k": "call"
        }
       }
-     ]
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "k": "ident",
+       "name": "length"
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "conv",
+       "type": {
+        "k": "named",
+        "name": "int64"
+       },
+       "x": {
+        "k": "int",
+        "value": "0"
+       }
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
     },
     {
      "k": "return",
@@ -22260,20 +24376,48 @@
         {
          "args": [
           {
-           "k": "binary",
-           "op": "-",
-           "x": {
-            "k": "ident",
-            "name": "maxElemAhead"
-           },
-           "y": {
-            "k": "int",
-            "value": "1"
-           }
+           "k": "ident",
+           "name": "candidates"
           },
           {
-           "k": "ident",
-           "name": "multi"
+           "args": [
+            {
+             "k": "binary",
+             "op": "+",
+             "x": {
+              "k": "int",
+              "value": "2"
+             },
+             "y": {
+              "k": "field",
+              "name": "preimages",
+              "x": {
+               "k": "ident",
+               "name": "lc"
+              }
+             }
+            },
+            {
+             "args": [
+              {
+               "k": "field",
+               "name": "casePreimages",
+               "x": {
+                "k": "ident",
+                "name": "lc"
+               }
+              },
+              {
+               "k": "ident",
+               "name": "leaf"
+              }
+             ],
+             "fn": "cAdd",
+             "k": "call"
+            }
+           ],
+           "fn": "cAdd",
+           "k": "call"
           }
          ],
          "fn": "cMul",
@@ -22282,6 +24426,281 @@
        ],
        "fn": "cAdd",
        "k": "call"
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "probeCost",
+   "params": [
+    {
+     "name": "brs",
+     "type": {
+      "elem": {
+       "k": "struct_ref",
+       "name": "bracketSet"
+      },
+      "k": "slice"
+     }
+    },
+    {
+     "name": "bi",
+     "type": {
+      "k": "named",
+      "name": "int32"
+     }
+    },
+    {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
+     }
+    },
+    {
+     "name": "length",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int64"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "cost"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "brs"
+       },
+       {
+        "k": "ident",
+        "name": "bi"
+       },
+       {
+        "k": "ident",
+        "name": "lc"
+       }
+      ],
+      "fn": "matchesOneCost",
+      "k": "call"
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "==",
+      "x": {
+       "k": "field",
+       "name": "multiLens",
+       "x": {
+        "index": {
+         "k": "ident",
+         "name": "bi"
+        },
+        "k": "index",
+        "x": {
+         "k": "ident",
+         "name": "brs"
+        }
+       }
+      },
+      "y": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "ident",
+         "name": "cost"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "ident",
+       "name": "cost"
+      }
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "cost"
+       },
+       {
+        "k": "binary",
+        "op": "-",
+        "x": {
+         "k": "ident",
+         "name": "maxElemAhead"
+        },
+        "y": {
+         "k": "int",
+         "value": "1"
+        }
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
+     }
+    },
+    {
+     "body": [
+      {
+       "cond": {
+        "k": "binary",
+        "op": "!=",
+        "x": {
+         "k": "binary",
+         "op": "\u0026",
+         "x": {
+          "k": "field",
+          "name": "multiLens",
+          "x": {
+           "index": {
+            "k": "ident",
+            "name": "bi"
+           },
+           "k": "index",
+           "x": {
+            "k": "ident",
+            "name": "brs"
+           }
+          }
+         },
+         "y": {
+          "k": "binary",
+          "op": "\u003c\u003c",
+          "x": {
+           "k": "int",
+           "value": "1"
+          },
+          "y": {
+           "k": "ident",
+           "name": "length"
+          }
+         }
+        },
+        "y": {
+         "k": "int",
+         "value": "0"
+        }
+       },
+       "else": null,
+       "k": "if",
+       "then": [
+        {
+         "k": "assign",
+         "lhs": [
+          {
+           "k": "ident",
+           "name": "cost"
+          }
+         ],
+         "value": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "cost"
+           },
+           {
+            "args": [
+             {
+              "k": "ident",
+              "name": "brs"
+             },
+             {
+              "k": "ident",
+              "name": "bi"
+             },
+             {
+              "k": "ident",
+              "name": "lc"
+             },
+             {
+              "k": "conv",
+              "type": {
+               "k": "named",
+               "name": "int64"
+              },
+              "x": {
+               "k": "ident",
+               "name": "length"
+              }
+             }
+            ],
+            "fn": "probeCost",
+            "k": "call"
+           }
+          ],
+          "fn": "cAdd",
+          "k": "call"
+         }
+        }
+       ]
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c=",
+      "x": {
+       "k": "ident",
+       "name": "length"
+      },
+      "y": {
+       "k": "ident",
+       "name": "maxElemAhead"
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "length"
+      ],
+      "value": {
+       "k": "int",
+       "value": "2"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "length"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "cost"
       }
      ]
     }
@@ -22304,6 +24723,13 @@
      "type": {
       "k": "named",
       "name": "int32"
+     }
+    },
+    {
+     "name": "lc",
+     "type": {
+      "k": "ptr",
+      "name": "lookupCosts"
      }
     }
    ],
@@ -33828,6 +36254,40 @@
      "lhs": [
       {
        "k": "field",
+       "name": "preimagesDefault",
+       "x": {
+        "k": "ident",
+        "name": "l"
+       }
+      }
+     ],
+     "value": {
+      "k": "int",
+      "value": "1"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "preimagesTurkic",
+       "x": {
+        "k": "ident",
+        "name": "l"
+       }
+      }
+     ],
+     "value": {
+      "k": "int",
+      "value": "1"
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
        "name": "posix",
        "x": {
         "k": "ident",
@@ -35108,18 +37568,130 @@
      ]
     },
     {
-     "cond": {
-      "k": "unary",
-      "op": "!",
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "preimagesDefault",
+       "x": {
+        "k": "ident",
+        "name": "l"
+       }
+      }
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
       "x": {
        "args": [
         {
          "k": "ident",
          "name": "l"
+        },
+        {
+         "k": "ident",
+         "name": "secInvUpperDefault"
         }
        ],
-       "fn": "preimageRunsFit",
+       "fn": "maxPairRun",
        "k": "call"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "l"
+        },
+        {
+         "k": "ident",
+         "name": "secInvLowerDefault"
+        }
+       ],
+       "fn": "maxPairRun",
+       "k": "call"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "preimagesTurkic",
+       "x": {
+        "k": "ident",
+        "name": "l"
+       }
+      }
+     ],
+     "value": {
+      "k": "binary",
+      "op": "+",
+      "x": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "l"
+        },
+        {
+         "k": "ident",
+         "name": "secInvUpperTurkic"
+        }
+       ],
+       "fn": "maxPairRun",
+       "k": "call"
+      },
+      "y": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "l"
+        },
+        {
+         "k": "ident",
+         "name": "secInvLowerTurkic"
+        }
+       ],
+       "fn": "maxPairRun",
+       "k": "call"
+      }
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "||",
+      "x": {
+       "k": "binary",
+       "op": "\u003e",
+       "x": {
+        "k": "field",
+        "name": "preimagesDefault",
+        "x": {
+         "k": "ident",
+         "name": "l"
+        }
+       },
+       "y": {
+        "k": "ident",
+        "name": "maxPreimages"
+       }
+      },
+      "y": {
+       "k": "binary",
+       "op": "\u003e",
+       "x": {
+        "k": "field",
+        "name": "preimagesTurkic",
+        "x": {
+         "k": "ident",
+         "name": "l"
+        }
+       },
+       "y": {
+        "k": "ident",
+        "name": "maxPreimages"
+       }
       }
      },
      "else": null,
@@ -40105,6 +42677,48 @@
      }
     },
     {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "preimagesDefault",
+       "x": {
+        "k": "ident",
+        "name": "result"
+       }
+      }
+     ],
+     "value": {
+      "k": "field",
+      "name": "preimagesDefault",
+      "x": {
+       "k": "ident",
+       "name": "data"
+      }
+     }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "preimagesTurkic",
+       "x": {
+        "k": "ident",
+        "name": "result"
+       }
+      }
+     ],
+     "value": {
+      "k": "field",
+      "name": "preimagesTurkic",
+      "x": {
+       "k": "ident",
+       "name": "data"
+      }
+     }
+    },
+    {
      "k": "define",
      "names": [
       "index"
@@ -43662,117 +46276,56 @@
   {
    "body": [
     {
-     "k": "define",
-     "names": [
-      "def"
-     ],
-     "value": {
+     "cond": {
       "k": "binary",
-      "op": "+",
+      "op": "==",
       "x": {
-       "args": [
-        {
-         "k": "ident",
-         "name": "l"
-        },
-        {
-         "k": "ident",
-         "name": "secInvUpperDefault"
-        }
-       ],
-       "fn": "maxPairRun",
-       "k": "call"
+       "k": "field",
+       "name": "caseProfile",
+       "x": {
+        "k": "ident",
+        "name": "l"
+       }
       },
       "y": {
-       "args": [
-        {
-         "k": "ident",
-         "name": "l"
-        },
-        {
-         "k": "ident",
-         "name": "secInvLowerDefault"
-        }
-       ],
-       "fn": "maxPairRun",
-       "k": "call"
+       "k": "int",
+       "value": "1"
       }
-     }
-    },
-    {
-     "k": "define",
-     "names": [
-      "turkic"
-     ],
-     "value": {
-      "k": "binary",
-      "op": "+",
-      "x": {
-       "args": [
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
         {
-         "k": "ident",
-         "name": "l"
-        },
-        {
-         "k": "ident",
-         "name": "secInvUpperTurkic"
+         "k": "field",
+         "name": "preimagesTurkic",
+         "x": {
+          "k": "ident",
+          "name": "l"
+         }
         }
-       ],
-       "fn": "maxPairRun",
-       "k": "call"
-      },
-      "y": {
-       "args": [
-        {
-         "k": "ident",
-         "name": "l"
-        },
-        {
-         "k": "ident",
-         "name": "secInvLowerTurkic"
-        }
-       ],
-       "fn": "maxPairRun",
-       "k": "call"
+       ]
       }
-     }
+     ]
     },
     {
      "k": "return",
      "values": [
       {
-       "k": "binary",
-       "op": "\u0026\u0026",
+       "k": "field",
+       "name": "preimagesDefault",
        "x": {
-        "k": "binary",
-        "op": "\u003c=",
-        "x": {
-         "k": "ident",
-         "name": "def"
-        },
-        "y": {
-         "k": "ident",
-         "name": "maxPreimages"
-        }
-       },
-       "y": {
-        "k": "binary",
-        "op": "\u003c=",
-        "x": {
-         "k": "ident",
-         "name": "turkic"
-        },
-        "y": {
-         "k": "ident",
-         "name": "maxPreimages"
-        }
+        "k": "ident",
+        "name": "l"
        }
       }
      ]
     }
    ],
    "k": "func",
-   "name": "preimageRunsFit",
+   "name": "localeMaxPreimages",
    "params": [
     {
      "name": "l",
@@ -43785,7 +46338,7 @@
    "results": [
     {
      "k": "named",
-     "name": "bool"
+     "name": "int"
     }
    ]
   },
@@ -75842,6 +78395,61 @@
   {
    "fields": [
     {
+     "name": "sequenceSearch",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "contraction",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "primaryToken",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "classMask",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "casePreimages",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "caseConvert",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    },
+    {
+     "name": "preimages",
+     "type": {
+      "k": "named",
+      "name": "int64"
+     }
+    }
+   ],
+   "k": "type",
+   "name": "lookupCosts"
+  },
+  {
+   "fields": [
+    {
      "name": "stamp",
      "type": {
       "elem": {
@@ -76268,6 +78876,20 @@
     },
     {
      "name": "maxSeq",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    },
+    {
+     "name": "preimagesDefault",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    },
+    {
+     "name": "preimagesTurkic",
      "type": {
       "k": "named",
       "name": "int"

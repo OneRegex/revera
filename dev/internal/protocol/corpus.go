@@ -146,7 +146,7 @@ var FixedFlagSets = []uint32{0, revera.FlagICase, revera.FlagNewline, revera.Fla
 // MultiElementPatterns exercise the ch collating element of the cs locale.
 var MultiElementPatterns = []string{
 	"[[.ch.]]", "([[.ch.]]|c)h?", "[[.ch.]]*x?", "a?[[.ch.]]+",
-	"([[.ch.]]?)(h*)", "[[=ch=]]", "([[.ch.]]|[ch])*",
+	"([[.ch.]]?)(h*)", "[[=ch=]]", "([[.ch.]]|[ch])*", "([[=ch=]]|c)h?",
 }
 
 // ReplaceCase is one ReplaceAll differential call.
@@ -173,6 +173,20 @@ var IterPatterns = []string{"a*", "(a|b)+", "b", "", "a?"}
 // LocalePatterns and LocaleSubjects exercise case-insensitive matching under locales with distinct case behavior.
 // The subjects hold dotted and dotless i, sharp s, and final sigma.
 var LocalePatterns = []string{"i+", "k", "[[:alpha:]]+", "s(a|s)*", "(σ|i)+"}
+
+// LocaleBracketPatterns exercise the locale lookups of bracket tests.
+var LocaleBracketPatterns = []string{
+	"[[=a=]]", "[[=a=][=e=][=s=]]+", "[^[=i=]]*x", "[ab[=i=]]+x", "([[=s=]]|s)+", "[[.a.][=c=]]h?",
+}
+
+// LocaleBracketSubjects are long enough for the bracket tests to dominate the contract check.
+var LocaleBracketSubjects = []string{
+	strings.Repeat("z", 64), strings.Repeat("sS", 32) + "ſ", strings.Repeat("ıİiI", 16),
+	strings.Repeat("äÄaA", 16), strings.Repeat("ch", 32),
+}
+
+// LocaleBracketShortSubjects keep the case-insensitive runs cheap, since their probes try every case candidate.
+var LocaleBracketShortSubjects = []string{"zzzz", "sSſs", "ıİiI", "äÄaA", "chCH"}
 
 var LocaleSubjects = []string{
 	"IİıiIi", "KkK", "straße", "SS ss ſ", "ΣΟΦΟΣ σοφος τέλος ς",

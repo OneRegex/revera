@@ -254,7 +254,10 @@ def atomsOf (x : Extracted) (nlMode : Bool) : Atoms :=
 
 def matcherStackBytes : Nat := 2048
 def frameBytes' : Nat := 256
-def equivFrames : Nat := maxElemAhead + 2
+/-- The frames below a multi-character probe, as `go/contract.go` counts them. -/
+def multiLookupFrames : Nat := maxElemAhead + 8
+/-- The matcher stack figure of `go/contract.go`, which a NoSub pattern reports for the whole call. -/
+def matcherStackFigure : Nat := matcherStackBytes + multiLookupFrames * frameBytes'
 
 /-! ## The walk -/
 
@@ -359,7 +362,7 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
         | some x =>
           if x.nosub then
             match (cmd.splitOn " ").filter (· ≠ ""), parseT got with
-            | ["T", maxT], some (hs, heap, _, steps) =>
+            | ["T", maxT], some (hs, heap, stack, steps) =>
               let some maxInput := maxT.toInt? | return { rep with failure := some "bad T argument" }
               let len := clampInput maxInput
               if hs != 0 then return { rep with failure := some s!"command {idx} '{cmd}': solver on a NoSub pattern" }
@@ -367,6 +370,8 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
                 return { rep with failure := some s!"command {idx} '{cmd}': engine heap figure {heap}, proven {heapFigure x.prog.n x.prog.k x.prog.ring}" }
               if steps != stepsFigure x.prog atom len then
                 return { rep with failure := some s!"command {idx} '{cmd}': engine step figure {steps}, proven {stepsFigure x.prog atom len}" }
+              if stack != matcherStackFigure then
+                return { rep with failure := some s!"command {idx} '{cmd}': engine stack figure {stack}, expected {matcherStackFigure}" }
               rep := { rep with cov := { rep.cov with contractsChecked := rep.cov.contractsChecked + 1 } }
             | _, _ => return { rep with failure := some s!"command {idx}: unparsable T" }
       else if kind == 'X' then
@@ -405,7 +410,7 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
 
 /-- The coverage the theorem pins down. -/
 def linkCoverage : LinkCoverage :=
-  { execsChecked := 47922, execsCaptures := 25974, execsNonPosix := 1160, execsPruned := 0, contractsChecked := 46,
+  { execsChecked := 47922, execsCaptures := 25974, execsNonPosix := 1700, execsPruned := 0, contractsChecked := 46,
     programsWf := 6893 }
 
 /--

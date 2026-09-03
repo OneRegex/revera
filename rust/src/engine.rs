@@ -16,12 +16,13 @@ pub const solverArenaLimit: i64 = 67108864i64;
 pub const contractCap: i64 = 4611686018427387904i64;
 pub const frameBytes: i64 = 256i64;
 pub const matcherStackBytes: i64 = 2048i64;
-pub const equivFrames: i64 = 10i64;
+pub const singleLookupFrames: i64 = 8i64;
+pub const multiLookupFrames: i64 = 16i64;
 pub const ptreeBytes: i64 = 48i64;
 pub const kidBytes: i64 = 8i64;
 pub const mapEntryBytes: i64 = 128i64;
 pub const matchBytes: i64 = 16i64;
-pub const bracketFixedChecks: i64 = 17i64;
+pub const profileRowCost: i64 = 13i64;
 pub const maxElemAhead: i64 = 8i64;
 pub const queueCompactFactor: i64 = 2i64;
 pub const ErrNone: i32 = 0i32;
@@ -205,6 +206,17 @@ pub struct Contract {
 }
 
 #[derive(Clone, Copy)]
+pub struct lookupCosts {
+    pub sequenceSearch: i64,
+    pub contraction: i64,
+    pub primaryToken: i64,
+    pub classMask: i64,
+    pub casePreimages: i64,
+    pub caseConvert: i64,
+    pub preimages: i64,
+}
+
+#[derive(Clone, Copy)]
 pub struct slotTable {
     pub stamp: vg::Slice<u32>,
     pub starts: vg::Slice<i32>,
@@ -289,6 +301,8 @@ pub struct Locale {
     pub blob: vg::Str,
     pub sec: [SecRange; (numSections) as usize],
     pub maxSeq: i64,
+    pub preimagesDefault: i64,
+    pub preimagesTurkic: i64,
     pub collationProfile: u16,
     pub caseProfile: u8,
     pub posix: bool,
@@ -1608,7 +1622,7 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
     perBoundary = cAdd(perBoundary, cMul(n, perTest));
     perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2i64, k)), cAdd(cMul(4i64, ring), 38i64)));
     let steps: i64 = cAdd(cAdd((24i64 + ring), length), cMul(cAdd(length, 1i64), perBoundary));
-    let stack: i64 = 4608i64;
+    let stack: i64 = 6144i64;
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1624,7 +1638,7 @@ pub fn onePassContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
     let mut b: BackendContract = vg::zero();
     let perVisit: i64 = cAdd(atom, (((re.nsub) as i64) + 1i64));
     b.HeapBytes = { let _t1 = length; captureHeap(re, _t1) };
-    b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 4i64), frameBytes);
+    b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 10i64), frameBytes);
     b.Steps = cMul(cMul(astSize(re.nodes, re.root), cAdd(length, 2i64)), perVisit);
     return b;
 }
@@ -1640,7 +1654,7 @@ pub fn solverContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContrac
     let mut heap: i64 = cAdd(cMul(structural, perAlloc), cMul(16i64, ((re.minSlots) as i64)));
     heap = cAdd(heap, 4096i64);
     heap = cAdd(heap, { let _t1 = length; captureHeap(re, _t1) });
-    let stack: i64 = cMul(cAdd(depth, 14i64), frameBytes);
+    let stack: i64 = cMul(cAdd(depth, 19i64), frameBytes);
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -1676,24 +1690,25 @@ pub fn astHeight(nodes: vg::Slice<node>, ni: i32) -> i64 {
 }
 
 pub fn atomCost(re: &mut Regexp) -> i64 {
-    return atomCostNode(re.nodes, re.brackets, re.root);
+    let mut lc: lookupCosts = localeLookupCosts(&mut re.loc);
+    return { let _t1 = re.nodes; let _t2 = re.brackets; let _t3 = re.root; atomCostNode(_t1, _t2, &mut lc, _t3) };
 }
 
-pub fn atomCostNode(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i32) -> i64 {
+pub fn atomCostNode(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, lc: &mut lookupCosts, ni: i32) -> i64 {
     let mut cost: i64 = 1i64;
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opChar {
             cost = (((nodes.get(((ni) as i64)).fold.len) as i64) + 1i64);
         } else if _t1 == opBracket {
-            cost = bracketAtomCost(brs, nodes.get(((ni) as i64)).br);
+            cost = { let _t2 = brs; let _t3 = nodes.get(((ni) as i64)).br; bracketAtomCost(_t2, _t3, lc) };
         }
     }
     {
         let mut i: i64 = 0i64;
-        '_b2: while (i < nodes.get(((ni) as i64)).ch.len) {
-            '_c2: {
-                cost = std::cmp::max(cost, atomCostNode(nodes, brs, nodes.get(((ni) as i64)).ch.get(i)));
+        '_b4: while (i < nodes.get(((ni) as i64)).ch.len) {
+            '_c4: {
+                cost = std::cmp::max(cost, { let _t5 = nodes; let _t6 = brs; let _t7 = nodes.get(((ni) as i64)).ch.get(i); atomCostNode(_t5, _t6, lc, _t7) });
             }
             i += 1i64;
         }
@@ -1701,39 +1716,173 @@ pub fn atomCostNode(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, ni: i32)
     return cost;
 }
 
-pub fn bracketAtomCost(brs: vg::Slice<bracketSet>, bi: i32) -> i64 {
-    let members: i64 = (((((brs.get(((bi) as i64)).ranges.len + brs.get(((bi) as i64)).elems.len) + brs.get(((bi) as i64)).equivs.len)) as i64) + bracketFixedChecks);
-    let cost: i64 = cMul(17i64, members);
-    if (!bracketHasMultiMembers(brs, bi)) {
-        return cost;
+pub fn searchSteps(count: i64) -> i64 {
+    let mut count_v: i64 = count;
+    let mut steps: i64 = 0i64;
+    while (count_v > 0i64) {
+        count_v /= 2i64;
+        steps += 1i64;
     }
-    let mut elemChars: i64 = vg::zero();
+    return steps;
+}
+
+pub fn u32ContainsCost(count: i64) -> i64 {
+    return (1i64 + (3i64 * searchSteps(count)));
+}
+
+pub fn findPairCost(count: i64) -> i64 {
+    return (3i64 + (3i64 * searchSteps(count)));
+}
+
+pub fn findCaseCost(count: i64) -> i64 {
+    return (6i64 + (3i64 * searchSteps(count)));
+}
+
+pub fn pairSourcesRunCost(count: i64, preimages: i64) -> i64 {
+    return ((5i64 + (3i64 * searchSteps(count))) + (5i64 * preimages));
+}
+
+pub fn compareSequenceCost(length: i64) -> i64 {
+    return (5i64 + (3i64 * length));
+}
+
+pub fn localeLookupCosts(l: &mut Locale) -> lookupCosts {
+    let mut lc: lookupCosts = vg::zero();
+    if l.posix {
+        lc.contraction = 1i64;
+        lc.classMask = 3i64;
+        lc.casePreimages = 2i64;
+        lc.caseConvert = 2i64;
+        lc.preimages = 1i64;
+        return lc;
+    }
+    lc.sequenceSearch = searchSteps(({ let _t1 = secSequences; sectionLen(l, _t1) }).wrapping_div(8i64));
+    let row: CollProfile = { let _t2 = ((l.collationProfile) as i64); collationProfileRow(l, _t2) };
+    lc.contraction = ((((14i64 + u32ContainsCost(row.AddCount)) + 1i64) + u32ContainsCost(({ let _t3 = secRootContractions; sectionLen(l, _t3) }).wrapping_div(4i64))) + u32ContainsCost(row.RemoveCount));
+    lc.primaryToken = (((14i64 + findPairCost(row.OverrideCount)) + 1i64) + findPairCost(({ let _t4 = secRootEquivalences; sectionLen(l, _t4) }).wrapping_div(8i64)));
+    lc.classMask = 4i64;
+    lc.preimages = ((localeMaxPreimages(l)) as i64);
+    lc.caseConvert = (2i64 + findCaseCost(({ let _t5 = secCaseDefault; sectionLen(l, _t5) }).wrapping_div(12i64)));
+    let mut upper: i64 = secInvUpperDefault;
+    let mut lower: i64 = secInvLowerDefault;
+    if (l.caseProfile == 1u8) {
+        lc.caseConvert += findCaseCost(({ let _t6 = secCaseTurkic; sectionLen(l, _t6) }).wrapping_div(12i64));
+        upper = secInvUpperTurkic;
+        lower = secInvLowerTurkic;
+    }
+    lc.casePreimages = (((2i64 + pairSourcesRunCost(({ let _t7 = upper; sectionLen(l, _t7) }).wrapping_div(8i64), lc.preimages)) + pairSourcesRunCost(({ let _t8 = lower; sectionLen(l, _t8) }).wrapping_div(8i64), lc.preimages)) + (lc.preimages * (2i64 + lc.preimages)));
+    return lc;
+}
+
+pub fn elementIDCost(lc: &mut lookupCosts, length: i64) -> i64 {
+    if (length == 1i64) {
+        return 3i64;
+    }
+    return ((2i64 + (2i64 * length)) + (lc.sequenceSearch * (1i64 + compareSequenceCost(length))));
+}
+
+pub fn collatingElementIDCost(lc: &mut lookupCosts, length: i64) -> i64 {
+    let mut cost: i64 = (1i64 + { let _t1 = length; elementIDCost(lc, _t1) });
+    if (length > 1i64) {
+        cost += lc.contraction;
+    }
+    return cost;
+}
+
+pub fn primaryEqualCost(lc: &mut lookupCosts, left: i64, right: i64) -> i64 {
+    return (((1i64 + { let _t1 = left; collatingElementIDCost(lc, _t1) }) + { let _t2 = right; collatingElementIDCost(lc, _t2) }) + (2i64 * lc.primaryToken));
+}
+
+pub fn equivsCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, length: i64) -> i64 {
+    let mut cost: i64 = 0i64;
     {
         let mut i: i64 = 0i64;
-        '_b1: while (i < brs.get(((bi) as i64)).elems.len) {
+        '_b1: while (i < brs.get(((bi) as i64)).equivs.len) {
             '_c1: {
-                elemChars += ((brs.get(((bi) as i64)).elems.get(i).len) as i64);
+                cost = cAdd(cost, (1i64 + { let _t2 = length; let _t3 = ((brs.get(((bi) as i64)).equivs.get(i).len) as i64); primaryEqualCost(lc, _t2, _t3) }));
             }
             i += 1i64;
         }
     }
-    let mut multi: i64 = elemChars;
-    if (brs.get(((bi) as i64)).equivs.len > 0i64) {
-        let mut candidates: i64 = 1i64;
-        if brs.get(((bi) as i64)).icase {
-            {
-                let mut i_2: i64 = 0i64;
-                '_b2: while (i_2 < maxElemAhead) {
-                    '_c2: {
-                        candidates *= 17i64;
-                    }
-                    i_2 += 1i64;
+    return cost;
+}
+
+pub fn positiveSingleCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts) -> i64 {
+    let mut cost: i64 = (2i64 + searchSteps(brs.get(((bi) as i64)).ranges.len));
+    if (brs.get(((bi) as i64)).classMask != 0u16) {
+        cost += lc.classMask;
+    }
+    return cAdd(cost, { let _t1 = brs; let _t2 = bi; let _t3 = 1i64; equivsCost(_t1, _t2, lc, _t3) });
+}
+
+pub fn matchesOneCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts) -> i64 {
+    let positive: i64 = { let _t1 = brs; let _t2 = bi; positiveSingleCost(_t1, _t2, lc) };
+    let mut cost: i64 = cAdd(1i64, positive);
+    if brs.get(((bi) as i64)).icase {
+        cost = cAdd(cost, cAdd(lc.casePreimages, cMul(lc.preimages, cAdd(1i64, positive))));
+    }
+    return cost;
+}
+
+pub fn candidateLeafCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, length: i64) -> i64 {
+    return cAdd((1i64 + { let _t1 = length; collatingElementIDCost(lc, _t1) }), { let _t2 = brs; let _t3 = bi; let _t4 = length; equivsCost(_t2, _t3, lc, _t4) });
+}
+
+pub fn probeCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, length: i64) -> i64 {
+    let mut cost: i64 = cAdd(2i64, ((brs.get(((bi) as i64)).elems.len) as i64));
+    let mut counterpart: i64 = 1i64;
+    if brs.get(((bi) as i64)).icase {
+        counterpart = (1i64 + (2i64 * lc.caseConvert));
+    }
+    {
+        let mut i: i64 = 0i64;
+        '_b1: while (i < brs.get(((bi) as i64)).elems.len) {
+            '_c1: {
+                if (((brs.get(((bi) as i64)).elems.get(i).len) as i64) == length) {
+                    cost = cAdd(cost, cMul(length, counterpart));
                 }
             }
+            i += 1i64;
         }
-        multi = cAdd(multi, cMul(candidates, cMul((((brs.get(((bi) as i64)).equivs.len) as i64) + 1i64), maxElemAhead)));
     }
-    return cAdd(cost, cMul(7i64, multi));
+    if (brs.get(((bi) as i64)).equivs.len == 0i64) {
+        return cost;
+    }
+    let leaf: i64 = { let _t2 = brs; let _t3 = bi; let _t4 = length; candidateLeafCost(_t2, _t3, lc, _t4) };
+    if (!brs.get(((bi) as i64)).icase) {
+        return cAdd(cost, cAdd((length + 1i64), leaf));
+    }
+    let mut candidates: i64 = 1i64;
+    {
+        let mut i_2: i64 = 0i64;
+        '_b5: while (i_2 < length) {
+            '_c5: {
+                candidates = cMul(candidates, (lc.preimages + 1i64));
+            }
+            i_2 += 1i64;
+        }
+    }
+    return cAdd(cost, cMul(candidates, cAdd((2i64 + lc.preimages), cAdd(lc.casePreimages, leaf))));
+}
+
+pub fn bracketAtomCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts) -> i64 {
+    let mut cost: i64 = { let _t1 = brs; let _t2 = bi; matchesOneCost(_t1, _t2, lc) };
+    if (brs.get(((bi) as i64)).multiLens == 0u16) {
+        return cost;
+    }
+    cost = cAdd(cost, 7i64);
+    {
+        let mut length: i64 = 2i64;
+        '_b3: while (length <= maxElemAhead) {
+            '_c3: {
+                if ((brs.get(((bi) as i64)).multiLens & (1u16 << length)) != 0u16) {
+                    cost = cAdd(cost, { let _t4 = brs; let _t5 = bi; let _t6 = ((length) as i64); probeCost(_t4, _t5, lc, _t6) });
+                }
+            }
+            length += 1i64;
+        }
+    }
+    return cost;
 }
 
 pub fn solverSteps(nodes: vg::Slice<node>, ni: i32, length: i64) -> i64 {
@@ -2462,6 +2611,8 @@ pub fn memoPut(mem: &vg::Arena, t: &mut memoTab, k: memoKey, v: memoVal) {
 pub fn LocalePOSIX() -> Locale {
     let mut l: Locale = vg::zero();
     l.maxSeq = 1i64;
+    l.preimagesDefault = 1i64;
+    l.preimagesTurkic = 1i64;
     l.posix = true;
     l.valid = true;
     return l;
@@ -2536,7 +2687,9 @@ pub fn localeLoad(l: &mut Locale, blob: vg::Str) -> bool {
     if (!localeValidate(l)) {
         return false;
     }
-    if (!preimageRunsFit(l)) {
+    l.preimagesDefault = ({ let _t5 = secInvUpperDefault; maxPairRun(l, _t5) } + { let _t6 = secInvLowerDefault; maxPairRun(l, _t6) });
+    l.preimagesTurkic = ({ let _t7 = secInvUpperTurkic; maxPairRun(l, _t7) } + { let _t8 = secInvLowerTurkic; maxPairRun(l, _t8) });
+    if ((l.preimagesDefault > maxPreimages) || (l.preimagesTurkic > maxPreimages)) {
         return false;
     }
     return true;
@@ -2886,6 +3039,8 @@ pub fn resolveLocale(data: &mut Locale, req: localeRequest) -> (Locale, bool) {
     result.blob = data.blob;
     result.sec = data.sec;
     result.maxSeq = data.maxSeq;
+    result.preimagesDefault = data.preimagesDefault;
+    result.preimagesTurkic = data.preimagesTurkic;
     let index: i64 = { let _t1 = req.name; let _t2 = secLocaleNames; let _t3 = secLocaleNameOffsets; let _t4 = localesCount(&mut result); findName(&mut result, _t1, _t2, _t3, _t4) };
     if (index < 0i64) {
         return (invalid, false);
@@ -3137,10 +3292,11 @@ pub fn maxPairRun(l: &mut Locale, sec: i64) -> i64 {
     return longest;
 }
 
-pub fn preimageRunsFit(l: &mut Locale) -> bool {
-    let def: i64 = ({ let _t1 = secInvUpperDefault; maxPairRun(l, _t1) } + { let _t2 = secInvLowerDefault; maxPairRun(l, _t2) });
-    let turkic: i64 = ({ let _t3 = secInvUpperTurkic; maxPairRun(l, _t3) } + { let _t4 = secInvLowerTurkic; maxPairRun(l, _t4) });
-    return ((def <= maxPreimages) && (turkic <= maxPreimages));
+pub fn localeMaxPreimages(l: &mut Locale) -> i64 {
+    if (l.caseProfile == 1u8) {
+        return l.preimagesTurkic;
+    }
+    return l.preimagesDefault;
 }
 
 pub fn localeCasePreimages(l: &mut Locale, buf: &mut preimageBuf, r: i32) {

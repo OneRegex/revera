@@ -67,9 +67,13 @@ type SecRange struct {
 // It also carries the data it reads from, which never changes.
 // The zero value is not valid, so use LocalePOSIX or LocaleOpen.
 type Locale struct {
-	blob             string
-	sec              [numSections]SecRange
-	maxSeq           int
+	blob   string
+	sec    [numSections]SecRange
+	maxSeq int
+	// preimagesDefault and preimagesTurkic bound the case preimages of one scalar under each case profile.
+	// The resource contract prices ICase tests with them.
+	preimagesDefault int
+	preimagesTurkic  int
 	collationProfile uint16
 	caseProfile      uint8
 	posix            bool
@@ -81,6 +85,8 @@ type Locale struct {
 func LocalePOSIX() Locale {
 	var l Locale
 	l.maxSeq = 1
+	l.preimagesDefault = 1
+	l.preimagesTurkic = 1
 	l.posix = true
 	l.valid = true
 	return l
@@ -156,7 +162,11 @@ func localeLoad(l *Locale, blob string) bool {
 	if !localeValidate(l) {
 		return false
 	}
-	if !preimageRunsFit(l) {
+	l.preimagesDefault = maxPairRun(l, secInvUpperDefault) +
+		maxPairRun(l, secInvLowerDefault)
+	l.preimagesTurkic = maxPairRun(l, secInvUpperTurkic) +
+		maxPairRun(l, secInvLowerTurkic)
+	if l.preimagesDefault > maxPreimages || l.preimagesTurkic > maxPreimages {
 		// The fixed preimage buffer must cover every scalar.
 		return false
 	}
@@ -493,6 +503,8 @@ func resolveLocale(data *Locale, req localeRequest) (Locale, bool) {
 	result.blob = data.blob
 	result.sec = data.sec
 	result.maxSeq = data.maxSeq
+	result.preimagesDefault = data.preimagesDefault
+	result.preimagesTurkic = data.preimagesTurkic
 	index := findName(&result, req.name, secLocaleNames,
 		secLocaleNameOffsets, localesCount(&result))
 	if index < 0 {
@@ -761,11 +773,12 @@ func maxPairRun(l *Locale, sec int) int {
 	return longest
 }
 
-// preimageRunsFit reports whether every scalar's preimage count fits the fixed buffer, for both case profiles.
-func preimageRunsFit(l *Locale) bool {
-	def := maxPairRun(l, secInvUpperDefault) + maxPairRun(l, secInvLowerDefault)
-	turkic := maxPairRun(l, secInvUpperTurkic) + maxPairRun(l, secInvLowerTurkic)
-	return def <= maxPreimages && turkic <= maxPreimages
+// localeMaxPreimages returns the most case preimages one scalar can have under the locale's case profile.
+func localeMaxPreimages(l *Locale) int {
+	if l.caseProfile == 1 {
+		return l.preimagesTurkic
+	}
+	return l.preimagesDefault
 }
 
 // localeCasePreimages fills buf with every scalar, other than r itself, whose uppercase or lowercase counterpart is r.

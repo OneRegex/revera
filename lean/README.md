@@ -59,7 +59,7 @@ Before each call, the session computes the contract of the pattern for the subje
 A measurement above `ContractHeapBytes`, `ContractStackBytes` or `ContractSteps` is a hard fault.
 The stack comparison uses the 256-byte frame estimate of the contract.
 
-That covers the 76,112 retained X commands.
+That covers the 75,596 retained X commands.
 It does not cover R and I.
 ReplaceAll and MatchIterNext call Exec themselves, and the session measures only its own calls.
 Those 360 commands are therefore checked for output agreement alone.
@@ -76,7 +76,7 @@ The runtimes round a zero-length request up to one element, and malloc adds its 
 Instead, it folds a constant factor of slack into its per-record sizes to cover it.
 
 Two corpus patterns cannot run under the interpreter in any reasonable time, and the theorem leaves their executions out.
-That is 1,056 X commands of the 86,704, so the theorem covers 85,648 commands.
+That is 1,056 X commands of the 87,415, so the theorem covers 86,359 commands.
 
 Both nest a star inside counted repetitions, `((a*){250}){250}b` in six blocks and `((a*){4}){4}` in six more.
 The parse search then explores a very large number of ways to split a subject among nullable instances.

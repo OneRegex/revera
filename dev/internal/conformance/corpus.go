@@ -160,6 +160,23 @@ func (b *builder) locales() {
 				b.exec(0, s)
 			}
 		}
+		if n == "nosuchlocale" {
+			// The failed selection keeps the previous locale, so these runs would repeat the last block.
+			continue
+		}
+		// These runs hold the resource contract to the locale lookups of bracket tests, with and without ICase.
+		for _, p := range protocol.LocaleBracketPatterns {
+			b.compile(0, p)
+			for _, s := range protocol.LocaleBracketSubjects {
+				b.exec(0, s)
+			}
+			b.add("T %d", 64)
+			b.compile(revera.FlagICase, p)
+			for _, s := range protocol.LocaleBracketShortSubjects {
+				b.exec(0, s)
+			}
+			b.add("T %d", 4)
+		}
 	}
 	b.add("P")
 	b.add("O 0 65536")

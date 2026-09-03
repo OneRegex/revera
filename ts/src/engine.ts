@@ -56,12 +56,13 @@ export const solverArenaLimit: number = 67108864;
 export const contractCap: bigint = 4611686018427387904n;
 export const frameBytes: number = 256;
 export const matcherStackBytes: number = 2048;
-export const equivFrames: number = 10;
+export const singleLookupFrames: number = 8;
+export const multiLookupFrames: number = 16;
 export const ptreeBytes: number = 48;
 export const kidBytes: number = 8;
 export const mapEntryBytes: number = 128;
 export const matchBytes: number = 16;
-export const bracketFixedChecks: number = 17;
+export const profileRowCost: number = 13;
 export const maxElemAhead: number = 8;
 export const queueCompactFactor: number = 2;
 export const ErrNone: number = 0;
@@ -399,6 +400,36 @@ export class Contract {
     static readonly elem: vg.Elem<Contract> = vg.structElem(() => new Contract(), 82);
 }
 
+export class lookupCosts {
+    sequenceSearch: bigint;
+    contraction: bigint;
+    primaryToken: bigint;
+    classMask: bigint;
+    casePreimages: bigint;
+    caseConvert: bigint;
+    preimages: bigint;
+
+    constructor(sequenceSearch: bigint = 0n, contraction: bigint = 0n, primaryToken: bigint = 0n, classMask: bigint = 0n, casePreimages: bigint = 0n, caseConvert: bigint = 0n, preimages: bigint = 0n) {
+        this.sequenceSearch = sequenceSearch;
+        this.contraction = contraction;
+        this.primaryToken = primaryToken;
+        this.classMask = classMask;
+        this.casePreimages = casePreimages;
+        this.caseConvert = caseConvert;
+        this.preimages = preimages;
+    }
+
+    clone(): lookupCosts {
+        return new lookupCosts(this.sequenceSearch, this.contraction, this.primaryToken, this.classMask, this.casePreimages, this.caseConvert, this.preimages);
+    }
+
+    static eq(a: lookupCosts, b: lookupCosts): boolean {
+        return a.sequenceSearch === b.sequenceSearch && a.contraction === b.contraction && a.primaryToken === b.primaryToken && a.classMask === b.classMask && a.casePreimages === b.casePreimages && a.caseConvert === b.caseConvert && a.preimages === b.preimages;
+    }
+
+    static readonly elem: vg.Elem<lookupCosts> = vg.structElem(() => new lookupCosts(), 56);
+}
+
 export class slotTable {
     stamp: vg.Slice<number>;
     starts: vg.Slice<number>;
@@ -623,15 +654,19 @@ export class Locale {
     blob: vg.Str;
     sec: SecRange[];
     maxSeq: number;
+    preimagesDefault: number;
+    preimagesTurkic: number;
     collationProfile: number;
     caseProfile: number;
     posix: boolean;
     valid: boolean;
 
-    constructor(blob: vg.Str = vg.EMPTY, sec: SecRange[] = vg.makeArr(23, () => new SecRange()), maxSeq: number = 0, collationProfile: number = 0, caseProfile: number = 0, posix: boolean = false, valid: boolean = false) {
+    constructor(blob: vg.Str = vg.EMPTY, sec: SecRange[] = vg.makeArr(23, () => new SecRange()), maxSeq: number = 0, preimagesDefault: number = 0, preimagesTurkic: number = 0, collationProfile: number = 0, caseProfile: number = 0, posix: boolean = false, valid: boolean = false) {
         this.blob = blob;
         this.sec = sec;
         this.maxSeq = maxSeq;
+        this.preimagesDefault = preimagesDefault;
+        this.preimagesTurkic = preimagesTurkic;
         this.collationProfile = collationProfile;
         this.caseProfile = caseProfile;
         this.posix = posix;
@@ -639,14 +674,14 @@ export class Locale {
     }
 
     clone(): Locale {
-        return new Locale(this.blob, this.sec.map((v) => v.clone()), this.maxSeq, this.collationProfile, this.caseProfile, this.posix, this.valid);
+        return new Locale(this.blob, this.sec.map((v) => v.clone()), this.maxSeq, this.preimagesDefault, this.preimagesTurkic, this.collationProfile, this.caseProfile, this.posix, this.valid);
     }
 
     static eq(a: Locale, b: Locale): boolean {
-        return vg.streq(a.blob, b.blob) && vg.arrEq(a.sec, b.sec, (x, y) => SecRange.eq(x, y)) && a.maxSeq === b.maxSeq && a.collationProfile === b.collationProfile && a.caseProfile === b.caseProfile && a.posix === b.posix && a.valid === b.valid;
+        return vg.streq(a.blob, b.blob) && vg.arrEq(a.sec, b.sec, (x, y) => SecRange.eq(x, y)) && a.maxSeq === b.maxSeq && a.preimagesDefault === b.preimagesDefault && a.preimagesTurkic === b.preimagesTurkic && a.collationProfile === b.collationProfile && a.caseProfile === b.caseProfile && a.posix === b.posix && a.valid === b.valid;
     }
 
-    static readonly elem: vg.Elem<Locale> = vg.structElem(() => new Locale(), 397);
+    static readonly elem: vg.Elem<Locale> = vg.structElem(() => new Locale(), 413);
 }
 
 export class LocaleRow {
@@ -974,7 +1009,7 @@ export class Regexp {
         return new Regexp(this.nodes, this.brackets, this.root, this.nsub, this.flags, this.loc.clone(), this.minSlots, this.nested, this.multi, this.progOK, this.prog.clone(), this.minLen, this.anchors, this.onePass);
     }
 
-    static readonly elem: vg.Elem<Regexp> = vg.structElem(() => new Regexp(), 865);
+    static readonly elem: vg.Elem<Regexp> = vg.structElem(() => new Regexp(), 881);
 }
 
 export class groupStack {
@@ -2259,7 +2294,7 @@ export function matcherContract(re: Regexp, length: bigint, atom: bigint): Backe
     perBoundary = cAdd(perBoundary, cMul(n, perTest));
     perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2n, k)), cAdd(cMul(4n, ring), 38n)));
     const steps: bigint = cAdd(cAdd(BigInt.asIntN(64, 24n + ring), length), cMul(cAdd(length, 1n), perBoundary));
-    const stack: bigint = BigInt.asIntN(64, 2048n + BigInt.asIntN(64, 10n * 256n));
+    const stack: bigint = BigInt.asIntN(64, 2048n + BigInt.asIntN(64, 16n * 256n));
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -2275,7 +2310,7 @@ export function onePassContract(re: Regexp, length: bigint, atom: bigint): Backe
     let b: BackendContract = new BackendContract();
     const perVisit: bigint = cAdd(atom, BigInt.asIntN(64, BigInt(re.nsub) + 1n));
     b.HeapBytes = captureHeap(re, length);
-    b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 4n), 256n);
+    b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), BigInt.asIntN(64, 2n + 8n)), 256n);
     b.Steps = cMul(cMul(astSize(re.nodes, re.root), cAdd(length, 2n)), perVisit);
     return b;
 }
@@ -2291,7 +2326,7 @@ export function solverContract(re: Regexp, length: bigint, atom: bigint): Backen
     let heap: bigint = cAdd(cMul(structural, perAlloc), cMul(16n, BigInt(re.minSlots)));
     heap = cAdd(heap, 4096n);
     heap = cAdd(heap, captureHeap(re, length));
-    const stack: bigint = cMul(cAdd(depth, BigInt.asIntN(64, 10n + 4n)), 256n);
+    const stack: bigint = cMul(cAdd(depth, BigInt.asIntN(64, 3n + 16n)), 256n);
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
@@ -2317,10 +2352,11 @@ export function astHeight(nodes: vg.Slice<node>, ni: number): bigint {
 }
 
 export function atomCost(re: Regexp): bigint {
-    return atomCostNode(re.nodes, re.brackets, re.root);
+    let lc: lookupCosts = localeLookupCosts(re.loc);
+    return atomCostNode(re.nodes, re.brackets, lc, re.root);
 }
 
-export function atomCostNode(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, ni: number): bigint {
+export function atomCostNode(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, lc: lookupCosts, ni: number): bigint {
     let _t2!: vg.Slice<number>;
     let cost: bigint = 1n;
     switch (nodes.buf[nodes.off + vg.ix(ni, nodes.len)].op) {
@@ -2331,38 +2367,161 @@ export function atomCostNode(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, n
         }
         case opBracket:
         {
-            cost = bracketAtomCost(brs, nodes.buf[nodes.off + vg.ix(ni, nodes.len)].br);
+            cost = bracketAtomCost(brs, nodes.buf[nodes.off + vg.ix(ni, nodes.len)].br, lc);
             break;
         }
     }
     for (let i: number = 0; (i < nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len); i = vg.chk(i + 1)) {
-        cost = vg.maxBig(cost, atomCostNode(nodes, brs, (_t2 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t2.buf[_t2.off + vg.ix(i, _t2.len)])));
+        cost = vg.maxBig(cost, atomCostNode(nodes, brs, lc, (_t2 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t2.buf[_t2.off + vg.ix(i, _t2.len)])));
     }
     return cost;
 }
 
-export function bracketAtomCost(brs: vg.Slice<bracketSet>, bi: number): bigint {
+export function searchSteps(count: number): bigint {
+    let count_v: number = count;
+    let steps: bigint = 0n;
+    while ((count_v > 0)) {
+        count_v = vg.div(count_v, 2);
+        steps = BigInt.asIntN(64, steps + 1n);
+    }
+    return steps;
+}
+
+export function u32ContainsCost(count: number): bigint {
+    return BigInt.asIntN(64, 1n + BigInt.asIntN(64, 3n * searchSteps(count)));
+}
+
+export function findPairCost(count: number): bigint {
+    return BigInt.asIntN(64, 3n + BigInt.asIntN(64, 3n * searchSteps(count)));
+}
+
+export function findCaseCost(count: number): bigint {
+    return BigInt.asIntN(64, 6n + BigInt.asIntN(64, 3n * searchSteps(count)));
+}
+
+export function pairSourcesRunCost(count: number, preimages: bigint): bigint {
+    return BigInt.asIntN(64, BigInt.asIntN(64, 5n + BigInt.asIntN(64, 3n * searchSteps(count))) + BigInt.asIntN(64, 5n * preimages));
+}
+
+export function compareSequenceCost(length: bigint): bigint {
+    return BigInt.asIntN(64, 5n + BigInt.asIntN(64, 3n * length));
+}
+
+export function localeLookupCosts(l: Locale): lookupCosts {
+    let lc: lookupCosts = new lookupCosts();
+    if (l.posix) {
+        lc.contraction = 1n;
+        lc.classMask = 3n;
+        lc.casePreimages = 2n;
+        lc.caseConvert = 2n;
+        lc.preimages = 1n;
+        return lc;
+    }
+    lc.sequenceSearch = searchSteps(vg.div(sectionLen(l, secSequences), 8));
+    const row: CollProfile = collationProfileRow(l, l.collationProfile);
+    lc.contraction = BigInt.asIntN(64, BigInt.asIntN(64, BigInt.asIntN(64, BigInt.asIntN(64, BigInt.asIntN(64, 1n + 13n) + u32ContainsCost(row.AddCount)) + 1n) + u32ContainsCost(vg.div(sectionLen(l, secRootContractions), 4))) + u32ContainsCost(row.RemoveCount));
+    lc.primaryToken = BigInt.asIntN(64, BigInt.asIntN(64, BigInt.asIntN(64, BigInt.asIntN(64, 1n + 13n) + findPairCost(row.OverrideCount)) + 1n) + findPairCost(vg.div(sectionLen(l, secRootEquivalences), 8)));
+    lc.classMask = 4n;
+    lc.preimages = BigInt(localeMaxPreimages(l));
+    lc.caseConvert = BigInt.asIntN(64, 2n + findCaseCost(vg.div(sectionLen(l, secCaseDefault), 12)));
+    let upper: number = secInvUpperDefault;
+    let lower: number = secInvLowerDefault;
+    if ((l.caseProfile === 1)) {
+        lc.caseConvert = BigInt.asIntN(64, lc.caseConvert + findCaseCost(vg.div(sectionLen(l, secCaseTurkic), 12)));
+        upper = secInvUpperTurkic;
+        lower = secInvLowerTurkic;
+    }
+    lc.casePreimages = BigInt.asIntN(64, BigInt.asIntN(64, BigInt.asIntN(64, 2n + pairSourcesRunCost(vg.div(sectionLen(l, upper), 8), lc.preimages)) + pairSourcesRunCost(vg.div(sectionLen(l, lower), 8), lc.preimages)) + BigInt.asIntN(64, lc.preimages * BigInt.asIntN(64, 2n + lc.preimages)));
+    return lc;
+}
+
+export function elementIDCost(lc: lookupCosts, length: bigint): bigint {
+    if ((length === 1n)) {
+        return 3n;
+    }
+    return BigInt.asIntN(64, BigInt.asIntN(64, 2n + BigInt.asIntN(64, 2n * length)) + BigInt.asIntN(64, lc.sequenceSearch * BigInt.asIntN(64, 1n + compareSequenceCost(length))));
+}
+
+export function collatingElementIDCost(lc: lookupCosts, length: bigint): bigint {
+    let cost: bigint = BigInt.asIntN(64, 1n + elementIDCost(lc, length));
+    if ((length > 1n)) {
+        cost = BigInt.asIntN(64, cost + lc.contraction);
+    }
+    return cost;
+}
+
+export function primaryEqualCost(lc: lookupCosts, left: bigint, right: bigint): bigint {
+    return BigInt.asIntN(64, BigInt.asIntN(64, BigInt.asIntN(64, 1n + collatingElementIDCost(lc, left)) + collatingElementIDCost(lc, right)) + BigInt.asIntN(64, 2n * lc.primaryToken));
+}
+
+export function equivsCost(brs: vg.Slice<bracketSet>, bi: number, lc: lookupCosts, length: bigint): bigint {
     let _t2!: vg.Slice<vg.Slice<number>>;
-    const members: bigint = BigInt.asIntN(64, BigInt(vg.chk(vg.chk(brs.buf[brs.off + vg.ix(bi, brs.len)].ranges.len + brs.buf[brs.off + vg.ix(bi, brs.len)].elems.len) + brs.buf[brs.off + vg.ix(bi, brs.len)].equivs.len)) + 17n);
-    const cost: bigint = cMul(BigInt.asIntN(64, 16n + 1n), members);
-    if ((!bracketHasMultiMembers(brs, bi))) {
+    let cost: bigint = 0n;
+    for (let i: number = 0; (i < brs.buf[brs.off + vg.ix(bi, brs.len)].equivs.len); i = vg.chk(i + 1)) {
+        cost = cAdd(cost, BigInt.asIntN(64, 1n + primaryEqualCost(lc, length, BigInt((_t2 = brs.buf[brs.off + vg.ix(bi, brs.len)].equivs, _t2.buf[_t2.off + vg.ix(i, _t2.len)]).len))));
+    }
+    return cost;
+}
+
+export function positiveSingleCost(brs: vg.Slice<bracketSet>, bi: number, lc: lookupCosts): bigint {
+    let cost: bigint = BigInt.asIntN(64, 2n + searchSteps(brs.buf[brs.off + vg.ix(bi, brs.len)].ranges.len));
+    if ((brs.buf[brs.off + vg.ix(bi, brs.len)].classMask !== 0)) {
+        cost = BigInt.asIntN(64, cost + lc.classMask);
+    }
+    return cAdd(cost, equivsCost(brs, bi, lc, 1n));
+}
+
+export function matchesOneCost(brs: vg.Slice<bracketSet>, bi: number, lc: lookupCosts): bigint {
+    const positive: bigint = positiveSingleCost(brs, bi, lc);
+    let cost: bigint = cAdd(1n, positive);
+    if (brs.buf[brs.off + vg.ix(bi, brs.len)].icase) {
+        cost = cAdd(cost, cAdd(lc.casePreimages, cMul(lc.preimages, cAdd(1n, positive))));
+    }
+    return cost;
+}
+
+export function candidateLeafCost(brs: vg.Slice<bracketSet>, bi: number, lc: lookupCosts, length: bigint): bigint {
+    return cAdd(BigInt.asIntN(64, 1n + collatingElementIDCost(lc, length)), equivsCost(brs, bi, lc, length));
+}
+
+export function probeCost(brs: vg.Slice<bracketSet>, bi: number, lc: lookupCosts, length: bigint): bigint {
+    let _t2!: vg.Slice<vg.Slice<number>>;
+    let cost: bigint = cAdd(2n, BigInt(brs.buf[brs.off + vg.ix(bi, brs.len)].elems.len));
+    let counterpart: bigint = 1n;
+    if (brs.buf[brs.off + vg.ix(bi, brs.len)].icase) {
+        counterpart = BigInt.asIntN(64, 1n + BigInt.asIntN(64, 2n * lc.caseConvert));
+    }
+    for (let i: number = 0; (i < brs.buf[brs.off + vg.ix(bi, brs.len)].elems.len); i = vg.chk(i + 1)) {
+        if ((BigInt((_t2 = brs.buf[brs.off + vg.ix(bi, brs.len)].elems, _t2.buf[_t2.off + vg.ix(i, _t2.len)]).len) === length)) {
+            cost = cAdd(cost, cMul(length, counterpart));
+        }
+    }
+    if ((brs.buf[brs.off + vg.ix(bi, brs.len)].equivs.len === 0)) {
         return cost;
     }
-    let elemChars: bigint = 0n;
-    for (let i: number = 0; (i < brs.buf[brs.off + vg.ix(bi, brs.len)].elems.len); i = vg.chk(i + 1)) {
-        elemChars = BigInt.asIntN(64, elemChars + BigInt((_t2 = brs.buf[brs.off + vg.ix(bi, brs.len)].elems, _t2.buf[_t2.off + vg.ix(i, _t2.len)]).len));
+    const leaf: bigint = candidateLeafCost(brs, bi, lc, length);
+    if ((!brs.buf[brs.off + vg.ix(bi, brs.len)].icase)) {
+        return cAdd(cost, cAdd(BigInt.asIntN(64, length + 1n), leaf));
     }
-    let multi: bigint = elemChars;
-    if ((brs.buf[brs.off + vg.ix(bi, brs.len)].equivs.len > 0)) {
-        let candidates: bigint = 1n;
-        if (brs.buf[brs.off + vg.ix(bi, brs.len)].icase) {
-            for (let i_2: number = 0; (i_2 < maxElemAhead); i_2 = vg.chk(i_2 + 1)) {
-                candidates = BigInt.asIntN(64, candidates * BigInt.asIntN(64, 16n + 1n));
-            }
+    let candidates: bigint = 1n;
+    for (let i_2: bigint = 0n; (i_2 < length); i_2 = BigInt.asIntN(64, i_2 + 1n)) {
+        candidates = cMul(candidates, BigInt.asIntN(64, lc.preimages + 1n));
+    }
+    return cAdd(cost, cMul(candidates, cAdd(BigInt.asIntN(64, 2n + lc.preimages), cAdd(lc.casePreimages, leaf))));
+}
+
+export function bracketAtomCost(brs: vg.Slice<bracketSet>, bi: number, lc: lookupCosts): bigint {
+    let cost: bigint = matchesOneCost(brs, bi, lc);
+    if ((brs.buf[brs.off + vg.ix(bi, brs.len)].multiLens === 0)) {
+        return cost;
+    }
+    cost = cAdd(cost, BigInt.asIntN(64, 8n - 1n));
+    for (let length: number = 2; (length <= maxElemAhead); length = vg.chk(length + 1)) {
+        if (((brs.buf[brs.off + vg.ix(bi, brs.len)].multiLens & ((1 << length) & 0xffff)) !== 0)) {
+            cost = cAdd(cost, probeCost(brs, bi, lc, BigInt(length)));
         }
-        multi = cAdd(multi, cMul(candidates, cMul(BigInt.asIntN(64, BigInt(brs.buf[brs.off + vg.ix(bi, brs.len)].equivs.len) + 1n), 8n)));
     }
-    return cAdd(cost, cMul(BigInt.asIntN(64, 8n - 1n), multi));
+    return cost;
 }
 
 export function solverSteps(nodes: vg.Slice<node>, ni: number, length: bigint): bigint {
@@ -3183,6 +3342,8 @@ export function memoPut(t: memoTab, k: memoKey, v: memoVal): void {
 export function LocalePOSIX(): Locale {
     let l: Locale = new Locale();
     l.maxSeq = 1;
+    l.preimagesDefault = 1;
+    l.preimagesTurkic = 1;
     l.posix = true;
     l.valid = true;
     return l;
@@ -3254,7 +3415,9 @@ export function localeLoad(l: Locale, blob: vg.Str): boolean {
     if ((!localeValidate(l))) {
         return false;
     }
-    if ((!preimageRunsFit(l))) {
+    l.preimagesDefault = vg.chk(maxPairRun(l, secInvUpperDefault) + maxPairRun(l, secInvLowerDefault));
+    l.preimagesTurkic = vg.chk(maxPairRun(l, secInvUpperTurkic) + maxPairRun(l, secInvLowerTurkic));
+    if (((l.preimagesDefault > maxPreimages) || (l.preimagesTurkic > maxPreimages))) {
         return false;
     }
     return true;
@@ -3544,6 +3707,8 @@ export function resolveLocale(data: Locale, req: localeRequest): [Locale, boolea
     result.blob = data.blob;
     result.sec = data.sec.map((v) => v.clone());
     result.maxSeq = data.maxSeq;
+    result.preimagesDefault = data.preimagesDefault;
+    result.preimagesTurkic = data.preimagesTurkic;
     const index: number = findName(result, req.name, secLocaleNames, secLocaleNameOffsets, localesCount(result));
     if ((index < 0)) {
         return [invalid, false];
@@ -3785,10 +3950,11 @@ export function maxPairRun(l: Locale, sec: number): number {
     return longest;
 }
 
-export function preimageRunsFit(l: Locale): boolean {
-    const def: number = vg.chk(maxPairRun(l, secInvUpperDefault) + maxPairRun(l, secInvLowerDefault));
-    const turkic: number = vg.chk(maxPairRun(l, secInvUpperTurkic) + maxPairRun(l, secInvLowerTurkic));
-    return ((def <= maxPreimages) && (turkic <= maxPreimages));
+export function localeMaxPreimages(l: Locale): number {
+    if ((l.caseProfile === 1)) {
+        return l.preimagesTurkic;
+    }
+    return l.preimagesDefault;
 }
 
 export function localeCasePreimages(l: Locale, buf: preimageBuf, r: number): void {

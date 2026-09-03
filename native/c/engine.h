@@ -14,12 +14,13 @@
 #define revera_eng_contractCap ((int64_t)(4611686018427387904LL))
 #define revera_eng_frameBytes ((int64_t)(256LL))
 #define revera_eng_matcherStackBytes ((int64_t)(2048LL))
-#define revera_eng_equivFrames ((int64_t)(10LL))
+#define revera_eng_singleLookupFrames ((int64_t)(8LL))
+#define revera_eng_multiLookupFrames ((int64_t)(16LL))
 #define revera_eng_ptreeBytes ((int64_t)(48LL))
 #define revera_eng_kidBytes ((int64_t)(8LL))
 #define revera_eng_mapEntryBytes ((int64_t)(128LL))
 #define revera_eng_matchBytes ((int64_t)(16LL))
-#define revera_eng_bracketFixedChecks ((int64_t)(17LL))
+#define revera_eng_profileRowCost ((int64_t)(13LL))
 #define revera_eng_maxElemAhead ((int64_t)(8LL))
 #define revera_eng_queueCompactFactor ((int64_t)(2LL))
 #define revera_eng_ErrNone ((int32_t)(0))
@@ -123,6 +124,7 @@ typedef struct revera_eng_repBest revera_eng_repBest;
 typedef struct revera_eng_repWin revera_eng_repWin;
 typedef struct revera_eng_BackendContract revera_eng_BackendContract;
 typedef struct revera_eng_Contract revera_eng_Contract;
+typedef struct revera_eng_lookupCosts revera_eng_lookupCosts;
 typedef struct revera_eng_slotTable revera_eng_slotTable;
 typedef struct revera_eng_engineWS revera_eng_engineWS;
 typedef struct revera_eng_engineResult revera_eng_engineResult;
@@ -350,6 +352,16 @@ struct revera_eng_Contract {
     bool HasSolver;
 };
 
+struct revera_eng_lookupCosts {
+    int64_t sequenceSearch;
+    int64_t contraction;
+    int64_t primaryToken;
+    int64_t classMask;
+    int64_t casePreimages;
+    int64_t caseConvert;
+    int64_t preimages;
+};
+
 struct revera_eng_slotTable {
     revera_eng_slice_u32 stamp;
     revera_eng_slice_i32 starts;
@@ -422,6 +434,8 @@ struct revera_eng_Locale {
     vg_str blob;
     revera_eng_arr_SecRange_23 sec;
     int64_t maxSeq;
+    int64_t preimagesDefault;
+    int64_t preimagesTurkic;
     uint16_t collationProfile;
     uint8_t caseProfile;
     bool posix;
@@ -697,6 +711,7 @@ static inline bool revera_eng_repBest_eq(revera_eng_repBest a, revera_eng_repBes
 static inline bool revera_eng_repWin_eq(revera_eng_repWin a, revera_eng_repWin b);
 static inline bool revera_eng_BackendContract_eq(revera_eng_BackendContract a, revera_eng_BackendContract b);
 static inline bool revera_eng_Contract_eq(revera_eng_Contract a, revera_eng_Contract b);
+static inline bool revera_eng_lookupCosts_eq(revera_eng_lookupCosts a, revera_eng_lookupCosts b);
 static inline bool revera_eng_engineResult_eq(revera_eng_engineResult a, revera_eng_engineResult b);
 static inline bool revera_eng_phaseAState_eq(revera_eng_phaseAState a, revera_eng_phaseAState b);
 static inline bool revera_eng_Error_eq(revera_eng_Error a, revera_eng_Error b);
@@ -750,6 +765,10 @@ static inline bool revera_eng_Contract_eq(revera_eng_Contract a, revera_eng_Cont
     return a.MaxInput == b.MaxInput && revera_eng_BackendContract_eq(a.Matcher, b.Matcher) && revera_eng_BackendContract_eq(a.OnePass, b.OnePass) && a.HasOnePass == b.HasOnePass && revera_eng_BackendContract_eq(a.Solver, b.Solver) && a.HasSolver == b.HasSolver;
 }
 
+static inline bool revera_eng_lookupCosts_eq(revera_eng_lookupCosts a, revera_eng_lookupCosts b) {
+    return a.sequenceSearch == b.sequenceSearch && a.contraction == b.contraction && a.primaryToken == b.primaryToken && a.classMask == b.classMask && a.casePreimages == b.casePreimages && a.caseConvert == b.caseConvert && a.preimages == b.preimages;
+}
+
 static inline bool revera_eng_engineResult_eq(revera_eng_engineResult a, revera_eng_engineResult b) {
     return a.matched == b.matched && a.so == b.so && a.eo == b.eo;
 }
@@ -775,7 +794,7 @@ static inline bool revera_eng_SecRange_eq(revera_eng_SecRange a, revera_eng_SecR
 }
 
 static inline bool revera_eng_Locale_eq(revera_eng_Locale a, revera_eng_Locale b) {
-    return vg_streq(a.blob, b.blob) && revera_eng_arr_SecRange_23_eq(a.sec, b.sec) && a.maxSeq == b.maxSeq && a.collationProfile == b.collationProfile && a.caseProfile == b.caseProfile && a.posix == b.posix && a.valid == b.valid;
+    return vg_streq(a.blob, b.blob) && revera_eng_arr_SecRange_23_eq(a.sec, b.sec) && a.maxSeq == b.maxSeq && a.preimagesDefault == b.preimagesDefault && a.preimagesTurkic == b.preimagesTurkic && a.collationProfile == b.collationProfile && a.caseProfile == b.caseProfile && a.posix == b.posix && a.valid == b.valid;
 }
 
 static inline bool revera_eng_LocaleRow_eq(revera_eng_LocaleRow a, revera_eng_LocaleRow b) {
@@ -2352,8 +2371,23 @@ revera_eng_BackendContract revera_eng_solverContract(revera_eng_Regexp *re, int6
 int64_t revera_eng_astSize(revera_eng_slice_node nodes, int32_t ni);
 int64_t revera_eng_astHeight(revera_eng_slice_node nodes, int32_t ni);
 int64_t revera_eng_atomCost(revera_eng_Regexp *re);
-int64_t revera_eng_atomCostNode(revera_eng_slice_node nodes, revera_eng_slice_bracketSet brs, int32_t ni);
-int64_t revera_eng_bracketAtomCost(revera_eng_slice_bracketSet brs, int32_t bi);
+int64_t revera_eng_atomCostNode(revera_eng_slice_node nodes, revera_eng_slice_bracketSet brs, revera_eng_lookupCosts *lc, int32_t ni);
+int64_t revera_eng_searchSteps(int64_t count);
+int64_t revera_eng_u32ContainsCost(int64_t count);
+int64_t revera_eng_findPairCost(int64_t count);
+int64_t revera_eng_findCaseCost(int64_t count);
+int64_t revera_eng_pairSourcesRunCost(int64_t count, int64_t preimages);
+int64_t revera_eng_compareSequenceCost(int64_t length);
+revera_eng_lookupCosts revera_eng_localeLookupCosts(revera_eng_Locale *l);
+int64_t revera_eng_elementIDCost(revera_eng_lookupCosts *lc, int64_t length);
+int64_t revera_eng_collatingElementIDCost(revera_eng_lookupCosts *lc, int64_t length);
+int64_t revera_eng_primaryEqualCost(revera_eng_lookupCosts *lc, int64_t left, int64_t right);
+int64_t revera_eng_equivsCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc, int64_t length);
+int64_t revera_eng_positiveSingleCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc);
+int64_t revera_eng_matchesOneCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc);
+int64_t revera_eng_candidateLeafCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc, int64_t length);
+int64_t revera_eng_probeCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc, int64_t length);
+int64_t revera_eng_bracketAtomCost(revera_eng_slice_bracketSet brs, int32_t bi, revera_eng_lookupCosts *lc);
 int64_t revera_eng_solverSteps(revera_eng_slice_node nodes, int32_t ni, int64_t length);
 int64_t revera_eng_repInstances(revera_eng_slice_node nodes, int32_t ni, int64_t length);
 int64_t revera_eng_solverDepth(revera_eng_slice_node nodes, int32_t ni, int64_t length);
@@ -2419,7 +2453,7 @@ revera_eng_Tup_t4361736550616972x_bool revera_eng_findCase(revera_eng_Locale *l,
 int32_t revera_eng_caseConvert(revera_eng_Locale *l, int32_t r, bool toUpper);
 void revera_eng_pairSourcesRun(revera_eng_Locale *l, revera_eng_preimageBuf *buf, int64_t sec, int32_t r);
 int64_t revera_eng_maxPairRun(revera_eng_Locale *l, int64_t sec);
-bool revera_eng_preimageRunsFit(revera_eng_Locale *l);
+int64_t revera_eng_localeMaxPreimages(revera_eng_Locale *l);
 void revera_eng_localeCasePreimages(revera_eng_Locale *l, revera_eng_preimageBuf *buf, int32_t r);
 int32_t revera_eng_localeToUpper(revera_eng_Locale *l, int32_t r);
 int32_t revera_eng_localeToLower(revera_eng_Locale *l, int32_t r);

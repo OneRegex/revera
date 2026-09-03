@@ -116,6 +116,73 @@ func init() {
 		panic("locale: trailing bytes in data blob")
 	}
 	maxSeqLen = int(u32At(secScalars, 0))
+	preimagesDefault = maxPairRun(secInvUpperDefault) + maxPairRun(secInvLowerDefault)
+	preimagesTurkic = maxPairRun(secInvUpperTurkic) + maxPairRun(secInvLowerTurkic)
+}
+
+// preimagesDefault and preimagesTurkic bound the case preimages of one scalar under each case profile.
+var preimagesDefault, preimagesTurkic int
+
+// maxPairRun returns the longest run of equal targets in one (target, source) pair section.
+func maxPairRun(sec int) int {
+	count := sectionLen(sec) / 8
+	longest, run := 0, 0
+	var last uint32
+	for i := range count {
+		target := u32At(sec, 2*i)
+		if i > 0 && target == last {
+			run++
+		} else {
+			run, last = 1, target
+		}
+		longest = max(longest, run)
+	}
+	return longest
+}
+
+// LookupTables holds the sizes, in entries, of the tables the lookups of one locale search, and the most case
+// preimages one scalar can have.
+type LookupTables struct {
+	Sequences          int
+	RootContractions   int
+	RootEquivalences   int
+	Overrides          int
+	ContractionAdds    int
+	ContractionRemoves int
+	CaseDefault        int
+	CaseTurkic         int
+	InverseUpper       int
+	InverseLower       int
+	Turkic             bool
+	MaxPreimages       int
+}
+
+// LookupTables reports the lookup tables of this locale, which are empty for POSIX.
+func (l Locale) LookupTables() LookupTables {
+	if l.posix {
+		return LookupTables{MaxPreimages: 1}
+	}
+	_, overrides, _, adds, _, removes := collationProfileRow(int(l.collationProfile))
+	t := LookupTables{
+		Sequences:          sectionLen(secSequences) / 8,
+		RootContractions:   sectionLen(secRootContractions) / 4,
+		RootEquivalences:   sectionLen(secRootEquivalences) / 8,
+		Overrides:          overrides,
+		ContractionAdds:    adds,
+		ContractionRemoves: removes,
+		CaseDefault:        sectionLen(secCaseDefault) / 12,
+		CaseTurkic:         sectionLen(secCaseTurkic) / 12,
+		InverseUpper:       sectionLen(secInvUpperDefault) / 8,
+		InverseLower:       sectionLen(secInvLowerDefault) / 8,
+		MaxPreimages:       preimagesDefault,
+	}
+	if l.caseProfile == 1 {
+		t.Turkic = true
+		t.InverseUpper = sectionLen(secInvUpperTurkic) / 8
+		t.InverseLower = sectionLen(secInvLowerTurkic) / 8
+		t.MaxPreimages = preimagesTurkic
+	}
+	return t
 }
 
 // maxSeqLen caches the maximum sequence length of the scalar section.

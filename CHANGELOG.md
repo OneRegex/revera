@@ -9,6 +9,14 @@ The Vego toolchain has its own version, which `vegoc version` prints.
 
 The date replaces `unreleased` when the tag is made; `make dist` checks for it.
 
+### Fixed
+
+- Resource contracts price a bracket test from the lookups it really performs: a binary range search, one class lookup, and one primary comparison per equivalence class, plus one probe per multi-character length the bracket can match.
+  The former figure charged every bracket for sixteen case preimages, and it still fell short of the collating searches an equivalence class runs in a full locale.
+  Case-sensitive brackets now cost a few units per test, while equivalence classes in a full locale report the thousands of units their searches take.
+  The stack figures also gained the frames of the deepest lookup a bracket test can start, which a multi-character probe in a full locale exceeded by two frames.
+  The corpus gained locale runs of such brackets on long subjects, so the Lean replay keeps those figures honest.
+
 ### Added
 
 - The Revera engine, a clean-room POSIX.1-2024 ERE implementation written in Vego and printed into Go, Rust, Zig, C, C++ and TypeScript.
