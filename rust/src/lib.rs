@@ -21,12 +21,6 @@
 //!
 //! Every search returns a [`Result`], because a subject can exceed what the engine has capacity for.
 //! [`Regex::contract`] reports that capacity ahead of time.
-//!
-//! The generated engine and raw-pointer runtime are private implementation details.
-//!
-//! ```compile_fail
-//! let _ = revera::vg::Arena::new();
-//! ```
 
 // The generated engine and its runtime.
 // They are the low level: explicit arenas, raw pointers, and numeric flags.
