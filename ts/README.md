@@ -1,16 +1,21 @@
 # Revera for TypeScript
 
 Revera is a POSIX.1-2024 extended regular expression engine for JavaScript.
+
 It uses leftmost-longest matching and accepts the same regular expression language as POSIX `regcomp()` and `regexec()`.
+
 Use Revera when a pattern needs POSIX ERE behavior instead of JavaScript `RegExp` behavior.
+
 Patterns do not support backreferences, lookaround, or Perl-style escapes such as `\d` and `\w`.
 
-[Source repository](https://github.com/oneregex/revera) | [Changelog](https://github.com/oneregex/revera/blob/main/CHANGELOG.md)
+[Source repository](https://github.com/oneregex/revera)
 
 ## Requirements
 
-Revera requires Node.js 22.18 or later and is published as an ES module.
+Revera is published as an ES module.
+
 It is intended for Node.js applications, not browsers.
+
 Importing the package uses `node:fs` to load its bundled locale data.
 
 ## Installation
