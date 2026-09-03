@@ -519,6 +519,7 @@ struct revera_eng_program {
     bool multi;
     int64_t failMin;
     revera_eng_scanFilter scan;
+    int64_t depth;
 };
 
 struct revera_eng_patchSlot {
@@ -2487,9 +2488,12 @@ bool revera_eng_disjointLengths(revera_eng_slice_node nodes, int32_t ni);
 revera_eng_Tup_si32_bool revera_eng_firstSet(vg_arena *mem, revera_eng_slice_node nodes, int32_t ni);
 bool revera_eng_disjointFirsts(vg_arena *mem, revera_eng_slice_node nodes, int32_t ni);
 bool revera_eng_onePassCaps(revera_eng_Regexp *re, revera_eng_decoded *d, int32_t ni, int64_t i, int64_t j, uint32_t eflags, revera_eng_slice_Match caps);
-void revera_eng_buildScanFilter(vg_arena *mem, revera_eng_program *pr, bool newlineMode);
+int64_t revera_eng_buildScanFilter(vg_arena *mem, revera_eng_program *pr, bool newlineMode);
 int64_t revera_eng_instrEstimate(revera_eng_slice_node nodes, int32_t ni);
 void revera_eng_compileProgram(vg_arena *mem, revera_eng_progBuilder *b, revera_eng_slice_node nodes, int32_t root, bool multi, bool newlineMode);
+bool revera_eng_consumingOp(uint8_t op);
+revera_eng_Tup_u32_bool revera_eng_progEdge(revera_eng_program *pr, uint32_t pc, int64_t i);
+int64_t revera_eng_progDepth(vg_arena *mem, revera_eng_program *pr);
 uint32_t revera_eng_addInstr(vg_arena *mem, revera_eng_progBuilder *b, revera_eng_instr ins);
 void revera_eng_patch(revera_eng_progBuilder *b, revera_eng_slice_patchSlot slots, uint32_t target);
 revera_eng_slice_patchSlot revera_eng_singleOut(vg_arena *mem, uint32_t idx, bool alt);

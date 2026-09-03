@@ -33,6 +33,7 @@ structure Layout where
   progFoldSets : Nat
   progFailMin : Nat
   progScan : Nat
+  progDepth : Nat
   insOp : Nat
   insNext : Nat
   insAlt : Nat
@@ -70,7 +71,7 @@ def resolveLayout (m : Machine) : Except String Layout := do
          reProgOK := ← fld "Regexp" "progOK", reProg := ← fld "Regexp" "prog",
          progIns := ← fld "program" "ins", progStart := ← fld "program" "start",
          progFoldSets := ← fld "program" "foldSets", progFailMin := ← fld "program" "failMin",
-         progScan := ← fld "program" "scan",
+         progScan := ← fld "program" "scan", progDepth := ← fld "program" "depth",
          insOp := ← fld "instr" "op", insNext := ← fld "instr" "next", insAlt := ← fld "instr" "alt",
          insArg := ← fld "instr" "arg", insMask := ← fld "instr" "mask", insExtra := ← fld "instr" "extra",
          scanEnabled := ← fld "scanFilter" "enabled", scanSingle := ← fld "scanFilter" "single",
@@ -99,6 +100,8 @@ structure Extracted where
   nosub : Bool
   newline : Bool
   nsub : Nat
+  /-- `program.depth`: the bound of the anchored figure, or -1 when the program has none. -/
+  depth : Int
 
 private def asI (v : Val) : Except String Int :=
   match v with
@@ -153,6 +156,7 @@ def extract (m : Machine) (L : Layout) (reCell : Nat) : Except String (Outside �
   let progOK ← asB (← field re L.reProgOK)
   let prog ← field re L.reProg
   let failMin ← asI (← field prog L.progFailMin)
+  let depth ← asI (← field prog L.progDepth)
   let nosub := (flags / 4) % 2 == 1
   if !progOK || failMin != failMinNone then return (.inl .pruned)
   if !nosub && nsub != 0 then return (.inl .captures)
@@ -198,7 +202,7 @@ def extract (m : Machine) (L : Layout) (reCell : Nat) : Except String (Outside �
         nlMode := ← asB (← field v L.brNlMode), ranges,
         classMask := (← asI (← field v L.brClassMask)).toNat, equivs }
   pure (.inr { prog := { ins, start, k, ring, scan }, foldSets, brackets, nosub,
-               newline := (flags / 2) % 2 == 1, nsub := nsub.toNat })
+               newline := (flags / 2) % 2 == 1, nsub := nsub.toNat, depth })
 
 /-! ## The atom tests of the POSIX locale, from `bracket.go` and `locale.go` -/
 
@@ -259,6 +263,90 @@ def multiLookupFrames : Nat := maxElemAhead + 8
 /-- The matcher stack figure of `go/contract.go`, which a NoSub pattern reports for the whole call. -/
 def matcherStackFigure : Nat := matcherStackBytes + multiLookupFrames * frameBytes'
 
+/-! ## The certificate of a bounded program, behind the anchored figure -/
+
+/-- The successors of one instruction, as `progEdge` of `program.go` lists them. -/
+def edgesOf (p : Prog) (pc : Nat) : List Nat :=
+  let ins := p.ins.getD pc default
+  match ins.op with
+  | .accept | .fail => []
+  | .split => [ins.next, ins.alt]
+  | _ => [ins.next]
+
+/-- One relaxation round of the depth labels: every edge raises its target to its source plus its weight. -/
+def relaxRound (p : Prog) (d : Array Nat) : Array Nat × Bool := Id.run do
+  let mut d := d
+  let mut changed := false
+  for pc in List.range p.n do
+    let w := if (p.ins.getD pc default).op.consuming then 1 else 0
+    for q in edgesOf p pc do
+      if d.getD q 0 < d.getD pc 0 + w then
+        d := d.setIfInBounds q (d.getD pc 0 + w)
+        changed := true
+  return (d, changed)
+
+/--
+The depth labels by relaxation to a fixed point: the longest consuming path into every instruction.
+A consuming cycle keeps the labels growing, and the relaxation then gives up after `n + 1` rounds.
+-/
+def depthLabels (p : Prog) : Option (Array Nat) := Id.run do
+  let mut d := Array.replicate p.n 0
+  for _ in List.range (p.n + 1) do
+    let (d', changed) := relaxRound p d
+    if !changed then return some d
+    d := d'
+  return none
+
+/-- One closure round of the seed reach: every marked split or jump marks its targets. -/
+def reachRound (p : Prog) (seen : Array Bool) : Array Bool × Bool := Id.run do
+  let mut seen := seen
+  let mut changed := false
+  for pc in List.range p.n do
+    if seen.getD pc false then
+      let ins := p.ins.getD pc default
+      let targets := match ins.op with
+        | .split => [ins.next, ins.alt]
+        | .jmp => [ins.next]
+        | _ => []
+      for q in targets do
+        if !seen.getD q false then
+          seen := seen.setIfInBounds q true
+          changed := true
+  return (seen, changed)
+
+/-- The instructions the spawn of a mid-subject boundary reaches: the start, closed under the split and jump edges. -/
+def seedReach (p : Prog) : Array Bool := Id.run do
+  let mut seen := (Array.replicate p.n false).setIfInBounds p.start true
+  for _ in List.range (p.n + 1) do
+    let (seen', changed) := reachRound p seen
+    if !changed then return seen
+    seen := seen'
+  return seen
+
+def maxLabel (d : Array Nat) : Nat := d.foldl max 0
+
+/-- The step figure of a program of the given depth: the anchored figure when the depth is bounded. -/
+def stepsFigureOf (p : Prog) (atom len : Nat) (depth : Int) : Nat :=
+  if depth < 0 then stepsFigure p atom len else stepsFigureAnchored p atom len depth.toNat
+
+/--
+The step figure the contract reports for a program of the given depth, with the certificate of the anchored
+figure checked first.
+A bounded depth needs the newline flag off, the relaxation labels must settle, `anchoredCheck` must accept
+them with the seed reach at the depth the engine computed, and that depth must be the largest label.
+The figure is then `stepsFigureAnchored` under the hypotheses of the proof, and the engine's depth is exact.
+-/
+def contractStepFigure (p : Prog) (atom len : Nat) (depth : Int) (newline : Bool) : Except String Nat :=
+  if depth < 0 then pure (stepsFigure p atom len)
+  else if newline then throw s!"engine depth {depth} under newline mode"
+  else
+    match depthLabels p with
+    | none => throw s!"engine depth {depth} on a program whose labels do not settle"
+    | some d =>
+      if !anchoredCheck p d (seedReach p) depth.toNat then throw s!"engine depth {depth} fails the certificate"
+      else if maxLabel d != depth.toNat then throw s!"engine depth {depth}, labels reach {maxLabel d}"
+      else pure (stepsFigureOf p atom len depth)
+
 /-! ## The walk -/
 
 structure LinkCoverage where
@@ -267,6 +355,7 @@ structure LinkCoverage where
   execsNonPosix : Nat := 0
   execsPruned : Nat := 0
   contractsChecked : Nat := 0
+  contractsAnchored : Nat := 0
   programsWf : Nat := 0
   deriving Repr, BEq, DecidableEq, Inhabited
 
@@ -368,11 +457,16 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
               if hs != 0 then return { rep with failure := some s!"command {idx} '{cmd}': solver on a NoSub pattern" }
               if heap != heapFigure x.prog.n x.prog.k x.prog.ring then
                 return { rep with failure := some s!"command {idx} '{cmd}': engine heap figure {heap}, proven {heapFigure x.prog.n x.prog.k x.prog.ring}" }
-              if steps != stepsFigure x.prog atom len then
-                return { rep with failure := some s!"command {idx} '{cmd}': engine step figure {steps}, proven {stepsFigure x.prog atom len}" }
+              let fig ← match contractStepFigure x.prog atom len x.depth x.newline with
+                | .ok f => pure f
+                | .error e => return { rep with failure := some s!"command {idx} '{cmd}': {e}" }
+              if steps != fig then
+                return { rep with failure := some s!"command {idx} '{cmd}': engine step figure {steps}, proven {fig}" }
               if stack != matcherStackFigure then
                 return { rep with failure := some s!"command {idx} '{cmd}': engine stack figure {stack}, expected {matcherStackFigure}" }
-              rep := { rep with cov := { rep.cov with contractsChecked := rep.cov.contractsChecked + 1 } }
+              let anchored := if x.depth < 0 then 0 else 1
+              let cov := rep.cov
+              rep := { rep with cov := { cov with contractsChecked := cov.contractsChecked + 1, contractsAnchored := cov.contractsAnchored + anchored } }
             | _, _ => return { rep with failure := some s!"command {idx}: unparsable T" }
       else if kind == 'X' then
         match cur with
@@ -399,7 +493,7 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
             let fig := stepFigure r.m x.prog.k x.prog.ring atom
             if loopsInterp > fig then
               return { rep with failure := some s!"command {idx} '{cmd}': engine loops {loopsInterp} over model figure {fig}: {repr r.m}" }
-            let bound := stepsFigure x.prog atom subj.size
+            let bound := stepsFigureOf x.prog atom subj.size x.depth
             let hbound := heapFigure x.prog.n x.prog.k x.prog.ring
             rep := { rep with cov := { rep.cov with execsChecked := rep.cov.execsChecked + 1 },
                               worstStepRatio := Nat.max rep.worstStepRatio (fig * 1000 / Nat.max bound 1),
@@ -410,8 +504,8 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
 
 /-- The coverage the theorem pins down. -/
 def linkCoverage : LinkCoverage :=
-  { execsChecked := 47922, execsCaptures := 25974, execsNonPosix := 1700, execsPruned := 0, contractsChecked := 46,
-    programsWf := 6893 }
+  { execsChecked := 49682, execsCaptures := 26854, execsNonPosix := 1700, execsPruned := 0, contractsChecked := 56,
+    contractsAnchored := 10, programsWf := 6913 }
 
 /--
 The interpreted engine agrees with the phase A model on every covered corpus execution, its heap bytes are

@@ -897,21 +897,23 @@ export class program {
     multi: boolean;
     failMin: number;
     scan: scanFilter;
+    depth: number;
 
-    constructor(ins: vg.Slice<instr> = vg.NIL, start: number = 0, foldSets: vg.Slice<vg.Slice<number>> = vg.NIL, multi: boolean = false, failMin: number = 0, scan: scanFilter = new scanFilter()) {
+    constructor(ins: vg.Slice<instr> = vg.NIL, start: number = 0, foldSets: vg.Slice<vg.Slice<number>> = vg.NIL, multi: boolean = false, failMin: number = 0, scan: scanFilter = new scanFilter(), depth: number = 0) {
         this.ins = ins;
         this.start = start;
         this.foldSets = foldSets;
         this.multi = multi;
         this.failMin = failMin;
         this.scan = scan;
+        this.depth = depth;
     }
 
     clone(): program {
-        return new program(this.ins, this.start, this.foldSets, this.multi, this.failMin, this.scan.clone());
+        return new program(this.ins, this.start, this.foldSets, this.multi, this.failMin, this.scan.clone(), this.depth);
     }
 
-    static readonly elem: vg.Elem<program> = vg.structElem(() => new program(), 336);
+    static readonly elem: vg.Elem<program> = vg.structElem(() => new program(), 344);
 }
 
 export class patchSlot {
@@ -969,7 +971,7 @@ export class progBuilder {
         return new progBuilder(this.prog.clone(), this.tooBig, this.failMin, this.errCode, this.icase);
     }
 
-    static readonly elem: vg.Elem<progBuilder> = vg.structElem(() => new progBuilder(), 350);
+    static readonly elem: vg.Elem<progBuilder> = vg.structElem(() => new progBuilder(), 358);
 }
 
 export class Regexp {
@@ -1009,7 +1011,7 @@ export class Regexp {
         return new Regexp(this.nodes, this.brackets, this.root, this.nsub, this.flags, this.loc.clone(), this.minSlots, this.nested, this.multi, this.progOK, this.prog.clone(), this.minLen, this.anchors, this.onePass);
     }
 
-    static readonly elem: vg.Elem<Regexp> = vg.structElem(() => new Regexp(), 881);
+    static readonly elem: vg.Elem<Regexp> = vg.structElem(() => new Regexp(), 889);
 }
 
 export class groupStack {
@@ -2293,7 +2295,11 @@ export function matcherContract(re: Regexp, length: bigint, atom: bigint): Backe
     let perBoundary: bigint = cMul(weight, cMul(BigInt.asIntN(64, n + 1n), BigInt.asIntN(64, n + 1n)));
     perBoundary = cAdd(perBoundary, cMul(n, perTest));
     perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2n, k)), cAdd(cMul(4n, ring), 38n)));
-    const steps: bigint = cAdd(cAdd(BigInt.asIntN(64, 24n + ring), length), cMul(cAdd(length, 1n), perBoundary));
+    let boundaries: bigint = cAdd(length, 1n);
+    if ((re.prog.depth >= 0)) {
+        boundaries = vg.minBig(boundaries, BigInt.asIntN(64, BigInt(re.prog.depth) + 3n));
+    }
+    const steps: bigint = cAdd(cAdd(BigInt.asIntN(64, 24n + ring), length), cMul(boundaries, perBoundary));
     const stack: bigint = BigInt.asIntN(64, 2048n + BigInt.asIntN(64, 16n * 256n));
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -4724,7 +4730,7 @@ export function onePassCaps(re: Regexp, d: decoded, ni: number, i: number, j: nu
     return false;
 }
 
-export function buildScanFilter(pr: program, newlineMode: boolean): void {
+export function buildScanFilter(pr: program, newlineMode: boolean): number {
     let _t2!: vg.Slice<instr>;
     let _t3!: vg.Slice<instr>;
     let _t4!: vg.Slice<instr>;
@@ -4801,7 +4807,7 @@ export function buildScanFilter(pr: program, newlineMode: boolean): void {
     if (((matchReachable || (!ok)) || pr.multi)) {
         const none: scanFilter = new scanFilter();
         pr.scan = none.clone();
-        return;
+        return 0;
     }
     if (newlineMode) {
         pr.scan.stop[10] = true;
@@ -4815,6 +4821,7 @@ export function buildScanFilter(pr: program, newlineMode: boolean): void {
         }
     }
     pr.scan.single = (count === 1);
+    return count;
 }
 
 export function instrEstimate(nodes: vg.Slice<node>, ni: number): number {
@@ -4890,7 +4897,64 @@ export function compileProgram(b: progBuilder, nodes: vg.Slice<node>, root: numb
     b.prog.start = body.start;
     b.prog.multi = multi;
     b.prog.failMin = b.failMin;
-    buildScanFilter(b.prog, newlineMode);
+    const stops: number = buildScanFilter(b.prog, newlineMode);
+    b.prog.depth = (0 - 1);
+    if ((((!newlineMode) && b.prog.scan.enabled) && (stops === 0))) {
+        b.prog.depth = progDepth(b.prog);
+    }
+}
+
+export function consumingOp(op: number): boolean {
+    return (op <= iBracket);
+}
+
+export function progEdge(pr: program, pc: number, i: number): [number, boolean] {
+    let _t1!: vg.Slice<instr>;
+    let _t2!: vg.Slice<instr>;
+    let _t3!: vg.Slice<instr>;
+    const op: number = (_t1 = pr.ins, _t1.buf[_t1.off + vg.ix(pc, _t1.len)]).op;
+    if (((op === iMatch) || (op === iFail))) {
+        return [0, false];
+    }
+    if ((i === 0)) {
+        return [(_t2 = pr.ins, _t2.buf[_t2.off + vg.ix(pc, _t2.len)]).next, true];
+    }
+    if (((i === 1) && (op === iSplit))) {
+        return [(_t3 = pr.ins, _t3.buf[_t3.off + vg.ix(pc, _t3.len)]).alt, true];
+    }
+    return [0, false];
+}
+
+export function progDepth(pr: program): number {
+    let _t3!: vg.Slice<instr>;
+    const n: number = pr.ins.len;
+    const depth: vg.Slice<number> = vg.make(vg.I32, n);
+    for (let round: number = 0; (round < 2); round = vg.chk(round + 1)) {
+        let changed: boolean = false;
+        for (let pc: number = 0; (pc < n); pc = vg.chk(pc + 1)) {
+            let weight: number = 0;
+            if (consumingOp((_t3 = pr.ins, _t3.buf[_t3.off + vg.ix(pc, _t3.len)]).op)) {
+                weight = 1;
+            }
+            for (let e: number = 0; (e < 2); e = vg.chk(e + 1)) {
+                const _t5 = progEdge(pr, (pc >>> 0), e);
+                const target: number = _t5[0];
+                const has: boolean = _t5[1];
+                if ((has && (depth.buf[depth.off + vg.ix(target, depth.len)] < ((depth.buf[depth.off + vg.ix(pc, depth.len)] + weight) | 0)))) {
+                    depth.buf[depth.off + vg.ix(target, depth.len)] = ((depth.buf[depth.off + vg.ix(pc, depth.len)] + weight) | 0);
+                    changed = true;
+                }
+            }
+        }
+        if ((!changed)) {
+            let best: number = 0;
+            for (let pc_2: number = 0; (pc_2 < n); pc_2 = vg.chk(pc_2 + 1)) {
+                best = Math.max(best, depth.buf[depth.off + vg.ix(pc_2, depth.len)]);
+            }
+            return best;
+        }
+    }
+    return (0 - 1);
 }
 
 export function addInstr(b: progBuilder, ins: instr): number {
@@ -5118,13 +5182,13 @@ export function emitRepeat(b: progBuilder, nodes: vg.Slice<node>, ni: number, ma
             return none;
         }
         if (((i === vg.chk(lo - 1)) && (hi === infinite))) {
-            haveResult = fragAppend(b, result, haveResult, emitPlus(b, nodes, child, mask_v, extra_v));
+            fragAppend(b, result, haveResult, emitPlus(b, nodes, child, mask_v, extra_v));
             return result;
         }
         haveResult = fragAppend(b, result, haveResult, emit(b, nodes, child, mask_v, extra_v));
     }
     if ((hi === infinite)) {
-        haveResult = fragAppend(b, result, haveResult, emitStar(b, nodes, child, mask_v, extra_v));
+        fragAppend(b, result, haveResult, emitStar(b, nodes, child, mask_v, extra_v));
         return result;
     }
     let skips: vg.Slice<patchSlot> = vg.make(patchSlot.elem, 0, Math.max(vg.chk(hi - lo), 1));

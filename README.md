@@ -68,6 +68,7 @@ Separately, the development states the ERE specification as a Lean definition.
 It checks the interpreted engine against that definition on every constrained corpus command and on an exhaustive small domain.
 
 For Phase A, the heap and step bounds are proved for every well-formed program, atom test and subject.
+A start-anchored expression of bounded length gets a tighter step bound, proved for every program that carries a decidable certificate, which the corpus link checks on every such contract the engine reports.
 The reported match is also proved correct under the additional hypotheses stated in the formalization.
 However, the link to the shipped engine covers only corpus executions that use Phase A alone.
 

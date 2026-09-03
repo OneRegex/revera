@@ -19954,6 +19954,100 @@
     {
      "k": "define",
      "names": [
+      "boundaries"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "length"
+       },
+       {
+        "k": "int",
+        "value": "1"
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "\u003e=",
+      "x": {
+       "k": "field",
+       "name": "depth",
+       "x": {
+        "k": "field",
+        "name": "prog",
+        "x": {
+         "k": "ident",
+         "name": "re"
+        }
+       }
+      },
+      "y": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "ident",
+         "name": "boundaries"
+        }
+       ],
+       "value": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "boundaries"
+         },
+         {
+          "k": "binary",
+          "op": "+",
+          "x": {
+           "k": "conv",
+           "type": {
+            "k": "named",
+            "name": "int64"
+           },
+           "x": {
+            "k": "field",
+            "name": "depth",
+            "x": {
+             "k": "field",
+             "name": "prog",
+             "x": {
+              "k": "ident",
+              "name": "re"
+             }
+            }
+           }
+          },
+          "y": {
+           "k": "int",
+           "value": "3"
+          }
+         }
+        ],
+        "fn": "min",
+        "k": "builtin",
+        "spread": false,
+        "type": null
+       }
+      }
+     ]
+    },
+    {
+     "k": "define",
+     "names": [
       "steps"
      ],
      "value": {
@@ -19983,18 +20077,8 @@
        {
         "args": [
          {
-          "args": [
-           {
-            "k": "ident",
-            "name": "length"
-           },
-           {
-            "k": "int",
-            "value": "1"
-           }
-          ],
-          "fn": "cAdd",
-          "k": "call"
+          "k": "ident",
+          "name": "boundaries"
          },
          {
           "k": "ident",
@@ -57884,7 +57968,12 @@
       },
       {
        "k": "return",
-       "values": []
+       "values": [
+        {
+         "k": "int",
+         "value": "0"
+        }
+       ]
       }
      ]
     },
@@ -58081,6 +58170,15 @@
        "value": "1"
       }
      }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "ident",
+       "name": "count"
+      }
+     ]
     }
    ],
    "k": "func",
@@ -58101,7 +58199,12 @@
      }
     }
    ],
-   "results": []
+   "results": [
+    {
+     "k": "named",
+     "name": "int"
+    }
+   ]
   },
   {
    "body": [
@@ -59062,7 +59165,10 @@
      }
     },
     {
-     "k": "expr_stmt",
+     "k": "define",
+     "names": [
+      "stops"
+     ],
      "value": {
       "args": [
        {
@@ -59085,6 +59191,116 @@
       "fn": "buildScanFilter",
       "k": "call"
      }
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "depth",
+       "x": {
+        "k": "field",
+        "name": "prog",
+        "x": {
+         "k": "ident",
+         "name": "b"
+        }
+       }
+      }
+     ],
+     "value": {
+      "k": "unary",
+      "op": "-",
+      "x": {
+       "k": "int",
+       "value": "1"
+      }
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "\u0026\u0026",
+      "x": {
+       "k": "binary",
+       "op": "\u0026\u0026",
+       "x": {
+        "k": "unary",
+        "op": "!",
+        "x": {
+         "k": "ident",
+         "name": "newlineMode"
+        }
+       },
+       "y": {
+        "k": "field",
+        "name": "enabled",
+        "x": {
+         "k": "field",
+         "name": "scan",
+         "x": {
+          "k": "field",
+          "name": "prog",
+          "x": {
+           "k": "ident",
+           "name": "b"
+          }
+         }
+        }
+       }
+      },
+      "y": {
+       "k": "binary",
+       "op": "==",
+       "x": {
+        "k": "ident",
+        "name": "stops"
+       },
+       "y": {
+        "k": "int",
+        "value": "0"
+       }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "field",
+         "name": "depth",
+         "x": {
+          "k": "field",
+          "name": "prog",
+          "x": {
+           "k": "ident",
+           "name": "b"
+          }
+         }
+        }
+       ],
+       "value": {
+        "args": [
+         {
+          "k": "unary",
+          "op": "\u0026",
+          "x": {
+           "k": "field",
+           "name": "prog",
+           "x": {
+            "k": "ident",
+            "name": "b"
+           }
+          }
+         }
+        ],
+        "fn": "progDepth",
+        "k": "call"
+       }
+      }
+     ]
     }
    ],
    "k": "func",
@@ -59130,6 +59346,774 @@
     }
    ],
    "results": []
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "\u003c=",
+       "x": {
+        "k": "ident",
+        "name": "op"
+       },
+       "y": {
+        "k": "ident",
+        "name": "iBracket"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "consumingOp",
+   "params": [
+    {
+     "name": "op",
+     "type": {
+      "k": "named",
+      "name": "uint8"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "bool"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "op"
+     ],
+     "value": {
+      "k": "field",
+      "name": "op",
+      "x": {
+       "index": {
+        "k": "ident",
+        "name": "pc"
+       },
+       "k": "index",
+       "x": {
+        "k": "field",
+        "name": "ins",
+        "x": {
+         "k": "ident",
+         "name": "pr"
+        }
+       }
+      }
+     }
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "||",
+      "x": {
+       "k": "binary",
+       "op": "==",
+       "x": {
+        "k": "ident",
+        "name": "op"
+       },
+       "y": {
+        "k": "ident",
+        "name": "iMatch"
+       }
+      },
+      "y": {
+       "k": "binary",
+       "op": "==",
+       "x": {
+        "k": "ident",
+        "name": "op"
+       },
+       "y": {
+        "k": "ident",
+        "name": "iFail"
+       }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "int",
+         "value": "0"
+        },
+        {
+         "k": "bool",
+         "value": false
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "==",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "field",
+         "name": "next",
+         "x": {
+          "index": {
+           "k": "ident",
+           "name": "pc"
+          },
+          "k": "index",
+          "x": {
+           "k": "field",
+           "name": "ins",
+           "x": {
+            "k": "ident",
+            "name": "pr"
+           }
+          }
+         }
+        },
+        {
+         "k": "bool",
+         "value": true
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "\u0026\u0026",
+      "x": {
+       "k": "binary",
+       "op": "==",
+       "x": {
+        "k": "ident",
+        "name": "i"
+       },
+       "y": {
+        "k": "int",
+        "value": "1"
+       }
+      },
+      "y": {
+       "k": "binary",
+       "op": "==",
+       "x": {
+        "k": "ident",
+        "name": "op"
+       },
+       "y": {
+        "k": "ident",
+        "name": "iSplit"
+       }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "field",
+         "name": "alt",
+         "x": {
+          "index": {
+           "k": "ident",
+           "name": "pc"
+          },
+          "k": "index",
+          "x": {
+           "k": "field",
+           "name": "ins",
+           "x": {
+            "k": "ident",
+            "name": "pr"
+           }
+          }
+         }
+        },
+        {
+         "k": "bool",
+         "value": true
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "int",
+       "value": "0"
+      },
+      {
+       "k": "bool",
+       "value": false
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "progEdge",
+   "params": [
+    {
+     "name": "pr",
+     "type": {
+      "k": "ptr",
+      "name": "program"
+     }
+    },
+    {
+     "name": "pc",
+     "type": {
+      "k": "named",
+      "name": "uint32"
+     }
+    },
+    {
+     "name": "i",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "uint32"
+    },
+    {
+     "k": "named",
+     "name": "bool"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "define",
+     "names": [
+      "n"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "field",
+        "name": "ins",
+        "x": {
+         "k": "ident",
+         "name": "pr"
+        }
+       }
+      ],
+      "fn": "len",
+      "k": "builtin",
+      "spread": false,
+      "type": null
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "depth"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "n"
+       }
+      ],
+      "fn": "make",
+      "k": "builtin",
+      "spread": false,
+      "type": {
+       "elem": {
+        "k": "named",
+        "name": "int32"
+       },
+       "k": "slice"
+      }
+     }
+    },
+    {
+     "body": [
+      {
+       "k": "define",
+       "names": [
+        "changed"
+       ],
+       "value": {
+        "k": "bool",
+        "value": false
+       }
+      },
+      {
+       "body": [
+        {
+         "k": "define",
+         "names": [
+          "weight"
+         ],
+         "value": {
+          "k": "conv",
+          "type": {
+           "k": "named",
+           "name": "int32"
+          },
+          "x": {
+           "k": "int",
+           "value": "0"
+          }
+         }
+        },
+        {
+         "cond": {
+          "args": [
+           {
+            "k": "field",
+            "name": "op",
+            "x": {
+             "index": {
+              "k": "ident",
+              "name": "pc"
+             },
+             "k": "index",
+             "x": {
+              "k": "field",
+              "name": "ins",
+              "x": {
+               "k": "ident",
+               "name": "pr"
+              }
+             }
+            }
+           }
+          ],
+          "fn": "consumingOp",
+          "k": "call"
+         },
+         "else": null,
+         "k": "if",
+         "then": [
+          {
+           "k": "assign",
+           "lhs": [
+            {
+             "k": "ident",
+             "name": "weight"
+            }
+           ],
+           "value": {
+            "k": "int",
+            "value": "1"
+           }
+          }
+         ]
+        },
+        {
+         "body": [
+          {
+           "k": "define",
+           "names": [
+            "target",
+            "has"
+           ],
+           "value": {
+            "args": [
+             {
+              "k": "ident",
+              "name": "pr"
+             },
+             {
+              "k": "conv",
+              "type": {
+               "k": "named",
+               "name": "uint32"
+              },
+              "x": {
+               "k": "ident",
+               "name": "pc"
+              }
+             },
+             {
+              "k": "ident",
+              "name": "e"
+             }
+            ],
+            "fn": "progEdge",
+            "k": "call"
+           }
+          },
+          {
+           "cond": {
+            "k": "binary",
+            "op": "\u0026\u0026",
+            "x": {
+             "k": "ident",
+             "name": "has"
+            },
+            "y": {
+             "k": "binary",
+             "op": "\u003c",
+             "x": {
+              "index": {
+               "k": "ident",
+               "name": "target"
+              },
+              "k": "index",
+              "x": {
+               "k": "ident",
+               "name": "depth"
+              }
+             },
+             "y": {
+              "k": "binary",
+              "op": "+",
+              "x": {
+               "index": {
+                "k": "ident",
+                "name": "pc"
+               },
+               "k": "index",
+               "x": {
+                "k": "ident",
+                "name": "depth"
+               }
+              },
+              "y": {
+               "k": "ident",
+               "name": "weight"
+              }
+             }
+            }
+           },
+           "else": null,
+           "k": "if",
+           "then": [
+            {
+             "k": "assign",
+             "lhs": [
+              {
+               "index": {
+                "k": "ident",
+                "name": "target"
+               },
+               "k": "index",
+               "x": {
+                "k": "ident",
+                "name": "depth"
+               }
+              }
+             ],
+             "value": {
+              "k": "binary",
+              "op": "+",
+              "x": {
+               "index": {
+                "k": "ident",
+                "name": "pc"
+               },
+               "k": "index",
+               "x": {
+                "k": "ident",
+                "name": "depth"
+               }
+              },
+              "y": {
+               "k": "ident",
+               "name": "weight"
+              }
+             }
+            },
+            {
+             "k": "assign",
+             "lhs": [
+              {
+               "k": "ident",
+               "name": "changed"
+              }
+             ],
+             "value": {
+              "k": "bool",
+              "value": true
+             }
+            }
+           ]
+          }
+         ],
+         "cond": {
+          "k": "binary",
+          "op": "\u003c",
+          "x": {
+           "k": "ident",
+           "name": "e"
+          },
+          "y": {
+           "k": "int",
+           "value": "2"
+          }
+         },
+         "init": {
+          "k": "define",
+          "names": [
+           "e"
+          ],
+          "value": {
+           "k": "int",
+           "value": "0"
+          }
+         },
+         "k": "for",
+         "post": {
+          "k": "incdec",
+          "lhs": {
+           "k": "ident",
+           "name": "e"
+          },
+          "op": "++"
+         }
+        }
+       ],
+       "cond": {
+        "k": "binary",
+        "op": "\u003c",
+        "x": {
+         "k": "ident",
+         "name": "pc"
+        },
+        "y": {
+         "k": "ident",
+         "name": "n"
+        }
+       },
+       "init": {
+        "k": "define",
+        "names": [
+         "pc"
+        ],
+        "value": {
+         "k": "int",
+         "value": "0"
+        }
+       },
+       "k": "for",
+       "post": {
+        "k": "incdec",
+        "lhs": {
+         "k": "ident",
+         "name": "pc"
+        },
+        "op": "++"
+       }
+      },
+      {
+       "cond": {
+        "k": "unary",
+        "op": "!",
+        "x": {
+         "k": "ident",
+         "name": "changed"
+        }
+       },
+       "else": null,
+       "k": "if",
+       "then": [
+        {
+         "k": "define",
+         "names": [
+          "best"
+         ],
+         "value": {
+          "k": "conv",
+          "type": {
+           "k": "named",
+           "name": "int32"
+          },
+          "x": {
+           "k": "int",
+           "value": "0"
+          }
+         }
+        },
+        {
+         "body": [
+          {
+           "k": "assign",
+           "lhs": [
+            {
+             "k": "ident",
+             "name": "best"
+            }
+           ],
+           "value": {
+            "args": [
+             {
+              "k": "ident",
+              "name": "best"
+             },
+             {
+              "index": {
+               "k": "ident",
+               "name": "pc"
+              },
+              "k": "index",
+              "x": {
+               "k": "ident",
+               "name": "depth"
+              }
+             }
+            ],
+            "fn": "max",
+            "k": "builtin",
+            "spread": false,
+            "type": null
+           }
+          }
+         ],
+         "cond": {
+          "k": "binary",
+          "op": "\u003c",
+          "x": {
+           "k": "ident",
+           "name": "pc"
+          },
+          "y": {
+           "k": "ident",
+           "name": "n"
+          }
+         },
+         "init": {
+          "k": "define",
+          "names": [
+           "pc"
+          ],
+          "value": {
+           "k": "int",
+           "value": "0"
+          }
+         },
+         "k": "for",
+         "post": {
+          "k": "incdec",
+          "lhs": {
+           "k": "ident",
+           "name": "pc"
+          },
+          "op": "++"
+         }
+        },
+        {
+         "k": "return",
+         "values": [
+          {
+           "k": "conv",
+           "type": {
+            "k": "named",
+            "name": "int"
+           },
+           "x": {
+            "k": "ident",
+            "name": "best"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "round"
+      },
+      "y": {
+       "k": "int",
+       "value": "2"
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "round"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "round"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "unary",
+       "op": "-",
+       "x": {
+        "k": "int",
+        "value": "1"
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "progDepth",
+   "params": [
+    {
+     "name": "pr",
+     "type": {
+      "k": "ptr",
+      "name": "program"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int"
+    }
+   ]
   },
   {
    "body": [
@@ -62522,13 +63506,7 @@
        "k": "if",
        "then": [
         {
-         "k": "assign",
-         "lhs": [
-          {
-           "k": "ident",
-           "name": "haveResult"
-          }
-         ],
+         "k": "expr_stmt",
          "value": {
           "args": [
            {
@@ -62696,13 +63674,7 @@
      "k": "if",
      "then": [
       {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "ident",
-         "name": "haveResult"
-        }
-       ],
+       "k": "expr_stmt",
        "value": {
         "args": [
          {
@@ -79300,6 +80272,13 @@
      "type": {
       "k": "struct_ref",
       "name": "scanFilter"
+     }
+    },
+    {
+     "name": "depth",
+     "type": {
+      "k": "named",
+      "name": "int"
      }
     }
    ],

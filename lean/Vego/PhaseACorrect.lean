@@ -94,10 +94,6 @@ def EpsEdge (p : Prog) (input : Input) (i pc q : Nat) : Prop :=
   | .eol => eolRef input i ∧ q = p.next pc
   | _ => False
 
-def Op.consuming : Op → Bool
-  | .rune | .runeFold | .any | .bracket => true
-  | _ => false
-
 /-- A consuming edge of `delta` characters at the boundary with index `i`: the single test, or one probe. -/
 def Consumes (p : Prog) (atoms : Atoms) (input : Input) (i pc delta : Nat) : Prop :=
   (p.op pc).consuming = true ∧

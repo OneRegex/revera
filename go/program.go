@@ -54,6 +54,12 @@ type program struct {
 	// The saturated minimum of a pruned subtree can legitimately reach lenInf, so lenInf cannot be the sentinel.
 	failMin int
 	scan    scanFilter
+	// depth is the most consuming instructions on any path through a program whose scan filter is enabled
+	// with an empty stop set, or -1 when the filter stops on some byte or a consuming cycle leaves the paths
+	// unbounded.
+	// Such a program seeds no thread past the first boundary, so the resource contract charges depth+3
+	// boundaries instead of one per byte; lean/Vego/PhaseAAnchored.lean proves that sufficient.
+	depth int
 }
 
 // failMinNone marks a program with no pruned subtree.
@@ -91,7 +97,8 @@ type progBuilder struct {
 // It records the first bytes of the reachable consuming instructions.
 // It gives up when dot, a bracket, or a reachable accept makes the filter unsound.
 // newlineMode forces a stop at every newline, because anchors gain line boundaries there.
-func buildScanFilter(pr *program, newlineMode bool) {
+// It returns the number of stop bytes, which is zero when the filter is off.
+func buildScanFilter(pr *program, newlineMode bool) int {
 	ok := true
 	matchReachable := false
 	seen := make([]bool, len(pr.ins))
@@ -132,7 +139,7 @@ func buildScanFilter(pr *program, newlineMode bool) {
 	if matchReachable || !ok || pr.multi {
 		var none scanFilter
 		pr.scan = none
-		return
+		return 0
 	}
 	if newlineMode {
 		pr.scan.stop['\n'] = true
@@ -146,6 +153,7 @@ func buildScanFilter(pr *program, newlineMode bool) {
 		}
 	}
 	pr.scan.single = count == 1
+	return count
 }
 
 // instrEstimate bounds the instruction count one node expands into.
@@ -209,7 +217,71 @@ func compileProgram(b *progBuilder, nodes []node, root int32, multi bool, newlin
 	b.prog.start = body.start
 	b.prog.multi = multi
 	b.prog.failMin = b.failMin
-	buildScanFilter(&b.prog, newlineMode)
+	stops := buildScanFilter(&b.prog, newlineMode)
+	b.prog.depth = -1
+	if !newlineMode && b.prog.scan.enabled && stops == 0 {
+		b.prog.depth = progDepth(&b.prog)
+	}
+}
+
+// consumingOp reports whether an opcode consumes a character.
+// The consuming opcodes come first in the table.
+func consumingOp(op uint8) bool {
+	return op <= iBracket
+}
+
+// progEdge returns the i-th successor of one instruction.
+// An accept or a dead end has none, a split has two, and every other instruction has one.
+func progEdge(pr *program, pc uint32, i int) (uint32, bool) {
+	op := pr.ins[pc].op
+	if op == iMatch || op == iFail {
+		return 0, false
+	}
+	if i == 0 {
+		return pr.ins[pc].next, true
+	}
+	if i == 1 && op == iSplit {
+		return pr.ins[pc].alt, true
+	}
+	return 0, false
+}
+
+// progDepth returns the most consuming instructions on any path through the program, or -1 when a
+// consuming cycle leaves that unbounded.
+// It relaxes one label per instruction, in instruction order: every edge raises its target to its source,
+// plus one when the source consumes.
+// The emitter lays an acyclic program out with every edge pointing forward, so the first round settles the
+// labels and the second confirms it, while a second round that still raises a label has found a consuming
+// cycle.
+// A cycle of epsilon instructions settles too, so a star over an empty body keeps its bound.
+// The Lean link relaxes the same labels to their fixed point and checks that this value is their maximum.
+func progDepth(pr *program) int {
+	n := len(pr.ins)
+	depth := make([]int32, n)
+	for round := 0; round < 2; round++ {
+		changed := false
+		for pc := 0; pc < n; pc++ {
+			weight := int32(0)
+			if consumingOp(pr.ins[pc].op) {
+				weight = 1
+			}
+			for e := 0; e < 2; e++ {
+				target, has := progEdge(pr, uint32(pc), e)
+				if has && depth[target] < depth[pc]+weight {
+					depth[target] = depth[pc] + weight
+					changed = true
+				}
+			}
+		}
+		if !changed {
+			best := int32(0)
+			for pc := 0; pc < n; pc++ {
+				best = max(best, depth[pc])
+			}
+			return int(best)
+		}
+	}
+	return -1
 }
 
 func addInstr(b *progBuilder, ins instr) uint32 {
@@ -411,8 +483,7 @@ func emitRepeat(b *progBuilder, nodes []node, ni int32, mask uint64, extra []uin
 			return none
 		}
 		if i == lo-1 && hi == infinite {
-			haveResult = fragAppend(b, &result, haveResult,
-				emitPlus(b, nodes, child, mask, extra))
+			fragAppend(b, &result, haveResult, emitPlus(b, nodes, child, mask, extra))
 			return result
 		}
 		haveResult = fragAppend(b, &result, haveResult,
@@ -421,8 +492,7 @@ func emitRepeat(b *progBuilder, nodes []node, ni int32, mask uint64, extra []uin
 
 	if hi == infinite {
 		// The minimum is zero here, so this is a plain star.
-		haveResult = fragAppend(b, &result, haveResult,
-			emitStar(b, nodes, child, mask, extra))
+		fragAppend(b, &result, haveResult, emitStar(b, nodes, child, mask, extra))
 		return result
 	}
 

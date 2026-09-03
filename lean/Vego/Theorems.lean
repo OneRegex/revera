@@ -43,7 +43,7 @@ What the theorems say:
    Metering them needs a delta around the inner call rather than a reset around the outer one.
 
    The corpus holds two patterns that cannot run under the interpreter in any reasonable time.
-   The theorem leaves their 1056 executions out of the 87415 commands.
+   The theorem leaves their 1056 executions out of the 90145 commands.
    It keeps their compiles and their contract queries, so no pattern escapes the check.
    The figures of the extreme cases still compare against the Go reference.
    `Vego.Corpus` records the measurements behind that choice, and the proposition re-checks its own coverage.
@@ -51,6 +51,8 @@ What the theorems say:
 6. `phaseA_link_agrees`, with `PhaseA.run_steps_le` and `PhaseA.run_heap_le` of `Vego/PhaseAProofs.lean`.
    The model of the phase A matcher in `Vego/PhaseA.lean` is bounded for every program and subject by the heap and step figures the contract reports, by ordinary induction and a potential argument on the closure.
    The link theorem checks the model against the interpreted engine on the corpus, result, bytes and loop meter, and checks the engine's contract figures against the proven ones.
+   `phaseA_run_steps_anchored`, from `PhaseA.run_steps_le_anchored` of `Vego/PhaseAAnchored.lean`, is the tighter step figure of a start-anchored program of bounded depth, which pays for `depth + 3` boundaries instead of one per byte.
+   Its certificate is decidable, and the link theorem checks that every contract the engine reports with that figure carries one.
 
 5. `spec_agrees_with_corpus`, `engine_meets_spec_on_corpus` and `engine_meets_spec_exhaustively`.
    The `Ere` library is a model of the ERE specification, written from its text.
@@ -65,6 +67,7 @@ import Vego.SpecCheck
 import Vego.Exhaustive
 import Vego.PhaseALink
 import Vego.PhaseAProofs
+import Vego.PhaseAAnchored
 import Vego.PhaseARun
 
 namespace Vego
@@ -178,6 +181,23 @@ theorem phaseA_run_correct (p : PhaseA.Prog) (atoms : PhaseA.Atoms) (input : Pha
       ∃ c, PhaseA.IsBest p atoms input (PhaseA.run p atoms input).so c (PhaseA.run p atoms input).eo) ∧
     ((PhaseA.run p atoms input).matched = false → ∀ s c e, ¬ PhaseA.Cand p atoms input s c e) :=
   PhaseA.run_correct p atoms input (PhaseA.wfCheck_sound p hwf).1 hawf hring hscan
+
+/--
+Phase A of a start-anchored program of bounded depth pays for `depth + 3` boundaries rather than one per
+byte, for every atom test and every subject without newline mode. `anchoredCheck` decides the certificate:
+labels that never drop along a split or jump edge, grow by one across a consuming instruction and stay
+within the depth, and the seed reach, which holds the start, is closed under those edges and holds no
+consuming instruction. The engine computes the depth at compile time, and `phaseA_link_agrees` checks that
+every contract it reports with the anchored figure carries such a certificate.
+-/
+theorem phaseA_run_steps_anchored (p : PhaseA.Prog) (atoms : PhaseA.Atoms) (input : PhaseA.Input)
+    (atom : Nat) (d : Array Nat) (seed : Array Bool) (depth : Nat) (hwf : p.wfCheck = true)
+    (hawf : atoms.wf p) (hnl : input.nlMode = false) (hcert : PhaseA.anchoredCheck p d seed depth = true) :
+    PhaseA.stepFigure (PhaseA.run p atoms input).m p.k p.ring atom ≤
+      PhaseA.stepsFigureAnchored p atom input.bytes.size depth :=
+  have ha := PhaseA.anchoredCheck_sound p d seed depth hcert
+  PhaseA.run_steps_le_anchored p atoms input atom _ _ depth (PhaseA.wfCheck_sound p hwf).1 hawf
+    ((PhaseA.wfCheck_sound p hwf).2 ha.enabled) hnl ha
 
 /--
 The two corpus theorems composed: on every corpus command the specification constrains, the interpreted

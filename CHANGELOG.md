@@ -16,6 +16,11 @@ The date replaces `unreleased` when the tag is made; `make dist` checks for it.
   Case-sensitive brackets now cost a few units per test, while equivalence classes in a full locale report the thousands of units their searches take.
   The stack figures also gained the frames of the deepest lookup a bracket test can start, which a multi-character probe in a full locale exceeded by two frames.
   The corpus gained locale runs of such brackets on long subjects, so the Lean replay keeps those figures honest.
+- The matcher step figure of a start-anchored expression of bounded length no longer charges one boundary per subject byte.
+  Such an expression, compiled without newline mode, seeds no thread past the first boundary, and its scan filter jumps to the end of the subject once the threads of the first boundary are gone.
+  The compiler now records the longest consuming path of the program as its depth, and the contract charges depth+3 boundaries when that is fewer.
+  For `^abc$` on a subject of at most 1000 bytes the figure drops from 1,222,246 steps to 8,346.
+  `lean/Vego/PhaseAAnchored.lean` proves the bound for every program that carries a decidable certificate, the corpus link builds that certificate for every anchored contract it checks, and the corpus gained five anchored patterns to exercise it.
 
 ### Added
 

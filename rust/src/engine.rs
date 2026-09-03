@@ -388,6 +388,7 @@ pub struct program {
     pub multi: bool,
     pub failMin: i64,
     pub scan: scanFilter,
+    pub depth: i64,
 }
 
 #[derive(Clone, Copy)]
@@ -1621,7 +1622,11 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
     let mut perBoundary: i64 = cMul(weight, cMul((n + 1i64), (n + 1i64)));
     perBoundary = cAdd(perBoundary, cMul(n, perTest));
     perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2i64, k)), cAdd(cMul(4i64, ring), 38i64)));
-    let steps: i64 = cAdd(cAdd((24i64 + ring), length), cMul(cAdd(length, 1i64), perBoundary));
+    let mut boundaries: i64 = cAdd(length, 1i64);
+    if (re.prog.depth >= 0i64) {
+        boundaries = std::cmp::min(boundaries, (((re.prog.depth) as i64) + 3i64));
+    }
+    let steps: i64 = cAdd(cAdd((24i64 + ring), length), cMul(boundaries, perBoundary));
     let stack: i64 = 6144i64;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -4106,7 +4111,7 @@ pub fn onePassCaps(re: &mut Regexp, d: &mut decoded, ni: i32, i: i64, j: i64, ef
     return false;
 }
 
-pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) {
+pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) -> i64 {
     let mut ok: bool = true;
     let mut matchReachable: bool = false;
     let seen: vg::Slice<bool> = vg::make::<bool>(mem, pr.ins.len);
@@ -4159,7 +4164,7 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) {
     if ((matchReachable || (!ok)) || pr.multi) {
         let none: scanFilter = vg::zero();
         pr.scan = none;
-        return;
+        return 0i64;
     }
     if newlineMode {
         pr.scan.stop[(10i64) as usize] = true;
@@ -4179,6 +4184,7 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) {
         }
     }
     pr.scan.single = (count == 1i64);
+    return count;
 }
 
 pub fn instrEstimate(nodes: vg::Slice<node>, ni: i32) -> i64 {
@@ -4252,7 +4258,84 @@ pub fn compileProgram(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<nod
     b.prog.start = body.start;
     b.prog.multi = multi;
     b.prog.failMin = b.failMin;
-    { let _t8 = newlineMode; buildScanFilter(mem, &mut b.prog, _t8) };
+    let stops: i64 = { let _t8 = newlineMode; buildScanFilter(mem, &mut b.prog, _t8) };
+    b.prog.depth = (1i64).wrapping_neg();
+    if (((!newlineMode) && b.prog.scan.enabled) && (stops == 0i64)) {
+        b.prog.depth = progDepth(mem, &mut b.prog);
+    }
+}
+
+pub fn consumingOp(op: u8) -> bool {
+    return (op <= iBracket);
+}
+
+pub fn progEdge(pr: &mut program, pc: u32, i: i64) -> (u32, bool) {
+    let op: u8 = pr.ins.get(((pc) as i64)).op;
+    if ((op == iMatch) || (op == iFail)) {
+        return (0u32, false);
+    }
+    if (i == 0i64) {
+        return (pr.ins.get(((pc) as i64)).next, true);
+    }
+    if ((i == 1i64) && (op == iSplit)) {
+        return (pr.ins.get(((pc) as i64)).alt, true);
+    }
+    return (0u32, false);
+}
+
+pub fn progDepth(mem: &vg::Arena, pr: &mut program) -> i64 {
+    let n: i64 = pr.ins.len;
+    let depth: vg::Slice<i32> = vg::make::<i32>(mem, n);
+    {
+        let mut round: i64 = 0i64;
+        '_b1: while (round < 2i64) {
+            '_c1: {
+                let mut changed: bool = false;
+                {
+                    let mut pc: i64 = 0i64;
+                    '_b2: while (pc < n) {
+                        '_c2: {
+                            let mut weight: i32 = 0i32;
+                            if consumingOp(pr.ins.get(pc).op) {
+                                weight = 1i32;
+                            }
+                            {
+                                let mut e: i64 = 0i64;
+                                '_b3: while (e < 2i64) {
+                                    '_c3: {
+                                        let _t4 = { let _t5 = ((pc) as u32); let _t6 = e; progEdge(pr, _t5, _t6) };
+                                        let target: u32 = _t4.0;
+                                        let has: bool = _t4.1;
+                                        if (has && (depth.get(((target) as i64)) < (depth.get(pc) + weight))) {
+                                            depth.set(((target) as i64), (depth.get(pc) + weight));
+                                            changed = true;
+                                        }
+                                    }
+                                    e += 1i64;
+                                }
+                            }
+                        }
+                        pc += 1i64;
+                    }
+                }
+                if (!changed) {
+                    let mut best: i32 = 0i32;
+                    {
+                        let mut pc_2: i64 = 0i64;
+                        '_b7: while (pc_2 < n) {
+                            '_c7: {
+                                best = std::cmp::max(best, depth.get(pc_2));
+                            }
+                            pc_2 += 1i64;
+                        }
+                    }
+                    return ((best) as i64);
+                }
+            }
+            round += 1i64;
+        }
+    }
+    return (1i64).wrapping_neg();
 }
 
 pub fn addInstr(mem: &vg::Arena, b: &mut progBuilder, ins: instr) -> u32 {
@@ -4465,7 +4548,7 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
                     return none;
                 }
                 if ((i == (lo - 1i64)) && (hi == infinite)) {
-                    haveResult = { let _t3 = haveResult; let _t4 = { let _t5 = nodes; let _t6 = child; let _t7 = mask_v; let _t8 = extra_v; emitPlus(mem, b, _t5, _t6, _t7, _t8) }; fragAppend(b, &mut result, _t3, _t4) };
+                    let _ = { let _t3 = haveResult; let _t4 = { let _t5 = nodes; let _t6 = child; let _t7 = mask_v; let _t8 = extra_v; emitPlus(mem, b, _t5, _t6, _t7, _t8) }; fragAppend(b, &mut result, _t3, _t4) };
                     return result;
                 }
                 haveResult = { let _t9 = haveResult; let _t10 = { let _t11 = nodes; let _t12 = child; let _t13 = mask_v; let _t14 = extra_v; emit(mem, b, _t11, _t12, _t13, _t14) }; fragAppend(b, &mut result, _t9, _t10) };
@@ -4474,7 +4557,7 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
         }
     }
     if (hi == infinite) {
-        haveResult = { let _t15 = haveResult; let _t16 = { let _t17 = nodes; let _t18 = child; let _t19 = mask_v; let _t20 = extra_v; emitStar(mem, b, _t17, _t18, _t19, _t20) }; fragAppend(b, &mut result, _t15, _t16) };
+        let _ = { let _t15 = haveResult; let _t16 = { let _t17 = nodes; let _t18 = child; let _t19 = mask_v; let _t20 = extra_v; emitStar(mem, b, _t17, _t18, _t19, _t20) }; fragAppend(b, &mut result, _t15, _t16) };
         return result;
     }
     let mut skips: vg::Slice<patchSlot> = vg::make_cap::<patchSlot>(mem, 0i64, std::cmp::max((hi - lo), 1i64));

@@ -59,7 +59,7 @@ Before each call, the session computes the contract of the pattern for the subje
 A measurement above `ContractHeapBytes`, `ContractStackBytes` or `ContractSteps` is a hard fault.
 The stack comparison uses the 256-byte frame estimate of the contract.
 
-That covers the 75,596 retained X commands.
+That covers the 78,236 retained X commands.
 It does not cover R and I.
 ReplaceAll and MatchIterNext call Exec themselves, and the session measures only its own calls.
 Those 360 commands are therefore checked for output agreement alone.
@@ -76,7 +76,7 @@ The runtimes round a zero-length request up to one element, and malloc adds its 
 Instead, it folds a constant factor of slack into its per-record sizes to cover it.
 
 Two corpus patterns cannot run under the interpreter in any reasonable time, and the theorem leaves their executions out.
-That is 1,056 X commands of the 87,415, so the theorem covers 86,359 commands.
+That is 1,056 X commands of the 90,145, so the theorem covers 89,089 commands.
 
 Both nest a star inside counted repetitions, `((a*){250}){250}b` in six blocks and `((a*){4}){4}` in six more.
 The parse search then explores a very large number of ways to split a subject among nullable instances.
@@ -87,7 +87,7 @@ The second needs minutes on the empty subject.
 Therefore, replaying all twelve blocks would take days.
 
 What stays is chosen so that nothing escapes the check that matters.
-Every compile command of the corpus stays, all 9,780 of them, so no pattern goes uncompiled and unchecked.
+Every compile command of the corpus stays, all 9,810 of them, so no pattern goes uncompiled and unchecked.
 The T commands of those blocks stay too, so the contract figures of the two extreme patterns still compare against the Go reference.
 Those are the largest figures in the corpus, which makes them the ones worth keeping.
 
@@ -154,7 +154,7 @@ Finally, all three statements are finite: they quantify over the corpus and the 
 
 ### 5. The phase A heap and step bounds are universal
 
-`PhaseA.run_steps_le`, `PhaseA.run_heap_le` and `phaseA_link_agrees`.
+`PhaseA.run_steps_le`, `PhaseA.run_heap_le`, `phaseA_run_steps_anchored` and `phaseA_link_agrees`.
 
 The matcher has two stages.
 Phase A scans the subject once, advances every viable automaton path in lockstep, and selects the overall match start and end; Phase B later resolves subexpression captures inside that span.
@@ -181,10 +181,18 @@ On those executions, the model runs on the program read from the interpreted `Re
 It also allocates exactly the bytes that the interpreter counts, while its step figure dominates the interpreter's loop meter.
 
 On every `T` command of such a pattern, the heap and step figures the engine reports equal the proven figures.
-`linkCoverage` pins the counts: 47,922 executions, 46 contract queries, and 6,893 programs that pass `Prog.wfCheck`.
+`linkCoverage` pins the counts: 49,682 executions, 56 contract queries of which 10 use the anchored figure, and 6,913 programs that pass `Prog.wfCheck`.
 
-On the linked corpus executions, `contract.go` computes exactly `heapFigure` and `stepsFigure` for phase A.
+On the linked corpus executions, `contract.go` computes exactly `heapFigure` and `stepsFigure` for phase A, or `stepsFigureAnchored` for a start-anchored program of bounded depth.
 Those are the bounds proved universally for the model under the well-formedness hypotheses above.
+
+A start-anchored program of bounded depth gets a tighter step figure.
+Such a program has a scan filter with an empty stop set: its start reaches no consuming instruction with the anchors off, and it was compiled without newline mode.
+A thread seeded past the first boundary dies in its closure, and once the threads of the first boundary are gone, the filter jumps to the end of the subject.
+Those threads live for at most as many boundaries as the longest consuming path of the program, which `program.go` computes at compile time as `depth`.
+`stepsFigureAnchored` charges `depth + 3` boundaries instead of one per byte, and `Vego/PhaseAAnchored.lean` proves it by carrying a depth invariant across the boundary loop: every live entry of boundary `ci` sits on an instruction whose label is at least `ci`.
+`phaseA_run_steps_anchored` states it under a decidable certificate, `anchoredCheck`: labels that never drop along a split or jump edge and grow by one across a consuming instruction, and the seed reach, closed under those edges and free of consuming instructions.
+The link builds that certificate for every corpus program whose contract uses the anchored figure, by relaxation of the labels and closure of the seed reach, and it checks that the engine's depth is exactly the largest label.
 
 Two things led to this.
 First, an adversarial probe found that the previous phase A heap figure was unsound.

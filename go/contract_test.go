@@ -77,3 +77,134 @@ func TestBracketAtomCost(t *testing.T) {
 		t.Errorf("equivalence classes cost %d then %d", two-plain, three-two)
 	}
 }
+
+// The bound exists exactly for start-anchored programs without newline mode and without a cycle.
+func TestProgramDepth(t *testing.T) {
+	cases := []struct {
+		pattern string
+		flags   uint32
+		want    int
+	}{
+		{"^abc$", 0, 3},
+		{"^abc$", FlagICase, 3},
+		{"^abc$", FlagNoSub, 3},
+		{"^abc$", FlagNewline, -1},
+		{"^$", 0, 0},
+		{"$", 0, 0},
+		{"^", 0, 0},
+		{"^(a|bc|def)$", 0, 3},
+		{"(^a)?$", 0, 1},
+		{"^a{3}", 0, 3},
+		{"^[ab]{2,4}c", 0, 5},
+		{"^.", 0, 1},
+		{"^(ab|c)?(de)?$", 0, 4},
+		{"abc", 0, -1},
+		{"^a|b", 0, -1},
+		{"^a*$", 0, -1},
+		{"^[a-z]+$", 0, -1},
+		{"^(a|b)*b", 0, -1},
+		{"^(^)*abc$", 0, 3},
+		{"a$", 0, -1},
+		{"a?", 0, -1},
+		{"^(a?)$", 0, 1},
+	}
+	for _, tc := range cases {
+		re, err := Compile(tc.pattern, LocalePOSIX(), tc.flags)
+		if err.Code != ErrNone {
+			t.Fatalf("Compile(%q, %d) failed: %v", tc.pattern, tc.flags, err)
+		}
+		if got := re.prog.depth; got != tc.want {
+			t.Errorf("depth of %q with flags %d is %d, want %d", tc.pattern, tc.flags, got, tc.want)
+		}
+	}
+}
+
+// bellmanFordDepth recomputes the longest consuming path by relaxation to a fixed point, and says -1 on a
+// consuming cycle.
+// It is the certificate check the Lean link performs, with no bound on the rounds, so it does not depend on
+// the forward layout that lets progDepth stop after two.
+func bellmanFordDepth(pr *program) int {
+	n := len(pr.ins)
+	depth := make([]int, n)
+	for round := 0; round <= n; round++ {
+		changed := false
+		for pc := range n {
+			weight := 0
+			if consumingOp(pr.ins[pc].op) {
+				weight = 1
+			}
+			for e := range 2 {
+				target, has := progEdge(pr, uint32(pc), e)
+				if has && depth[target] < depth[pc]+weight {
+					depth[target] = depth[pc] + weight
+					changed = true
+				}
+			}
+		}
+		if !changed {
+			best := 0
+			for pc := range n {
+				best = max(best, depth[pc])
+			}
+			return best
+		}
+	}
+	return -1
+}
+
+// progDepth agrees with the unbounded relaxation on every program, so the two rounds it stops after are enough.
+func TestProgDepthAgreesWithRelaxation(t *testing.T) {
+	atoms := []string{"a", "b", ".", "[ab]", "(a|b)", "(ab)?", "a{2}", "(a|bc){1,2}", "^", "$", "a?", "a*", "b+"}
+	var patterns []string
+	for _, x := range atoms {
+		patterns = append(patterns, "^"+x+"$", "^"+x, x+"$", x)
+		for _, y := range atoms {
+			patterns = append(patterns, "^"+x+y+"$", "^"+x+"|"+y+"$", "^("+x+"|"+y+")?")
+		}
+	}
+	bounded := 0
+	for _, pattern := range patterns {
+		for _, flags := range []uint32{0, FlagICase, FlagNewline, FlagNoSub} {
+			re, err := Compile(pattern, LocalePOSIX(), flags)
+			if err.Code != ErrNone {
+				continue
+			}
+			got := progDepth(&re.prog)
+			if want := bellmanFordDepth(&re.prog); got != want {
+				t.Errorf("progDepth(%q, %d) = %d, relaxation gives %d", pattern, flags, got, want)
+			}
+			if got >= 0 {
+				bounded++
+			}
+		}
+	}
+	if bounded < 100 {
+		t.Fatalf("only %d bounded programs, the sweep is too small", bounded)
+	}
+}
+
+// A start-anchored pattern of bounded length pays for depth+3 boundaries instead of one per byte.
+func TestAnchoredContractSteps(t *testing.T) {
+	re, err := Compile("^abc$", LocalePOSIX(), 0)
+	if err.Code != ErrNone {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	perBoundary := int64(1220)
+	for _, tc := range []struct {
+		maxInput   int
+		boundaries int64
+	}{{0, 1}, {1, 2}, {4, 5}, {5, 6}, {6, 6}, {1000, 6}} {
+		c := ContractFor(&re, tc.maxInput)
+		want := 26 + int64(tc.maxInput) + tc.boundaries*perBoundary
+		if c.Matcher.Steps != want {
+			t.Errorf("ContractFor(^abc$, %d).Matcher.Steps = %d, want %d", tc.maxInput, c.Matcher.Steps, want)
+		}
+	}
+	unanchored, err := Compile("abc", LocalePOSIX(), 0)
+	if err.Code != ErrNone {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	if got := ContractFor(&unanchored, 1000).Matcher.Steps; got != 26+1000+1001*660 {
+		t.Errorf("ContractFor(abc, 1000).Matcher.Steps = %d, want one boundary per byte", got)
+	}
+}

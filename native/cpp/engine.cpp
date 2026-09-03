@@ -976,7 +976,11 @@ BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
     int64_t perBoundary = ([&]{ auto _t5 = weight; auto _t6 = cMul((n + 1LL), (n + 1LL)); return cMul(_t5, _t6); }());
     perBoundary = ([&]{ auto _t7 = perBoundary; auto _t8 = cMul(n, perTest); return cAdd(_t7, _t8); }());
     perBoundary = ([&]{ auto _t9 = perBoundary; auto _t10 = ([&]{ auto _t11 = ([&]{ auto _t12 = n; auto _t13 = cMul(2LL, k); return cAdd(_t12, _t13); }()); auto _t14 = cAdd(cMul(4LL, ring), 38LL); return cAdd(_t11, _t14); }()); return cAdd(_t9, _t10); }());
-    int64_t steps = ([&]{ auto _t15 = cAdd((24LL + ring), length); auto _t16 = ([&]{ auto _t17 = cAdd(length, 1LL); auto _t18 = perBoundary; return cMul(_t17, _t18); }()); return cAdd(_t15, _t16); }());
+    int64_t boundaries = cAdd(length, 1LL);
+    if ((re.prog.depth >= 0LL)) {
+        boundaries = std::min<int64_t>(boundaries, (int64_t(re.prog.depth) + 3LL));
+    }
+    int64_t steps = ([&]{ auto _t15 = cAdd((24LL + ring), length); auto _t16 = cMul(boundaries, perBoundary); return cAdd(_t15, _t16); }());
     int64_t stack = 6144LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -3118,7 +3122,7 @@ bool onePassCaps(Regexp& re, decoded& d, int32_t ni, int64_t i, int64_t j, uint3
     return false;
 }
 
-void buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
+int64_t buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
     bool ok = true;
     bool matchReachable = false;
     vg::Slice<bool> seen = vg::make<bool>(mem, vg::len(pr.ins));
@@ -3164,7 +3168,7 @@ void buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
     if (((matchReachable || (!ok)) || pr.multi)) {
         scanFilter none{};
         pr.scan = none;
-        return;
+        return 0LL;
     }
     if (newlineMode) {
         pr.scan.stop[size_t(10LL)] = true;
@@ -3178,6 +3182,7 @@ void buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
         }
     }
     pr.scan.single = (count == 1LL);
+    return count;
 }
 
 int64_t instrEstimate(vg::Slice<node> nodes, int32_t ni) {
@@ -3242,7 +3247,60 @@ void compileProgram(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32
     b.prog.start = body.start;
     b.prog.multi = multi;
     b.prog.failMin = b.failMin;
-    buildScanFilter(mem, b.prog, newlineMode);
+    int64_t stops = buildScanFilter(mem, b.prog, newlineMode);
+    b.prog.depth = int64_t(0ULL - uint64_t(1LL));
+    if ((((!newlineMode) && b.prog.scan.enabled) && (stops == 0LL))) {
+        b.prog.depth = progDepth(mem, b.prog);
+    }
+}
+
+bool consumingOp(uint8_t op) {
+    return (op <= iBracket);
+}
+
+Tup_u32_bool progEdge(program& pr, uint32_t pc, int64_t i) {
+    uint8_t op = pr.ins[pc].op;
+    if (((op == iMatch) || (op == iFail))) {
+        return Tup_u32_bool{0U, false};
+    }
+    if ((i == 0LL)) {
+        return Tup_u32_bool{pr.ins[pc].next, true};
+    }
+    if (((i == 1LL) && (op == iSplit))) {
+        return Tup_u32_bool{pr.ins[pc].alt, true};
+    }
+    return Tup_u32_bool{0U, false};
+}
+
+int64_t progDepth(vg::Arena& mem, program& pr) {
+    int64_t n = vg::len(pr.ins);
+    vg::Slice<int32_t> depth = vg::make<int32_t>(mem, n);
+    for (int64_t round = 0LL; (round < 2LL); round += 1LL) {
+        bool changed = false;
+        for (int64_t pc = 0LL; (pc < n); pc += 1LL) {
+            int32_t weight = 0;
+            if (consumingOp(pr.ins[pc].op)) {
+                weight = 1;
+            }
+            for (int64_t e = 0LL; (e < 2LL); e += 1LL) {
+                auto _t1 = progEdge(pr, uint32_t(pc), e);
+                uint32_t target = _t1.r0;
+                bool has = _t1.r1;
+                if ((has && (depth[target] < int32_t(depth[pc] + weight)))) {
+                    depth[target] = int32_t(depth[pc] + weight);
+                    changed = true;
+                }
+            }
+        }
+        if ((!changed)) {
+            int32_t best = 0;
+            for (int64_t pc_2 = 0LL; (pc_2 < n); pc_2 += 1LL) {
+                best = std::max<int32_t>(best, depth[pc_2]);
+            }
+            return int64_t(best);
+        }
+    }
+    return int64_t(0ULL - uint64_t(1LL));
 }
 
 uint32_t addInstr(vg::Arena& mem, progBuilder& b, instr ins) {
@@ -3442,13 +3500,13 @@ frag emitRepeat(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t n
             return none;
         }
         if (((i == (lo - 1LL)) && (hi == infinite))) {
-            haveResult = ([&]{ auto _t3 = haveResult; auto _t4 = emitPlus(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t3, _t4); }());
+            (void)(([&]{ auto _t3 = haveResult; auto _t4 = emitPlus(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t3, _t4); }()));
             return result;
         }
         haveResult = ([&]{ auto _t5 = haveResult; auto _t6 = emit(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t5, _t6); }());
     }
     if ((hi == infinite)) {
-        haveResult = ([&]{ auto _t7 = haveResult; auto _t8 = emitStar(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t7, _t8); }());
+        (void)(([&]{ auto _t7 = haveResult; auto _t8 = emitStar(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t7, _t8); }()));
         return result;
     }
     vg::Slice<patchSlot> skips = vg::make_cap<patchSlot>(mem, 0LL, std::max<int64_t>((hi - lo), 1LL));

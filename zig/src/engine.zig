@@ -371,6 +371,7 @@ pub const program = struct {
     multi: bool = false,
     failMin: i64 = 0,
     scan: scanFilter = .{},
+    depth: i64 = 0,
 };
 
 pub const patchSlot = struct {
@@ -1515,7 +1516,11 @@ pub fn matcherContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     var perBoundary: i64 = cMul(weight, cMul((n +% 1), (n +% 1)));
     perBoundary = cAdd(perBoundary, cMul(n, perTest));
     perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2, k)), cAdd(cMul(4, ring), 38)));
-    const steps: i64 = cAdd(cAdd((24 +% ring), length), cMul(cAdd(length, 1), perBoundary));
+    var boundaries: i64 = cAdd(length, 1);
+    if ((re.prog.depth >= 0)) {
+        boundaries = @min(boundaries, (vg.cv(i64, re.prog.depth) +% 3));
+    }
+    const steps: i64 = cAdd(cAdd((24 +% ring), length), cMul(boundaries, perBoundary));
     const stack: i64 = (vg.cv(i64, matcherStackBytes) +% (multiLookupFrames *% frameBytes));
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -3849,7 +3854,7 @@ pub fn onePassCaps(re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64, eflags: u3
     return false;
 }
 
-pub fn buildScanFilter(mem: vg.Allocator, pr: *program, newlineMode: bool) vg.Allocator.Error!void {
+pub fn buildScanFilter(mem: vg.Allocator, pr: *program, newlineMode: bool) vg.Allocator.Error!i64 {
     var ok: bool = true;
     var matchReachable: bool = false;
     const seen: vg.Slice(bool) = try vg.make(mem, bool, pr.ins.len);
@@ -3898,7 +3903,7 @@ pub fn buildScanFilter(mem: vg.Allocator, pr: *program, newlineMode: bool) vg.Al
     if (((matchReachable or (!ok)) or pr.multi)) {
         const none: scanFilter = .{};
         pr.scan = none;
-        return;
+        return 0;
     }
     if (newlineMode) {
         pr.scan.stop[10] = true;
@@ -3915,6 +3920,7 @@ pub fn buildScanFilter(mem: vg.Allocator, pr: *program, newlineMode: bool) vg.Al
         }
     }
     pr.scan.single = (count == 1);
+    return count;
 }
 
 pub fn instrEstimate(nodes: vg.Slice(node), ni: i32) i64 {
@@ -3985,7 +3991,72 @@ pub fn compileProgram(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node),
     b.prog.start = body.start;
     b.prog.multi = multi;
     b.prog.failMin = b.failMin;
-    try buildScanFilter(mem, &b.prog, newlineMode);
+    const stops: i64 = try buildScanFilter(mem, &b.prog, newlineMode);
+    b.prog.depth = (-%1);
+    if ((((!newlineMode) and b.prog.scan.enabled) and (stops == 0))) {
+        b.prog.depth = try progDepth(mem, &b.prog);
+    }
+}
+
+pub fn consumingOp(op: u8) bool {
+    return (op <= iBracket);
+}
+
+pub fn progEdge(pr: *program, pc: u32, i: i64) Tup_u32_bool {
+    const op: u8 = pr.ins.at(pc).*.op;
+    if (((op == iMatch) or (op == iFail))) {
+        return .{ 0, false };
+    }
+    if ((i == 0)) {
+        return .{ pr.ins.at(pc).*.next, true };
+    }
+    if (((i == 1) and (op == iSplit))) {
+        return .{ pr.ins.at(pc).*.alt, true };
+    }
+    return .{ 0, false };
+}
+
+pub fn progDepth(mem: vg.Allocator, pr: *program) vg.Allocator.Error!i64 {
+    const n: i64 = pr.ins.len;
+    const depth: vg.Slice(i32) = try vg.make(mem, i32, n);
+    {
+        var round: i64 = 0;
+        while ((round < 2)) : (round +%= 1) {
+            var changed: bool = false;
+            {
+                var pc: i64 = 0;
+                while ((pc < n)) : (pc +%= 1) {
+                    var weight: i32 = vg.cv(i32, 0);
+                    if (consumingOp(pr.ins.at(pc).*.op)) {
+                        weight = 1;
+                    }
+                    {
+                        var e: i64 = 0;
+                        while ((e < 2)) : (e +%= 1) {
+                            const _t1 = progEdge(pr, vg.cv(u32, pc), e);
+                            const target: u32 = _t1[0];
+                            const has: bool = _t1[1];
+                            if ((has and (depth.at(target).* < (depth.at(pc).* +% weight)))) {
+                                depth.at(target).* = (depth.at(pc).* +% weight);
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if ((!changed)) {
+                var best: i32 = vg.cv(i32, 0);
+                {
+                    var pc_2: i64 = 0;
+                    while ((pc_2 < n)) : (pc_2 +%= 1) {
+                        best = @max(best, depth.at(pc_2).*);
+                    }
+                }
+                return vg.cv(i64, best);
+            }
+        }
+    }
+    return (-%1);
 }
 
 pub fn addInstr(mem: vg.Allocator, b: *progBuilder, ins: instr) vg.Allocator.Error!u32 {
@@ -4196,14 +4267,14 @@ pub fn emitRepeat(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), ni:
                 return none;
             }
             if (((i == (lo -% 1)) and (hi == infinite))) {
-                haveResult = fragAppend(b, &result, haveResult, try emitPlus(mem, b, nodes, child, mask_v, extra_v));
+                _ = fragAppend(b, &result, haveResult, try emitPlus(mem, b, nodes, child, mask_v, extra_v));
                 return result;
             }
             haveResult = fragAppend(b, &result, haveResult, try emit(mem, b, nodes, child, mask_v, extra_v));
         }
     }
     if ((hi == infinite)) {
-        haveResult = fragAppend(b, &result, haveResult, try emitStar(mem, b, nodes, child, mask_v, extra_v));
+        _ = fragAppend(b, &result, haveResult, try emitStar(mem, b, nodes, child, mask_v, extra_v));
         return result;
     }
     var skips: vg.Slice(patchSlot) = try vg.makeCap(mem, patchSlot, 0, @max((hi -% lo), 1));

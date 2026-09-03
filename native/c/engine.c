@@ -1104,11 +1104,13 @@ revera_eng_BackendContract revera_eng_matcherContract(revera_eng_Regexp *re, int
     int64_t _t13 = revera_eng_cAdd(revera_eng_cMul(4LL, ring), 38LL);
     int64_t _t14 = revera_eng_cAdd(_t12, _t13);
     perBoundary = revera_eng_cAdd(_t9, _t14);
+    int64_t boundaries = revera_eng_cAdd(length, 1LL);
+    if ((re->prog.depth >= 0LL)) {
+        boundaries = vg_min_i64(boundaries, (((int64_t)(re->prog.depth)) + 3LL));
+    }
     int64_t _t15 = revera_eng_cAdd((24LL + ring), length);
-    int64_t _t16 = revera_eng_cAdd(length, 1LL);
-    int64_t _t17 = perBoundary;
-    int64_t _t18 = revera_eng_cMul(_t16, _t17);
-    int64_t steps = revera_eng_cAdd(_t15, _t18);
+    int64_t _t16 = revera_eng_cMul(boundaries, perBoundary);
+    int64_t steps = revera_eng_cAdd(_t15, _t16);
     int64_t stack = 6144LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -3597,7 +3599,7 @@ bool revera_eng_onePassCaps(revera_eng_Regexp *re, revera_eng_decoded *d, int32_
     return false;
 }
 
-void revera_eng_buildScanFilter(vg_arena *mem, revera_eng_program *pr, bool newlineMode) {
+int64_t revera_eng_buildScanFilter(vg_arena *mem, revera_eng_program *pr, bool newlineMode) {
     bool ok = true;
     bool matchReachable = false;
     revera_eng_slice_bool seen = revera_eng_slice_bool_make(mem, (pr->ins).len);
@@ -3652,7 +3654,7 @@ void revera_eng_buildScanFilter(vg_arena *mem, revera_eng_program *pr, bool newl
     if (((matchReachable || (!(ok))) || pr->multi)) {
         revera_eng_scanFilter none = {0};
         pr->scan = none;
-        return;
+        return 0LL;
     }
     if (newlineMode) {
         pr->scan.stop.v[10LL] = true;
@@ -3669,6 +3671,7 @@ void revera_eng_buildScanFilter(vg_arena *mem, revera_eng_program *pr, bool newl
         }
     }
     pr->scan.single = (count == 1LL);
+    return count;
 }
 
 int64_t revera_eng_instrEstimate(revera_eng_slice_node nodes, int32_t ni) {
@@ -3739,7 +3742,72 @@ void revera_eng_compileProgram(vg_arena *mem, revera_eng_progBuilder *b, revera_
     b->prog.start = body.start;
     b->prog.multi = multi;
     b->prog.failMin = b->failMin;
-    revera_eng_buildScanFilter(mem, &(b->prog), newlineMode);
+    int64_t stops = revera_eng_buildScanFilter(mem, &(b->prog), newlineMode);
+    b->prog.depth = ((int64_t)(0ULL - (uint64_t)(1LL)));
+    if ((((!(newlineMode)) && b->prog.scan.enabled) && (stops == 0LL))) {
+        b->prog.depth = revera_eng_progDepth(mem, &(b->prog));
+    }
+}
+
+bool revera_eng_consumingOp(uint8_t op) {
+    return (op <= revera_eng_iBracket);
+}
+
+revera_eng_Tup_u32_bool revera_eng_progEdge(revera_eng_program *pr, uint32_t pc, int64_t i) {
+    uint8_t op = (*revera_eng_slice_instr_at(pr->ins, pc)).op;
+    if (((op == revera_eng_iMatch) || (op == revera_eng_iFail))) {
+        return (revera_eng_Tup_u32_bool){0U, false};
+    }
+    if ((i == 0LL)) {
+        return (revera_eng_Tup_u32_bool){(*revera_eng_slice_instr_at(pr->ins, pc)).next, true};
+    }
+    if (((i == 1LL) && (op == revera_eng_iSplit))) {
+        return (revera_eng_Tup_u32_bool){(*revera_eng_slice_instr_at(pr->ins, pc)).alt, true};
+    }
+    return (revera_eng_Tup_u32_bool){0U, false};
+}
+
+int64_t revera_eng_progDepth(vg_arena *mem, revera_eng_program *pr) {
+    int64_t n = (pr->ins).len;
+    revera_eng_slice_i32 depth = revera_eng_slice_i32_make(mem, n);
+    {
+        int64_t round = 0LL;
+        for (; (round < 2LL); round += 1LL) {
+            bool changed = false;
+            {
+                int64_t pc = 0LL;
+                for (; (pc < n); pc += 1LL) {
+                    int32_t weight = 0;
+                    if (revera_eng_consumingOp((*revera_eng_slice_instr_at(pr->ins, pc)).op)) {
+                        weight = 1;
+                    }
+                    {
+                        int64_t e = 0LL;
+                        for (; (e < 2LL); e += 1LL) {
+                            revera_eng_Tup_u32_bool _t1 = revera_eng_progEdge(pr, ((uint32_t)(pc)), e);
+                            uint32_t target = _t1.r0;
+                            bool has = _t1.r1;
+                            if ((has && ((*revera_eng_slice_i32_at(depth, target)) < ((int32_t)((*revera_eng_slice_i32_at(depth, pc)) + weight))))) {
+                                (*revera_eng_slice_i32_at(depth, target)) = ((int32_t)((*revera_eng_slice_i32_at(depth, pc)) + weight));
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if ((!(changed))) {
+                int32_t best = 0;
+                {
+                    int64_t pc_2 = 0LL;
+                    for (; (pc_2 < n); pc_2 += 1LL) {
+                        best = vg_max_i32(best, (*revera_eng_slice_i32_at(depth, pc_2)));
+                    }
+                }
+                return ((int64_t)(best));
+            }
+        }
+    }
+    return ((int64_t)(0ULL - (uint64_t)(1LL)));
 }
 
 uint32_t revera_eng_addInstr(vg_arena *mem, revera_eng_progBuilder *b, revera_eng_instr ins) {
@@ -3956,7 +4024,7 @@ revera_eng_frag revera_eng_emitRepeat(vg_arena *mem, revera_eng_progBuilder *b, 
             if (((i == (lo - 1LL)) && (hi == revera_eng_infinite))) {
                 bool _t3 = haveResult;
                 revera_eng_frag _t4 = revera_eng_emitPlus(mem, b, nodes, child, mask_v, extra_v);
-                haveResult = revera_eng_fragAppend(b, &(result), _t3, _t4);
+                (void)(revera_eng_fragAppend(b, &(result), _t3, _t4));
                 return result;
             }
             bool _t5 = haveResult;
@@ -3967,7 +4035,7 @@ revera_eng_frag revera_eng_emitRepeat(vg_arena *mem, revera_eng_progBuilder *b, 
     if ((hi == revera_eng_infinite)) {
         bool _t7 = haveResult;
         revera_eng_frag _t8 = revera_eng_emitStar(mem, b, nodes, child, mask_v, extra_v);
-        haveResult = revera_eng_fragAppend(b, &(result), _t7, _t8);
+        (void)(revera_eng_fragAppend(b, &(result), _t7, _t8));
         return result;
     }
     revera_eng_slice_patchSlot skips = revera_eng_slice_patchSlot_make_cap(mem, 0LL, vg_max_i64((hi - lo), 1LL));

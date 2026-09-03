@@ -172,8 +172,8 @@ These figures are what the walk over the replayed corpus produces; the theorem f
 so a change in coverage is a change in the statement.
 -/
 def expectedCoverage : Coverage :=
-  { definedC := 9653, invalidC := 0, freeC := 66, nonPosixC := 148,
-    execChecked := 66576, execOutsideDomain := 1512, execOverBudget := 0,
+  { definedC := 9683, invalidC := 0, freeC := 66, nonPosixC := 148,
+    execChecked := 68856, execOutsideDomain := 1872, execOverBudget := 0,
     execUnconstrained := 7508 }
 
 /--

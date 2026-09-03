@@ -544,5 +544,63 @@ def stepsFigure (p : Prog) (atom len : Nat) : Nat := 24 + p.ring + len + (len + 
 
 def heapFigure (n k ring : Nat) : Nat := prepareBytes n k ring + ring * (16 * n + 64) + 32 * n + 272
 
+/-!
+## The anchored figure
+
+A program whose scan filter is enabled with an empty stop set reaches no consuming instruction from its
+start with the anchors off, and it was compiled without newline mode.
+A thread seeded past the first boundary therefore dies in its closure, and once the threads of the first
+boundary are gone, the filter jumps to the end of the subject.
+Those threads live for at most as many boundaries as the longest consuming path of the program, its depth,
+which `program.depth` of `program.go` records.
+`stepsFigureAnchored` charges `depth + 3` boundaries instead of one per byte.
+`Vego/PhaseAAnchored.lean` proves it for every program that carries the certificate `Anchored`, and
+`anchoredCheck` decides that certificate.
+-/
+
+/-- The instructions that consume a character. -/
+def Op.consuming : Op → Bool
+  | .rune | .runeFold | .any | .bracket => true
+  | _ => false
+
+/--
+The certificate of a bounded program.
+`d` labels every instruction with a bound on the consuming steps of any path that reaches it: the label
+never drops along a split or jump edge, and it grows by one across a consuming instruction.
+`seed` marks the instructions the spawn of a mid-subject boundary can reach: the start, closed under the
+split and jump edges, and never a consuming instruction.
+-/
+structure Anchored (p : Prog) (d : Nat → Nat) (seed : Nat → Bool) (depth : Nat) : Prop where
+  enabled : p.scan.enabled = true
+  single : p.scan.single = false
+  stop : ∀ b, p.scan.stop b = false
+  start : seed p.start = true
+  split : ∀ pc, pc < p.n → (p.ins.getD pc default).op = .split →
+    d pc ≤ d (p.ins.getD pc default).next ∧ d pc ≤ d (p.ins.getD pc default).alt ∧
+    (seed pc = true → seed (p.ins.getD pc default).next = true ∧ seed (p.ins.getD pc default).alt = true)
+  jmp : ∀ pc, pc < p.n → (p.ins.getD pc default).op = .jmp →
+    d pc ≤ d (p.ins.getD pc default).next ∧ (seed pc = true → seed (p.ins.getD pc default).next = true)
+  consume : ∀ pc, pc < p.n → (p.ins.getD pc default).op.consuming = true →
+    seed pc = false ∧ d pc + 1 ≤ d (p.ins.getD pc default).next
+  bound : ∀ pc, pc < p.n → d pc ≤ depth
+
+/-- The decidable form of `Anchored`, over labels and marks stored in arrays. -/
+def anchoredCheck (p : Prog) (d : Array Nat) (seed : Array Bool) (depth : Nat) : Bool :=
+  p.scan.enabled && !p.scan.single && (List.range 256).all (fun b => !p.scan.stop (UInt8.ofNat b)) &&
+  seed.getD p.start false &&
+  (List.range p.n).all fun pc =>
+    let ins := p.ins.getD pc default
+    let edges := match ins.op with
+      | .split => d.getD pc 0 ≤ d.getD ins.next 0 && d.getD pc 0 ≤ d.getD ins.alt 0 &&
+          (!seed.getD pc false || (seed.getD ins.next false && seed.getD ins.alt false))
+      | .jmp => d.getD pc 0 ≤ d.getD ins.next 0 && (!seed.getD pc false || seed.getD ins.next false)
+      | .rune | .runeFold | .any | .bracket => !seed.getD pc false && d.getD pc 0 + 1 ≤ d.getD ins.next 0
+      | _ => true
+    edges && d.getD pc 0 ≤ depth
+
+/-- The step figure of a bounded program: `depth + 3` boundaries, or one per byte plus the end when that is fewer. -/
+def stepsFigureAnchored (p : Prog) (atom len depth : Nat) : Nat :=
+  24 + p.ring + len + min (len + 1) (depth + 3) * perBoundary p atom
+
 end PhaseA
 end Vego

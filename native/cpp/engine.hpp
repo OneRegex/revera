@@ -418,6 +418,7 @@ struct program {
     bool multi = {};
     int64_t failMin = {};
     scanFilter scan = {};
+    int64_t depth = {};
 };
 
 struct patchSlot {
@@ -688,9 +689,12 @@ bool disjointLengths(vg::Slice<node> nodes, int32_t ni);
 Tup_si32_bool firstSet(vg::Arena& mem, vg::Slice<node> nodes, int32_t ni);
 bool disjointFirsts(vg::Arena& mem, vg::Slice<node> nodes, int32_t ni);
 bool onePassCaps(Regexp& re, decoded& d, int32_t ni, int64_t i, int64_t j, uint32_t eflags, vg::Slice<Match> caps);
-void buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode);
+int64_t buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode);
 int64_t instrEstimate(vg::Slice<node> nodes, int32_t ni);
 void compileProgram(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t root, bool multi, bool newlineMode);
+bool consumingOp(uint8_t op);
+Tup_u32_bool progEdge(program& pr, uint32_t pc, int64_t i);
+int64_t progDepth(vg::Arena& mem, program& pr);
 uint32_t addInstr(vg::Arena& mem, progBuilder& b, instr ins);
 void patch(progBuilder& b, vg::Slice<patchSlot> slots, uint32_t target);
 vg::Slice<patchSlot> singleOut(vg::Arena& mem, uint32_t idx, bool alt);

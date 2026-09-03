@@ -183,7 +183,15 @@ func matcherContract(re *Regexp, length int64, atom int64) BackendContract {
 	perBoundary := cMul(weight, cMul(n+1, n+1))
 	perBoundary = cAdd(perBoundary, cMul(n, perTest))
 	perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2, k)), cAdd(cMul(4, ring), 38)))
-	steps := cAdd(cAdd(24+ring, length), cMul(cAdd(length, 1), perBoundary))
+
+	// A run visits at most one boundary per byte, plus the end.
+	// When the program depth is bounded, the figure is stepsFigureAnchored of lean/Vego/PhaseAAnchored.lean,
+	// which proves that the run visits at most depth+3 boundaries instead.
+	boundaries := cAdd(length, 1)
+	if re.prog.depth >= 0 {
+		boundaries = min(boundaries, int64(re.prog.depth)+3)
+	}
+	steps := cAdd(cAdd(24+ring, length), cMul(boundaries, perBoundary))
 
 	// A bracket probe can start the deepest lookup below the fixed frames.
 	stack := int64(matcherStackBytes) + multiLookupFrames*frameBytes
