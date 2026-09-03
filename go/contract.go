@@ -33,7 +33,7 @@ type BackendContract struct {
 //     HasOnePass is set when compilation proved that every span has one parse.
 //     Its figures apply when the walk succeeds, which the proof guarantees.
 //   - Solver is the phase B memoized parse search.
-//     It is the guaranteed ceiling for any call that fills group offsets.
+//     It is the guaranteed ceiling for any call that resolves parenthesized subexpression offsets.
 //     The walk falls back to it on an inconsistency.
 //     HasSolver is false when the pattern was compiled with FlagNoSub, and when Exec cannot reach phase B.
 //
@@ -141,7 +141,7 @@ func ContractFor(re *Regexp, maxInput int) Contract {
 	var c Contract
 	c.MaxInput = int(length)
 	c.Matcher = matcherContract(re, length, atom)
-	if re.progOK && re.flags&FlagNoSub == 0 {
+	if re.progOK && re.nsub > 0 && re.flags&FlagNoSub == 0 {
 		if re.onePass {
 			c.OnePass = onePassContract(re, length, atom)
 			c.HasOnePass = true

@@ -1060,7 +1060,7 @@ revera_eng_Contract revera_eng_ContractFor(revera_eng_Regexp *re, int64_t maxInp
     revera_eng_Contract c = {0};
     c.MaxInput = ((int64_t)(length));
     c.Matcher = revera_eng_matcherContract(re, length, atom);
-    if ((re->progOK && (((uint32_t)(re->flags & revera_eng_FlagNoSub)) == 0U))) {
+    if (((re->progOK && (re->nsub > 0LL)) && (((uint32_t)(re->flags & revera_eng_FlagNoSub)) == 0U))) {
         if (re->onePass) {
             c.OnePass = revera_eng_onePassContract(re, length, atom);
             c.HasOnePass = true;

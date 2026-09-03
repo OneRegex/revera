@@ -1577,7 +1577,7 @@ pub fn ContractFor(re: &mut Regexp, maxInput: i64) -> Contract {
     let mut c: Contract = vg::zero();
     c.MaxInput = ((length) as i64);
     c.Matcher = { let _t1 = length; let _t2 = atom; matcherContract(re, _t1, _t2) };
-    if (re.progOK && ((re.flags & FlagNoSub) == 0u32)) {
+    if ((re.progOK && (re.nsub > 0i64)) && ((re.flags & FlagNoSub) == 0u32)) {
         if re.onePass {
             c.OnePass = { let _t3 = length; let _t4 = atom; onePassContract(re, _t3, _t4) };
             c.HasOnePass = true;

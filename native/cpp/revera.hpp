@@ -171,7 +171,7 @@ struct Contract {
     BackendContract matcher;
     // The figures of the one-pass capture walk, set when compilation proved that every span has one parse.
     std::optional<BackendContract> one_pass;
-    // The figures of the memoized capture search, the ceiling for any search that fills group offsets.
+    // The figures of the memoized capture search, the ceiling for any search that resolves parenthesized subexpression offsets.
     std::optional<BackendContract> solver;
 };
 

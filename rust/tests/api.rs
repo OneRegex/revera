@@ -124,6 +124,20 @@ fn contract_grows_with_the_input_bound() {
 }
 
 #[test]
+fn contract_omits_unreachable_capture_backends() {
+    let contract = Regex::new("a*").unwrap().contract(64);
+    assert!(contract.one_pass.is_none());
+    assert!(contract.solver.is_none());
+    assert_eq!(contract.heap_bytes, contract.matcher.heap_bytes);
+    assert_eq!(contract.stack_bytes, contract.matcher.stack_bytes);
+    assert_eq!(contract.steps, contract.matcher.steps);
+
+    let grouped = Regex::new("(a*)").unwrap().contract(64);
+    assert!(grouped.one_pass.is_some());
+    assert!(grouped.solver.is_some());
+}
+
+#[test]
 fn one_regex_serves_several_threads() {
     let re = Regex::new("[0-9]+").unwrap();
     std::thread::scope(|s| {

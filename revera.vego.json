@@ -19264,11 +19264,31 @@
       "k": "binary",
       "op": "\u0026\u0026",
       "x": {
-       "k": "field",
-       "name": "progOK",
+       "k": "binary",
+       "op": "\u0026\u0026",
        "x": {
-        "k": "ident",
-        "name": "re"
+        "k": "field",
+        "name": "progOK",
+        "x": {
+         "k": "ident",
+         "name": "re"
+        }
+       },
+       "y": {
+        "k": "binary",
+        "op": "\u003e",
+        "x": {
+         "k": "field",
+         "name": "nsub",
+         "x": {
+          "k": "ident",
+          "name": "re"
+         }
+        },
+        "y": {
+         "k": "int",
+         "value": "0"
+        }
        }
       },
       "y": {

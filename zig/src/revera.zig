@@ -502,7 +502,7 @@ pub const Contract = struct {
     matcher: BackendContract,
     /// The figures of the one-pass capture walk, set when compilation proved that every span has one parse.
     one_pass: ?BackendContract,
-    /// The figures of the memoized capture search, the ceiling for any search that fills group offsets.
+    /// The figures of the memoized capture search, the ceiling for any search that resolves parenthesized subexpression offsets.
     solver: ?BackendContract,
 };
 

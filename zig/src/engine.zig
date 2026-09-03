@@ -1472,7 +1472,7 @@ pub fn ContractFor(re: *Regexp, maxInput: i64) Contract {
     var c: Contract = .{};
     c.MaxInput = vg.cv(i64, length);
     c.Matcher = matcherContract(re, length, atom);
-    if ((re.progOK and ((re.flags & FlagNoSub) == 0))) {
+    if (((re.progOK and (re.nsub > 0)) and ((re.flags & FlagNoSub) == 0))) {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length, atom);
             c.HasOnePass = true;

@@ -35,7 +35,7 @@ type BackendContract struct {
 //     It is set when compilation proved that every span has one parse.
 //     Its figures apply when the walk succeeds, which the proof guarantees.
 //   - Solver is the phase B memoized parse search.
-//     It is the guaranteed ceiling for any call that fills group offsets.
+//     It is the guaranteed ceiling for any call that resolves parenthesized subexpression offsets.
 //     The walk falls back to it on an inconsistency.
 //     It is nil when the pattern was compiled with NoSub, and when Exec cannot reach phase B.
 //
@@ -145,7 +145,7 @@ func (re *Regexp) newContract(maxInput int) *Contract {
 	atom := atomCost(re.root)
 	c := &Contract{MaxInput: int(length)}
 	c.Matcher = re.matcherContract(length, atom)
-	if re.prog != nil && re.flags&NoSub == 0 {
+	if re.prog != nil && re.nsub > 0 && re.flags&NoSub == 0 {
 		if re.onePass {
 			walk := re.onePassContract(length, atom)
 			c.OnePass = &walk

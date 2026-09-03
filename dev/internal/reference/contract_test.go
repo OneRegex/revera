@@ -25,12 +25,20 @@ func compileContract(t *testing.T, pattern string, flags CompileFlags, maxInput 
 }
 
 func TestContractBackendSelection(t *testing.T) {
-	_, c := compileContract(t, "(a|b)*abb", NoSub, 100)
+	re, c := compileContract(t, "a*", 0, 100)
+	if re.nsub != 0 {
+		t.Fatal("pattern must not have subexpressions")
+	}
+	if c.OnePass != nil || c.Solver != nil {
+		t.Error("a zero-group pattern must leave only the matcher backend")
+	}
+
+	_, c = compileContract(t, "(a|b)*abb", NoSub, 100)
 	if c.OnePass != nil || c.Solver != nil {
 		t.Error("NoSub must leave only the matcher backend")
 	}
 
-	re, c := compileContract(t, "(a|b)*abb", 0, 100)
+	re, c = compileContract(t, "(a|b)*abb", 0, 100)
 	if !re.onePass {
 		t.Fatal("pattern must be one-pass")
 	}

@@ -946,7 +946,7 @@ Contract ContractFor(Regexp& re, int64_t maxInput) {
     Contract c{};
     c.MaxInput = int64_t(length);
     c.Matcher = matcherContract(re, length, atom);
-    if ((re.progOK && (uint32_t(re.flags & FlagNoSub) == 0U))) {
+    if (((re.progOK && (re.nsub > 0LL)) && (uint32_t(re.flags & FlagNoSub) == 0U))) {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length, atom);
             c.HasOnePass = true;

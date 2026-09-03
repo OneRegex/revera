@@ -2228,7 +2228,7 @@ export function ContractFor(re: Regexp, maxInput: number): Contract {
     let c: Contract = new Contract();
     c.MaxInput = vg.intOf(length);
     c.Matcher = matcherContract(re, length, atom);
-    if ((re.progOK && (((re.flags & FlagNoSub) >>> 0) === 0))) {
+    if (((re.progOK && (re.nsub > 0)) && (((re.flags & FlagNoSub) >>> 0) === 0))) {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length, atom);
             c.HasOnePass = true;
