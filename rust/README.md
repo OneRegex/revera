@@ -84,6 +84,8 @@ Because those binaries never link the library crate, a driver failure points at 
 
 `src/vg.rs` is the runtime.
 It supplies the `Copy` `Slice<T>` and `Str` header types with Go slice semantics, the conversion and comparison helpers, and the `Arena` allocator.
+The generated modules forbid unsafe code.
+Raw-pointer dereferences and arithmetic stay in this hand-written runtime, behind bounds-checked value and slot operations.
 
 `Arena` is `!Sync`, so the compiler refuses to share one between threads.
 A Vego view can alias, which a Rust reference cannot express, so a slice lowers to a raw pointer and a length.

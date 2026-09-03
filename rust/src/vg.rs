@@ -171,11 +171,12 @@ impl<T> Clone for Slice<T> {
 impl<T> Copy for Slice<T> {}
 
 impl<T> Slice<T> {
-    // ptr addresses one element for writing.
-    // The bounds check happens here, so generated writes stay as safe as Go's.
-    pub fn ptr(self, i: i64) -> *mut T {
+    #[inline(always)]
+    pub(crate) fn slot(self, i: i64) -> Slot<T> {
         assert!(i >= 0 && i < self.len);
-        unsafe { self.p.add(i as usize) }
+        Slot {
+            p: unsafe { self.p.add(i as usize) },
+        }
     }
 
     pub fn sub(self, lo: i64, hi: i64) -> Slice<T> {
@@ -205,9 +206,46 @@ impl<T> Slice<T> {
 
 impl<T: Copy> Slice<T> {
     pub fn get(self, i: i64) -> T {
-        assert!(i >= 0 && i < self.len);
-        unsafe { *self.p.add(i as usize) }
+        self.slot(i).get()
     }
+
+    #[inline(always)]
+    pub(crate) fn set(self, i: i64, value: T) {
+        self.slot(i).set(value)
+    }
+
+    #[inline(always)]
+    pub(crate) fn update<V>(self, i: i64, value: V, f: impl FnOnce(T, V) -> T) {
+        self.slot(i).update(value, f)
+    }
+}
+
+pub(crate) struct Slot<T> {
+    p: *mut T,
+}
+
+impl<T: Copy> Slot<T> {
+    #[inline(always)]
+    fn get(&self) -> T {
+        unsafe { *self.p }
+    }
+
+    #[inline(always)]
+    pub(crate) fn set(self, value: T) {
+        unsafe { *self.p = value }
+    }
+
+    #[inline(always)]
+    pub(crate) fn update<V>(self, value: V, f: impl FnOnce(T, V) -> T) {
+        let current = self.get();
+        self.set(f(current, value));
+    }
+}
+
+#[inline(always)]
+pub fn array_index(i: i64, len: usize) -> usize {
+    assert!((i as u64) < len as u64, "array index out of bounds");
+    i as usize
 }
 
 pub fn make<T>(mem: &Arena, n: i64) -> Slice<T> {
@@ -335,4 +373,53 @@ pub fn slice_of<T: Copy>(mem: &Arena, src: &[T]) -> Slice<T> {
 // A Slice or Str becomes nil, which is exactly Go's zero slice and empty string.
 pub fn zero<T>() -> T {
     unsafe { std::mem::zeroed() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct Pair {
+        first: i64,
+        second: i64,
+    }
+
+    #[test]
+    fn pinned_slot_preserves_a_sibling_updated_by_the_value() {
+        let mem = Arena::new();
+        let values = make::<Pair>(&mem, 1);
+        values.set(
+            0,
+            Pair {
+                first: 1,
+                second: 2,
+            },
+        );
+
+        let slot = values.slot(0);
+        values.update(0, 9, |mut pair, value| {
+            pair.second = value;
+            pair
+        });
+        slot.update(7, |mut pair, value| {
+            pair.first = value;
+            pair
+        });
+
+        assert_eq!(
+            values.get(0),
+            Pair {
+                first: 7,
+                second: 9,
+            }
+        );
+    }
+
+    #[test]
+    fn array_index_rejects_both_bounds() {
+        assert_eq!(array_index(3, 4), 3);
+        assert!(std::panic::catch_unwind(|| array_index(-1, 4)).is_err());
+        assert!(std::panic::catch_unwind(|| array_index(4, 4)).is_err());
+    }
 }
