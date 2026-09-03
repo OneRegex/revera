@@ -11,7 +11,7 @@ Add Revera to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-revera = "0.2"
+revera = "0"
 ```
 
 The crate has no Cargo dependencies or feature flags.
