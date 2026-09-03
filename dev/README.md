@@ -65,6 +65,10 @@ As a result, two runs on the same commit produce the same bytes.
 The command refuses a dirty tracked tree unless `-allow-dirty` is given.
 It also refuses to run when the three package versions disagree, when a license copy is stale, or when `CHANGELOG.md` has no dated section for the version.
 
+Between releases the tree satisfies none of the last two conditions, so `-unreleased` drops the Cargo version and changelog checks and marks the manifest as unreleased.
+The Zig and native versions still have to agree, since one version names both archives.
+This is how CI stages and tests the archives on every push.
+
 However, it does not regenerate or test the committed files, so run `make check-generated` and the release validation before committing the revision to stage.
 
 Separately, `sh sync-licenses.sh` copies the root license files into `go/`, `rust/`, `zig/`, `ts/` and `native/`.

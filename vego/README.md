@@ -4,6 +4,7 @@ Vego is the strict Go subset that the Revera engine is written in, built for mec
 This module, `github.com/oneregex/revera/vego`, holds the language specification, its compiler and the `vegoc` command.
 
 This module has no dependencies and does not depend on the engine.
+It requires Go 1.27 or later.
 
 [`SPECIFICATION.md`](SPECIFICATION.md) defines the subset and its JSON form, the Vego IR, in full.
 [`schema/vego.schema.json`](schema/vego.schema.json) is the structural schema of the IR; the semantics stay in the prose.
@@ -66,7 +67,7 @@ To integrate it, add a printer here, a hand-written runtime and public API in it
 The Vego toolchain has its own SemVer, starting at 0.1.0, which `vegoc version` prints.
 The IR carries its compatibility major in the `"vego": 1` field.
 
-Separately, the Revera engine releases move on a third axis, shared by the six implementations.
+Revera engine versions are a separate axis.
 
 ## License
 

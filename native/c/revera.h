@@ -36,6 +36,7 @@ typedef enum {
     REVERA_BRACE,
     REVERA_INTERVAL,
     REVERA_RANGE,
+    // A capacity limit was exceeded, or a selected one-pass walk failed an internal consistency check.
     REVERA_CAPACITY,
     REVERA_REPEAT,
     REVERA_NO_CAPTURES,
@@ -71,6 +72,7 @@ typedef struct {
 } revera_options;
 
 typedef struct {
+    // Bounds fixed-width allocation requests, not total process memory or runtime bookkeeping.
     uint64_t heap_bytes;
     uint64_t stack_bytes;
     uint64_t steps;
@@ -78,6 +80,7 @@ typedef struct {
 
 typedef struct {
     size_t max_input;
+    // Bounds fixed-width allocation requests, not total process memory or runtime bookkeeping.
     uint64_t heap_bytes;
     uint64_t stack_bytes;
     uint64_t steps;

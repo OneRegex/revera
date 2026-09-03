@@ -16,7 +16,7 @@ Specifically, it includes the Issue 8 repetition modifier, written `*?`, `+?`, `
   It never reads the host locale database, so the results are identical on every platform.
 - `reference/libcre`, imported as `github.com/oneregex/revera/dev/internal/reference/libcre`, is the cgo wrapper around the host `regcomp()` and `regexec()` for the libc differential test.
 - `dev/internal/genlocale` rebuilds this package's `locale/data.bin` from the repository-root file `locale/rv_locale_data.inc`.
-  Run it as `cd dev && go run ./internal/genlocale`; it writes all six checked-in copies of `data.bin`.
+  Run it as `cd dev && go run ./internal/genlocale`; it writes all seven checked-in copies of `data.bin`.
 
 ## API
 
@@ -74,7 +74,7 @@ Because all three need offsets, an expression compiled with `NoSub` reports `ENo
 
 `CompileWithContract` compiles like `Compile` and also returns a `Contract`.
 
-The resulting contract bounds the heap, the stack and the abstract steps of one `Exec` call on a subject of at most `maxInput` bytes.
+The resulting contract bounds explicit heap allocation requests and abstract steps for one `Exec` call on a subject of at most `maxInput` bytes, and estimates stack use from the deepest call chain.
 The contract stores figures per backend, while the `HeapBytes`, `StackBytes` and `Steps` methods combine them for a whole call.
 
 This structure lets an application compare the figures against its budget and refuse a pattern before it ever runs.

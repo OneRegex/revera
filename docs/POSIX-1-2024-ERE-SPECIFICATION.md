@@ -1167,4 +1167,10 @@ A claimed complete ERE implementation should have affirmative evidence for every
 | Compilation, execution, captures, flags, errors, and lifecycle  | [XSH `regcomp()` family][regcomp] |
 | Explanatory match-selection and internationalization rationale  | [XBD Rationale A.9][xrat-a9]      |
 
-[xbd-4]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap04.html [xbd-7]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap07.html [xbd-9]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html [limits-h]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/limits.h.html [regex-h]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html [regcomp]: https://pubs.opengroup.org/onlinepubs/9799919799/functions/regcomp.html [xrat-a9]: https://pubs.opengroup.org/onlinepubs/9799919799/xrat/V4_xbd_chap01.html#tag_21_09
+[xbd-4]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap04.html
+[xbd-7]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap07.html
+[xbd-9]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html
+[limits-h]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/limits.h.html
+[regex-h]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html
+[regcomp]: https://pubs.opengroup.org/onlinepubs/9799919799/functions/regcomp.html
+[xrat-a9]: https://pubs.opengroup.org/onlinepubs/9799919799/xrat/V4_xbd_chap01.html#tag_21_09

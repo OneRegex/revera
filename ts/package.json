@@ -1,6 +1,6 @@
 {
   "name": "@oneregex/revera",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "POSIX.1-2024 extended regular expressions, generated from the Revera Vego engine",
   "license": "MIT",
   "type": "module",

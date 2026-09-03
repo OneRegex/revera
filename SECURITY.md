@@ -3,16 +3,18 @@
 ## Supported versions
 
 Only the latest release of Revera receives fixes.
-One release number covers the Go, Rust, Zig, C, C++ and TypeScript implementations, so a fix lands in all six at once.
+Security fixes are applied to every affected implementation and included in the next engine release.
 
 ## Reporting a vulnerability
 
-Report a vulnerability privately through the GitHub security advisory form of the repository, at `https://github.com/oneregex/revera/security/advisories/new`.
-Do not open a public issue for it.
+GitHub private vulnerability reporting is not currently enabled for this repository.
+Do not put exploit details in a public issue.
+Contact the maintainer through the contact information on the [maintainer's GitHub profile](https://github.com/jedisct1) to arrange a private reporting channel.
 
 Include the pattern, the subject, the flags and the locale that trigger the problem, and the language you observed it in.
-A pattern that makes an engine read or write outside its buffers, loop without bound, or exceed the resource contract it reported is a vulnerability.
+A pattern that makes an engine read or write outside its buffers, loop without bound, or exceed a reported heap or step bound is a vulnerability.
+A stack figure is an estimate rather than a bound.
 A pattern that the engine rejects with an error, or that runs slowly but within its contract, is not.
 
 You get an acknowledgement within a week.
-A fix ships as a new release of every implementation, and the advisory is published with it.
+A fix is published for each affected implementation, and an advisory is published when those updates are available.

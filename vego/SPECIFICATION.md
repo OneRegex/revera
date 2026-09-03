@@ -61,6 +61,11 @@ Locals with a conflicting name are renamed during translation.
 A Vego program must only run on targets where `int` is 64 bits, and translators must map it to a 64-bit signed type.
 Rust translators cast to `usize` at index sites.
 
+The TypeScript printer is narrower for `int`.
+It maps `int` and the types of 32 bits or less to checked JavaScript `number` values, while `int64` and `uint64` use `bigint`.
+This preserves the current Revera and probe programs, whose indexes and lengths stay within the exact integer range of `number`, but it is not a general lowering for Vego programs that need all 64 bits of `int`.
+An inexact result traps instead of being rounded.
+
 The Go types `rune`, `byte`, `uintptr`, `float32`, `float64`, `complex64`, `complex128`, and the platform-width `uint` are not in the subset.
 Character values use `int32`.
 There is no floating point.
@@ -223,7 +228,8 @@ In particular, `string(i)` from an integer is not in the subset.
 
 `clear`, `new`, `panic`, `recover`, `print`, `println`, `delete`, and `complex/real/imag` are not in the subset.
 Out-of-range indexing and slicing abort the program in every target, as in Go.
-A correct program never does it, and the planned LEAN4 proof shows exactly that.
+A conforming program must not rely on that abort.
+The finite Lean replay checks that the covered engine and probe executions do not trap; the universal proofs are limited to the Phase A properties stated in `lean/README.md`.
 
 ## 6. The buffer model
 
@@ -272,7 +278,8 @@ Capacities from `make` and from slicing are exact and identical in every target.
 A write into a slice-typed field or element must be a fresh buffer, a move, or a self-truncation.
 Nothing writes package-level data.
 `&` stays on struct variables and fields.
-The "not used again" move clauses and rule 9 stay with the program author, and the LEAN4 model gives the final word.
+The "not used again" move clauses and rule 9 stay with the program author.
+Lean models the resulting aliasing behavior but does not recheck those ownership rules.
 
 ## 7. Semantics
 
@@ -396,40 +403,45 @@ The JSON therefore doubles as the subset's machine definition: what the tool emi
 
 The subset was chosen so each construct has a direct target form:
 
-| Vego               | C++                | Rust               | Zig                  |
-| ------------------ | ------------------ | ------------------ | -------------------- |
-| int / int64        | int64_t            | i64                | i64                  |
-| int32 / uint8 ...  | int32_t, uint8_t   | i32, u8            | i32, u8              |
-| string             | std::string_view*  | &[u8]*             | []const u8*          |
-| []T                | std::vector<T>     | Vec<T>             | std.ArrayList(T)     |
-| [N]T               | std::array<T,N>    | [T; N]             | [N]T                 |
-| struct             | struct             | struct             | struct               |
-| *S parameter       | S&                 | &mut S             | *S                   |
-| slice parameter    | std::span<T>       | &mut [T] or raw    | []T                  |
-| multiple results   | struct / pair      | tuple              | struct               |
-| append             | push_back / insert | extend / push      | appendSlice / append |
-| copy               | memmove            | copy_within / copy | @memmove             |
-| abort on bad index | assert / at()      | panic (checked)    | safety check         |
+| Vego               | C                 | C++                | Rust               | Zig                  | TypeScript                 |
+| ------------------ | ----------------- | ------------------ | ------------------ | -------------------- | -------------------------- |
+| int                | int64_t           | int64_t            | i64                | i64                  | checked number             |
+| int64 / uint64     | int64_t / uint64_t | int64_t / uint64_t | i64 / u64          | i64 / u64            | bigint                     |
+| int32 / uint8 ...  | int32_t, uint8_t  | int32_t, uint8_t   | i32, u8            | i32, u8              | checked number             |
+| string             | vg_str*           | std::string_view*  | &[u8]*             | []const u8*          | Uint8Array                 |
+| []T                | generated slice   | std::vector<T>     | Vec<T>             | std.ArrayList(T)     | vg.Slice<T>                |
+| [N]T               | T[N]              | std::array<T,N>    | [T; N]             | [N]T                 | array or typed array       |
+| struct             | struct            | struct             | struct             | struct               | class                      |
+| *S parameter       | S*                | S&                 | &mut S             | *S                   | object reference           |
+| slice parameter    | generated slice   | std::span<T>       | &mut [T] or raw    | []T                  | vg.Slice<T>                |
+| multiple results   | generated struct  | struct / pair      | tuple              | struct               | tuple                      |
+| append             | runtime helper    | push_back / insert | extend / push      | appendSlice / append | runtime helper             |
+| copy               | memmove           | memmove            | copy_within / copy | @memmove             | typed-array or loop copy   |
+| abort on bad index | assert            | assert / at()      | panic (checked)    | safety check         | checked RangeError         |
 
 (*) An owned result string (rule 6.5) becomes std::string, String, or an allocated []u8 in the target.
 The exemption of rule 6.7 makes both representations valid for stored strings.
 
 Views can alias, so a borrow-checked target either copies at the few aliasing call sites or lowers slices to pointer-and-length pairs in generated (unsafe) code.
-The correctness argument for generated code is the LEAN4 proof over the JSON, not the target language's checker.
+Lean proves properties of the IR under its formal semantics.
+The generated targets are linked to that IR by finite probe and corpus conformance tests; printer correctness is not formally proved.
 
 ### 9.1 The memory context
 
-Translated code holds no global state, mutable or hidden.
+The native translated targets hold no mutable global state.
 The Go original leans on the garbage collector.
-The targets lean on memory the host owns.
-Every function that can allocate, directly or through a callee, receives an explicit memory context as a synthetic first parameter.
+The Rust, Zig, C and C++ targets lean on memory the host owns.
+In those targets, every function that can allocate, directly or through a callee, receives an explicit memory context as a synthetic first parameter.
 Translators name it `mem`.
 The name is reserved: a package-level declaration must not use it, and the checker renames any local of that name, like any other clash.
 
 The allocation sites are `make`, `append`, the two string and buffer conversions, and slice composite literals.
 The shared front end computes the transitive "allocates" flag per function.
-Each printer adds the parameter and threads it through call sites mechanically.
+Each native printer adds the parameter and threads it through call sites mechanically.
 A function that never allocates keeps its plain signature.
+
+TypeScript is the garbage-collected exception.
+Its generated functions take no memory context, and its runtime keeps only the allocation counters used by the benchmark host.
 
 The context is an allocator or arena of the target runtime.
 The host owns these arenas and picks the one that backs each engine call.
@@ -444,20 +456,22 @@ Generated code is the low level of a target.
 Its names come from the Vego package, its errors are integer codes, and it asks the caller for a memory context.
 That surface is right for a translator and wrong for a programmer.
 
-Each target therefore adds one hand-written file that wraps the generated engine in the shape its own language expects.
+Each target therefore adds hand-written runtime and public API files that wrap the generated engine in the shape its own language expects.
 The wrapper owns the memory context, turns the error codes into the target's error type, and hides the runtime types.
-The generated engine stays reachable underneath for the few calls the wrapper leaves out.
 
-The four targets keep the two levels apart like this:
+The six targets keep the two levels apart like this:
 
-| Target | Generated engine    | Public API               |
-| ------ | ------------------- | ------------------------ |
-| Go     | package `revera`    | methods in `*_host.go`   |
-| C++    | `revera::engine`    | `revera` in `revera.hpp` |
-| Rust   | hidden `engine` mod | crate root, `lib.rs`     |
-| Zig    | `engine.zig`        | `revera.zig` module      |
+| Target     | Generated engine       | Public API               |
+| ---------- | ---------------------- | ------------------------ |
+| Go         | package `revera`       | methods in `*_host.go`   |
+| C          | `revera_eng_` names    | `revera.h`               |
+| C++        | `revera::engine`       | `revera` in `revera.hpp` |
+| Rust       | hidden `engine` module | crate root, `lib.rs`     |
+| Zig        | `engine.zig`           | `revera.zig` module      |
+| TypeScript | hidden `engine` module | `revera.ts`              |
 
-Only C++ needs help from its printer: both levels share one namespace mechanism, so `vegoc emit cpp` takes a `-namespace` flag that moves the generated code out of the way.
+C and C++ need help from their printers because the generated and public names share a language-level namespace.
+`vegoc emit c` takes a `-prefix` flag, and `vegoc emit cpp` takes a `-namespace` flag.
 
 Go is the exception in the other direction.
 The subset program is itself the Go target, so the public API shares one package with the generated engine and cannot hide it.

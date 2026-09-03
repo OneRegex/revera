@@ -52,7 +52,7 @@ pub const Error = error{
     InvalidInterval,
     /// A range like [z-a] runs backwards, or its endpoint is not a single character.
     InvalidRange,
-    /// The work needed passed a capacity limit.
+    /// The work passed a capacity limit, or a selected one-pass walk failed an internal consistency check.
     OutOfCapacity,
     /// A repetition operator has no operand to repeat.
     MissingRepeatOperand,
@@ -477,7 +477,8 @@ const Scan = struct {
 
 /// What one backend of one search can use.
 pub const BackendContract = struct {
-    /// The bound on explicit heap allocation, in bytes.
+    /// The bound on fixed-width allocation requests, in bytes.
+    /// This is not total process memory and excludes runtime and allocator metadata.
     heap_bytes: u64,
     /// The estimate of the deepest call stack, in bytes.
     stack_bytes: u64,
@@ -492,7 +493,8 @@ pub const BackendContract = struct {
 pub const Contract = struct {
     /// The subject length the figures cover, in bytes.
     max_input: usize,
-    /// The heap bound of a whole search, in bytes.
+    /// The bound on fixed-width allocation requests for a whole search, in bytes.
+    /// This is not total process memory and excludes runtime and allocator metadata.
     heap_bytes: u64,
     /// The stack estimate of a whole search, in bytes.
     stack_bytes: u64,

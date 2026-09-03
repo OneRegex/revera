@@ -4,12 +4,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Revera: POSIX regular expressions with the same answer in every language</title>
+  <title>Revera: one POSIX regex engine for every language</title>
   <meta name="description"
     content="Revera is a clean-room POSIX.1-2024 extended regular expression engine, written once, checked against a formal Lean model, and generated into native Go, Rust, Zig, C, C++ and TypeScript libraries with resource contracts.">
   <meta property="og:title" content="Revera">
   <meta property="og:description"
-    content="One POSIX regex engine, verified in Lean, generated into six languages, with resource contracts that bound memory and work before a match runs.">
+    content="One POSIX regex engine, generated into six languages, with Lean-checked semantics, heap and work bounds, and a stack estimate.">
   <meta property="og:type" content="website">
   <link rel="icon" type="image/png" href="assets/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -74,11 +74,11 @@
       <div class="container hero__inner">
         <div>
           <span class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span>By the OneRegex initiative.</span>
-          <h1>Regular expressions that give <span class="grad">the same answer</span> in every language.</h1>
+          <h1>One regular expression engine, <span class="grad">generated for every language.</span></h1>
           <p class="lede">Revera is a clean-room implementation of POSIX.1-2024 extended regular expressions.
             The engine is written once, checked against a formal model in Lean, and generated into native Go, Rust, Zig,
             C, C++ and TypeScript libraries.
-            Same matches, same errors, same resource bounds, whatever the language.</p>
+            A shared conformance suite checks the same matches, errors and resource reports across all six.</p>
           <div class="hero__cta">
             <a class="btn btn--primary" href="#code">Get started</a>
             <a class="btn btn--ghost" href="#how">How it works</a>
@@ -90,11 +90,11 @@
               </svg>Machine-checked in Lean 4</li>
             <li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="currentColor" d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />
-              </svg>Bounded memory and work</li>
+              </svg>Bounded heap and work</li>
             <li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="currentColor"
                   d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1 15-4-4 1.4-1.4L11 14.2l5.6-5.6L18 10l-7 7Z" />
-              </svg>No bindings, no drift</li>
+              </svg>Native APIs, no bindings</li>
           </ul>
         </div>
 
@@ -118,7 +118,7 @@
         revera.<span class="tok-fn">NoCaptures</span>(),
     )
 
-    <span class="tok-cmt">// What can one match cost on any input up to 64 KiB?</span>
+    <span class="tok-cmt">// What can one search cost on any input up to 64 KiB?</span>
     c := re.<span class="tok-fn">Contract</span>(<span class="tok-num">65536</span>)
     fmt.<span class="tok-fn">Println</span>(c.<span class="tok-fn">HeapBytes</span>(), c.<span class="tok-fn">StackBytes</span>(), c.<span class="tok-fn">Steps</span>())
 
@@ -127,14 +127,14 @@
 }</code></pre>
           </div>
           <div class="float-tag float-tag--tr"><span>Heap bound</span><strong>1158 bytes</strong></div>
-          <div class="float-tag float-tag--bl"><span>Stack estimate</span><strong>4608 bytes</strong></div>
+          <div class="float-tag float-tag--bl"><span>Stack estimate</span><strong>6144 bytes</strong></div>
         </div>
       </div>
     </section>
 
     <div class="strip">
       <div class="container strip__inner">
-        <p class="strip__label">One engine source, printed into</p>
+        <p class="strip__label">One engine source, generated for</p>
         <ul class="strip__items">
           <li>Go</li>
           <li>Rust</li>
@@ -158,7 +158,7 @@
 
         <div class="grid grid--3">
           <div class="card">
-            <h3>No two engines agree</h3>
+            <h3>Regex engines can disagree</h3>
             <p>Each implementation has its own features and quirks, and nothing guarantees that a pattern accepted by
               one returns the same result in another.
               Move a rule between two services written in different languages and its meaning can quietly change.</p>
@@ -170,11 +170,10 @@
               It is a bypass, a crash, or a server that stops answering.</p>
           </div>
           <div class="card">
-            <h3>There is no real specification</h3>
-            <p>The closest thing is POSIX extended regular expressions, and POSIX.1-2024 brought them up to date with
-              the features people expect.
-              But no fully conforming implementation exists, apart from MinRX, which focuses on correctness and
-              simplicity, not on performance or on other languages.</p>
+            <h3>The standard still needs choices</h3>
+            <p>POSIX extended regular expressions provide a real specification, updated in POSIX.1-2024.
+              They also leave some behavior undefined, unspecified or implementation-defined.
+              Revera documents those choices and applies them consistently in every generated engine.</p>
           </div>
         </div>
       </div>
@@ -185,8 +184,8 @@
         <div class="section__head">
           <span class="kicker">What Revera is</span>
           <h2>One engine, checked once, shipped to every language.</h2>
-          <p class="section__sub">The OneRegex initiative builds precise, verified regex specifications that turn into
-            trusted, interoperable libraries for any language.
+          <p class="section__sub">The OneRegex initiative builds precise regex specifications with explicit verification
+            boundaries, then turns them into interoperable libraries.
             Revera is that idea applied to POSIX.1-2024 extended regular expressions.</p>
         </div>
 
@@ -195,18 +194,18 @@
             <h3>A precise, executable specification</h3>
             <p>The ERE rules are written down twice: as a plain-language specification every engine implements, and as a
               formal Lean model the engine is checked against.
-              Ambiguity has nowhere to hide.</p>
+              The remaining implementation choices are documented explicitly.</p>
           </div>
           <div class="card">
-            <h3>The same answer everywhere</h3>
+            <h3>Cross-checked everywhere</h3>
             <p>Every library comes from the same engine source and is cross-checked on the same corpus: the same
               matches, the same errors, the same resource reports.
-              A rule that works in the Go service works identically in the Rust one.</p>
+              The suite compares each rule through every backend.</p>
           </div>
           <div class="card">
             <h3>Resource contracts</h3>
-            <p>Before a match runs, a compiled pattern reports how much heap, stack and work it can cost on any input up
-              to a chosen length.
+            <p>Before a search runs, a compiled pattern reports portable heap and work bounds, plus a stack estimate, for
+              any input up to a chosen length.
               Provision for it, cap it, or reject the pattern before it ever touches a request.</p>
           </div>
           <div class="card">
@@ -214,7 +213,7 @@
             <p>Go, Rust, Zig, C, C++ and TypeScript, each with a hand-written API in the shape that language expects on
               top of a generated engine.
               No bindings to a C library.
-              A new language gets a correct, fast engine without a rewrite.</p>
+              A new language starts from the same checked IR instead of reimplementing regex semantics.</p>
           </div>
         </div>
       </div>
@@ -227,16 +226,17 @@
             <span class="kicker">Resource contracts</span>
             <h2>Know the worst case <span class="grad">before</span> you run it.</h2>
           </div>
-          <p class="contract__lede">Ask a compiled pattern what one match can cost on any input up to a chosen length.
-            The answer is a bound, not a measurement of one run: it holds for every subject of that length or shorter.
+          <p class="contract__lede">Ask a compiled pattern for the portable heap and work bounds of one search, plus its
+            stack estimate, on input up to a chosen length.
+            The figures describe the worst case in that model, not a measurement of one run.
             Size a service around it, reject a pattern that exceeds a budget, or refuse a request before doing any work.
           </p>
           <ul class="checks">
-            <li><strong>Heap</strong>: the maximum number of bytes the match explicitly allocates.</li>
+            <li><strong>Heap</strong>: a portable bound on allocation requests, with conservative rounding allowances.
+              Runtime metadata and garbage-collector bookkeeping are outside the model.</li>
             <li><strong>Stack</strong>: an estimate of the deepest call stack, from fixed frame sizes shared by every
               target.</li>
-            <li><strong>Steps</strong>: an upper bound on abstract work, counted as one step per loop iteration or
-              function call.</li>
+            <li><strong>Steps</strong>: an upper bound on abstract unit-cost operations, not elapsed time.</li>
             <li><strong>Bounded even on failure</strong>: a search that would exceed the engine's memory capacity
               returns a capacity error instead of growing without limit.</li>
           </ul>
@@ -252,8 +252,8 @@
 c := re.<span class="tok-fn">Contract</span>(<span class="tok-num">65536</span>)
 
 <span class="tok-key">c.HeapBytes()</span>   <span class="tok-out">1158</span>        <span class="tok-cmt">// bytes, whatever the input</span>
-<span class="tok-key">c.StackBytes()</span>  <span class="tok-out">4608</span>        <span class="tok-cmt">// bytes, deepest call stack</span>
-<span class="tok-key">c.Steps()</span>       <span class="tok-out">199953412</span>   <span class="tok-cmt">// abstract operations, at most</span>
+<span class="tok-key">c.StackBytes()</span>  <span class="tok-out">6144</span>        <span class="tok-cmt">// bytes, deepest call stack</span>
+<span class="tok-key">c.Steps()</span>       <span class="tok-out">82380034</span>    <span class="tok-cmt">// abstract operations, at most</span>
 
 <span class="tok-cmt">// Same pattern, same call, in every language:</span>
 <span class="tok-cmt">// the six libraries report the same three numbers.</span></code></pre>
@@ -272,7 +272,7 @@ c := re.<span class="tok-fn">Contract</span>(<span class="tok-num">65536</span>)
       <div class="container">
         <div class="section__head">
           <span class="kicker">How it works</span>
-          <h2>Written once. Proved once. Printed into every language.</h2>
+          <h2>Written once. Checked once. Generated for every language.</h2>
           <p class="section__sub">Revera is a pipeline, not six hand-written libraries.
             The engine is written in Vego, a strict subset of Go made for mechanical translation.
             A compiler exports it as an intermediate representation, and printers turn that one artifact into each
@@ -294,13 +294,13 @@ c := re.<span class="tok-fn">Contract</span>(<span class="tok-num">65536</span>)
             <div class="pipeline__box pipeline__box--ir">
               <span class="pipeline__label">Vego IR</span>
               <code>revera.vego.json</code>
-              <small>The release artifact.
+              <small>The versioned engine artifact.
                 Every generated engine, and the Lean model, starts from this file.</small>
             </div>
             <div class="pipeline__box pipeline__box--proof">
               <span class="pipeline__label">Lean 4</span>
               <code>well formed, checked, bounded</code>
-              <small>Reads the exact shipped IR, proves it well formed, checks it against the ERE model.</small>
+              <small>Reads the exact IR, proves it well formed, and checks it against the ERE model within the documented scope.</small>
             </div>
           </div>
           <div class="pipeline__arrow" aria-hidden="true"><svg viewBox="0 0 24 24">
@@ -319,9 +319,9 @@ c := re.<span class="tok-fn">Contract</span>(<span class="tok-num">65536</span>)
           </div>
         </div>
 
-        <p class="pipeline__note">The Lean development reads byte-for-byte copies of the shipped IR, so the artifact
+        <p class="pipeline__note">The Lean development reads byte-for-byte copies of the checked-in IR, so the artifact
           that is proved is the artifact the printers consume.
-          Each target adds a small hand-written runtime and public API, and nothing else.</p>
+          Each target adds a small hand-written runtime and public API, plus the shared embedded locale data.</p>
       </div>
     </section>
 
@@ -335,19 +335,21 @@ c := re.<span class="tok-fn">Contract</span>(<span class="tok-num">65536</span>)
         </div>
 
         <div class="codeblock">
-          <div class="codeblock__tabs" role="tablist" aria-label="Language">
-            <button class="codeblock__tab is-active" role="tab" id="tab-go" aria-controls="pane-go" aria-selected="true"
-              data-tab="go" type="button">Go</button>
-            <button class="codeblock__tab" role="tab" id="tab-rust" aria-controls="pane-rust" aria-selected="false"
-              data-tab="rust" type="button">Rust</button>
-            <button class="codeblock__tab" role="tab" id="tab-zig" aria-controls="pane-zig" aria-selected="false"
-              data-tab="zig" type="button">Zig</button>
-            <button class="codeblock__tab" role="tab" id="tab-c" aria-controls="pane-c" aria-selected="false"
-              data-tab="c" type="button">C</button>
-            <button class="codeblock__tab" role="tab" id="tab-cpp" aria-controls="pane-cpp" aria-selected="false"
-              data-tab="cpp" type="button">C++</button>
-            <button class="codeblock__tab" role="tab" id="tab-ts" aria-controls="pane-ts" aria-selected="false"
-              data-tab="ts" type="button">TypeScript</button>
+          <div class="codeblock__tabs">
+            <div class="codeblock__tablist" role="tablist" aria-label="Language">
+              <button class="codeblock__tab is-active" role="tab" id="tab-go" aria-controls="pane-go"
+                aria-selected="true" data-tab="go" type="button">Go</button>
+              <button class="codeblock__tab" role="tab" id="tab-rust" aria-controls="pane-rust"
+                aria-selected="false" data-tab="rust" type="button" tabindex="-1">Rust</button>
+              <button class="codeblock__tab" role="tab" id="tab-zig" aria-controls="pane-zig"
+                aria-selected="false" data-tab="zig" type="button" tabindex="-1">Zig</button>
+              <button class="codeblock__tab" role="tab" id="tab-c" aria-controls="pane-c" aria-selected="false"
+                data-tab="c" type="button" tabindex="-1">C</button>
+              <button class="codeblock__tab" role="tab" id="tab-cpp" aria-controls="pane-cpp"
+                aria-selected="false" data-tab="cpp" type="button" tabindex="-1">C++</button>
+              <button class="codeblock__tab" role="tab" id="tab-ts" aria-controls="pane-ts" aria-selected="false"
+                data-tab="ts" type="button" tabindex="-1">TypeScript</button>
+            </div>
             <span class="codeblock__spacer"></span>
             <button class="btn btn--ghost btn--sm codeblock__copy" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
@@ -454,15 +456,13 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
           </div>
           <div>
             <dt>Zig</dt>
-            <dd>
-              <code>zig fetch --save https://github.com/oneregex/revera/releases/download/v0.1.0/revera-zig-0.1.0.tar.gz</code>
-            </dd>
+            <dd><a href="https://github.com/oneregex/revera/tree/main/zig">Use the source package</a>.
+              No public Zig archive is available yet.</dd>
           </div>
           <div>
             <dt>C and C++</dt>
-            <dd><code>find_package(Revera CONFIG REQUIRED)</code> then link <code>Revera::C</code> or
-              <code>Revera::CXX</code>
-            </dd>
+            <dd><a href="https://github.com/oneregex/revera/tree/main/native">Build and install the CMake package</a>,
+              then link <code>Revera::C</code> or <code>Revera::CXX</code>.</dd>
           </div>
           <div>
             <dt>TypeScript</dt>
@@ -476,7 +476,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
       <div class="container">
         <div class="section__head">
           <span class="kicker">Correctness and interoperability</span>
-          <h2>Tested across languages. Proved against the specification.</h2>
+          <h2>Cross-checked across languages. Proved against the specification.</h2>
           <p class="section__sub">No single mechanism carries the claim.
             Each layer catches what the others cannot.
             Phase A is the first matching stage: it scans the subject once and selects the overall match span before
@@ -486,7 +486,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
         <div class="layers">
           <div class="card">
             <h3>One corpus, every backend</h3>
-            <p>The conformance kit runs the same fixed corpus of 86,704 commands, covering matches, errors,
+            <p>The conformance kit runs the same fixed corpus of 90,145 commands, covering matches, errors,
               replacements, iteration and contract reports, through every generated backend, and compares each answer
               with the canonical Go engine.
               Random stress rounds, a fuzz seed pack and sanitizer builds are part of the same run.</p>
@@ -502,7 +502,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
             <h3>Proofs about the shipped artifact</h3>
             <p>Lean decodes the exact IR files that ship, proves them well formed, and proves universal heap and step
               bounds for Phase A of the matcher, along with the soundness of the meter that records those costs.
-              The proved file is the released file.</p>
+              The proved file is the checked-in IR consumed by the printers.</p>
           </div>
         </div>
 
@@ -540,7 +540,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
               classes, equivalence classes and collating elements, interval expressions, and the shortest-preferring
               repetition modifiers that the 2024 revision added.
               There are no backreferences and no Perl escapes, because the ERE language has none.
-              If you need Perl-compatible syntax, the same approach is being worked on for PCRE.</p>
+              Revera does not provide Perl-compatible syntax.</p>
           </details>
           <details>
             <summary>What exactly is a resource contract?</summary>
@@ -552,7 +552,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
           <details>
             <summary>Does it use a C library under the hood?</summary>
             <p>No.
-              Each library is the engine printed into that language, plus a small hand-written runtime and API.
+              Each library is the engine generated for that language, plus a small hand-written runtime and API.
               The C and C++ libraries are generated the same way as the others.
               The only shared data is the embedded locale tables.</p>
           </details>
@@ -561,7 +561,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
             <p>Patterns and subjects are UTF-8.
               Every library embeds the same generated tables, built from CLDR 48.2 and Unicode 17.0.0, for character
               classes, case mappings and collating data in 1,122 CLDR locales.
-              A locale-aware pattern therefore behaves the same in every language.
+              The conformance suite checks that locale-aware behavior across every backend.
               The default locale is POSIX, and the generator that reproduces the tables lives in the repository.</p>
           </details>
           <details>
@@ -575,13 +575,9 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
           <details>
             <summary>Is it vibe-coded AI slop?</summary>
             <p>Revera is heavily AI-assisted.
-              But agents have very little freedom.
-              Every change is constrained by a written, ahead-of-time design and specification, the POSIX standard text,
-              a conformance corpus that every backend must reproduce, differential fuzzing, generated files that must
-              match the checked-in ones byte for byte, Lean proofs that read the shipped artifact, and manual review.
-              If an agent produces incorrect code or drifts from the design, those constraints are meant to catch it
-              immediately.
-              Multiple large models are also systematically used to review and challenge every change.</p>
+              Changes are reviewed against the written specification, the POSIX standard text, differential tests, the
+              shared conformance corpus, generated-file freshness checks, and Lean proofs with stated boundaries.
+              These checks provide concrete evidence for a change instead of treating its origin as evidence.</p>
           </details>
         </div>
       </div>
@@ -591,8 +587,8 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
       <div class="cta__glow" aria-hidden="true"></div>
       <div class="container cta__inner">
         <h2>Give every language the same regex.</h2>
-        <p>One behavior in every language: correct, interoperable, resource-aware POSIX regular expressions, generated
-          from one verified source.</p>
+        <p>One behavior in every language: interoperable, resource-aware POSIX regular expressions generated from one
+          shared source.</p>
         <div class="cta__buttons">
           <a class="btn btn--primary btn--lg" href="https://github.com/oneregex/revera" target="_blank"
             rel="noopener">Star on GitHub</a>
@@ -612,7 +608,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
             <img class="brand__logo" src="assets/logo.png" alt="" width="30" height="30">
             <span>Revera</span>
           </a>
-          <p>A clean-room POSIX.1-2024 ERE engine, verified in Lean and generated into six languages.
+          <p>A clean-room POSIX.1-2024 ERE engine with Lean semantics and proofs, generated into six languages.
             Part of the OneRegex initiative.</p>
         </div>
         <div>
@@ -649,7 +645,7 @@ console.<span class="tok-fn">log</span>(caps.<span class="tok-fn">get</span>(<sp
       </div>
       <div class="footer__base">
         <p>Revera is MIT licensed. The embedded Unicode and CLDR data is under the Unicode License v3.</p>
-        <p>Proved in Lean 4. Cross-checked in six languages.</p>
+        <p>Lean 4 semantics and Phase A proofs. Cross-checked in six languages.</p>
       </div>
     </div>
   </footer>

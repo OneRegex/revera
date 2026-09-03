@@ -9,7 +9,8 @@ Match positions and compile error positions are byte offsets.
 
 ## Requirements
 
-The package requires Zig `0.17.0` or newer and has no external dependencies.
+The package currently builds with Zig `0.17.0-dev.1936+5a625d5f3` and has no external dependencies.
+Later compatible development snapshots may also work, but there is no stable Zig 0.17 release to require yet.
 Its CLDR locale data is embedded in the module.
 
 ## Add the dependency
@@ -233,7 +234,8 @@ NoCaptures
 UnknownFailure
 ```
 
-`OutOfCapacity` means an engine capacity limit was exceeded.
+`OutOfCapacity` usually means an engine capacity limit was exceeded.
+It is also the fail-closed result if a compile-time-selected one-pass capture walk detects an internal inconsistency.
 It is distinct from allocator exhaustion.
 
 `Regex.contract(max_input)` reports bounds for a search over a subject of at most `max_input` bytes.
@@ -242,6 +244,9 @@ The one-pass and solver entries are mutually exclusive.
 An expression proven one-pass does not include the general solver in its totals.
 Steps are abstract operations, not a time estimate.
 Stack bytes are an estimate.
+Heap bytes bound the engine's fixed-width allocation requests, not total process memory.
+Capture figures include conservative allocator-rounding allowances.
+Runtime object headers, general allocator metadata, map buckets, and similar bookkeeping are outside the model.
 Figures saturate at `1 << 62`, which means the bound is too large to be useful.
 The engine clamps `max_input` to `(1 << 31) - 1`.
 

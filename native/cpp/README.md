@@ -38,7 +38,13 @@ The engine, its arenas and its numeric flags stay out of sight.
   Its capture breakdown selects either the one-pass walk or the general solver, never both.
 
 The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not on this surface.
-A caller who needs them includes `engine.hpp` and works in `namespace revera::engine`.
+The installed package does not expose them.
+A source-checkout-only integration can use the generated `engine.hpp` interface in `namespace revera::engine`, but that header is internal, is not installed, and is not a supported public API.
+
+The contract's heap figure bounds the engine's fixed-width allocation requests, not total process memory.
+Capture figures include conservative allocator-rounding allowances.
+Runtime object headers, general allocator metadata, map buckets, and similar bookkeeping are outside the model.
+Capacity failures normally mean a limit was exceeded, but they are also used to fail closed if a selected one-pass capture walk detects an internal inconsistency.
 
 The CMake package in the parent directory builds this port as `librevera_cxx`, installs the header as `<revera/revera.hpp>`, and exports the target `Revera::CXX`.
 That is the way to use it from another project.

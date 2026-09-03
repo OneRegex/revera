@@ -73,6 +73,7 @@
         var on = t.getAttribute("data-tab") === name;
         t.classList.toggle("is-active", on);
         t.setAttribute("aria-selected", on ? "true" : "false");
+        t.tabIndex = on ? 0 : -1;
       });
       panes.forEach(function (p) {
         p.classList.toggle("is-active", p.getAttribute("data-pane") === name);

@@ -124,22 +124,23 @@ It attempts each manifest's configured debug or sanitizer builds and repeats the
 Finally, `profile` writes CPU and allocation profiles of the Go engine.
 
 `make licenses` synchronizes `LICENSE` and `LICENSES/Unicode-3.0.txt` into `go/`, `rust/`, `zig/`, `ts/` and `native/`.
-Before a release, replace `unreleased` in the version's changelog heading with its date, run `make licenses`, and commit the result.
+Before `make dist`, add a dated changelog heading for the versions being packaged, align the Cargo, Zig and CMake versions, run `make licenses`, and commit the result.
 
 `make dist` then reads committed `HEAD` and refuses tracked changes.
 It checks the Cargo, Zig and CMake versions as well as the license copies.
 Finally, it stages deterministic Zig and native archives, both IR files, and a manifest with the source commit, `vegoc` version, IR digest and asset checksums in `tmp/dist/`.
+Between releases, `go run ./cmd/dist -unreleased` from `dev/` stages the same assets without the Cargo version and changelog checks, which is what CI runs on every push.
 
 ## Versions
 
-Three axes move on their own:
+Three version axes move independently:
 
-- the Revera engine release, one number shared by the six implementations, starting at `0.1.0`;
+- the Revera engine release, one number shared by the six implementations;
 - the Vego toolchain, its own SemVer, starting at `0.1.0`, which `vegoc version` prints;
 - the Vego IR compatibility major, the `"vego": 1` field of the IR.
 
 Engine releases use matching project `vX.Y.Z` and Go engine `go/vX.Y.Z` tags.
-Vego releases use independent `vego/vA.B.C` tags; the first engine and Vego releases both happen to be `0.1.0`.
+Vego releases use independent `vego/vA.B.C` tags.
 [`CHANGELOG.md`](CHANGELOG.md) records the releases, and [`SECURITY.md`](SECURITY.md) says how to report a vulnerability.
 
 ## License

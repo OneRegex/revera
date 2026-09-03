@@ -43,7 +43,7 @@ Those corners are division overflow, wrapping at every width, evaluation order, 
 
 `revera_corpus_agrees_within_contract`.
 
-Under the formal semantics, the Revera engine answers the retained commands of the embedded crosscheck corpus exactly like the Go reference.
+Under the formal semantics, the Revera engine answers the retained commands of the embedded crosscheck corpus exactly like the canonical Go engine.
 That corpus is `lean/data/corpus.tsv`, which pairs each command with the output of the Go engine.
 The replay uses the same driver protocol as the Zig, C++ and Rust targets: compile, execute, replace, iterate, contracts, locale selection and case digests.
 
@@ -62,7 +62,7 @@ The stack comparison uses the 256-byte frame estimate of the contract.
 That covers the 78,236 retained X commands.
 It does not cover R and I.
 ReplaceAll and MatchIterNext call Exec themselves, and the session measures only its own calls.
-Those 360 commands are therefore checked for output agreement alone.
+Those 372 commands are therefore checked for output agreement alone.
 
 Metering them needs a delta around the inner call, rather than a reset around the outer one.
 The monotonicity lemmas of `MeterSound.lean` would justify that delta.
@@ -87,8 +87,8 @@ The second needs minutes on the empty subject.
 Therefore, replaying all twelve blocks would take days.
 
 What stays is chosen so that nothing escapes the check that matters.
-Every compile command of the corpus stays, all 9,810 of them, so no pattern goes uncompiled and unchecked.
-The T commands of those blocks stay too, so the contract figures of the two extreme patterns still compare against the Go reference.
+Every compile command of the corpus stays, all 9,897 of them, so no pattern goes uncompiled and unchecked.
+The T commands of those blocks stay too, so the contract figures of the two extreme patterns still compare against the canonical Go engine.
 Those are the largest figures in the corpus, which makes them the ones worth keeping.
 
 Only the executions go, and dropping them is sound for the session state.
@@ -127,10 +127,10 @@ Every constrained command's recorded output meets its verdict.
 The walk leaves a command unconstrained in exactly the counted cases: the locale is not POSIX, the pattern is free, the subject holds a NUL or is not valid UTF-8, or the enumeration ran out of budget.
 `expectedCoverage` pins the figures, so any drift in coverage fails the theorem.
 
-On the current corpus, all 9,653 defined patterns compile with the specification's subexpression count.
+On the current corpus, all 9,683 defined patterns compile with the specification's subexpression count.
 In addition, all 66 free spellings in the corpus are the ones the engine rejects.
-Finally, 66,576 executions produce the specified line.
-The 1,512 executions left out are the ones on subjects with NUL bytes or invalid UTF-8, which are not strings of the interface.
+Finally, 68,856 executions produce the specified line.
+The 1,872 executions left out are the ones on subjects with NUL bytes or invalid UTF-8, which are not strings of the interface.
 
 `engine_meets_spec_on_corpus` composes that theorem with the corpus theorem.
 For every corpus command the specification constrains, the interpreted engine prints a line that meets the specification's verdict.
@@ -283,7 +283,7 @@ What remains corpus-bound is the control flow of the walk and of the capture sol
 ## What this means for the pipeline
 
 The generated Rust, Zig, TypeScript, C++, and C11 engines come from the same JSON that the theorems cover.
-`dev/internal/conformance/crosscheck` verifies all four against the Go engine on the same corpus.
+`dev/internal/conformance/crosscheck` verifies all five generated backends against the Go engine on the same corpus.
 
 On the covered corpus commands, the Lean semantics therefore anchors the whole chain.
 One side runs JSON through the formal semantics to the recorded outputs.

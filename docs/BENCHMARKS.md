@@ -29,7 +29,9 @@ The tables report the fastest repetition; `-tsv` also records the slowest, so th
 An untimed pass counts allocations: the bytes and the number of requests that the operation makes to its allocator.
 In Go these are heap allocations; in Rust, Zig, C++, and C11 they are arena requests, counted by the runtime; in TypeScript they are the buffers the runtime allocates for the engine, with the bytes at the element widths the runtime assumes.
 A match operation allocates its match buffer, as every public API does.
-The five generated targets report the same counts and, up to struct padding, the same bytes, which is expected, since they run the same program through the same growth rule, and it is a useful cross-check of the counters.
+The five generated targets follow the same allocation sequence.
+The native targets report the same request counts and, apart from struct padding, the same bytes.
+TypeScript reports the same request counts but can differ in bytes because its runtime assigns its own fixed width to each field.
 
 The contract column of the allocation table is `ContractHeapBytes` of the pattern for the length of the subject.
 It is a bound, not a prediction, and the table shows how far the bound sits above the measured figure.
@@ -49,12 +51,13 @@ cd dev && go run ./cmd/bench -only hard/ -reps 3 -backend ../zig
 ```
 
 `-only` takes a prefix of `group/name`, `-scale` multiplies the iteration counts, and `-backend` limits the run to some manifests.
-The Go benchmarks also exist as `BenchmarkEngine` under `go test`, which is what `make profile` runs:
+The Go benchmarks also exist as `BenchmarkEngine` in `dev/internal/protocol`, which is what `make profile` runs:
 
 ```sh
-cd go && go test . -run '^$' -bench BenchmarkEngine -benchmem -cpuprofile ../tmp/cpu.pprof -memprofile ../tmp/mem.pprof -o ../tmp/revera.test
-go tool pprof -top ../tmp/revera.test ../tmp/cpu.pprof
-go tool pprof -sample_index=alloc_space -top ../tmp/revera.test ../tmp/mem.pprof
+cd dev && go test ./internal/protocol -run '^$' -bench BenchmarkEngine -benchmem \
+  -cpuprofile ../tmp/cpu.pprof -memprofile ../tmp/mem.pprof -o ../tmp/revera.test
+cd dev && go tool pprof -top ../tmp/revera.test ../tmp/cpu.pprof
+cd dev && go tool pprof -sample_index=alloc_space -top ../tmp/revera.test ../tmp/mem.pprof
 ```
 
 The Go profile is the profile of the engine source of truth.
@@ -78,7 +81,7 @@ Reference machine, 2026-08-31:
 | rust   | 202520       | 5572         | 85600      | 101       | 328392            |
 | zig    | 170335       | 5259         | 58652      | 72        | 376628            |
 
-The engine is between 59 KB and 86 KB of machine code in every language.
+The three generated native targets in this 2026-08-31 table contain between 59 KB and 86 KB of measured engine machine code.
 The C++ figure counts 215 functions because every template instantiation of the runtime gets its own symbol; Rust and Zig inline most of them.
 Several symbols can share one address, such as a function and its cold path label; they count once.
 `revera.vego.json`, the artifact the printers read, is 1.3 MB.
@@ -210,11 +213,11 @@ Compilation runs about five times slower than C, and matching between seven and 
 A profile with `node --cpu-prof` puts the Phase A matcher, which selects the overall match span, on top.
 The cost is structural: every element access reads a slice header and checks its bounds, every subslice and append allocates a header, every 64-bit add is range-checked, and the memo hash and the capture masks compute on `bigint`.
 The allocation table shows the TypeScript column equal to the other generated targets in requests on every case, and a few percent above them in bytes, since the runtime charges a fixed width per struct field.
-`make size` reports the source figures only for TypeScript, because the engine has no machine code; the engine and probe sources are 233 KB and 6,253 lines, the largest of the printed engines because of the pinned bases and the bounds checks written out.
+`make size` reports the source figures only for TypeScript, because the engine has no ahead-of-time machine code; the engine and probe sources are 233 KB and 6,253 lines, the largest of the generated engines because of the pinned bases and the bounds checks written out.
 
 ## What the figures say
 
-The four languages are within 30 percent of each other on almost every case, which is the expected outcome for one program printed four times.
+The four languages in the 2026-08-31 native table are within 30 percent of each other on almost every case, which is the expected outcome for the same program running in four languages.
 Zig compiles fastest and C++ matches fastest; Rust is the slowest of the three on matching by 10 to 20 percent, with the release profile that keeps `debug-assertions` on.
 The Go engine keeps up with the native targets on matching and is 20 to 40 percent slower on compilation, where its allocations go through the garbage collector.
 
@@ -228,7 +231,7 @@ The contract bounds sit far above the measurements, by four to seven orders of m
 The bound must hold for every subject of the given length, and the solver bound grows with the number of ways the pattern can split a subject.
 `match/nosub-long` shows the other end: 969 bytes bound against 553 measured, because a `FlagNoSub` pattern never reaches phase B.
 
-The three generated targets make the same number of requests on every case, and the same bytes outside the padding of compiled nodes.
+The three generated targets in the 2026-08-31 native table make the same number of requests on every case, and the same bytes outside the padding of compiled nodes.
 A difference there would mean a printer or a runtime diverges from the growth rule the specification fixes.
 
 ## Profile findings
@@ -253,7 +256,7 @@ The time did not move on any case, within the 2 percent noise of the run, and `r
 The change was reverted.
 A first attempt at the same experiment shared one block among the ring slots and was rejected by the Vego checker: a slice field takes a fresh buffer, a move, or a truncation of itself, never a view into another buffer.
 
-The lesson is that the number of allocation requests is not where the time goes, in any of the four runtimes.
+The lesson from that native run is that the number of allocation requests is not where the time goes in any of the four runtimes shown.
 Bytes matter for Go, through the collector, and the phase A loop matters everywhere.
 The next candidates, in the order the profile suggests, are:
 

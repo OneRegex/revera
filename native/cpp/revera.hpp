@@ -61,7 +61,7 @@ enum class Failure {
     Interval,
     // A range like [z-a] runs backwards, or its endpoint is not a single character.
     Range,
-    // The work needed passed a capacity limit.
+    // The work passed a capacity limit, or a selected one-pass walk failed an internal consistency check.
     Capacity,
     // A repetition operator has no operand to repeat.
     Repeat,
@@ -80,7 +80,7 @@ class Error : public std::runtime_error {
     // Returns which failure this is.
     Failure failure() const noexcept { return failure_; }
 
-    // Returns the byte offset in the pattern where compilation stopped, when the failure has one.
+    // Returns the byte offset in the pattern or replacement where processing stopped, when the failure has one.
     std::optional<size_t> offset() const noexcept { return offset_; }
 
   private:
@@ -146,7 +146,8 @@ class Locale {
 
 // What one backend of one search can use.
 struct BackendContract {
-    // The bound on explicit heap allocation, in bytes.
+    // The bound on fixed-width allocation requests, in bytes.
+    // This is not total process memory and excludes runtime and allocator metadata.
     uint64_t heap_bytes;
     // The estimate of the deepest call stack, in bytes.
     uint64_t stack_bytes;
@@ -161,7 +162,8 @@ struct BackendContract {
 struct Contract {
     // The subject length the figures cover, in bytes.
     size_t max_input;
-    // The heap bound of a whole search, in bytes.
+    // The bound on fixed-width allocation requests for a whole search, in bytes.
+    // This is not total process memory and excludes runtime and allocator metadata.
     uint64_t heap_bytes;
     // The stack estimate of a whole search, in bytes.
     uint64_t stack_bytes;

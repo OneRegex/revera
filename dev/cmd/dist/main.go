@@ -4,11 +4,14 @@
 //
 // Usage:
 //
-//	dist [-repo path] [-commit ref] [-allow-dirty] [-out dir]
+//	dist [-repo path] [-commit ref] [-allow-dirty] [-unreleased] [-out dir]
 //
 // Every file comes out of the recorded commit, through git archive, so the manifest and the
 // archives cannot disagree. A dirty tracked tree is refused unless -allow-dirty is given, in which
 // case the working tree is read instead and the manifest says so.
+// A release also requires the Cargo version to match the archived packages and a dated changelog
+// section for that version; -unreleased drops both checks so a tree between releases can still be
+// staged and tested, and marks the manifest accordingly.
 // The archives carry no timestamps but the commit time, no ownership and no platform metadata,
 // so two runs on one commit produce the same bytes.
 package main
@@ -52,6 +55,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	repoValue := flags.String("repo", "", "repository root (default: discover from the working directory)")
 	commitRef := flags.String("commit", "HEAD", "the commit to build the assets from")
 	allowDirty := flags.Bool("allow-dirty", false, "read the working tree instead of the commit when tracked files are modified")
+	unreleased := flags.Bool("unreleased", false, "stage a tree that is not release-ready: skip the Cargo version and changelog checks")
 	outDir := flags.String("out", "", "output directory (default tmp/dist below the repository root)")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -76,7 +80,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if *outDir == "" {
 		*outDir = filepath.Join(repo, "tmp", "dist")
 	}
-	manifest, err := stage(repo, *commitRef, *allowDirty, *outDir)
+	manifest, err := stage(repo, *commitRef, *allowDirty, *unreleased, *outDir)
 	if err != nil {
 		fmt.Fprintln(stderr, "dist:", err)
 		return 1
@@ -221,7 +225,7 @@ func git(repo string, args ...string) ([]byte, error) {
 }
 
 // stage builds every asset into outDir and returns the manifest text.
-func stage(repo, commitRef string, allowDirty bool, outDir string) (string, error) {
+func stage(repo, commitRef string, allowDirty, unreleased bool, outDir string) (string, error) {
 	sha, err := git(repo, "rev-parse", "--verify", commitRef+"^{commit}")
 	if err != nil {
 		return "", err
@@ -256,15 +260,17 @@ func stage(repo, commitRef string, allowDirty bool, outDir string) (string, erro
 	}
 	mtime := time.Unix(seconds, 0).UTC()
 
-	version, err := packageVersion(src)
+	version, err := packageVersion(src, unreleased)
 	if err != nil {
 		return "", err
 	}
 	if err := checkLicenses(src); err != nil {
 		return "", err
 	}
-	if err := checkChangelog(src, version); err != nil {
-		return "", err
+	if !unreleased {
+		if err := checkChangelog(src, version); err != nil {
+			return "", err
+		}
 	}
 
 	if err := os.RemoveAll(outDir); err != nil {
@@ -317,7 +323,11 @@ func stage(repo, commitRef string, allowDirty bool, outDir string) (string, erro
 	assets = append(assets, asset{"revera.vego.json", reveraIR}, asset{"probe.vego.json", probeIR})
 
 	var manifest strings.Builder
-	fmt.Fprintf(&manifest, "revera %s\n", version)
+	versionLine := version
+	if unreleased {
+		versionLine += " (unreleased)"
+	}
+	fmt.Fprintf(&manifest, "revera %s\n", versionLine)
 	fmt.Fprintf(&manifest, "commit %s\n", commitLine)
 	fmt.Fprintf(&manifest, "vegoc %s\n", compiler.Version)
 	fmt.Fprintf(&manifest, "ir-digest sha256:%x\n", sha256.Sum256(reveraIR))
@@ -343,8 +353,12 @@ var (
 	changelogPattern    = `(?m)^## %s - (\d{4}-\d{2}-\d{2})\s*$`
 )
 
-// packageVersion reads the version of the three package manifests and requires one value.
-func packageVersion(src source) (string, error) {
+// packageVersion reads the version of the three package manifests and returns the version of the
+// packages being archived.
+// The Zig and native manifests must always agree, since one version names both archives.
+// The Cargo version has to agree too, unless the tree is staged as unreleased: the crate ships on
+// its own cadence, and only a coordinated release puts every implementation on one version.
+func packageVersion(src source, unreleased bool) (string, error) {
 	find := func(rel string, pattern *regexp.Regexp) (string, error) {
 		data, _, err := src.read(rel)
 		if err != nil {
@@ -368,8 +382,11 @@ func packageVersion(src source) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if zig != cargo || zig != cmake {
-		return "", fmt.Errorf("the package versions disagree: zig %s, rust %s, native %s", zig, cargo, cmake)
+	if zig != cmake {
+		return "", fmt.Errorf("the archived package versions disagree: zig %s, native %s", zig, cmake)
+	}
+	if !unreleased && zig != cargo {
+		return "", fmt.Errorf("the package versions disagree: zig %s, rust %s, native %s; align them or stage with -unreleased", zig, cargo, cmake)
 	}
 	return zig, nil
 }

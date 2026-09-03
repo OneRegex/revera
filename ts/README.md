@@ -18,6 +18,8 @@ It is intended for Node.js applications, not browsers.
 
 Importing the package uses `node:fs` to load its bundled locale data.
 
+Node.js 22.18 or later is required.
+
 ## Installation
 
 ```sh
@@ -260,7 +262,8 @@ Compilation offsets refer to the pattern.
 
 Escape and backreference errors produced while parsing replacement text refer to the replacement.
 
-A search can fail with a `"capacity"` error if its subject exceeds the engine's capacity for that pattern.
+A search usually fails with a `"capacity"` error when its subject exceeds the engine's capacity for that pattern.
+The same error is used to fail closed if a compile-time-selected one-pass capture walk detects an internal inconsistency.
 
 Numeric arguments such as a replacement limit or contract size throw `RangeError` when they are not integers.
 
@@ -286,10 +289,17 @@ console.log(contract.steps);
 `heapBytes`, `stackBytes`, and `steps` are `bigint` values so their bounds remain exact.
 
 `heapBytes` bounds explicit heap allocation, `stackBytes` estimates the deepest call stack, and `steps` bounds abstract unit-cost operations rather than elapsed time.
+The heap figure covers fixed-width allocation requests, not total process memory.
+Capture figures include conservative allocator-rounding allowances.
+Runtime object headers, general allocator metadata, map buckets, and JavaScript garbage-collector bookkeeping are outside the model.
+
+`maxInput` must be an integer.
+Values below zero are clamped to zero, and values above `(1 << 31) - 1` are clamped to that engine limit.
+The returned object does not expose the effective clamped value, so callers that require an exact input ceiling should validate the requested range before calling `contract`.
 
 `hasOnePass` reports that captures use the compile-time selected one-pass walk.
 `hasSolver` reports that they require the general solver.
-The flags are mutually exclusive, and both are false when a search does not need group offsets.
+The flags are mutually exclusive, and both are false when Phase B cannot run, such as for an expression without parenthesized subexpressions or one compiled with `noCaptures`.
 
 ## API summary
 

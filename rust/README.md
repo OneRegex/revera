@@ -224,7 +224,8 @@ fn main() {
 }
 ```
 
-`ErrorKind::Capacity` means the requested work exceeded an engine capacity limit.
+`ErrorKind::Capacity` usually means the requested work exceeded an engine capacity limit.
+It is also the fail-closed result if a compile-time-selected one-pass capture walk detects an internal inconsistency.
 
 Do not treat every `Err` as invalid syntax, and do not discard iterator errors with `filter_map` unless that is an intentional policy.
 
@@ -233,6 +234,10 @@ Do not treat every `Err` as invalid syntax, and do not discard iterator errors w
 `Regex::contract(max_input)` reports the resource cost of one search for subjects up to `max_input` bytes.
 
 The top-level `heap_bytes` and `steps` values are bounds, while `stack_bytes` is an estimate.
+
+The heap figure bounds the engine's fixed-width allocation requests, not total process memory.
+Capture figures include conservative allocator-rounding allowances.
+Runtime object headers, general allocator metadata, map buckets, and similar bookkeeping are outside the model.
 
 The `matcher`, `one_pass`, and `solver` fields provide the backend breakdown.
 `one_pass` and `solver` are mutually exclusive.

@@ -13,7 +13,7 @@ The parts used here are:
 - [XBD Rationale A.9](https://pubs.opengroup.org/onlinepubs/9799919799/xrat/V4_xbd_chap01.html#tag_21_09)
 
 The implementation baseline is `third_party/tre` commit `71bfcaf0af3994384987c6c2679ed7d078ffe189`, which identifies itself as TRE 0.9.0.
-TRE's own README still names IEEE Std 1003.1-2001 / Issue 6 as its conformance target ([`README.md`, lines 101-116](../third_party/tre/README.md)).
+TRE's own README still names IEEE Std 1003.1-2001 / Issue 6 as its conformance target ([`README.md`, lines 101-116](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/README.md)).
 
 This document covers:
 
@@ -45,7 +45,7 @@ The audited tree has six concrete conformance gaps:
 | `REG_NOSUB` output argument             | When an expression was compiled with `REG_NOSUB`, `regexec()` must ignore `pmatch`.                                                                                                                             | On a successful match TRE writes `{-1,-1}` to every one of the `nmatch` elements, even though `REG_NOSUB` was set.                                                 |
 | Case-insensitive non-matching lists     | Under XBD 4.1's closure, a string that matches case-sensitively must keep matching after case-counterpart substitution. Case-insensitive `[^a]` must therefore match `a`, because `A` matches case-sensitively. | TRE case-expands the positive list and then inverts it, so case-insensitive `[^a]` matches neither `a` nor `A`.                                                    |
 
-TRE's [`TODO`, lines 12-15](../third_party/tre/TODO) acknowledges the first two gaps as missing features.
+TRE's [`TODO`, lines 12-15](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/TODO) acknowledges the first two gaps as missing features.
 The README understates the first one, because the parser rejects single-character collating symbols as well as multi-character ones.
 
 Issue 8 standardized the `*?`, `+?`, `??`, and `{m,n}?` repetition syntax that TRE already implements.
@@ -60,7 +60,7 @@ POSIX bracket expressions allow a collating element to be written between `[.` a
 A valid explicit collating symbol is part of the portable bracket-expression grammar.
 Multi-character collating elements are locale-dependent, but the single-character elements of the current locale are not optional.
 
-TRE's bracket parser unconditionally returns `REG_ECOLLATE` as soon as an item begins with `[.` ([`lib/tre-parse.c`, lines 296-301](../third_party/tre/lib/tre-parse.c)).
+TRE's bracket parser unconditionally returns `REG_ECOLLATE` as soon as an item begins with `[.` ([`lib/tre-parse.c`, lines 296-301](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c)).
 It never parses the element or asks the locale whether it is valid.
 
 Observed in the isolated default build:
@@ -100,10 +100,10 @@ With `REG_MINIMAL`, repetitions are shortest by default and the modifier request
 
 TRE implements those semantics but exposes them as `REG_UNGREEDY`:
 
-- the flag is defined at [`include/tre/tre.h`, lines 135-140](../third_party/tre/include/tre/tre.h).
+- the flag is defined at [`include/tre/tre.h`, lines 135-140](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/include/tre/tre.h).
 - the parser takes its default `minimal` value from `REG_UNGREEDY`, and inverts it for a following `?`.
-  See [`lib/tre-parse.c`, lines 623-653 and 835-863](../third_party/tre/lib/tre-parse.c).
-- the same inversion is implemented for `*`, `+`, and `?` ([`lib/tre-parse.c`, lines 1127-1167](../third_party/tre/lib/tre-parse.c)).
+  See [`lib/tre-parse.c`, lines 623-653 and 835-863](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c).
+- the same inversion is implemented for `*`, `+`, and `?` ([`lib/tre-parse.c`, lines 1127-1167](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c)).
 
 The audited header contains no definition of `REG_MINIMAL`, and the implementation contains no test for it.
 Therefore:
@@ -116,7 +116,7 @@ Therefore:
   `.*?` with `REG_UNGREEDY` matched all four characters.
 
 The syntax and API documentation of TRE still describe minimal repetition as an extension over Issue 6.
-See [`doc/tre-syntax.html`, lines 96-156](../third_party/tre/doc/tre-syntax.html) and [`doc/tre-api.html`, lines 131-134](../third_party/tre/doc/tre-api.html).
+See [`doc/tre-syntax.html`, lines 96-156](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/doc/tre-syntax.html) and [`doc/tre-api.html`, lines 131-134](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/doc/tre-api.html).
 That description is out of date for Issue 8.
 
 TRE states that minimal repetitions are not supported by its approximate matcher.
@@ -131,8 +131,8 @@ TRE's non-system-ABI declarations use:
 typedef int regoff_t;
 ```
 
-at [`include/tre/tre.h`, lines 92-106](../third_party/tre/include/tre/tre.h).
-The implementation also sets `TRE_MAX_STRING` to `INT_MAX` ([`lib/tre-internal.h`, lines 28-30](../third_party/tre/lib/tre-internal.h)).
+at [`include/tre/tre.h`, lines 92-106](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/include/tre/tre.h).
+The implementation also sets `TRE_MAX_STRING` to `INT_MAX` ([`lib/tre-internal.h`, lines 28-30](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-internal.h)).
 
 In the audited default macOS build:
 
@@ -144,7 +144,7 @@ sizeof(ssize_t)   = 8
 
 The type therefore cannot represent every offset that the POSIX type contract requires on that ABI.
 A build against a usable system regex ABI imports the `regoff_t` of the system, and can avoid this gap.
-`--enable-system-abi` is optional, and [`configure.ac`, lines 121-127](../third_party/tre/configure.ac) disables it by default.
+`--enable-system-abi` is optional, and [`configure.ac`, lines 121-127](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/configure.ac) disables it by default.
 
 ### 5. `REG_NOSUB` does not make `pmatch` unused
 
@@ -153,8 +153,8 @@ In particular, an application need not supply an array merely because `nmatch` i
 
 TRE suppresses the real match offsets under `REG_NOSUB`.
 It then fills every one of the `nmatch` output elements with `{-1,-1}`.
-The first branch of `tre_fill_pmatch()` skips submatch construction, after which its final loop writes the unused entries ([`lib/regexec.c`, lines 54-114](../third_party/tre/lib/regexec.c)).
-`tre_match()` calls this function after every successful match without overriding `nmatch` when `REG_NOSUB` applies ([`lib/regexec.c`, lines 139-201](../third_party/tre/lib/regexec.c)).
+The first branch of `tre_fill_pmatch()` skips submatch construction, after which its final loop writes the unused entries ([`lib/regexec.c`, lines 54-114](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/regexec.c)).
+`tre_match()` calls this function after every successful match without overriding `nmatch` when `REG_NOSUB` applies ([`lib/regexec.c`, lines 139-201](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/regexec.c)).
 
 A focused probe set one `regmatch_t` to `{123,456}` and compiled `a` with `REG_EXTENDED | REG_NOSUB`.
 It then called `tre_regexec()` with `nmatch == 1`.
@@ -173,10 +173,10 @@ The "simple algorithm" of rationale A.4.1 produces the same result.
 It checks each subject character in both cases, and matches when either case matches.
 
 TRE instead expands case before inverting.
-For ordinary members and ranges, the bracket parser adds opposite-case counterpart items to the positive list, at [`lib/tre-parse.c`, lines 380-414](../third_party/tre/lib/tre-parse.c).
-It then builds the negated union from that expanded list, at [`lib/tre-parse.c`, lines 441-457](../third_party/tre/lib/tre-parse.c).
+For ordinary members and ranges, the bracket parser adds opposite-case counterpart items to the positive list, at [`lib/tre-parse.c`, lines 380-414](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c).
+It then builds the negated union from that expanded list, at [`lib/tre-parse.c`, lines 441-457](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c).
 Negated character classes take a separate path with the same effect.
-The matcher rejects a character when either of its cases belongs to the class, at [`lib/tre-match-utils.h`, lines 204-215](../third_party/tre/lib/tre-match-utils.h).
+The matcher rejects a character when either of its cases belongs to the class, at [`lib/tre-match-utils.h`, lines 204-215](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-match-utils.h).
 
 Observed in the isolated default build, POSIX locale, `REG_EXTENDED | REG_ICASE`:
 
@@ -216,10 +216,10 @@ Where the POSIX text assigns undefined behavior to the underlying spelling, acce
 | `{,}`                              | Zero or more repetitions.                                                                                                                                                                       | Same undefined area; equivalent in language to `*`.                                                             |
 | `{+...-...#...~..., ...}` settings | Per-subexpression insertion, deletion, substitution, total-error, and cost controls for approximate matching.                                                                                   | Approximate matching and this interval-like syntax are outside POSIX.                                           |
 
-The escape macros are enumerated in [`lib/tre-parse.c`, lines 53-63](../third_party/tre/lib/tre-parse.c).
-The parser implementations for quoting, assertions, numeric escapes, and ERE back-references are at [`lib/tre-parse.c`, lines 1383-1530](../third_party/tre/lib/tre-parse.c).
-Approximate and omitted-bound parsing is at [`lib/tre-parse.c`, lines 615-863](../third_party/tre/lib/tre-parse.c).
-Inline groups are handled at [`lib/tre-parse.c`, lines 1217-1376](../third_party/tre/lib/tre-parse.c).
+The escape macros are enumerated in [`lib/tre-parse.c`, lines 53-63](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c).
+The parser implementations for quoting, assertions, numeric escapes, and ERE back-references are at [`lib/tre-parse.c`, lines 1383-1530](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c).
+Approximate and omitted-bound parsing is at [`lib/tre-parse.c`, lines 615-863](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c).
+Inline groups are handled at [`lib/tre-parse.c`, lines 1217-1376](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c).
 
 Although TRE's syntax manual limits back-references to `\1` through `\9`, the parser actually recognizes any single digit.
 Thus `\0` is also accepted and matched the empty string in the focused probes.
@@ -248,7 +248,7 @@ a|
 a||b
 ```
 
-This behavior comes from the parser's explicit empty-node paths ([`lib/tre-parse.c`, lines 1357-1376 and 1620-1651](../third_party/tre/lib/tre-parse.c)).
+This behavior comes from the parser's explicit empty-node paths ([`lib/tre-parse.c`, lines 1357-1376 and 1620-1651](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c)).
 It is an allowed extension, not the POSIX meaning of an empty ERE.
 
 ### Escaped ordinary characters
@@ -264,7 +264,7 @@ POSIX makes an unescaped `{` that is not part of a valid interval undefined.
 TRE usually tries to parse it as a bound and returns an error.
 The audited patterns `{x` and `a{x` returned `REG_BADBR`.
 
-This contradicts TRE's syntax manual, which says that `{` followed by a non-digit is ordinary ([`doc/tre-syntax.html`, lines 368-371](../third_party/tre/doc/tre-syntax.html)).
+This contradicts TRE's syntax manual, which says that `{` followed by a non-digit is ordinary ([`doc/tre-syntax.html`, lines 368-371](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/doc/tre-syntax.html)).
 The source and executable behavior are authoritative for this audit.
 
 ### Adjacent duplication symbols
@@ -277,11 +277,11 @@ TRE makes several different choices:
 - further postfix operators can be applied after a minimal modifier, so `a*??` is accepted.
 - combinations such as `a**`, `a*+`, `a++`, and a bound followed by `*` or `+` return `REG_BADRPT`.
 
-The repeated postfix loop and its selective error checks are at [`lib/tre-parse.c`, lines 1127-1180](../third_party/tre/lib/tre-parse.c) and [`lib/tre-parse.c`, lines 835-863](../third_party/tre/lib/tre-parse.c).
+The repeated postfix loop and its selective error checks are at [`lib/tre-parse.c`, lines 1127-1180](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c) and [`lib/tre-parse.c`, lines 835-863](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c).
 
 ### Ranges and multi-character elements not explicitly named
 
-TRE forms ranges from numeric character values and rejects a descending pair ([`lib/tre-parse.c`, lines 284-301](../third_party/tre/lib/tre-parse.c)).
+TRE forms ranges from numeric character values and rejects a descending pair ([`lib/tre-parse.c`, lines 284-301](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/lib/tre-parse.c)).
 Issue 8 requires the POSIX locale's collation sequence, but deliberately leaves range behavior unspecified in other locales.
 Consequently:
 
@@ -296,7 +296,7 @@ Explicit collating symbols and equivalence classes remain required, as described
 TRE is namespaced as a library rather than installed as the system POSIX regex provider:
 
 - the primary header is `<tre/tre.h>` and the exported functions are `tre_regcomp()`, `tre_regexec()`, `tre_regerror()`, and `tre_regfree()`.
-- `<tre/regex.h>` provides source-level compatibility by macro-aliasing the unprefixed names ([`include/tre/regex.h`, lines 13-37](../third_party/tre/include/tre/regex.h)).
+- `<tre/regex.h>` provides source-level compatibility by macro-aliasing the unprefixed names ([`include/tre/regex.h`, lines 13-37](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/include/tre/regex.h)).
 - the standalone prototypes do not reproduce the Issue 8 `restrict` qualifiers.
   This changes neither the C ABI nor the matching result.
   It is a source-header difference from the specified `<regex.h>` declarations.
@@ -315,13 +315,13 @@ TRE also exposes the following options outside POSIX:
 | `REG_BADMAX`                 | More specific extension error for a repetition count above `RE_DUP_MAX`; in system-ABI mode it aliases `REG_BADBR`. |
 | `REG_OK`                     | Name the zero success result.                                                                                       |
 
-The definitions are in [`include/tre/tre.h`, lines 54-90 and 109-161](../third_party/tre/include/tre/tre.h).
+The definitions are in [`include/tre/tre.h`, lines 54-90 and 109-161](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/include/tre/tre.h).
 TRE also adds the `reg_errcode_t` typedef used by its implementation.
 POSIX permits additional names that begin with `REG_`, so their existence is not a conformance failure.
 Passing `REG_RIGHT_ASSOC`, `REG_LITERAL`, or an approximate-matching option deliberately requests behavior outside the POSIX ERE contract.
 
 Additional APIs support length-delimited strings, embedded NUL bytes, wide-character strings, raw byte vectors, approximate results, and caller-provided streaming sources.
-[`include/tre/tre.h`, lines 178-301](../third_party/tre/include/tre/tre.h) declares them.
+[`include/tre/tre.h`, lines 178-301](https://github.com/laurikari/tre/blob/71bfcaf0af3994384987c6c2679ed7d078ffe189/include/tre/tre.h) declares them.
 POSIX `regcomp()` and `regexec()` accept NUL-terminated byte strings and cannot express embedded NUL bytes.
 The added APIs extend rather than contradict the standard interfaces.
 

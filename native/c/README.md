@@ -44,6 +44,10 @@ By contrast, replacement functions return memory that the caller frees with `fre
 - `revera_locale_open` selects embedded locale data, and `revera_contract_for` reports resource figures before a search.
 
 A capture contract selects either the one-pass walk or the general solver, never both.
+Its heap figure bounds the engine's fixed-width allocation requests, not total process memory.
+Capture figures include conservative allocator-rounding allowances.
+Runtime object headers, general allocator metadata, map buckets, and similar bookkeeping are outside the model.
+Capacity failures normally mean a limit was exceeded, but they are also used to fail closed if a selected one-pass capture walk detects an internal inconsistency.
 
 The CMake package in the parent directory builds this port as `librevera_c`, installs the header as `<revera/revera.h>`, and exports the target `Revera::C`.
 That is the way to use it from another project.

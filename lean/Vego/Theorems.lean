@@ -26,7 +26,7 @@ What the theorems say:
 
 4. `revera_corpus_agrees_within_contract`.
    Under the formal semantics, the revera engine answers the crosscheck corpus with exactly the output of the Go reference engine.
-   It uses the same driver protocol as the Zig, C++ and Rust targets.
+   It uses the same driver protocol as all five generated backends.
    That protocol covers compile, execute, replace, iterate, contracts, locale selection and case digests.
    The runs hit no trap: no out-of-range index or slice, no division by zero, no impossible shift, no ill-typed step.
 
@@ -39,7 +39,7 @@ What the theorems say:
 
    The R and I commands are outside that claim.
    ReplaceAll and MatchIterNext call Exec themselves, and the session measures only the calls it makes directly.
-   The 360 R and I commands of the corpus are therefore checked for output agreement, but not against a contract.
+   The 372 R and I commands of the corpus are therefore checked for output agreement, but not against a contract.
    Metering them needs a delta around the inner call rather than a reset around the outer one.
 
    The corpus holds two patterns that cannot run under the interpreter in any reasonable time.

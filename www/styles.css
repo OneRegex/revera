@@ -315,6 +315,7 @@ html[data-theme="light"] .icon-moon { display: none; }
 
 .codeblock { max-width: 900px; width: 100%; margin: 0 auto; background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); overflow: hidden; }
 .codeblock__tabs { display: flex; align-items: center; gap: 4px; padding: 0.55rem 0.8rem; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-soft); flex-wrap: wrap; }
+.codeblock__tablist { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .codeblock__tab {
   background: transparent; border: 1px solid transparent; color: var(--text-faint);
   font-family: var(--font-mono); font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 8px; cursor: pointer;
@@ -342,6 +343,7 @@ html[data-theme="light"] .codeblock__copy { color: #c9d2e6; border-color: rgba(2
 .install > div:first-child { border-top: none; }
 .install dt { font-size: 0.86rem; font-weight: 600; color: var(--text-dim); }
 .install dd { margin: 0; min-width: 0; font-size: 0.86rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.install a { text-decoration: underline; text-underline-offset: 0.15em; }
 .install code { font-size: 0.8rem; color: var(--text); }
 
 /* Verification layers */

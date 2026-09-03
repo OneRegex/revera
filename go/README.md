@@ -4,6 +4,7 @@ This module is the Go implementation of the Revera POSIX.1-2024 extended regular
 Across the project, the six language implementations are cross-checked on the shared conformance corpus.
 
 The module path is `github.com/oneregex/revera/go`, and it has no dependencies.
+It requires Go 1.27 or later.
 
 The engine is written in Vego, the strict Go subset that [`../vego/SPECIFICATION.md`](../vego/SPECIFICATION.md) defines.
 For that reason, this directory is also the canonical source of every other implementation.
@@ -48,7 +49,7 @@ Every non-test Go file is in the Vego subset except `revera_host.go`.
 - `LICENSE` covers the engine under the MIT license, and `LICENSES/Unicode-3.0.txt` covers the embedded Unicode and CLDR data.
   `make licenses` at the repository root keeps both copies current.
 - `data.bin` is the CLDR locale blob, embedded by the host file.
-  Six copies of it exist in the repository, and the conformance kit checks that they stay identical.
+  Seven copies of it exist in the repository, and the conformance kit checks that they stay identical.
 - `testdata/locale-expected.tsv.gz` holds the locale answers of the reference engine.
   `locale_test.go` replays it, so the module tests need no dependency.
 

@@ -15,8 +15,8 @@
 // Bracket expressions read their character classes, collating elements, and equivalence classes from a Locale.
 // The default locale is POSIX.
 //
-// Every search can throw, because a subject can exceed what the engine has capacity for.
-// Regex.contract reports that capacity ahead of time.
+// Every search can throw because the engine can reject work that exceeds its capacity or fails an internal consistency check.
+// Regex.contract reports the resource capacity ahead of time.
 
 import { readFileSync } from "node:fs";
 
@@ -239,17 +239,17 @@ export class Captures implements Iterable<Match | null> {
     }
 }
 
-/** How a search may cost, for a subject of at most the bytes given to Regex.contract. */
+/** How a search may cost after Regex.contract clamps its requested byte limit to the engine range. */
 export interface Contract {
     /** Whether captures use the compile-time selected one-pass walk. */
     readonly hasOnePass: boolean;
     /** Whether captures require the general solver instead of the compile-time selected one-pass walk. */
     readonly hasSolver: boolean;
-    /** A bound on the explicit heap allocation of one match, in bytes. */
+    /** A bound on fixed-width allocation requests, not total process memory or runtime bookkeeping. */
     readonly heapBytes: bigint;
-    /** An estimate of the deepest call stack of one match, in bytes. */
+    /** An estimate of the deepest call stack of one search, in bytes. */
     readonly stackBytes: bigint;
-    /** A bound on the abstract operations of one match; unit-cost operations, not nanoseconds. */
+    /** A bound on the abstract operations of one search; unit-cost operations, not nanoseconds. */
     readonly steps: bigint;
 }
 
@@ -434,7 +434,7 @@ export class Regex {
         return decoder.decode(out);
     }
 
-    /** Bounds what one search can cost on a subject of at most maxInput bytes. */
+    /** Bounds one search after clamping maxInput to zero through (1 << 31) - 1. */
     contract(maxInput: number): Contract {
         const c = engine.ContractFor(this.re, integer(maxInput, "maxInput"));
         return {

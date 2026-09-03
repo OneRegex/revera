@@ -19,8 +19,8 @@
 //! Bracket expressions read their character classes, collating elements, and equivalence classes from a [`Locale`].
 //! The default locale is POSIX.
 //!
-//! Every search returns a [`Result`], because a subject can exceed what the engine has capacity for.
-//! [`Regex::contract`] reports that capacity ahead of time.
+//! Every search returns a [`Result`], because the engine can reject work that exceeds its capacity or fails an internal consistency check.
+//! [`Regex::contract`] reports the resource capacity ahead of time.
 
 // The generated engine and its runtime.
 // They are the low level: explicit arenas, raw pointers, and numeric flags.
@@ -76,7 +76,7 @@ pub enum ErrorKind {
     Interval,
     /// A range like `[z-a]` runs backwards, or its endpoint is not a single character.
     Range,
-    /// The work needed passed a capacity limit.
+    /// The work passed a capacity limit, or a selected one-pass walk failed an internal consistency check.
     Capacity,
     /// A repetition operator has no operand to repeat.
     Repeat,
@@ -715,7 +715,8 @@ impl<'r, 't> Iterator for CaptureMatches<'r, 't> {
 /// What one backend of one search can use.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct BackendContract {
-    /// The bound on explicit heap allocation, in bytes.
+    /// The bound on fixed-width allocation requests, in bytes.
+    /// This is not total process memory and excludes runtime and allocator metadata.
     pub heap_bytes: u64,
     /// The estimate of the deepest call stack, in bytes.
     pub stack_bytes: u64,
@@ -731,7 +732,8 @@ pub struct BackendContract {
 pub struct Contract {
     /// The subject length the figures cover, in bytes.
     pub max_input: usize,
-    /// The heap bound of a whole search, in bytes.
+    /// The bound on fixed-width allocation requests for a whole search, in bytes.
+    /// This is not total process memory and excludes runtime and allocator metadata.
     pub heap_bytes: u64,
     /// The stack estimate of a whole search, in bytes.
     pub stack_bytes: u64,
