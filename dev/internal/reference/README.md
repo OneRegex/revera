@@ -89,7 +89,8 @@ if err == nil && (c.HeapBytes() > heapBudget || c.Steps() > stepBudget) {
 Heap figures count the explicit allocations that the engine performs, using fixed 64-bit field sizes.
 Because those field sizes are fixed, the figures are identical on every platform.
 
-However, they leave out allocator rounding, object headers and garbage collection.
+Capture figures include a conservative allowance for rounding the engine's three short-lived buffers.
+The contract does not include other allocator metadata, object headers, garbage collection, caller-owned inputs, or returned result storage.
 
 Steps are abstract unit-cost operations, not time.
 The reported step counts are worst-case bounds, although ordinary subjects stay far below them.

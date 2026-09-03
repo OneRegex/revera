@@ -32,7 +32,7 @@ Because it is a host file outside the subset, every target provides its own publ
   For patterns fixed at build time, use `MustNew`, which panics on compilation errors.
 - The options are functions: `CaseInsensitive()`, `NewlineSensitive()`, `NoCaptures()`, `ShortestMatch()`, and `In(loc)` for a locale.
 - The methods take the names of the standard `regexp` package: `MatchString`, `FindStringIndex`, `FindStringSubmatch`, `FindAllString`, `ReplaceAllString`, and the rest.
-  Each one adds an `error` result, because a subject can exceed the capacity of the engine.
+  Each one adds an `error` result because execution can fail when a subject exceeds the engine's capacity or when an internal consistency check rejects the result.
   Slice-returning find methods return `nil` when there is no match; `MatchString` returns false, and `FindString` distinguishes an empty match with its boolean result.
 - `Error` implements the `error` interface.
 - `OpenLocale("cs", "")` selects a CLDR locale for bracket expressions.
@@ -72,6 +72,10 @@ Consequently, below the host file, the engine has a different shape from an ordi
 
 The arenas of the capture solver are capped.
 An input that would need tens of gigabytes reports `ESpace` early, with bounded memory.
+
+Resource contracts bound the engine's explicit allocation requests and abstract work.
+They do not include allocator metadata, garbage collector overhead, caller-owned inputs, or returned result storage.
+Stack use is an estimate rather than a formal bound.
 
 ## Verification
 
