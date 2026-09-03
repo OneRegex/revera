@@ -35,6 +35,7 @@ The engine, its arenas and its numeric flags stay out of sight.
 - `revera::Locale::open("cs")` selects a CLDR locale for bracket expressions.
   The default is POSIX.
 - `re.contract(max_input)` reports what one search can cost, before it runs.
+  Its capture breakdown selects either the one-pass walk or the general solver, never both.
 
 The execution flags of `regexec()`, `REG_NOTBOL` and `REG_NOTEOL`, are not on this surface.
 A caller who needs them includes `engine.hpp` and works in `namespace revera::engine`.

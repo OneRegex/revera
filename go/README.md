@@ -65,6 +65,7 @@ Consequently, below the host file, the engine has a different shape from an ordi
 - The callback API of the reference engine became an iterator.
   `MatchIterInit` and `MatchIterNext` drive the scan, and `ReplaceAll` builds on them.
 - `ContractFor(&re, maxInput)` computes the resource contract.
+  A capture contract selects either the one-pass walk or the general solver, never both.
 - Workspaces are fresh per `Exec` call.
   `Compile` never writes to a `Regexp` again, so concurrent `Exec` calls stay safe.
 

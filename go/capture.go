@@ -503,8 +503,7 @@ func solveCaptures(re *Regexp, d *decoded, so int, eo int, eflags uint32, caps [
 		if onePassCaps(re, d, re.root, so, eo, eflags, caps) {
 			return noError()
 		}
-		// The walk hit an inconsistency.
-		// The solver below derives everything again, so a failure here only costs speed.
+		return compileError(ErrESpace, -1)
 	}
 	var s capSolver
 	s.eflags = eflags

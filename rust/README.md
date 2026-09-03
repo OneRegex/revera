@@ -235,6 +235,9 @@ Do not treat every `Err` as invalid syntax, and do not discard iterator errors w
 The top-level `heap_bytes` and `steps` values are bounds, while `stack_bytes` is an estimate.
 
 The `matcher`, `one_pass`, and `solver` fields provide the backend breakdown.
+`one_pass` and `solver` are mutually exclusive.
+When compilation proves that every matching span has one parse, the smaller one-pass contract is the complete capture cost and `solver` is `None`.
+Only an expression whose captures need the general parse search reports a solver contract.
 
 ```rust
 use revera::Regex;
@@ -253,7 +256,7 @@ fn main() -> revera::Result<()> {
         return Ok(());
     }
 
-    assert!(re.is_match("item42")?);
+    assert!(re.captures("item42")?.is_some());
     Ok(())
 }
 ```

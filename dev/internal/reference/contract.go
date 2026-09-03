@@ -4,10 +4,11 @@ package reference
 // A contract bounds, for each backend, what one Exec call can use on a subject of a given maximum length.
 // An application can compare the figures against its budget and refuse a pattern before it ever runs.
 //
-// Heap figures count the explicit allocations the code performs, with fixed 64-bit field sizes.
+// Heap figures count explicit allocation requests with fixed 64-bit field sizes and conservative allowances.
 // They are therefore the same on every platform.
-// They leave out runtime object headers, map buckets, allocator rounding, and garbage collection.
-// The true footprint stays a bounded constant factor above the figure.
+// Capture figures include allocator rounding for the three short-lived buffers.
+// Runtime object headers, general allocator metadata, map buckets, and garbage-collector bookkeeping stay outside
+// this portable model.
 // Stack figures multiply the deepest possible call chain by a fixed per-frame estimate.
 // Step figures count abstract unit-cost operations, not nanoseconds.
 // They are worst-case bounds, and ordinary subjects stay far below them.
@@ -37,17 +38,16 @@ type BackendContract struct {
 //     It always runs, and it answers every call that needs no group offsets.
 //   - OnePass is the phase B capture walk.
 //     It is set when compilation proved that every span has one parse.
-//     Its figures apply when the walk succeeds, which the proof guarantees.
+//     It is then the only phase B backend that can run.
 //   - Solver is the phase B memoized parse search.
-//     It is the guaranteed ceiling for any call that resolves parenthesized subexpression offsets.
-//     The walk falls back to it on an inconsistency.
-//     It is nil when the pattern was compiled with NoSub, and when Exec cannot reach phase B.
+//     It is set when parenthesized subexpression offsets require the general parse search.
+//     OnePass and Solver are mutually exclusive.
 //
 // Every value saturates at 1<<62, which marks a bound too large to be useful.
 // The pooled per-Regexp workspace counts once.
 // Concurrent Exec calls on the same Regexp each use their own copy of it.
-// Both capture backends include the shared window allocations, so nothing may sum their heap fields.
-// The HeapBytes method takes the maximum instead.
+// Each capture backend includes the shared window allocations.
+// HeapBytes combines the matcher with the selected capture backend.
 type Contract struct {
 	MaxInput int
 	Matcher  BackendContract
@@ -109,7 +109,7 @@ func CompileWithContract(pattern string, loc locale.Locale, flags CompileFlags, 
 }
 
 // HeapBytes bounds the heap of one whole call.
-// It adds the matcher workspace and the most expensive capture backend that can run.
+// It adds the matcher workspace and the selected capture backend.
 func (c *Contract) HeapBytes() int64 {
 	capture := int64(0)
 	if c.OnePass != nil {
@@ -134,7 +134,7 @@ func (c *Contract) StackBytes() int64 {
 }
 
 // Steps bounds the operations of one whole call.
-// The walk can fall back to the solver, so both capture backends count.
+// It combines the matcher with the selected capture backend.
 func (c *Contract) Steps() int64 {
 	steps := c.Matcher.Steps
 	if c.OnePass != nil {
@@ -155,9 +155,10 @@ func (re *Regexp) newContract(maxInput int) *Contract {
 		if re.onePass {
 			walk := re.onePassContract(length, atom)
 			c.OnePass = &walk
+		} else {
+			solver := re.solverContract(length, atom)
+			c.Solver = &solver
 		}
-		solver := re.solverContract(length, atom)
-		c.Solver = &solver
 	}
 	return c
 }
@@ -203,15 +204,21 @@ func (re *Regexp) matcherContract(length, atom int64) BackendContract {
 		Steps: steps}
 }
 
-// captureHeap counts the allocations every capture call performs before its backend runs.
-// Those allocations are the decoded window with its escaping struct, and the span buffer.
+// captureHeap bounds the allocations every capture call performs before its backend runs.
+// It counts the decoded window, its escaping struct, and the span buffer, then adds an allowance for allocator rounding.
 func (re *Regexp) captureHeap(length int64) int64 {
 	window := cAdd(cMul(4, length), cMul(8, cAdd(length, 1)))
-	return cAdd(window+64, cMul(matchBytes, int64(re.nsub)+1))
+	spans := cMul(matchBytes, cAdd(int64(re.nsub), 1))
+	payload := cAdd(window, spans)
+	// Go's size-class gaps are below 8 KiB, and large allocations round to 8 KiB pages.
+	// One page per buffer therefore covers the rounding whatever the subject length is.
+	allowance := int64(3 * 8192)
+	return cAdd(cAdd(payload, allowance), 64)
 }
 
 // onePassContract bounds the phase B capture walk.
-// The walk allocates nothing itself, and it visits each pattern node at most once per span position.
+// The walk allocates nothing itself.
+// Its structural factor covers recursive visits and the fixed scans around them, including both concat scans.
 // Each group visit also clears the groups nested inside it, so the group count joins the per-visit cost.
 func (re *Regexp) onePassContract(length, atom int64) BackendContract {
 	perVisit := cAdd(atom, int64(re.nsub)+1)

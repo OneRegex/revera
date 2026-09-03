@@ -739,9 +739,10 @@ pub struct Contract {
     pub steps: u64,
     /// The figures of the automaton, which every search runs.
     pub matcher: BackendContract,
-    /// The figures of the one-pass capture walk, set when compilation proved that every span has one parse.
+    /// The figures of the one-pass capture walk.
+    /// This is the only capture backend when compilation proved that every span has one parse.
     pub one_pass: Option<BackendContract>,
-    /// The figures of the memoized capture search, the ceiling for any search that resolves parenthesized subexpression offsets.
+    /// The figures of the memoized capture search for an expression that is not one-pass.
     pub solver: Option<BackendContract>,
 }
 

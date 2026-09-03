@@ -8,8 +8,8 @@ package reference
 // Parse uniqueness leaves no two derivations whose ordering or captures could differ.
 //
 // The walk checks every step it takes.
-// On any inconsistency it reports failure, and the caller falls back to the solver.
-// A defect here can therefore only cost speed, never a wrong result.
+// On any inconsistency it reports failure, and the caller returns ESpace.
+// This keeps the compile-time backend choice and its resource contract intact.
 
 import "slices"
 
@@ -163,6 +163,30 @@ func disjointFirsts(n *node) bool {
 // onePassCaps fills the group spans from the unique parse of n over [i, j).
 // It returns false when the walk hits an inconsistency.
 func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, caps []Match) bool {
+	return re.onePassCapsMeasured(d, n, i, j, eflags, caps, nil)
+}
+
+// onePassWork records recursive calls and loops written directly in onePassCapsMeasured.
+// Helper work such as slices.Contains scans is covered by the contract but not this test meter.
+type onePassWork struct {
+	calls int64
+	loops int64
+}
+
+func (w *onePassWork) call() {
+	if w != nil {
+		w.calls++
+	}
+}
+
+func (w *onePassWork) loop() {
+	if w != nil {
+		w.loops++
+	}
+}
+
+func (re *Regexp) onePassCapsMeasured(d *decoded, n *node, i, j int, eflags ExecFlags, caps []Match, work *onePassWork) bool {
+	work.call()
 	span := j - i
 	if span < n.minL || span > n.maxL {
 		return false
@@ -182,23 +206,26 @@ func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, c
 		// Entry into a group clears every group nested inside it.
 		// This is the same section 12.7 rule that assignCaps applies.
 		for _, inner := range re.nested[n.index] {
+			work.loop()
 			caps[inner] = Match{-1, -1}
 		}
 		caps[n.index] = Match{i, j}
-		return re.onePassCaps(d, n.ch[0], i, j, eflags, caps)
+		return re.onePassCapsMeasured(d, n.ch[0], i, j, eflags, caps, work)
 	case opConcat:
 		rest := span
 		for _, child := range n.ch {
+			work.loop()
 			rest -= child.minL
 		}
 		at := i
 		for _, child := range n.ch {
+			work.loop()
 			length := child.minL
 			if !fixedLength(child) {
 				// The single variable child takes the remainder.
 				length += rest
 			}
-			if length < 0 || !re.onePassCaps(d, child, at, at+length, eflags, caps) {
+			if length < 0 || !re.onePassCapsMeasured(d, child, at, at+length, eflags, caps, work) {
 				return false
 			}
 			at += length
@@ -216,7 +243,8 @@ func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, c
 		}
 		at := i
 		for range count {
-			if !re.onePassCaps(d, n.ch[0], at, at+size, eflags, caps) {
+			work.loop()
+			if !re.onePassCapsMeasured(d, n.ch[0], at, at+size, eflags, caps, work) {
 				return false
 			}
 			at += size
@@ -225,6 +253,7 @@ func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, c
 	case opAlt:
 		chosen := -1
 		for idx, branch := range n.ch {
+			work.loop()
 			if span < branch.minL || span > branch.maxL {
 				continue
 			}
@@ -237,6 +266,7 @@ func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, c
 		if chosen < 0 && n.firsts != nil {
 			if span == 0 {
 				for idx, branch := range n.ch {
+					work.loop()
 					if branch.minL == 0 {
 						chosen = idx
 						break
@@ -244,6 +274,7 @@ func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, c
 				}
 			} else {
 				for idx := range n.ch {
+					work.loop()
 					if slices.Contains(n.firsts[idx], d.runes[i]) {
 						chosen = idx
 						break
@@ -254,7 +285,7 @@ func (re *Regexp) onePassCaps(d *decoded, n *node, i, j int, eflags ExecFlags, c
 		if chosen < 0 {
 			return false
 		}
-		return re.onePassCaps(d, n.ch[chosen], i, j, eflags, caps)
+		return re.onePassCapsMeasured(d, n.ch[chosen], i, j, eflags, caps, work)
 	}
 	return false
 }

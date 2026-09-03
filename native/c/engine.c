@@ -958,6 +958,7 @@ revera_eng_Error revera_eng_solveCaptures(vg_arena *mem, revera_eng_Regexp *re, 
         if (revera_eng_onePassCaps(re, d, re->root, so, eo, eflags, caps)) {
             return revera_eng_noError();
         }
+        return revera_eng_compileError(revera_eng_ErrESpace, ((int64_t)(0ULL - (uint64_t)(1LL))));
     }
     revera_eng_capSolver s = {0};
     s.eflags = eflags;
@@ -1064,9 +1065,10 @@ revera_eng_Contract revera_eng_ContractFor(revera_eng_Regexp *re, int64_t maxInp
         if (re->onePass) {
             c.OnePass = revera_eng_onePassContract(re, length, atom);
             c.HasOnePass = true;
+        } else {
+            c.Solver = revera_eng_solverContract(re, length, atom);
+            c.HasSolver = true;
         }
-        c.Solver = revera_eng_solverContract(re, length, atom);
-        c.HasSolver = true;
     }
     return c;
 }
@@ -1122,9 +1124,10 @@ int64_t revera_eng_captureHeap(revera_eng_Regexp *re, int64_t length) {
     int64_t _t1 = revera_eng_cMul(4LL, length);
     int64_t _t2 = revera_eng_cMul(8LL, revera_eng_cAdd(length, 1LL));
     int64_t window = revera_eng_cAdd(_t1, _t2);
-    int64_t _t3 = (window + 64LL);
-    int64_t _t4 = revera_eng_cMul(revera_eng_matchBytes, (((int64_t)(re->nsub)) + 1LL));
-    return revera_eng_cAdd(_t3, _t4);
+    int64_t spans = revera_eng_cMul(revera_eng_matchBytes, revera_eng_cAdd(((int64_t)(re->nsub)), 1LL));
+    int64_t payload = revera_eng_cAdd(window, spans);
+    int64_t allowance = 24576LL;
+    return revera_eng_cAdd(revera_eng_cAdd(payload, allowance), 64LL);
 }
 
 revera_eng_BackendContract revera_eng_onePassContract(revera_eng_Regexp *re, int64_t length, int64_t atom) {

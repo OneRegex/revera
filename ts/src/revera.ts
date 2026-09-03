@@ -241,7 +241,9 @@ export class Captures implements Iterable<Match | null> {
 
 /** How a search may cost, for a subject of at most the bytes given to Regex.contract. */
 export interface Contract {
-    /** Whether the capture solver, the slowest backend, can be selected. */
+    /** Whether captures use the compile-time selected one-pass walk. */
+    readonly hasOnePass: boolean;
+    /** Whether captures require the general solver instead of the compile-time selected one-pass walk. */
     readonly hasSolver: boolean;
     /** A bound on the explicit heap allocation of one match, in bytes. */
     readonly heapBytes: bigint;
@@ -436,6 +438,7 @@ export class Regex {
     contract(maxInput: number): Contract {
         const c = engine.ContractFor(this.re, integer(maxInput, "maxInput"));
         return {
+            hasOnePass: c.HasOnePass,
             hasSolver: c.HasSolver,
             heapBytes: engine.ContractHeapBytes(c),
             stackBytes: engine.ContractStackBytes(c),

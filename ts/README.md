@@ -276,6 +276,7 @@ import { Regex } from "@oneregex/revera";
 const regex = new Regex("(a|b)*c");
 const contract = regex.contract(64 * 1024);
 
+console.log(contract.hasOnePass);
 console.log(contract.hasSolver);
 console.log(contract.heapBytes);
 console.log(contract.stackBytes);
@@ -286,7 +287,9 @@ console.log(contract.steps);
 
 `heapBytes` bounds explicit heap allocation, `stackBytes` estimates the deepest call stack, and `steps` bounds abstract unit-cost operations rather than elapsed time.
 
-`hasSolver` reports whether the capture solver, the engine's slowest matching backend, can be selected.
+`hasOnePass` reports that captures use the compile-time selected one-pass walk.
+`hasSolver` reports that they require the general solver.
+The flags are mutually exclusive, and both are false when a search does not need group offsets.
 
 ## API summary
 

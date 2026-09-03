@@ -1,8 +1,12 @@
 package revera
 
-import "testing"
+import (
+	"runtime"
+	"strings"
+	"testing"
+)
 
-func TestContractOmitsUnreachableCaptureBackends(t *testing.T) {
+func TestContractSelectsReachableBackends(t *testing.T) {
 	re, err := Compile("a*", LocalePOSIX(), 0)
 	if err.Code != ErrNone {
 		t.Fatalf("Compile failed: %v", err)
@@ -17,13 +21,73 @@ func TestContractOmitsUnreachableCaptureBackends(t *testing.T) {
 		t.Fatalf("zero-group contract is not matcher-only: %+v", c)
 	}
 
-	grouped, err := Compile("(a*)", LocalePOSIX(), 0)
+	grouped, err := Compile("(abc+)", LocalePOSIX(), 0)
 	if err.Code != ErrNone {
 		t.Fatalf("Compile grouped expression failed: %v", err)
 	}
-	groupedContract := ContractFor(&grouped, 64)
-	if !groupedContract.HasOnePass || !groupedContract.HasSolver {
-		t.Fatalf("grouped contract omitted phase B: %+v", groupedContract)
+	groupedContract := ContractFor(&grouped, 1000)
+	if !groupedContract.HasOnePass || groupedContract.HasSolver {
+		t.Fatalf("one-pass contract selected the wrong phase B backend: %+v", groupedContract)
+	}
+	if ContractHeapBytes(&groupedContract) != 37757 ||
+		ContractStackBytes(&groupedContract) != 6144 ||
+		ContractSteps(&groupedContract) != 937980 {
+		t.Fatalf("one-pass contract has unexpected totals: %+v", groupedContract)
+	}
+
+	ambiguous, err := Compile("(a|ab)(c|bcd)(d*)", LocalePOSIX(), 0)
+	if err.Code != ErrNone {
+		t.Fatalf("Compile ambiguous expression failed: %v", err)
+	}
+	ambiguousContract := ContractFor(&ambiguous, 64)
+	if ambiguousContract.HasOnePass || !ambiguousContract.HasSolver {
+		t.Fatalf("ambiguous contract selected the wrong phase B backend: %+v", ambiguousContract)
+	}
+}
+
+func measureHeap(f func()) int64 {
+	runtime.GC()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	f()
+	runtime.ReadMemStats(&after)
+	return int64(after.TotalAlloc - before.TotalAlloc)
+}
+
+func TestContractCoversOnePassHeap(t *testing.T) {
+	manyGroups := strings.Repeat("(^)", 2047) + "(a+)"
+	cases := []struct {
+		name    string
+		pattern string
+		subject string
+	}{
+		{"small-size-class", "(abc+)", "ab" + strings.Repeat("c", 901)},
+		{"window-page-edge", "(abc+)", "ab" + strings.Repeat("c", 4094)},
+		{"window-class-edge", "(abc+)", "ab" + strings.Repeat("c", 4095)},
+		{"two-window-pages", "(abc+)", "ab" + strings.Repeat("c", 8191)},
+		{"three-page-rounding", manyGroups, strings.Repeat("a", 8193)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			re, err := Compile(tc.pattern, LocalePOSIX(), 0)
+			if err.Code != ErrNone {
+				t.Fatalf("Compile failed: %v", err)
+			}
+			contract := ContractFor(&re, len(tc.subject))
+			if !contract.HasOnePass || contract.HasSolver {
+				t.Fatalf("contract selected the wrong phase B backend: %+v", contract)
+			}
+			measured := measureHeap(func() {
+				d := decodeWindow(tc.subject, 0, len(tc.subject))
+				caps := make([]Match, re.nsub+1)
+				if err := solveCaptures(&re, &d, 0, len(d.runes), 0, caps); err.Code != ErrNone {
+					t.Errorf("solveCaptures failed: %v", err)
+				}
+			})
+			if measured > contract.OnePass.HeapBytes {
+				t.Errorf("measured %d bytes, one-pass contract %d", measured, contract.OnePass.HeapBytes)
+			}
+		})
 	}
 }
 

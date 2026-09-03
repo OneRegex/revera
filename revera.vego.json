@@ -17633,6 +17633,29 @@
          ]
         }
        ]
+      },
+      {
+       "k": "return",
+       "values": [
+        {
+         "args": [
+          {
+           "k": "ident",
+           "name": "ErrESpace"
+          },
+          {
+           "k": "unary",
+           "op": "-",
+           "x": {
+            "k": "int",
+            "value": "1"
+           }
+          }
+         ],
+         "fn": "compileError",
+         "k": "call"
+        }
+       ]
       }
      ]
     },
@@ -19337,7 +19360,56 @@
          "name": "re"
         }
        },
-       "else": null,
+       "else": [
+        {
+         "k": "assign",
+         "lhs": [
+          {
+           "k": "field",
+           "name": "Solver",
+           "x": {
+            "k": "ident",
+            "name": "c"
+           }
+          }
+         ],
+         "value": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "re"
+           },
+           {
+            "k": "ident",
+            "name": "length"
+           },
+           {
+            "k": "ident",
+            "name": "atom"
+           }
+          ],
+          "fn": "solverContract",
+          "k": "call"
+         }
+        },
+        {
+         "k": "assign",
+         "lhs": [
+          {
+           "k": "field",
+           "name": "HasSolver",
+           "x": {
+            "k": "ident",
+            "name": "c"
+           }
+          }
+         ],
+         "value": {
+          "k": "bool",
+          "value": true
+         }
+        }
+       ],
        "k": "if",
        "then": [
         {
@@ -19389,54 +19461,6 @@
          }
         }
        ]
-      },
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "field",
-         "name": "Solver",
-         "x": {
-          "k": "ident",
-          "name": "c"
-         }
-        }
-       ],
-       "value": {
-        "args": [
-         {
-          "k": "ident",
-          "name": "re"
-         },
-         {
-          "k": "ident",
-          "name": "length"
-         },
-         {
-          "k": "ident",
-          "name": "atom"
-         }
-        ],
-        "fn": "solverContract",
-        "k": "call"
-       }
-      },
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "field",
-         "name": "HasSolver",
-         "x": {
-          "k": "ident",
-          "name": "c"
-         }
-        }
-       ],
-       "value": {
-        "k": "bool",
-        "value": true
-       }
       }
      ]
     },
@@ -20272,54 +20296,113 @@
      }
     },
     {
+     "k": "define",
+     "names": [
+      "spans"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "matchBytes"
+       },
+       {
+        "args": [
+         {
+          "k": "conv",
+          "type": {
+           "k": "named",
+           "name": "int64"
+          },
+          "x": {
+           "k": "field",
+           "name": "nsub",
+           "x": {
+            "k": "ident",
+            "name": "re"
+           }
+          }
+         },
+         {
+          "k": "int",
+          "value": "1"
+         }
+        ],
+        "fn": "cAdd",
+        "k": "call"
+       }
+      ],
+      "fn": "cMul",
+      "k": "call"
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "payload"
+     ],
+     "value": {
+      "args": [
+       {
+        "k": "ident",
+        "name": "window"
+       },
+       {
+        "k": "ident",
+        "name": "spans"
+       }
+      ],
+      "fn": "cAdd",
+      "k": "call"
+     }
+    },
+    {
+     "k": "define",
+     "names": [
+      "allowance"
+     ],
+     "value": {
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int64"
+      },
+      "x": {
+       "k": "binary",
+       "op": "*",
+       "x": {
+        "k": "int",
+        "value": "3"
+       },
+       "y": {
+        "k": "int",
+        "value": "8192"
+       }
+      }
+     }
+    },
+    {
      "k": "return",
      "values": [
       {
        "args": [
         {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "window"
-         },
-         "y": {
-          "k": "int",
-          "value": "64"
-         }
-        },
-        {
          "args": [
           {
            "k": "ident",
-           "name": "matchBytes"
+           "name": "payload"
           },
           {
-           "k": "binary",
-           "op": "+",
-           "x": {
-            "k": "conv",
-            "type": {
-             "k": "named",
-             "name": "int64"
-            },
-            "x": {
-             "k": "field",
-             "name": "nsub",
-             "x": {
-              "k": "ident",
-              "name": "re"
-             }
-            }
-           },
-           "y": {
-            "k": "int",
-            "value": "1"
-           }
+           "k": "ident",
+           "name": "allowance"
           }
          ],
-         "fn": "cMul",
+         "fn": "cAdd",
          "k": "call"
+        },
+        {
+         "k": "int",
+         "value": "64"
         }
        ],
        "fn": "cAdd",

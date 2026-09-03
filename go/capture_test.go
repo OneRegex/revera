@@ -20,3 +20,18 @@ func TestCmpCandAfterFailure(t *testing.T) {
 		t.Fatalf("cmpCand after failure = %d, want a positive result", got)
 	}
 }
+
+func TestOnePassInconsistencyFailsClosed(t *testing.T) {
+	re, err := Compile("(a|.)", LocalePOSIX(), 0)
+	if err.Code != ErrNone {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	if re.onePass {
+		t.Fatal("ambiguous expression must not be one-pass")
+	}
+	re.onePass = true
+	matched, execErr := Exec(&re, "a", make([]Match, re.nsub+1), 0)
+	if matched || execErr.Code != ErrESpace {
+		t.Fatalf("inconsistent one-pass walk returned matched=%v, error=%v", matched, execErr)
+	}
+}

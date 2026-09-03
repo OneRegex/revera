@@ -8,8 +8,8 @@ package revera
 // Parse uniqueness leaves no two derivations whose ordering or captures could differ.
 //
 // The walk checks every step it takes.
-// On any inconsistency it reports failure, and the caller falls back to the solver.
-// A defect here can therefore only cost speed, never a wrong result.
+// On any inconsistency it reports failure, and the caller returns ErrESpace.
+// This keeps the compile-time backend choice and its resource contract intact.
 
 // onePassAnalyze reports whether every span has at most one parse of node ni.
 // It also reports whether one deterministic walk can find that parse.

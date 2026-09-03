@@ -144,11 +144,18 @@ static void contract_grows_with_the_input_bound() {
     revera::Contract big = re.contract(1 << 12);
     check(big.max_input == 1 << 12, "contract max_input");
     check(big.heap_bytes > 0 && big.stack_bytes > 0 && big.steps > 0, "contract figures");
-    check(big.solver.has_value(), "contract solver");
+    check(!big.one_pass.has_value() && big.solver.has_value(), "contract solver");
     check(big.matcher.steps > 0, "contract matcher");
     check(re.contract(16).steps < big.steps, "contract grows");
     // An absurd bound clamps to the subject limit of the engine.
     check(re.contract(SIZE_MAX).max_input == (1u << 31) - 1, "contract clamps");
+
+    revera::Contract one_pass = revera::Regex("(abc+)").contract(1000);
+    check(one_pass.one_pass.has_value() && !one_pass.solver.has_value(),
+          "one-pass contract backend");
+    check(one_pass.heap_bytes == 37757 && one_pass.stack_bytes == 6144 &&
+              one_pass.steps == 937980,
+          "one-pass contract figures");
 }
 
 static void one_regex_serves_several_threads() {

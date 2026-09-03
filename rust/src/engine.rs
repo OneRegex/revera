@@ -1481,6 +1481,7 @@ pub fn solveCaptures(mem: &vg::Arena, re: &mut Regexp, d: &mut decoded, so: i64,
         if { let _t2 = re.root; let _t3 = so; let _t4 = eo; let _t5 = eflags; let _t6 = caps; onePassCaps(re, d, _t2, _t3, _t4, _t5, _t6) } {
             return noError();
         }
+        return compileError(ErrESpace, (1i64).wrapping_neg());
     }
     let mut s: capSolver = vg::zero();
     s.eflags = eflags;
@@ -1596,9 +1597,10 @@ pub fn ContractFor(re: &mut Regexp, maxInput: i64) -> Contract {
         if re.onePass {
             c.OnePass = { let _t3 = length; let _t4 = atom; onePassContract(re, _t3, _t4) };
             c.HasOnePass = true;
+        } else {
+            c.Solver = { let _t5 = length; let _t6 = atom; solverContract(re, _t5, _t6) };
+            c.HasSolver = true;
         }
-        c.Solver = { let _t5 = length; let _t6 = atom; solverContract(re, _t5, _t6) };
-        c.HasSolver = true;
     }
     return c;
 }
@@ -1636,7 +1638,10 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
 
 pub fn captureHeap(re: &mut Regexp, length: i64) -> i64 {
     let window: i64 = cAdd(cMul(4i64, length), cMul(8i64, cAdd(length, 1i64)));
-    return cAdd((window + 64i64), cMul(matchBytes, (((re.nsub) as i64) + 1i64)));
+    let spans: i64 = cMul(matchBytes, cAdd(((re.nsub) as i64), 1i64));
+    let payload: i64 = cAdd(window, spans);
+    let allowance: i64 = 24576i64;
+    return cAdd(cAdd(payload, allowance), 64i64);
 }
 
 pub fn onePassContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContract {

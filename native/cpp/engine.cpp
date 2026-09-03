@@ -853,6 +853,7 @@ Error solveCaptures(vg::Arena& mem, Regexp& re, decoded& d, int64_t so, int64_t 
         if (onePassCaps(re, d, re.root, so, eo, eflags, caps)) {
             return noError();
         }
+        return compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)));
     }
     capSolver s{};
     s.eflags = eflags;
@@ -950,9 +951,10 @@ Contract ContractFor(Regexp& re, int64_t maxInput) {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length, atom);
             c.HasOnePass = true;
+        } else {
+            c.Solver = solverContract(re, length, atom);
+            c.HasSolver = true;
         }
-        c.Solver = solverContract(re, length, atom);
-        c.HasSolver = true;
     }
     return c;
 }
@@ -990,7 +992,10 @@ BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
 
 int64_t captureHeap(Regexp& re, int64_t length) {
     int64_t window = ([&]{ auto _t1 = cMul(4LL, length); auto _t2 = cMul(8LL, cAdd(length, 1LL)); return cAdd(_t1, _t2); }());
-    return ([&]{ auto _t3 = (window + 64LL); auto _t4 = cMul(matchBytes, (int64_t(re.nsub) + 1LL)); return cAdd(_t3, _t4); }());
+    int64_t spans = cMul(matchBytes, cAdd(int64_t(re.nsub), 1LL));
+    int64_t payload = cAdd(window, spans);
+    int64_t allowance = 24576LL;
+    return cAdd(cAdd(payload, allowance), 64LL);
 }
 
 BackendContract onePassContract(Regexp& re, int64_t length, int64_t atom) {

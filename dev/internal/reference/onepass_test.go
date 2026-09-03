@@ -65,6 +65,19 @@ func TestOnePassWalk(t *testing.T) {
 	}
 }
 
+func TestOnePassInconsistencyFailsClosed(t *testing.T) {
+	re := compileOK(t, "(a|.)", 0)
+	if re.onePass {
+		t.Fatal("ambiguous expression must not be one-pass")
+	}
+	re.onePass = true
+	matched, err := re.Exec("a", make([]Match, re.NumSub()+1), 0)
+	serr, ok := err.(*Error)
+	if matched || !ok || serr.Code != ESpace {
+		t.Fatalf("inconsistent one-pass walk returned matched=%v, error=%v", matched, err)
+	}
+}
+
 // TestOnePassAgainstSolver drives random patterns through the one-pass walk, the phase B solver, and the oracle.
 // It requires identical capture vectors from all three.
 func TestOnePassAgainstSolver(t *testing.T) {

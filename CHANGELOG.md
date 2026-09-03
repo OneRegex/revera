@@ -11,6 +11,10 @@ The date replaces `unreleased` when the tag is made; `make dist` checks for it.
 
 ### Fixed
 
+- One-pass expressions no longer report the general capture solver or include its unreachable worst-case figures in their totals.
+  The compile-time backend choice is now exclusive in both the contract and execution.
+  If the one-pass walk ever detects an internal inconsistency, execution fails closed with the existing capacity error instead of entering an unreported solver path.
+  For `(abc+)` with a 1000-byte subject limit, the Rust contract now reports 37,757 heap bytes and 937,980 steps instead of roughly 413 GB and 101 billion steps.
 - Resource contracts price a bracket test from the lookups it really performs: a binary range search, one class lookup, and one primary comparison per equivalence class, plus one probe per multi-character length the bracket can match.
   The former figure charged every bracket for sixteen case preimages, and it still fell short of the collating searches an equivalence class runs in a full locale.
   Case-sensitive brackets now cost a few units per test, while equivalence classes in a full locale report the thousands of units their searches take.

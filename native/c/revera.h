@@ -82,6 +82,7 @@ typedef struct {
     uint64_t stack_bytes;
     uint64_t steps;
     revera_backend_contract matcher;
+    // has_one_pass and has_solver are mutually exclusive.
     bool has_one_pass;
     revera_backend_contract one_pass;
     bool has_solver;

@@ -1384,6 +1384,7 @@ pub fn solveCaptures(mem: vg.Allocator, re: *Regexp, d: *decoded, so: i64, eo: i
         if (onePassCaps(re, d, re.root, so, eo, eflags, caps)) {
             return noError();
         }
+        return compileError(ErrESpace, (-%1));
     }
     var s: capSolver = .{};
     s.eflags = eflags;
@@ -1490,9 +1491,10 @@ pub fn ContractFor(re: *Regexp, maxInput: i64) Contract {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length, atom);
             c.HasOnePass = true;
+        } else {
+            c.Solver = solverContract(re, length, atom);
+            c.HasSolver = true;
         }
-        c.Solver = solverContract(re, length, atom);
-        c.HasSolver = true;
     }
     return c;
 }
@@ -1530,7 +1532,10 @@ pub fn matcherContract(re: *Regexp, length: i64, atom: i64) BackendContract {
 
 pub fn captureHeap(re: *Regexp, length: i64) i64 {
     const window: i64 = cAdd(cMul(4, length), cMul(8, cAdd(length, 1)));
-    return cAdd((window +% 64), cMul(matchBytes, (vg.cv(i64, re.nsub) +% 1)));
+    const spans: i64 = cMul(matchBytes, cAdd(vg.cv(i64, re.nsub), 1));
+    const payload: i64 = cAdd(window, spans);
+    const allowance: i64 = vg.cv(i64, (3 *% 8192));
+    return cAdd(cAdd(payload, allowance), 64);
 }
 
 pub fn onePassContract(re: *Regexp, length: i64, atom: i64) BackendContract {

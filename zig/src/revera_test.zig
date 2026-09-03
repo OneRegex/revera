@@ -139,12 +139,22 @@ test "contract grows with the input bound" {
     try testing.expectEqual(1 << 12, big.max_input);
     try testing.expect(big.heap_bytes > 0);
     try testing.expect(big.stack_bytes > 0);
+    try testing.expect(big.one_pass == null);
     try testing.expect(big.solver != null);
     try testing.expect(big.matcher.steps > 0);
     try testing.expect(re.contract(16).steps < big.steps);
 
     // An absurd bound clamps to the subject limit of the engine.
     try testing.expectEqual((1 << 31) - 1, re.contract(std.math.maxInt(usize)).max_input);
+
+    var simple = try revera.Regex.compile(gpa, "(abc+)", .{});
+    defer simple.deinit();
+    const one_pass = simple.contract(1000);
+    try testing.expect(one_pass.one_pass != null);
+    try testing.expect(one_pass.solver == null);
+    try testing.expectEqual(37_757, one_pass.heap_bytes);
+    try testing.expectEqual(6_144, one_pass.stack_bytes);
+    try testing.expectEqual(937_980, one_pass.steps);
 }
 
 test "one expression serves several threads" {

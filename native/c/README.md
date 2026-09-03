@@ -43,6 +43,8 @@ By contrast, replacement functions return memory that the caller frees with `fre
 - `revera_replace_all` and `revera_replace_first_n` apply `&` and `\1` through `\9` replacements.
 - `revera_locale_open` selects embedded locale data, and `revera_contract_for` reports resource figures before a search.
 
+A capture contract selects either the one-pass walk or the general solver, never both.
+
 The CMake package in the parent directory builds this port as `librevera_c`, installs the header as `<revera/revera.h>`, and exports the target `Revera::C`.
 That is the way to use it from another project.
 See `../README.md`.

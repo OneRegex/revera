@@ -42,8 +42,8 @@ func TestContractBackendSelection(t *testing.T) {
 	if !re.onePass {
 		t.Fatal("pattern must be one-pass")
 	}
-	if c.OnePass == nil || c.Solver == nil {
-		t.Error("a one-pass pattern must report the walk and the solver ceiling")
+	if c.OnePass == nil || c.Solver != nil {
+		t.Error("a one-pass pattern must report only the walk backend")
 	}
 
 	re, c = compileContract(t, "(a|ab)(c|bcd)(d*)", 0, 100)
@@ -201,11 +201,45 @@ func TestContractCoversMatcherHeap(t *testing.T) {
 	}
 }
 
+func TestContractCoversOnePassHeap(t *testing.T) {
+	manyGroups := strings.Repeat("(^)", 2047) + "(a+)"
+	cases := []struct {
+		name    string
+		pattern string
+		subject string
+	}{
+		{"small-size-class", "(abc+)", "ab" + strings.Repeat("c", 901)},
+		{"window-page-edge", "(abc+)", "ab" + strings.Repeat("c", 4094)},
+		{"window-class-edge", "(abc+)", "ab" + strings.Repeat("c", 4095)},
+		{"two-window-pages", "(abc+)", "ab" + strings.Repeat("c", 8191)},
+		{"three-page-rounding", manyGroups, strings.Repeat("a", 8193)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			re, c := compileContract(t, tc.pattern, 0, len(tc.subject))
+			if !re.onePass || c.OnePass == nil || c.Solver != nil {
+				t.Fatalf("contract selected the wrong phase B backend: %+v", c)
+			}
+			measured := measureHeap(func() {
+				d := decodeSubject(tc.subject)
+				caps := make([]Match, re.nsub+1)
+				if err := re.solveCaptures(&d, 0, len(d.runes), 0, caps); err != nil {
+					t.Errorf("solveCaptures failed: %v", err)
+				}
+			})
+			if measured > c.OnePass.HeapBytes {
+				t.Errorf("measured %d bytes, one-pass contract %d", measured, c.OnePass.HeapBytes)
+			}
+		})
+	}
+}
+
 func TestContractCoversSolverHeap(t *testing.T) {
 	subject := strings.Repeat("ab", 400) + "-abab"
-	re, c := compileContract(t, "([ab]*)-([ab]{4})", 0, len(subject))
+	re, _ := compileContract(t, "([ab]*)-([ab]{4})", 0, len(subject))
 	// Force the solver, like the phase B benchmarks do.
 	re.onePass = false
+	c := re.newContract(len(subject))
 	pmatch := make([]Match, 3)
 	measured := measureHeap(func() {
 		matched, err := re.Exec(subject, pmatch, 0)
@@ -215,6 +249,40 @@ func TestContractCoversSolverHeap(t *testing.T) {
 	})
 	if measured > c.HeapBytes() {
 		t.Errorf("measured %d bytes, contract %d", measured, c.HeapBytes())
+	}
+}
+
+func TestContractCoversOnePassWork(t *testing.T) {
+	cases := []struct {
+		pattern string
+		subject string
+		loops   int64
+	}{
+		{"(a)(b)(c)", "abc", 6},
+		{"((ab){1,3})c", "ababc", -1},
+		{"((a)|b)*", "ab", -1},
+		{"((a)|(b))c", "bc", -1},
+	}
+	for _, tc := range cases {
+		re, c := compileContract(t, tc.pattern, 0, len(tc.subject))
+		if !re.onePass || c.OnePass == nil || c.Solver != nil {
+			t.Fatalf("%q must select only the one-pass backend", tc.pattern)
+		}
+		d := decodeSubject(tc.subject)
+		caps := make([]Match, re.nsub+1)
+		var measured onePassWork
+		if !re.onePassCapsMeasured(&d, re.root, 0, len(d.runes), 0, caps, &measured) {
+			t.Fatalf("onePassCapsMeasured(%q, %q) failed", tc.pattern, tc.subject)
+		}
+		work := measured.calls + measured.loops
+		if work > c.OnePass.Steps {
+			t.Errorf("%q on %q: work %d passed the step bound %d",
+				tc.pattern, tc.subject, work, c.OnePass.Steps)
+		}
+		if tc.loops >= 0 && measured.loops != tc.loops {
+			t.Errorf("%q on %q: loops %d, want %d",
+				tc.pattern, tc.subject, measured.loops, tc.loops)
+		}
 	}
 }
 

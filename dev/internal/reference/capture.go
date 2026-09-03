@@ -373,8 +373,7 @@ func (re *Regexp) solveCaptures(d *decoded, so, eo int, eflags ExecFlags, caps [
 		if re.onePassCaps(d, re.root, so, eo, eflags, caps) {
 			return nil
 		}
-		// The walk hit an inconsistency.
-		// The solver below derives everything again, so a failure here only costs speed.
+		return compileError(ESpace, -1)
 	}
 	s := re.getSolver()
 	s.re, s.d, s.eflags = re, d, eflags

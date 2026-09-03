@@ -260,8 +260,8 @@ c := re.<span class="tok-fn">Contract</span>(<span class="tok-num">65536</span>)
           </div>
           <p class="contract__note">These are the actual figures the Go library reports for that pattern.
             Bounds are conservative on purpose.
-            A pattern compiled with captures enabled is bounded by the general capture solver, and a deeply nested one
-            can report a heap bound in the tens of gigabytes.
+            A pattern whose captures need the general solver can report a heap bound in the tens of gigabytes.
+            An expression proven one-pass reports only the much smaller capture-walk bound.
             That is the number you cannot rule out, which is exactly what you need to know before accepting the pattern.
           </p>
         </div>

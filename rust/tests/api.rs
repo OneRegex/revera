@@ -116,6 +116,7 @@ fn contract_grows_with_the_input_bound() {
     let big = re.contract(1 << 12);
     assert_eq!(big.max_input, 1 << 12);
     assert!(big.heap_bytes > 0 && big.stack_bytes > 0 && big.steps > 0);
+    assert!(big.one_pass.is_none());
     assert!(big.solver.is_some());
     assert!(big.matcher.steps > 0);
     assert!(re.contract(16).steps < big.steps);
@@ -124,7 +125,7 @@ fn contract_grows_with_the_input_bound() {
 }
 
 #[test]
-fn contract_omits_unreachable_capture_backends() {
+fn contract_selects_reachable_backends() {
     let contract = Regex::new("a*").unwrap().contract(64);
     assert!(contract.one_pass.is_none());
     assert!(contract.solver.is_none());
@@ -132,9 +133,12 @@ fn contract_omits_unreachable_capture_backends() {
     assert_eq!(contract.stack_bytes, contract.matcher.stack_bytes);
     assert_eq!(contract.steps, contract.matcher.steps);
 
-    let grouped = Regex::new("(a*)").unwrap().contract(64);
+    let grouped = Regex::new("(abc+)").unwrap().contract(1000);
     assert!(grouped.one_pass.is_some());
-    assert!(grouped.solver.is_some());
+    assert!(grouped.solver.is_none());
+    assert_eq!(grouped.heap_bytes, 37_757);
+    assert_eq!(grouped.stack_bytes, 6_144);
+    assert_eq!(grouped.steps, 937_980);
 }
 
 #[test]

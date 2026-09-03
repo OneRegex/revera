@@ -130,11 +130,27 @@ test("locales", () => {
 test("contract", () => {
     const re = new Regex("(a|b)*c");
     const c = re.contract(1000);
+    assert.equal(typeof c.hasOnePass, "boolean");
     assert.equal(typeof c.hasSolver, "boolean");
     assert.ok(c.heapBytes > 0n);
     assert.ok(c.stackBytes > 0n);
     assert.ok(c.steps > 0n);
     assert.equal(DUP_MAX, 255);
+
+    const onePass = new Regex("(abc+)").contract(1000);
+    assert.equal(onePass.hasOnePass, true);
+    assert.equal(onePass.hasSolver, false);
+    assert.equal(onePass.heapBytes, 37_757n);
+    assert.equal(onePass.stackBytes, 6_144n);
+    assert.equal(onePass.steps, 937_980n);
+
+    const solver = new Regex("(a|ab)(c|bcd)(d*)").contract(1000);
+    assert.equal(solver.hasOnePass, false);
+    assert.equal(solver.hasSolver, true);
+
+    const matcherOnly = new Regex("a*").contract(1000);
+    assert.equal(matcherOnly.hasOnePass, false);
+    assert.equal(matcherOnly.hasSolver, false);
 });
 
 test("numeric arguments must be integers", () => {

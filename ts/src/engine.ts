@@ -2161,6 +2161,7 @@ export function solveCaptures(re: Regexp, d: decoded, so: number, eo: number, ef
         if (onePassCaps(re, d, re.root, so, eo, eflags, caps)) {
             return noError();
         }
+        return compileError(ErrESpace, (0 - 1));
     }
     let s: capSolver = new capSolver();
     s.eflags = eflags;
@@ -2269,9 +2270,10 @@ export function ContractFor(re: Regexp, maxInput: number): Contract {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length, atom);
             c.HasOnePass = true;
+        } else {
+            c.Solver = solverContract(re, length, atom);
+            c.HasSolver = true;
         }
-        c.Solver = solverContract(re, length, atom);
-        c.HasSolver = true;
     }
     return c;
 }
@@ -2309,7 +2311,10 @@ export function matcherContract(re: Regexp, length: bigint, atom: bigint): Backe
 
 export function captureHeap(re: Regexp, length: bigint): bigint {
     const window: bigint = cAdd(cMul(4n, length), cMul(8n, cAdd(length, 1n)));
-    return cAdd(BigInt.asIntN(64, window + 64n), cMul(16n, BigInt.asIntN(64, BigInt(re.nsub) + 1n)));
+    const spans: bigint = cMul(16n, cAdd(BigInt(re.nsub), 1n));
+    const payload: bigint = cAdd(window, spans);
+    const allowance: bigint = 24576n;
+    return cAdd(cAdd(payload, allowance), 64n);
 }
 
 export function onePassContract(re: Regexp, length: bigint, atom: bigint): BackendContract {

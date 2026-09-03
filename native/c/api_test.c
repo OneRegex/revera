@@ -200,11 +200,22 @@ static void errors_and_contract(void) {
     revera_contract big = revera_contract_for(regex, 1 << 12);
     check(big.max_input == 1 << 12, "contract max_input");
     check(big.heap_bytes > 0 && big.stack_bytes > 0 && big.steps > 0, "contract figures");
-    check(big.has_solver, "contract solver");
+    check(!big.has_one_pass && big.has_solver, "contract solver");
     check(big.matcher.steps > 0, "contract matcher");
     check(revera_contract_for(regex, 16).steps < big.steps, "contract grows");
     check(revera_contract_for(regex, SIZE_MAX).max_input == (1u << 31) - 1,
           "contract clamps");
+    revera_regex_free(regex);
+
+    regex = compile("(abc+)", NULL);
+    if (regex == NULL) {
+        return;
+    }
+    revera_contract one_pass = revera_contract_for(regex, 1000);
+    check(one_pass.has_one_pass && !one_pass.has_solver, "one-pass contract backend");
+    check(one_pass.heap_bytes == 37757 && one_pass.stack_bytes == 6144 &&
+              one_pass.steps == 937980,
+          "one-pass contract figures");
     revera_regex_free(regex);
 }
 

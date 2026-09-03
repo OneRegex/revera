@@ -169,9 +169,10 @@ struct Contract {
     uint64_t steps;
     // The figures of the automaton, which every search runs.
     BackendContract matcher;
-    // The figures of the one-pass capture walk, set when compilation proved that every span has one parse.
+    // The figures of the one-pass capture walk.
+    // This is the only capture backend when compilation proved that every span has one parse.
     std::optional<BackendContract> one_pass;
-    // The figures of the memoized capture search, the ceiling for any search that resolves parenthesized subexpression offsets.
+    // The figures of the memoized capture search for an expression that is not one-pass.
     std::optional<BackendContract> solver;
 };
 

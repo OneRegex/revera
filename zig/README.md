@@ -238,6 +238,8 @@ It is distinct from allocator exhaustion.
 
 `Regex.contract(max_input)` reports bounds for a search over a subject of at most `max_input` bytes.
 The result includes total `heap_bytes`, `stack_bytes`, and `steps`, plus separate matcher, one-pass capture, and general capture-solver figures.
+The one-pass and solver entries are mutually exclusive.
+An expression proven one-pass does not include the general solver in its totals.
 Steps are abstract operations, not a time estimate.
 Stack bytes are an estimate.
 Figures saturate at `1 << 62`, which means the bound is too large to be useful.
