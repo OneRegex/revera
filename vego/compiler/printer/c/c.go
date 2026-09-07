@@ -1368,9 +1368,7 @@ func (g *gen) builtin(e *compiler.Expr) string {
 		case compiler.KSlice, compiler.KStr:
 			return "(" + g.expr(a) + ").len"
 		case compiler.KArray:
-			if compiler.Impure(a) {
-				g.pushPre(fmt.Sprintf("(void)(%s);", g.expr(a)))
-			}
+			g.pushPre(fmt.Sprintf("(void)(%s);", g.expr(a)))
 			return fmt.Sprintf("%dLL", a.Typ.ALenVal)
 		}
 		fatal("len of", a.Typ)

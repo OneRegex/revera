@@ -253,6 +253,27 @@ func (c *checker) checkFunc(f *FuncDecl) {
 		pa.Name = l.unique
 	}
 	c.checkBody(f.Body)
+	// Constant folding can remove reads and borrows.
+	for _, info := range f.Info {
+		info.Used = false
+		info.Mutated = false
+	}
+	WalkBody(f.Body, func(e *Expr) {
+		if e.K == "ident" {
+			if info := f.Info[e.Name]; info != nil {
+				info.Used = true
+			}
+		}
+		if (e.K == "unary" && e.Op == "&") || (e.K == "slice_expr" && e.X.Typ.K == KArray) {
+			c.markMutated(e.X)
+		}
+	}, func(s *Stmt) {
+		if s.K == "assign" || s.K == "op_assign" {
+			for _, lhs := range s.Lhs {
+				c.markMutated(lhs)
+			}
+		}
+	})
 	c.scope = nil
 	c.fn = nil
 }
@@ -735,6 +756,18 @@ func (c *checker) checkBuiltin(e *Expr) {
 	case "len", "cap":
 		c.checkExpr(e.Args[0])
 		e.Typ = TInt
+		if e.Name == "len" {
+			a := e.Args[0]
+			var length *big.Int
+			if a.Typ.K == KArray && !nonConstantCall(a) {
+				length = c.fold(a.Typ.ALen)
+			} else if a.Typ.K == KStr && a.IsConst {
+				length = big.NewInt(int64(len(c.foldString(a))))
+			}
+			if length != nil {
+				*e = Expr{K: "int", Value: length.String(), Typ: TInt, IsConst: true}
+			}
+		}
 	case "make":
 		for _, a := range e.Args {
 			c.checkIndexOperand(a)
@@ -793,6 +826,35 @@ func (c *checker) checkBuiltin(e *Expr) {
 	default:
 		panic("unknown builtin " + e.Name)
 	}
+}
+
+func (c *checker) foldString(e *Expr) string {
+	switch e.K {
+	case "str":
+		return e.Value
+	case "ident":
+		return c.foldString(c.p.ConstMap[e.Name].Value)
+	case "builtin":
+		a, b := c.foldString(e.Args[0]), c.foldString(e.Args[1])
+		if e.Name == "min" {
+			return min(a, b)
+		}
+		if e.Name == "max" {
+			return max(a, b)
+		}
+	}
+	panic("cannot fold string expression " + e.K)
+}
+
+// nonConstantCall decides whether an array-length operand must be evaluated.
+func nonConstantCall(e *Expr) bool {
+	found := false
+	WalkExpr(e, func(x *Expr) {
+		if (x.K == "call" || x.K == "builtin") && !x.IsConst {
+			found = true
+		}
+	})
+	return found
 }
 
 // unifyDefaults picks the default type of a constant operator pair.

@@ -3448,10 +3448,19 @@ export function localeValidate(l: Locale): boolean {
     if (((vg.rem(sectionLen(l, secCaseDefault), 12) !== 0) || (vg.rem(sectionLen(l, secCaseTurkic), 12) !== 0))) {
         return false;
     }
+    if (((!scalarSectionValid(l, secCaseDefault)) || (!scalarSectionValid(l, secCaseTurkic)))) {
+        return false;
+    }
     if (((((vg.rem(sectionLen(l, secInvUpperDefault), 8) !== 0) || (vg.rem(sectionLen(l, secInvLowerDefault), 8) !== 0)) || (vg.rem(sectionLen(l, secInvUpperTurkic), 8) !== 0)) || (vg.rem(sectionLen(l, secInvLowerTurkic), 8) !== 0))) {
         return false;
     }
+    if (((((!scalarSectionValid(l, secInvUpperDefault)) || (!scalarSectionValid(l, secInvLowerDefault))) || (!scalarSectionValid(l, secInvUpperTurkic))) || (!scalarSectionValid(l, secInvLowerTurkic)))) {
+        return false;
+    }
     if (((vg.rem(sectionLen(l, secSeqCodepoints), 4) !== 0) || (vg.rem(sectionLen(l, secSequences), 8) !== 0))) {
+        return false;
+    }
+    if ((!scalarSectionValid(l, secSeqCodepoints))) {
         return false;
     }
     const codepointCount: number = vg.div(sectionLen(l, secSeqCodepoints), 4);
@@ -3459,7 +3468,7 @@ export function localeValidate(l: Locale): boolean {
     for (let i_2: number = 0; (i_2 < seqCount); i_2 = vg.chk(i_2 + 1)) {
         const off: number = u32At(l, secSequences, vg.chk(2 * i_2));
         const length: number = u32At(l, secSequences, vg.chk(vg.chk(2 * i_2) + 1));
-        if (((length < 1) || (vg.chk(off + length) > codepointCount))) {
+        if ((((length < 1) || (length > l.maxSeq)) || (vg.chk(off + length) > codepointCount))) {
             return false;
         }
     }
@@ -3515,6 +3524,15 @@ export function localeValidate(l: Locale): boolean {
     }
     for (let i_7: number = 0; (i_7 < typeRowCount); i_7 = vg.chk(i_7 + 1)) {
         if ((u16At(l, secLocaleTypes, vg.chk(vg.chk(2 * i_7) + 1)) >= profileCount)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+export function scalarSectionValid(l: Locale, sec: number): boolean {
+    for (let i: number = 0; (i < vg.div(sectionLen(l, sec), 4)); i = vg.chk(i + 1)) {
+        if ((!validScalar((u32At(l, sec, i) | 0)))) {
             return false;
         }
     }

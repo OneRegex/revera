@@ -3,6 +3,7 @@ import Vego.Decode
 import Vego.Data
 import Vego.Core
 import Vego.Elab
+import Vego.LenEvaluation
 import Vego.Interp
 import Vego.CostLemmas
 import Vego.Machine

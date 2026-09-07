@@ -631,6 +631,7 @@ int64_t sectionLen(Locale& l, int64_t sec);
 vg::Str byteString(Locale& l, int64_t sec, int64_t off);
 bool localeLoad(Locale& l, vg::Str blob);
 bool localeValidate(Locale& l);
+bool scalarSectionValid(Locale& l, int64_t sec);
 bool contractionIDsValid(Locale& l, int64_t sec, int64_t seqCount);
 int64_t localeMaxElementLength(Locale& l);
 bool validScalar(int32_t r);

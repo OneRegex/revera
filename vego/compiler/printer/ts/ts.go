@@ -1112,7 +1112,7 @@ func (g *gen) builtin(e *compiler.Expr) string {
 		case compiler.KSlice:
 			return g.expr(e.Args[0]) + ".len"
 		case compiler.KArray:
-			return strconv.FormatInt(g.arrayLen(e.Args[0].Typ), 10)
+			return "(" + g.expr(e.Args[0]) + ").length"
 		}
 		fatal("len of", e.Args[0].Typ)
 	case "cap":

@@ -38178,6 +38178,61 @@
       "k": "binary",
       "op": "||",
       "x": {
+       "k": "unary",
+       "op": "!",
+       "x": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "l"
+         },
+         {
+          "k": "ident",
+          "name": "secCaseDefault"
+         }
+        ],
+        "fn": "scalarSectionValid",
+        "k": "call"
+       }
+      },
+      "y": {
+       "k": "unary",
+       "op": "!",
+       "x": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "l"
+         },
+         {
+          "k": "ident",
+          "name": "secCaseTurkic"
+         }
+        ],
+        "fn": "scalarSectionValid",
+        "k": "call"
+       }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "bool",
+         "value": false
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "||",
+      "x": {
        "k": "binary",
        "op": "||",
        "x": {
@@ -38326,6 +38381,105 @@
       "op": "||",
       "x": {
        "k": "binary",
+       "op": "||",
+       "x": {
+        "k": "binary",
+        "op": "||",
+        "x": {
+         "k": "unary",
+         "op": "!",
+         "x": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "l"
+           },
+           {
+            "k": "ident",
+            "name": "secInvUpperDefault"
+           }
+          ],
+          "fn": "scalarSectionValid",
+          "k": "call"
+         }
+        },
+        "y": {
+         "k": "unary",
+         "op": "!",
+         "x": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "l"
+           },
+           {
+            "k": "ident",
+            "name": "secInvLowerDefault"
+           }
+          ],
+          "fn": "scalarSectionValid",
+          "k": "call"
+         }
+        }
+       },
+       "y": {
+        "k": "unary",
+        "op": "!",
+        "x": {
+         "args": [
+          {
+           "k": "ident",
+           "name": "l"
+          },
+          {
+           "k": "ident",
+           "name": "secInvUpperTurkic"
+          }
+         ],
+         "fn": "scalarSectionValid",
+         "k": "call"
+        }
+       }
+      },
+      "y": {
+       "k": "unary",
+       "op": "!",
+       "x": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "l"
+         },
+         {
+          "k": "ident",
+          "name": "secInvLowerTurkic"
+         }
+        ],
+        "fn": "scalarSectionValid",
+        "k": "call"
+       }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "bool",
+         "value": false
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "cond": {
+      "k": "binary",
+      "op": "||",
+      "x": {
+       "k": "binary",
        "op": "!=",
        "x": {
         "k": "binary",
@@ -38383,6 +38537,39 @@
         "k": "int",
         "value": "0"
        }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "bool",
+         "value": false
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "cond": {
+      "k": "unary",
+      "op": "!",
+      "x": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "l"
+        },
+        {
+         "k": "ident",
+         "name": "secSeqCodepoints"
+        }
+       ],
+       "fn": "scalarSectionValid",
+       "k": "call"
       }
      },
      "else": null,
@@ -38549,14 +38736,34 @@
         "op": "||",
         "x": {
          "k": "binary",
-         "op": "\u003c",
+         "op": "||",
          "x": {
-          "k": "ident",
-          "name": "length"
+          "k": "binary",
+          "op": "\u003c",
+          "x": {
+           "k": "ident",
+           "name": "length"
+          },
+          "y": {
+           "k": "int",
+           "value": "1"
+          }
          },
          "y": {
-          "k": "int",
-          "value": "1"
+          "k": "binary",
+          "op": "\u003e",
+          "x": {
+           "k": "ident",
+           "name": "length"
+          },
+          "y": {
+           "k": "field",
+           "name": "maxSeq",
+           "x": {
+            "k": "ident",
+            "name": "l"
+           }
+          }
          }
         },
         "y": {
@@ -39904,6 +40111,146 @@
      "type": {
       "k": "ptr",
       "name": "Locale"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "bool"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "body": [
+      {
+       "cond": {
+        "k": "unary",
+        "op": "!",
+        "x": {
+         "args": [
+          {
+           "k": "conv",
+           "type": {
+            "k": "named",
+            "name": "int32"
+           },
+           "x": {
+            "args": [
+             {
+              "k": "ident",
+              "name": "l"
+             },
+             {
+              "k": "ident",
+              "name": "sec"
+             },
+             {
+              "k": "ident",
+              "name": "i"
+             }
+            ],
+            "fn": "u32At",
+            "k": "call"
+           }
+          }
+         ],
+         "fn": "validScalar",
+         "k": "call"
+        }
+       },
+       "else": null,
+       "k": "if",
+       "then": [
+        {
+         "k": "return",
+         "values": [
+          {
+           "k": "bool",
+           "value": false
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "cond": {
+      "k": "binary",
+      "op": "\u003c",
+      "x": {
+       "k": "ident",
+       "name": "i"
+      },
+      "y": {
+       "k": "binary",
+       "op": "/",
+       "x": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "l"
+         },
+         {
+          "k": "ident",
+          "name": "sec"
+         }
+        ],
+        "fn": "sectionLen",
+        "k": "call"
+       },
+       "y": {
+        "k": "int",
+        "value": "4"
+       }
+      }
+     },
+     "init": {
+      "k": "define",
+      "names": [
+       "i"
+      ],
+      "value": {
+       "k": "int",
+       "value": "0"
+      }
+     },
+     "k": "for",
+     "post": {
+      "k": "incdec",
+      "lhs": {
+       "k": "ident",
+       "name": "i"
+      },
+      "op": "++"
+     }
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "bool",
+       "value": true
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "scalarSectionValid",
+   "params": [
+    {
+     "name": "l",
+     "type": {
+      "k": "ptr",
+      "name": "Locale"
+     }
+    },
+    {
+     "name": "sec",
+     "type": {
+      "k": "named",
+      "name": "int"
      }
     }
    ],

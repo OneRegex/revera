@@ -2564,10 +2564,19 @@ pub fn localeValidate(l: *Locale) bool {
     if (((vg.remT(sectionLen(l, secCaseDefault), 12) != 0) or (vg.remT(sectionLen(l, secCaseTurkic), 12) != 0))) {
         return false;
     }
+    if (((!scalarSectionValid(l, secCaseDefault)) or (!scalarSectionValid(l, secCaseTurkic)))) {
+        return false;
+    }
     if (((((vg.remT(sectionLen(l, secInvUpperDefault), 8) != 0) or (vg.remT(sectionLen(l, secInvLowerDefault), 8) != 0)) or (vg.remT(sectionLen(l, secInvUpperTurkic), 8) != 0)) or (vg.remT(sectionLen(l, secInvLowerTurkic), 8) != 0))) {
         return false;
     }
+    if (((((!scalarSectionValid(l, secInvUpperDefault)) or (!scalarSectionValid(l, secInvLowerDefault))) or (!scalarSectionValid(l, secInvUpperTurkic))) or (!scalarSectionValid(l, secInvLowerTurkic)))) {
+        return false;
+    }
     if (((vg.remT(sectionLen(l, secSeqCodepoints), 4) != 0) or (vg.remT(sectionLen(l, secSequences), 8) != 0))) {
+        return false;
+    }
+    if ((!scalarSectionValid(l, secSeqCodepoints))) {
         return false;
     }
     const codepointCount: i64 = vg.divT(sectionLen(l, secSeqCodepoints), 4);
@@ -2577,7 +2586,7 @@ pub fn localeValidate(l: *Locale) bool {
         while ((i_2 < seqCount)) : (i_2 +%= 1) {
             const off: i64 = vg.cv(i64, u32At(l, secSequences, (2 *% i_2)));
             const length: i64 = vg.cv(i64, u32At(l, secSequences, ((2 *% i_2) +% 1)));
-            if (((length < 1) or ((off +% length) > codepointCount))) {
+            if ((((length < 1) or (length > l.maxSeq)) or ((off +% length) > codepointCount))) {
                 return false;
             }
         }
@@ -2648,6 +2657,18 @@ pub fn localeValidate(l: *Locale) bool {
         var i_7: i64 = 0;
         while ((i_7 < typeRowCount)) : (i_7 +%= 1) {
             if ((vg.cv(i64, u16At(l, secLocaleTypes, ((2 *% i_7) +% 1))) >= profileCount)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+pub fn scalarSectionValid(l: *Locale, sec: i64) bool {
+    {
+        var i: i64 = 0;
+        while ((i < vg.divT(sectionLen(l, sec), 4))) : (i +%= 1) {
+            if ((!validScalar(vg.cv(i32, u32At(l, sec, i))))) {
                 return false;
             }
         }

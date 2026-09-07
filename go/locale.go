@@ -194,14 +194,24 @@ func localeValidate(l *Locale) bool {
 		sectionLen(l, secCaseTurkic)%12 != 0 {
 		return false
 	}
+	if !scalarSectionValid(l, secCaseDefault) || !scalarSectionValid(l, secCaseTurkic) {
+		return false
+	}
 	if sectionLen(l, secInvUpperDefault)%8 != 0 ||
 		sectionLen(l, secInvLowerDefault)%8 != 0 ||
 		sectionLen(l, secInvUpperTurkic)%8 != 0 ||
 		sectionLen(l, secInvLowerTurkic)%8 != 0 {
 		return false
 	}
+	if !scalarSectionValid(l, secInvUpperDefault) || !scalarSectionValid(l, secInvLowerDefault) ||
+		!scalarSectionValid(l, secInvUpperTurkic) || !scalarSectionValid(l, secInvLowerTurkic) {
+		return false
+	}
 	if sectionLen(l, secSeqCodepoints)%4 != 0 ||
 		sectionLen(l, secSequences)%8 != 0 {
+		return false
+	}
+	if !scalarSectionValid(l, secSeqCodepoints) {
 		return false
 	}
 	codepointCount := sectionLen(l, secSeqCodepoints) / 4
@@ -209,7 +219,7 @@ func localeValidate(l *Locale) bool {
 	for i := 0; i < seqCount; i++ {
 		off := int(u32At(l, secSequences, 2*i))
 		length := int(u32At(l, secSequences, 2*i+1))
-		if length < 1 || off+length > codepointCount {
+		if length < 1 || length > l.maxSeq || off+length > codepointCount {
 			return false
 		}
 	}
@@ -275,6 +285,16 @@ func localeValidate(l *Locale) bool {
 	}
 	for i := 0; i < typeRowCount; i++ {
 		if int(u16At(l, secLocaleTypes, 2*i+1)) >= profileCount {
+			return false
+		}
+	}
+	return true
+}
+
+// scalarSectionValid rejects non-scalars in case and sequence data.
+func scalarSectionValid(l *Locale, sec int) bool {
+	for i := 0; i < sectionLen(l, sec)/4; i++ {
+		if !validScalar(int32(u32At(l, sec, i))) {
 			return false
 		}
 	}

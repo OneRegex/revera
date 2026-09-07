@@ -1946,10 +1946,19 @@ bool localeValidate(Locale& l) {
     if (((vg::srem<int64_t>(sectionLen(l, secCaseDefault), 12LL) != 0LL) || (vg::srem<int64_t>(sectionLen(l, secCaseTurkic), 12LL) != 0LL))) {
         return false;
     }
+    if (((!scalarSectionValid(l, secCaseDefault)) || (!scalarSectionValid(l, secCaseTurkic)))) {
+        return false;
+    }
     if (((((vg::srem<int64_t>(sectionLen(l, secInvUpperDefault), 8LL) != 0LL) || (vg::srem<int64_t>(sectionLen(l, secInvLowerDefault), 8LL) != 0LL)) || (vg::srem<int64_t>(sectionLen(l, secInvUpperTurkic), 8LL) != 0LL)) || (vg::srem<int64_t>(sectionLen(l, secInvLowerTurkic), 8LL) != 0LL))) {
         return false;
     }
+    if (((((!scalarSectionValid(l, secInvUpperDefault)) || (!scalarSectionValid(l, secInvLowerDefault))) || (!scalarSectionValid(l, secInvUpperTurkic))) || (!scalarSectionValid(l, secInvLowerTurkic)))) {
+        return false;
+    }
     if (((vg::srem<int64_t>(sectionLen(l, secSeqCodepoints), 4LL) != 0LL) || (vg::srem<int64_t>(sectionLen(l, secSequences), 8LL) != 0LL))) {
+        return false;
+    }
+    if ((!scalarSectionValid(l, secSeqCodepoints))) {
         return false;
     }
     int64_t codepointCount = vg::sdiv<int64_t>(sectionLen(l, secSeqCodepoints), 4LL);
@@ -1957,7 +1966,7 @@ bool localeValidate(Locale& l) {
     for (int64_t i_2 = 0LL; (i_2 < seqCount); i_2 += 1LL) {
         int64_t off = int64_t(u32At(l, secSequences, (2LL * i_2)));
         int64_t length = int64_t(u32At(l, secSequences, ((2LL * i_2) + 1LL)));
-        if (((length < 1LL) || ((off + length) > codepointCount))) {
+        if ((((length < 1LL) || (length > l.maxSeq)) || ((off + length) > codepointCount))) {
             return false;
         }
     }
@@ -2013,6 +2022,15 @@ bool localeValidate(Locale& l) {
     }
     for (int64_t i_7 = 0LL; (i_7 < typeRowCount); i_7 += 1LL) {
         if (([&]{ auto _t7 = int64_t(u16At(l, secLocaleTypes, ((2LL * i_7) + 1LL))); auto _t8 = profileCount; return (_t7 >= _t8); }())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool scalarSectionValid(Locale& l, int64_t sec) {
+    for (int64_t i = 0LL; ([&]{ auto _t1 = i; auto _t2 = vg::sdiv<int64_t>(sectionLen(l, sec), 4LL); return (_t1 < _t2); }()); i += 1LL) {
+        if ((!validScalar(int32_t(u32At(l, sec, i))))) {
             return false;
         }
     }

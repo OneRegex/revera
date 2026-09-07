@@ -2430,6 +2430,7 @@ int64_t revera_eng_sectionLen(revera_eng_Locale *l, int64_t sec);
 vg_str revera_eng_byteString(revera_eng_Locale *l, int64_t sec, int64_t off);
 bool revera_eng_localeLoad(revera_eng_Locale *l, vg_str blob);
 bool revera_eng_localeValidate(revera_eng_Locale *l);
+bool revera_eng_scalarSectionValid(revera_eng_Locale *l, int64_t sec);
 bool revera_eng_contractionIDsValid(revera_eng_Locale *l, int64_t sec, int64_t seqCount);
 int64_t revera_eng_localeMaxElementLength(revera_eng_Locale *l);
 bool revera_eng_validScalar(int32_t r);

@@ -520,6 +520,33 @@ private partial def elabCall (g : Genv) (c : Lctx) (fn : String)
     pure (← coerce (← elabExpr g c (some pty) a) (some pty)).1)
   pure (.callFn sig.idx targs, sig.results)
 
+private partial def constantExpr (g : Genv) (c : Lctx) (e : Expr) : E Bool := do
+  match e with
+  | .intLit _ | .strLit _ | .boolLit _ => pure true
+  | .ident name => pure ((c.find? name).isNone && (lookup? g.consts name).isSome)
+  | .unary .addr _ => pure false
+  | .unary _ x | .conv _ x => constantExpr g c x
+  | .binary _ x y => return (← constantExpr g c x) && (← constantExpr g c y)
+  | .builtin .min [x, y] _ _ | .builtin .max [x, y] _ _ =>
+    return (← constantExpr g c x) && (← constantExpr g c y)
+  | .builtin .len _ _ _ =>
+    match ← elabExpr g c none e with
+    | .typed (.litInt _) (.int _) => pure true
+    | _ => pure false
+  | _ => pure false
+
+-- Constant array lengths must leave their operands unevaluated.
+private partial def nonConstantCall (g : Genv) (c : Lctx) (e : Expr) : E Bool := do
+  match e with
+  | .call _ _ => pure true
+  | .builtin _ _ _ _ => return !(← constantExpr g c e)
+  | .field x _ | .unary _ x | .conv _ x => nonConstantCall g c x
+  | .index x y | .binary _ x y => return (← nonConstantCall g c x) || (← nonConstantCall g c y)
+  | .sliceE x lo hi => ([x] ++ lo.toList ++ hi.toList).anyM (nonConstantCall g c)
+  | .compositeS _ fields => fields.anyM (fun (_, x) => nonConstantCall g c x)
+  | .compositeL _ elems => elems.anyM (nonConstantCall g c)
+  | _ => pure false
+
 private partial def elabBuiltin (g : Genv) (c : Lctx) (fn : BFn)
     (args : List Expr) (spread : Bool) (mty : Option Ty) : E ER := do
   match fn, args with
@@ -527,8 +554,10 @@ private partial def elabBuiltin (g : Genv) (c : Lctx) (fn : BFn)
     match ← elabExpr g c none x with
     | .typed tx (.slice _) => pure (.typed (.lenSlice tx) (.int .i64))
     | .typed tx .str => pure (.typed (.lenStr tx) (.int .i64))
-    | .cs s => pure (.ci s.size)
-    | .typed tx (.arr n _) => pure (.typed (.lenArr tx n) (.int .i64))
+    | .cs s => pure (.typed (.litInt s.size) (.int .i64))
+    | .typed tx (.arr n _) =>
+      if ← nonConstantCall g c x then pure (.typed (.lenArr tx n) (.int .i64))
+      else pure (.typed (.litInt n) (.int .i64))
     | _ => throw "len of a bad operand"
   | .cap, [x] => do
     let (tx, ty) ← coerce (← elabExpr g c none x) none

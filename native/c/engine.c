@@ -2277,10 +2277,19 @@ bool revera_eng_localeValidate(revera_eng_Locale *l) {
     if (((vg_srem_i64(revera_eng_sectionLen(l, revera_eng_secCaseDefault), 12LL) != 0LL) || (vg_srem_i64(revera_eng_sectionLen(l, revera_eng_secCaseTurkic), 12LL) != 0LL))) {
         return false;
     }
+    if (((!(revera_eng_scalarSectionValid(l, revera_eng_secCaseDefault))) || (!(revera_eng_scalarSectionValid(l, revera_eng_secCaseTurkic))))) {
+        return false;
+    }
     if (((((vg_srem_i64(revera_eng_sectionLen(l, revera_eng_secInvUpperDefault), 8LL) != 0LL) || (vg_srem_i64(revera_eng_sectionLen(l, revera_eng_secInvLowerDefault), 8LL) != 0LL)) || (vg_srem_i64(revera_eng_sectionLen(l, revera_eng_secInvUpperTurkic), 8LL) != 0LL)) || (vg_srem_i64(revera_eng_sectionLen(l, revera_eng_secInvLowerTurkic), 8LL) != 0LL))) {
         return false;
     }
+    if (((((!(revera_eng_scalarSectionValid(l, revera_eng_secInvUpperDefault))) || (!(revera_eng_scalarSectionValid(l, revera_eng_secInvLowerDefault)))) || (!(revera_eng_scalarSectionValid(l, revera_eng_secInvUpperTurkic)))) || (!(revera_eng_scalarSectionValid(l, revera_eng_secInvLowerTurkic))))) {
+        return false;
+    }
     if (((vg_srem_i64(revera_eng_sectionLen(l, revera_eng_secSeqCodepoints), 4LL) != 0LL) || (vg_srem_i64(revera_eng_sectionLen(l, revera_eng_secSequences), 8LL) != 0LL))) {
+        return false;
+    }
+    if ((!(revera_eng_scalarSectionValid(l, revera_eng_secSeqCodepoints)))) {
         return false;
     }
     int64_t codepointCount = vg_sdiv_i64(revera_eng_sectionLen(l, revera_eng_secSeqCodepoints), 4LL);
@@ -2290,7 +2299,7 @@ bool revera_eng_localeValidate(revera_eng_Locale *l) {
         for (; (i_2 < seqCount); i_2 += 1LL) {
             int64_t off = ((int64_t)(revera_eng_u32At(l, revera_eng_secSequences, (2LL * i_2))));
             int64_t length = ((int64_t)(revera_eng_u32At(l, revera_eng_secSequences, ((2LL * i_2) + 1LL))));
-            if (((length < 1LL) || ((off + length) > codepointCount))) {
+            if ((((length < 1LL) || (length > l->maxSeq)) || ((off + length) > codepointCount))) {
                 return false;
             }
         }
@@ -2369,6 +2378,23 @@ bool revera_eng_localeValidate(revera_eng_Locale *l) {
             int64_t _t7 = ((int64_t)(revera_eng_u16At(l, revera_eng_secLocaleTypes, ((2LL * i_7) + 1LL))));
             int64_t _t8 = profileCount;
             if ((_t7 >= _t8)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool revera_eng_scalarSectionValid(revera_eng_Locale *l, int64_t sec) {
+    {
+        int64_t i = 0LL;
+        for (;; i += 1LL) {
+            int64_t _t1 = i;
+            int64_t _t2 = vg_sdiv_i64(revera_eng_sectionLen(l, sec), 4LL);
+            if (!((_t1 < _t2))) {
+                break;
+            }
+            if ((!(revera_eng_validScalar(((int32_t)(revera_eng_u32At(l, sec, i))))))) {
                 return false;
             }
         }

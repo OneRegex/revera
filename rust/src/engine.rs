@@ -2725,48 +2725,57 @@ pub fn localeValidate(l: &mut Locale) -> bool {
     if ((({ let _t6 = secCaseDefault; sectionLen(l, _t6) }).wrapping_rem(12i64) != 0i64) || (({ let _t7 = secCaseTurkic; sectionLen(l, _t7) }).wrapping_rem(12i64) != 0i64)) {
         return false;
     }
-    if ((((({ let _t8 = secInvUpperDefault; sectionLen(l, _t8) }).wrapping_rem(8i64) != 0i64) || (({ let _t9 = secInvLowerDefault; sectionLen(l, _t9) }).wrapping_rem(8i64) != 0i64)) || (({ let _t10 = secInvUpperTurkic; sectionLen(l, _t10) }).wrapping_rem(8i64) != 0i64)) || (({ let _t11 = secInvLowerTurkic; sectionLen(l, _t11) }).wrapping_rem(8i64) != 0i64)) {
+    if ((!{ let _t8 = secCaseDefault; scalarSectionValid(l, _t8) }) || (!{ let _t9 = secCaseTurkic; scalarSectionValid(l, _t9) })) {
         return false;
     }
-    if ((({ let _t12 = secSeqCodepoints; sectionLen(l, _t12) }).wrapping_rem(4i64) != 0i64) || (({ let _t13 = secSequences; sectionLen(l, _t13) }).wrapping_rem(8i64) != 0i64)) {
+    if ((((({ let _t10 = secInvUpperDefault; sectionLen(l, _t10) }).wrapping_rem(8i64) != 0i64) || (({ let _t11 = secInvLowerDefault; sectionLen(l, _t11) }).wrapping_rem(8i64) != 0i64)) || (({ let _t12 = secInvUpperTurkic; sectionLen(l, _t12) }).wrapping_rem(8i64) != 0i64)) || (({ let _t13 = secInvLowerTurkic; sectionLen(l, _t13) }).wrapping_rem(8i64) != 0i64)) {
         return false;
     }
-    let codepointCount: i64 = ({ let _t14 = secSeqCodepoints; sectionLen(l, _t14) }).wrapping_div(4i64);
-    let seqCount: i64 = ({ let _t15 = secSequences; sectionLen(l, _t15) }).wrapping_div(8i64);
+    if ((((!{ let _t14 = secInvUpperDefault; scalarSectionValid(l, _t14) }) || (!{ let _t15 = secInvLowerDefault; scalarSectionValid(l, _t15) })) || (!{ let _t16 = secInvUpperTurkic; scalarSectionValid(l, _t16) })) || (!{ let _t17 = secInvLowerTurkic; scalarSectionValid(l, _t17) })) {
+        return false;
+    }
+    if ((({ let _t18 = secSeqCodepoints; sectionLen(l, _t18) }).wrapping_rem(4i64) != 0i64) || (({ let _t19 = secSequences; sectionLen(l, _t19) }).wrapping_rem(8i64) != 0i64)) {
+        return false;
+    }
+    if (!{ let _t20 = secSeqCodepoints; scalarSectionValid(l, _t20) }) {
+        return false;
+    }
+    let codepointCount: i64 = ({ let _t21 = secSeqCodepoints; sectionLen(l, _t21) }).wrapping_div(4i64);
+    let seqCount: i64 = ({ let _t22 = secSequences; sectionLen(l, _t22) }).wrapping_div(8i64);
     {
         let mut i_2: i64 = 0i64;
-        '_b16: while (i_2 < seqCount) {
-            '_c16: {
-                let off: i64 = (({ let _t17 = secSequences; let _t18 = (2i64).wrapping_mul(i_2); u32At(l, _t17, _t18) }) as i64);
-                let length: i64 = (({ let _t19 = secSequences; let _t20 = ((2i64).wrapping_mul(i_2)).wrapping_add(1i64); u32At(l, _t19, _t20) }) as i64);
-                if ((length < 1i64) || ((off).wrapping_add(length) > codepointCount)) {
+        '_b23: while (i_2 < seqCount) {
+            '_c23: {
+                let off: i64 = (({ let _t24 = secSequences; let _t25 = (2i64).wrapping_mul(i_2); u32At(l, _t24, _t25) }) as i64);
+                let length: i64 = (({ let _t26 = secSequences; let _t27 = ((2i64).wrapping_mul(i_2)).wrapping_add(1i64); u32At(l, _t26, _t27) }) as i64);
+                if (((length < 1i64) || (length > l.maxSeq)) || ((off).wrapping_add(length) > codepointCount)) {
                     return false;
                 }
             }
             i_2 = (i_2).wrapping_add(1i64);
         }
     }
-    if (((((({ let _t21 = secRootContractions; sectionLen(l, _t21) }).wrapping_rem(4i64) != 0i64) || (({ let _t22 = secContractionAdds; sectionLen(l, _t22) }).wrapping_rem(4i64) != 0i64)) || (({ let _t23 = secContractionRemoves; sectionLen(l, _t23) }).wrapping_rem(4i64) != 0i64)) || (({ let _t24 = secRootEquivalences; sectionLen(l, _t24) }).wrapping_rem(8i64) != 0i64)) || (({ let _t25 = secCollationOverrides; sectionLen(l, _t25) }).wrapping_rem(8i64) != 0i64)) {
+    if (((((({ let _t28 = secRootContractions; sectionLen(l, _t28) }).wrapping_rem(4i64) != 0i64) || (({ let _t29 = secContractionAdds; sectionLen(l, _t29) }).wrapping_rem(4i64) != 0i64)) || (({ let _t30 = secContractionRemoves; sectionLen(l, _t30) }).wrapping_rem(4i64) != 0i64)) || (({ let _t31 = secRootEquivalences; sectionLen(l, _t31) }).wrapping_rem(8i64) != 0i64)) || (({ let _t32 = secCollationOverrides; sectionLen(l, _t32) }).wrapping_rem(8i64) != 0i64)) {
         return false;
     }
-    if (!{ let _t26 = secRootContractions; let _t27 = seqCount; contractionIDsValid(l, _t26, _t27) }) {
+    if (!{ let _t33 = secRootContractions; let _t34 = seqCount; contractionIDsValid(l, _t33, _t34) }) {
         return false;
     }
-    if (!{ let _t28 = secContractionAdds; let _t29 = seqCount; contractionIDsValid(l, _t28, _t29) }) {
+    if (!{ let _t35 = secContractionAdds; let _t36 = seqCount; contractionIDsValid(l, _t35, _t36) }) {
         return false;
     }
-    if (({ let _t30 = secCollationProfiles; sectionLen(l, _t30) }).wrapping_rem(24i64) != 0i64) {
+    if (({ let _t37 = secCollationProfiles; sectionLen(l, _t37) }).wrapping_rem(24i64) != 0i64) {
         return false;
     }
-    let profileCount: i64 = ({ let _t31 = secCollationProfiles; sectionLen(l, _t31) }).wrapping_div(24i64);
-    let overrideCount: i64 = ({ let _t32 = secCollationOverrides; sectionLen(l, _t32) }).wrapping_div(8i64);
-    let addCount: i64 = ({ let _t33 = secContractionAdds; sectionLen(l, _t33) }).wrapping_div(4i64);
-    let removeCount: i64 = ({ let _t34 = secContractionRemoves; sectionLen(l, _t34) }).wrapping_div(4i64);
+    let profileCount: i64 = ({ let _t38 = secCollationProfiles; sectionLen(l, _t38) }).wrapping_div(24i64);
+    let overrideCount: i64 = ({ let _t39 = secCollationOverrides; sectionLen(l, _t39) }).wrapping_div(8i64);
+    let addCount: i64 = ({ let _t40 = secContractionAdds; sectionLen(l, _t40) }).wrapping_div(4i64);
+    let removeCount: i64 = ({ let _t41 = secContractionRemoves; sectionLen(l, _t41) }).wrapping_div(4i64);
     {
         let mut i_3: i64 = 0i64;
-        '_b35: while (i_3 < profileCount) {
-            '_c35: {
-                let row: CollProfile = { let _t36 = i_3; collationProfileRow(l, _t36) };
+        '_b42: while (i_3 < profileCount) {
+            '_c42: {
+                let row: CollProfile = { let _t43 = i_3; collationProfileRow(l, _t43) };
                 if ((((row.OverrideFirst).wrapping_add(row.OverrideCount) > overrideCount) || ((row.AddFirst).wrapping_add(row.AddCount) > addCount)) || ((row.RemoveFirst).wrapping_add(row.RemoveCount) > removeCount)) {
                     return false;
                 }
@@ -2774,45 +2783,45 @@ pub fn localeValidate(l: &mut Locale) -> bool {
             i_3 = (i_3).wrapping_add(1i64);
         }
     }
-    if (({ let _t37 = secTypeNameOffsets; sectionLen(l, _t37) }).wrapping_rem(4i64) != 0i64) {
+    if (({ let _t44 = secTypeNameOffsets; sectionLen(l, _t44) }).wrapping_rem(4i64) != 0i64) {
         return false;
     }
-    let typeNameCount: i64 = ({ let _t38 = secTypeNameOffsets; sectionLen(l, _t38) }).wrapping_div(4i64);
+    let typeNameCount: i64 = ({ let _t45 = secTypeNameOffsets; sectionLen(l, _t45) }).wrapping_div(4i64);
     {
         let mut i_4: i64 = 0i64;
-        '_b39: while (i_4 < typeNameCount) {
-            '_c39: {
-                if ((({ let _t40 = secTypeNameOffsets; let _t41 = i_4; u32At(l, _t40, _t41) }) as i64) >= { let _t42 = secTypeNames; sectionLen(l, _t42) }) {
+        '_b46: while (i_4 < typeNameCount) {
+            '_c46: {
+                if ((({ let _t47 = secTypeNameOffsets; let _t48 = i_4; u32At(l, _t47, _t48) }) as i64) >= { let _t49 = secTypeNames; sectionLen(l, _t49) }) {
                     return false;
                 }
             }
             i_4 = (i_4).wrapping_add(1i64);
         }
     }
-    if (((({ let _t43 = secLocales; sectionLen(l, _t43) }).wrapping_rem(20i64) != 0i64) || (({ let _t44 = secLocaleNameOffsets; sectionLen(l, _t44) }).wrapping_rem(4i64) != 0i64)) || (({ let _t45 = secLocaleTypes; sectionLen(l, _t45) }).wrapping_rem(4i64) != 0i64)) {
+    if (((({ let _t50 = secLocales; sectionLen(l, _t50) }).wrapping_rem(20i64) != 0i64) || (({ let _t51 = secLocaleNameOffsets; sectionLen(l, _t51) }).wrapping_rem(4i64) != 0i64)) || (({ let _t52 = secLocaleTypes; sectionLen(l, _t52) }).wrapping_rem(4i64) != 0i64)) {
         return false;
     }
     let count: i64 = localesCount(l);
-    if (({ let _t46 = secLocaleNameOffsets; sectionLen(l, _t46) }).wrapping_div(4i64) != count) {
+    if (({ let _t53 = secLocaleNameOffsets; sectionLen(l, _t53) }).wrapping_div(4i64) != count) {
         return false;
     }
     {
         let mut i_5: i64 = 0i64;
-        '_b47: while (i_5 < count) {
-            '_c47: {
-                if ((({ let _t48 = secLocaleNameOffsets; let _t49 = i_5; u32At(l, _t48, _t49) }) as i64) >= { let _t50 = secLocaleNames; sectionLen(l, _t50) }) {
+        '_b54: while (i_5 < count) {
+            '_c54: {
+                if ((({ let _t55 = secLocaleNameOffsets; let _t56 = i_5; u32At(l, _t55, _t56) }) as i64) >= { let _t57 = secLocaleNames; sectionLen(l, _t57) }) {
                     return false;
                 }
             }
             i_5 = (i_5).wrapping_add(1i64);
         }
     }
-    let typeRowCount: i64 = ({ let _t51 = secLocaleTypes; sectionLen(l, _t51) }).wrapping_div(4i64);
+    let typeRowCount: i64 = ({ let _t58 = secLocaleTypes; sectionLen(l, _t58) }).wrapping_div(4i64);
     {
         let mut i_6: i64 = 0i64;
-        '_b52: while (i_6 < count) {
-            '_c52: {
-                let row_2: LocaleRow = { let _t53 = i_6; localeRowAt(l, _t53) };
+        '_b59: while (i_6 < count) {
+            '_c59: {
+                let row_2: LocaleRow = { let _t60 = i_6; localeRowAt(l, _t60) };
                 if (((row_2.TypeFirst).wrapping_add(row_2.TypeCount) > typeRowCount) || (((row_2.DefaultCollation) as i64) >= profileCount)) {
                     return false;
                 }
@@ -2822,13 +2831,28 @@ pub fn localeValidate(l: &mut Locale) -> bool {
     }
     {
         let mut i_7: i64 = 0i64;
-        '_b54: while (i_7 < typeRowCount) {
-            '_c54: {
-                if ((({ let _t55 = secLocaleTypes; let _t56 = ((2i64).wrapping_mul(i_7)).wrapping_add(1i64); u16At(l, _t55, _t56) }) as i64) >= profileCount) {
+        '_b61: while (i_7 < typeRowCount) {
+            '_c61: {
+                if ((({ let _t62 = secLocaleTypes; let _t63 = ((2i64).wrapping_mul(i_7)).wrapping_add(1i64); u16At(l, _t62, _t63) }) as i64) >= profileCount) {
                     return false;
                 }
             }
             i_7 = (i_7).wrapping_add(1i64);
+        }
+    }
+    return true;
+}
+
+pub fn scalarSectionValid(l: &mut Locale, sec: i64) -> bool {
+    {
+        let mut i: i64 = 0i64;
+        '_b1: while (i < ({ let _t2 = sec; sectionLen(l, _t2) }).wrapping_div(4i64)) {
+            '_c1: {
+                if (!validScalar((({ let _t3 = sec; let _t4 = i; u32At(l, _t3, _t4) }) as i32))) {
+                    return false;
+                }
+            }
+            i = (i).wrapping_add(1i64);
         }
     }
     return true;

@@ -975,7 +975,7 @@ func (g *gen) builtin(e *compiler.Expr) string {
 		case compiler.KStr, compiler.KSlice:
 			return g.expr(e.Args[0]) + ".len"
 		case compiler.KArray:
-			return "((" + g.constPlain(e.Args[0].Typ.ALen) + ") as i64)"
+			return "{ let _ = " + g.expr(e.Args[0]) + "; ((" + g.constPlain(e.Args[0].Typ.ALen) + ") as i64) }"
 		}
 		fatal("len of", e.Args[0].Typ)
 	case "cap":
