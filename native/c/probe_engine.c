@@ -106,10 +106,10 @@ int64_t probe_PartialArray(void) {
     {
         int64_t i = 0LL;
         for (; (i < 5LL); i += 1LL) {
-            t = ((t * 10LL) + a.v[i]);
+            t = ((t * 10LL) + a.v[vg_index(i, 5)]);
         }
     }
-    return (((t * 10LL) + ((int64_t)((names.v[1LL]).len))) + ((int64_t)((names.v[0LL]).len)));
+    return (((t * 10LL) + ((int64_t)((names.v[vg_index(1LL, 3)]).len))) + ((int64_t)((names.v[vg_index(0LL, 3)]).len)));
 }
 
 bool probe_TaggedEq(probe_Tagged a, probe_Tagged b) {
@@ -211,7 +211,7 @@ uint32_t probe_AndNotProbe(uint32_t a, uint32_t b) {
 }
 
 uint64_t probe_ShiftProbe(uint64_t x, int64_t n) {
-    return ((x << n) >> vg_sdiv_i64(n, 2LL));
+    return ((x << vg_shift_count(n, 64)) >> vg_shift_count(vg_sdiv_i64(n, 2LL), 64));
 }
 
 uint64_t probe_ConvProbe(int64_t x) {
@@ -261,16 +261,16 @@ int64_t probe_MakeU64(vg_arena *mem, uint64_t n) {
 
 probe_arr_i64_3 probe_mkTriple(int64_t x) {
     probe_arr_i64_3 a = {0};
-    a.v[0LL] = x;
-    a.v[1LL] = (x + 1LL);
-    a.v[2LL] = (x + 2LL);
+    a.v[vg_index(0LL, 3)] = x;
+    a.v[vg_index(1LL, 3)] = (x + 1LL);
+    a.v[vg_index(2LL, 3)] = (x + 2LL);
     return a;
 }
 
 int64_t probe_PickArray(vg_arena *mem, probe_Counter *c) {
     probe_arr_i64_3 _t1 = probe_mkTriple(40LL);
     int64_t _t2 = probe_bump(mem, c, 2);
-    int64_t v = _t1.v[_t2];
+    int64_t v = _t1.v[vg_index(_t2, 3)];
     int64_t _t3 = (v * 10000LL);
     int64_t _t4 = probe_logCode(c);
     return (_t3 + _t4);

@@ -334,8 +334,18 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 	case "range":
 		g.emitRange(s, depth)
 	case "switch":
+		if s.Tag.Typ.K == compiler.KBool {
+			g.emitBoolSwitch(s, depth)
+			return
+		}
+		tag := g.expr(s.Tag)
+		// Zig rejects an else prong that no value can reach.
+		// When the cases cover every value of the tag type, the tag is widened so the prong, and the Go default, can stay.
+		if g.covers(s) {
+			tag = "@as(i64, " + tag + ")"
+		}
 		g.indent(depth)
-		g.wf("switch (%s) {\n", g.expr(s.Tag))
+		g.wf("switch (%s) {\n", tag)
 		for _, cs := range s.Cases {
 			var vals []string
 			for _, v := range cs.Values {
@@ -392,6 +402,67 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 	}
 }
 
+// covers reports whether the cases of an integer switch cover every value of the tag type.
+// Only uint8 and uint16 are small enough for that, and all their values fit in an i64.
+// Go rejects duplicate integer cases, so counting the values is enough.
+func (g *gen) covers(s *compiler.Stmt) bool {
+	width := s.Tag.Typ.Width()
+	if width > 16 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, cs := range s.Cases {
+		for _, v := range cs.Values {
+			n, ok := compiler.FoldConst(g.p, v)
+			if !ok {
+				return false
+			}
+			seen[n.String()] = true
+		}
+	}
+	return len(seen) == 1<<width
+}
+
+// emitBoolSwitch turns a switch on a bool into an if chain.
+// Go accepts duplicate bool cases, cases that cover both values, and case values that aren't constants, but a Zig switch accepts none of these.
+// As in Go, the tag is evaluated once and the first matching case runs.
+func (g *gen) emitBoolSwitch(s *compiler.Stmt, depth int) {
+	tag := g.newTmp()
+	g.indent(depth)
+	g.wf("{\n")
+	g.indent(depth + 1)
+	g.wf("const %s = %s;\n", tag, g.expr(s.Tag))
+	if len(s.Cases) == 0 {
+		g.indent(depth + 1)
+		g.wf("_ = &%s;\n", tag)
+		g.body(s.Default, depth+1)
+	} else {
+		g.indent(depth + 1)
+		for i, cs := range s.Cases {
+			var conds []string
+			for _, v := range cs.Values {
+				conds = append(conds, tag+" == "+g.expr(v))
+			}
+			if i > 0 {
+				g.wf(" else ")
+			}
+			g.wf("if (%s) {\n", strings.Join(conds, " or "))
+			g.body(cs.Body, depth+2)
+			g.indent(depth + 1)
+			g.wf("}")
+		}
+		if s.HasDef {
+			g.wf(" else {\n")
+			g.body(s.Default, depth+2)
+			g.indent(depth + 1)
+			g.wf("}")
+		}
+		g.wf("\n")
+	}
+	g.indent(depth)
+	g.wf("}\n")
+}
+
 // emitRange lowers a range statement to an index loop.
 // The Vego engine has no range statement, but the form stays supported for completeness.
 // The operand evaluates once, and a hidden counter drives the loop.
@@ -399,10 +470,16 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 func (g *gen) emitRange(s *compiler.Stmt, depth int) {
 	over := g.newTmp()
 	counter := g.newTmp()
+	hasVal := s.ValName != "" && s.ValName != "_"
 	g.indent(depth)
 	g.wf("{\n")
 	g.indent(depth + 1)
 	g.wf("const %s = %s;\n", over, g.expr(s.Value))
+	if s.Value.Typ.K == compiler.KArray && !hasVal {
+		// The loop only uses the array's constant length, so the evaluated operand is otherwise unused.
+		g.indent(depth + 1)
+		g.wf("_ = &%s;\n", over)
+	}
 	limit := over
 	switch s.Value.Typ.K {
 	case compiler.KSlice:
@@ -417,7 +494,7 @@ func (g *gen) emitRange(s *compiler.Stmt, depth int) {
 	if s.IdxName != "" && s.IdxName != "_" {
 		g.declLine(depth+2, s.IdxName, compiler.TInt, counter)
 	}
-	if s.ValName != "" && s.ValName != "_" {
+	if hasVal {
 		read := &compiler.Expr{K: "index", Typ: s.Value.Typ.Elem,
 			X:     &compiler.Expr{K: "ident", Name: over, Typ: s.Value.Typ},
 			Index: &compiler.Expr{K: "ident", Name: counter, Typ: compiler.TInt}}
@@ -514,7 +591,7 @@ func (g *gen) opAssignPlace(s *compiler.Stmt, lhs string) string {
 		}
 		return fmt.Sprintf("%s %s @intCast(%s)", lhs, s.Op, val)
 	case "&^=":
-		return fmt.Sprintf("%s &= ~(%s)", lhs, val)
+		return fmt.Sprintf("%s &= ~(%s)", lhs, g.typed(s.Value))
 	}
 	fatal("unknown op-assign", s.Op)
 	return ""
@@ -547,24 +624,24 @@ func (g *gen) expr(e *compiler.Expr) string {
 		}
 		return ident(e.Name)
 	case "field":
-		return g.expr(e.X) + "." + ident(e.Name)
+		return g.operand(e.X) + "." + ident(e.Name)
 	case "index":
 		switch e.X.Typ.K {
 		case compiler.KSlice:
-			return g.expr(e.X) + ".at(" + g.idx(e.Index) + ").*"
+			return g.operand(e.X) + ".at(" + g.idx(e.Index) + ").*"
 		case compiler.KStr:
-			return g.expr(e.X) + ".byte(" + g.idx(e.Index) + ")"
+			return g.operand(e.X) + ".byte(" + g.idx(e.Index) + ")"
 		case compiler.KArray:
 			if e.Index.IsConst {
-				return g.expr(e.X) + "[" + g.expr(e.Index) + "]"
+				return g.operand(e.X) + "[" + g.expr(e.Index) + "]"
 			}
-			return g.expr(e.X) + "[@intCast(" + g.expr(e.Index) + ")]"
+			return g.operand(e.X) + "[@intCast(" + g.expr(e.Index) + ")]"
 		}
 		fatal("index of", e.X.Typ)
 	case "slice_expr":
-		x := g.expr(e.X)
 		switch e.X.Typ.K {
 		case compiler.KSlice, compiler.KStr:
+			x := g.operand(e.X)
 			switch {
 			case e.Lo == nil && e.Hi == nil:
 				return x
@@ -584,7 +661,7 @@ func (g *gen) expr(e *compiler.Expr) string {
 			if e.Hi != nil {
 				hi = g.idx(e.Hi)
 			}
-			return fmt.Sprintf("vg.arrSlice(%s, &%s, %s, %s)", g.typ(e.X.Typ.Elem), x, lo, hi)
+			return fmt.Sprintf("vg.arrSlice(%s, &%s, %s, %s)", g.typ(e.X.Typ.Elem), g.expr(e.X), lo, hi)
 		}
 		fatal("slice of", e.X.Typ)
 	case "call":
@@ -611,9 +688,14 @@ func (g *gen) expr(e *compiler.Expr) string {
 	case "unary":
 		switch e.Op {
 		case "-":
-			return "(-%" + g.wide(e.X) + ")"
+			return "(-%" + g.expr(e.X) + ")"
 		case "^":
-			return "(~" + g.wide(e.X) + ")"
+			// An untyped constant is a comptime_int, which has no ~ operator.
+			// In two's complement, ^x equals -x-1 at any width, and for unbounded constants too.
+			if e.X.IsConst {
+				return "(-%" + g.expr(e.X) + " -% 1)"
+			}
+			return "(~" + g.expr(e.X) + ")"
 		case "!":
 			return "(!" + g.expr(e.X) + ")"
 		case "&":
@@ -634,14 +716,14 @@ func (g *gen) builtin(e *compiler.Expr) string {
 	case "len":
 		switch e.Args[0].Typ.K {
 		case compiler.KStr, compiler.KSlice:
-			return g.expr(e.Args[0]) + ".len"
+			return g.operand(e.Args[0]) + ".len"
 		case compiler.KArray:
 			label := g.newTmp()
 			return label + ": { _ = " + g.expr(e.Args[0]) + "; break :" + label + " @as(i64, " + g.expr(e.Args[0].Typ.ALen) + "); }"
 		}
 		fatal("len of", e.Args[0].Typ)
 	case "cap":
-		return g.expr(e.Args[0]) + ".cap"
+		return g.operand(e.Args[0]) + ".cap"
 	case "make":
 		elem := g.typ(e.TypeRef.Elem)
 		if len(e.Args) == 2 {
@@ -680,7 +762,8 @@ func (g *gen) builtin(e *compiler.Expr) string {
 		}
 		return fmt.Sprintf("vg.copy(%s, %s, %s)", g.typ(e.Args[0].Typ.Elem), g.expr(e.Args[0]), g.expr(e.Args[1]))
 	case "min", "max":
-		return fmt.Sprintf("@%s(%s, %s)", e.Name, g.expr(e.Args[0]), g.expr(e.Args[1]))
+		// vg.min and vg.max return the Go type, where the Zig builtins would narrow it when an operand is comptime-known.
+		return fmt.Sprintf("vg.%s(%s, %s)", e.Name, g.expr(e.Args[0]), g.expr(e.Args[1]))
 	}
 	fatal("unknown builtin", e.Name)
 	return ""
@@ -690,25 +773,33 @@ func isNil(e *compiler.Expr) bool {
 	return e.K == "ident" && e.Name == "nil"
 }
 
-// wide renders an arithmetic operand at its Go type.
-// Zig narrows a @min or @max with a comptime-known operand, and a wrapping operator or a division helper would keep that narrow type.
-// Every other position coerces the value back on its own.
-func (g *gen) wide(e *compiler.Expr) string {
-	if e.K == "builtin" && (e.Name == "min" || e.Name == "max") &&
-		(e.Args[0].IsConst || e.Args[1].IsConst) {
+// typed renders a constant with its Go type.
+// An untyped Go constant is a comptime_int in Zig, which has no fixed width and no ~ operator.
+func (g *gen) typed(e *compiler.Expr) string {
+	if e.IsConst {
 		return fmt.Sprintf("@as(%s, %s)", g.typ(e.Typ), g.expr(e))
 	}
 	return g.expr(e)
+}
+
+// operand renders the base of a field access, an index, a slice or a method call.
+// A try prefix would apply to the whole chain, and a composite literal can't take a suffix, so both get parentheses.
+func (g *gen) operand(e *compiler.Expr) string {
+	s := g.expr(e)
+	if e.K == "composite" || strings.HasPrefix(s, "try ") {
+		return "(" + s + ")"
+	}
+	return s
 }
 
 func (g *gen) binary(e *compiler.Expr) string {
 	// Slice-to-nil comparisons test the data pointer, like Go.
 	if e.Op == "==" || e.Op == "!=" {
 		if isNil(e.Y) && e.X.Typ.K == compiler.KSlice {
-			return "(" + g.expr(e.X) + ".p " + e.Op + " null)"
+			return "(" + g.operand(e.X) + ".p " + e.Op + " null)"
 		}
 		if isNil(e.X) && e.Y.Typ.K == compiler.KSlice {
-			return "(" + g.expr(e.Y) + ".p " + e.Op + " null)"
+			return "(" + g.operand(e.Y) + ".p " + e.Op + " null)"
 		}
 	}
 	if e.X.Typ.K == compiler.KStr {
@@ -722,7 +813,7 @@ func (g *gen) binary(e *compiler.Expr) string {
 			return fmt.Sprintf("(vg.strcmp3(%s, %s) %s 0)", x, y, e.Op)
 		}
 	}
-	if e.X.Typ.K == compiler.KStruct {
+	if e.X.Typ.K == compiler.KStruct || e.X.Typ.K == compiler.KArray {
 		x, y := g.expr(e.X), g.expr(e.Y)
 		switch e.Op {
 		case "==":
@@ -731,14 +822,14 @@ func (g *gen) binary(e *compiler.Expr) string {
 			return fmt.Sprintf("(!vg.structEq(%s, %s))", x, y)
 		}
 	}
-	x, y := g.wide(e.X), g.wide(e.Y)
+	x, y := g.expr(e.X), g.expr(e.Y)
 	// A constant left operand would reach a division helper as comptime_int.
 	// It could also make the @intCast of a shift lose its result type.
 	// The operand therefore takes its concrete type here.
 	switch e.Op {
 	case "/", "%", "<<", ">>":
-		if e.X.IsConst && !e.Y.IsConst {
-			x = fmt.Sprintf("@as(%s, %s)", g.typ(e.X.Typ), x)
+		if !e.Y.IsConst {
+			x = g.typed(e.X)
 		}
 	}
 	switch e.Op {
@@ -753,7 +844,11 @@ func (g *gen) binary(e *compiler.Expr) string {
 	case "||":
 		return fmt.Sprintf("(%s or %s)", x, y)
 	case "&^":
-		return fmt.Sprintf("(%s & ~(%s))", x, y)
+		// Both operands may be comptime_int constants, which have no ~ operator, so x &^ y is written x ^ (x & y).
+		if e.X.IsConst && e.Y.IsConst {
+			return fmt.Sprintf("(%s ^ (%s & %s))", x, x, y)
+		}
+		return fmt.Sprintf("(%s & ~(%s))", x, g.typed(e.Y))
 	case "&", "|", "^", "==", "!=", "<", "<=", ">", ">=":
 		return fmt.Sprintf("(%s %s %s)", x, e.Op, y)
 	case "<<", ">>":
@@ -770,8 +865,9 @@ func (g *gen) composite(e *compiler.Expr) string {
 	t := e.TypeRef
 	switch t.K {
 	case compiler.KStruct:
+		// The literal spells out its type, since it gets no result type when it has a suffix or goes to a generic helper.
 		if len(e.Fields) == 0 {
-			return ".{}"
+			return ident(t.Name) + "{}"
 		}
 		var parts []string
 		for _, f := range e.Fields {

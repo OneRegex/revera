@@ -78,3 +78,22 @@ func TestLocaleRejectsUnderstatedSequenceMaximum(t *testing.T) {
 		t.Fatalf("accepted maximum 1 for the two-character ch element; matched=%v, error=%v", matched, err)
 	}
 }
+
+func TestLocaleRejectsOutOfRangeRowFields(t *testing.T) {
+	base, ok := LocaleLoad(EmbeddedLocaleData())
+	if !ok {
+		t.Fatal("embedded locale failed to load")
+	}
+	// Fields 3 and 4 of row 0 hold the case profile and the default collation.
+	// The values below keep their low bits valid, so only a check of the full stored value catches them.
+	for _, tc := range []struct {
+		field int
+		value uint32
+	}{{3, 2}, {3, 0x101}, {4, 0x10000}} {
+		raw := []byte(EmbeddedLocaleData())
+		binary.LittleEndian.PutUint32(raw[base.sec[secLocales].Off+4*tc.field:], tc.value)
+		if _, accepted := LocaleLoad(string(raw)); accepted {
+			t.Errorf("locale row field %d accepted %#x", tc.field, tc.value)
+		}
+	}
+}

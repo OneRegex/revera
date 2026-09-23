@@ -70,6 +70,9 @@ Consequently, below the host file, the engine has a different shape from an ordi
 - Workspaces are fresh per `Exec` call.
   `Compile` never writes to a `Regexp` again, so concurrent `Exec` calls stay safe.
 
+Parentheses nest at most 256 deep, which covers every pattern of 256 bytes or fewer.
+A deeper pattern reports `ESpace` at compile time instead of exhausting the stack.
+
 The arenas of the capture solver are capped.
 An input that would need tens of gigabytes reports `ESpace` early, with bounded memory.
 

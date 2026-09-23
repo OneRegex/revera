@@ -379,9 +379,7 @@ pub const Regex = struct {
         pmatch: vg.Slice(engine.Match),
     ) Allocator.Error!Captures {
         const groups = try self.backing().alloc(?Match, @intCast(pmatch.len));
-        for (groups, pmatch.items()) |*slot, m| {
-            slot.* = spanOf(subject, m);
-        }
+        fillGroups(groups, subject, pmatch);
         return .{ .gpa = self.backing(), .groups = groups };
     }
 
@@ -431,8 +429,16 @@ pub const CaptureIterator = struct {
     pub fn next(self: *CaptureIterator) (Error || Allocator.Error)!?Captures {
         var scratch = std.heap.ArenaAllocator.init(self.scan.re.backing());
         defer scratch.deinit();
-        const pmatch = (try self.scan.step(scratch.allocator())) orelse return null;
-        return try self.scan.re.collect(self.scan.subject, pmatch);
+        // Allocate the group list before moving the scan forward, so a caller that retries after OutOfMemory still gets this match.
+        const gpa = self.scan.re.backing();
+        const groups = try gpa.alloc(?Match, self.scan.re.groups);
+        errdefer gpa.free(groups);
+        const pmatch = (try self.scan.step(scratch.allocator())) orelse {
+            gpa.free(groups);
+            return null;
+        };
+        fillGroups(groups, self.scan.subject, pmatch);
+        return .{ .gpa = gpa, .groups = groups };
     }
 };
 
@@ -522,4 +528,10 @@ fn spanOf(subject: []const u8, m: engine.Match) ?Match {
         return null;
     }
     return .{ .subject = subject, .start = @intCast(m.So), .end = @intCast(m.Eo) };
+}
+
+fn fillGroups(groups: []?Match, subject: []const u8, pmatch: vg.Slice(engine.Match)) void {
+    for (groups, pmatch.items()) |*slot, m| {
+        slot.* = spanOf(subject, m);
+    }
 }

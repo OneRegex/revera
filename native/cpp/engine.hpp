@@ -113,6 +113,7 @@ inline constexpr uint8_t opRepeat = 7;
 inline constexpr uint8_t opGroup = 8;
 inline constexpr int64_t infinite = int64_t(0ULL - uint64_t(1LL));
 inline constexpr int64_t lenInf = 1073741824LL;
+inline constexpr int64_t maxNesting = 256LL;
 inline constexpr int32_t invalidRune = int32_t(0ULL - uint64_t(1));
 
 struct runeRange;
@@ -345,8 +346,8 @@ struct Locale {
 struct LocaleRow {
     int64_t TypeFirst = {};
     int64_t TypeCount = {};
-    uint8_t CaseProfile = {};
-    uint16_t DefaultCollation = {};
+    uint32_t CaseProfile = {};
+    uint32_t DefaultCollation = {};
     bool operator==(const LocaleRow&) const = default;
 };
 
@@ -497,6 +498,7 @@ struct parser {
     int64_t pos = {};
     uint32_t flags = {};
     int64_t groups = {};
+    int64_t depth = {};
     vg::Slice<node> nodes = {};
     vg::Slice<bracketSet> brackets = {};
     Error err = {};
@@ -567,10 +569,12 @@ int64_t ContractStackBytes(Contract& c);
 int64_t ContractSteps(Contract& c);
 Contract ContractFor(Regexp& re, int64_t maxInput);
 BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom);
+int64_t runeCountSteps(int64_t length);
 int64_t captureHeap(Regexp& re, int64_t length);
-BackendContract onePassContract(Regexp& re, int64_t length, int64_t atom);
+BackendContract onePassContract(Regexp& re, int64_t length);
+int64_t onePassVisitCost(Regexp& re, lookupCosts& lc, int32_t ni);
+Tup_i64_i64 onePassWalk(Regexp& re, lookupCosts& lc, int32_t ni, bool repeated);
 BackendContract solverContract(Regexp& re, int64_t length, int64_t atom);
-int64_t astSize(vg::Slice<node> nodes, int32_t ni);
 int64_t astHeight(vg::Slice<node> nodes, int32_t ni);
 int64_t atomCost(Regexp& re);
 int64_t atomCostNode(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, lookupCosts& lc, int32_t ni);

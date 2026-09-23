@@ -84,6 +84,15 @@ test("options", () => {
     const yesNo = new Regex("a", { noCaptures: true });
     assert.equal(yesNo.test("a"), true);
     assert.throws(() => yesNo.find("a"), (e: unknown) => e instanceof RegexError && e.kind === "no-captures");
+
+    for (const limit of [-1e20, Number.MIN_SAFE_INTEGER, 2 ** 54, 1e20]) {
+        assert.equal(new Regex("a").replaceAll("aaa", "x", limit), "xxx");
+    }
+
+    // A plain JavaScript caller can pass any truthy value, which compiles without captures too.
+    const truthy = new Regex("b(c)", { noCaptures: 1 as unknown as boolean });
+    assert.throws(() => truthy.find("abc"), (e: unknown) => e instanceof RegexError && e.kind === "no-captures");
+    assert.throws(() => truthy.captures("abc"), (e: unknown) => e instanceof RegexError && e.kind === "no-captures");
 });
 
 test("compilation errors carry a kind and an offset", () => {
@@ -142,7 +151,7 @@ test("contract", () => {
     assert.equal(onePass.hasSolver, false);
     assert.equal(onePass.heapBytes, 37_757n);
     assert.equal(onePass.stackBytes, 6_144n);
-    assert.equal(onePass.steps, 937_980n);
+    assert.equal(onePass.steps, 925_986n);
 
     const solver = new Regex("(a|ab)(c|bcd)(d*)").contract(1000);
     assert.equal(solver.hasOnePass, false);

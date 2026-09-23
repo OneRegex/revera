@@ -252,7 +252,7 @@ static void errors_and_contract(void) {
     revera_contract one_pass = revera_contract_for(regex, 1000);
     check(one_pass.has_one_pass && !one_pass.has_solver, "one-pass contract backend");
     check(one_pass.heap_bytes == 37757 && one_pass.stack_bytes == 6144 &&
-              one_pass.steps == 937980,
+              one_pass.steps == 925986,
           "one-pass contract figures");
     revera_regex_free(regex);
 }

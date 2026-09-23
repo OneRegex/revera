@@ -554,18 +554,31 @@ func (g *gen) opAssign(s *compiler.Stmt, place string) string {
 	val := g.expr(s.Value)
 	t := s.Lhs[0].Typ
 	switch s.Op {
+	case "<<=", ">>=":
+		return fmt.Sprintf("%s %s %s", place, s.Op, g.shiftCount(t, s.Value, val))
 	case "&^=":
 		return fmt.Sprintf("%s &= ~(%s)", place, val)
 	case "/=":
 		if t.Signed() {
 			return fmt.Sprintf("%s = vg::sdiv<%s>(%s, %s)", place, g.typ(t), place, val)
 		}
+		return fmt.Sprintf("%s /= vg::udivisor(%s)", place, val)
 	case "%=":
 		if t.Signed() {
 			return fmt.Sprintf("%s = vg::srem<%s>(%s, %s)", place, g.typ(t), place, val)
 		}
+		return fmt.Sprintf("%s %%= vg::udivisor(%s)", place, val)
 	}
 	return fmt.Sprintf("%s %s %s", place, s.Op, val)
+}
+
+// shiftCount wraps y, the count of a shift on a value of type t, in vg::shift_count.
+// A constant count within the width is left alone, so constant expressions stay constant.
+func (g *gen) shiftCount(t *compiler.Type, e *compiler.Expr, y string) string {
+	if compiler.ConstBelow(g.p, e, t.Width()) {
+		return y
+	}
+	return fmt.Sprintf("vg::shift_count(%s, %d)", y, t.Width())
 }
 
 // inlineStmt renders a loop init or post statement, with no indentation and no terminator.
@@ -709,7 +722,8 @@ func (g *gen) expr(e *compiler.Expr) string {
 		case compiler.KSlice, compiler.KStr:
 			return g.expr(e.X) + "[" + g.expr(e.Index) + "]"
 		case compiler.KArray:
-			return g.expr(e.X) + "[size_t(" + g.expr(e.Index) + ")]"
+			// std::array doesn't check indexes, but Go aborts on a bad one.
+			return fmt.Sprintf("vg::at(%s, %s)", g.expr(e.X), g.expr(e.Index))
 		}
 		fatal("index of", e.X.Typ)
 	case "slice_expr":
@@ -1027,15 +1041,17 @@ func (g *gen) binary(e *compiler.Expr) string {
 			// Go defines MinInt / -1 as MinInt.
 			return fmt.Sprintf("vg::sdiv<%s>(%s, %s)", g.typ(e.Typ), x, y)
 		}
-		body = fmt.Sprintf("%s / %s", x, y)
+		body = fmt.Sprintf("%s / vg::udivisor(%s)", x, y)
 	case "%":
 		if e.Typ.Signed() {
 			return fmt.Sprintf("vg::srem<%s>(%s, %s)", g.typ(e.Typ), x, y)
 		}
-		body = fmt.Sprintf("%s %% %s", x, y)
+		body = fmt.Sprintf("%s %% vg::udivisor(%s)", x, y)
 	case "&^":
 		body = fmt.Sprintf("%s & ~(%s)", x, y)
-	case "+", "-", "*", "&", "|", "^", "<<", ">>":
+	case "<<", ">>":
+		body = fmt.Sprintf("%s %s %s", x, e.Op, g.shiftCount(e.Typ, e.Y, y))
+	case "+", "-", "*", "&", "|", "^":
 		body = fmt.Sprintf("%s %s %s", x, e.Op, y)
 	default:
 		fatal("unknown binary op", e.Op)

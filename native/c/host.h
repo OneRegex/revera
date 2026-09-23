@@ -69,6 +69,9 @@ static inline uint8_t hexval(char c) {
     if (c >= '0' && c <= '9') {
         return (uint8_t)(c - '0');
     }
+    if (c >= 'A' && c <= 'F') {
+        return (uint8_t)(c - 'A' + 10);
+    }
     return (uint8_t)(c - 'a' + 10);
 }
 

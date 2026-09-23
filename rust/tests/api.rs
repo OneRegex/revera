@@ -162,7 +162,7 @@ fn contract_selects_reachable_backends() {
     assert!(grouped.solver.is_none());
     assert_eq!(grouped.heap_bytes, 37_757);
     assert_eq!(grouped.stack_bytes, 6_144);
-    assert_eq!(grouped.steps, 937_980);
+    assert_eq!(grouped.steps, 925_986);
 }
 
 #[test]

@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 )
 
@@ -77,6 +78,7 @@ func (c *checker) run() {
 		c.rewriteMutatedParams(f)
 	}
 	markAllocates(c.p)
+	checkEvalOrder(c.p)
 }
 
 // checkReservedPackageNames rejects package-level declarations whose name a target runtime claims.
@@ -167,6 +169,10 @@ func (c *checker) resolveArrayLens() {
 			if !t.ALenSet {
 				if v, ok := c.tryFold(t.ALen); ok {
 					t.ALenVal, t.ALenSet = v, true
+					// The printers copy a literal or a named constant as written, so a computed length is replaced by its value.
+					if t.ALen.K != "int" && t.ALen.K != "ident" {
+						t.ALen = &Expr{K: "int", Value: strconv.FormatInt(v, 10)}
+					}
 				}
 			}
 		}
@@ -484,22 +490,18 @@ func (c *checker) checkStmt(s *Stmt) {
 	}
 }
 
-// checkAssignOrder rejects a two-value assignment whose later place reads an earlier target, as in i, x[i] = f().
-// Go evaluates every place before it assigns, but the printers assign in order, and only such a statement tells the two apart.
+// checkAssignOrder rejects a two-value assignment whose second target reads what the first one writes, as in i, x[i] = f().
+// Go evaluates both targets before assigning, but the translations assign one after the other.
 func checkAssignOrder(lhs []*Expr) {
-	for i, target := range lhs {
-		if target.K != "ident" || target.Name == "_" {
-			continue
-		}
-		for _, later := range lhs[i+1:] {
-			if later.K == "ident" {
-				continue
-			}
-			WalkExpr(later, func(e *Expr) {
-				if e.K == "ident" && e.Name == target.Name {
-					panic("two-value assign place reads the earlier target " + target.Name + ", which the printers cannot order")
-				}
-			})
+	written := valuePath(lhs[0])
+	if written == nil || written[0] == "_" {
+		return
+	}
+	o := &orderWalk{}
+	o.place(lhs[1])
+	for _, ev := range o.events {
+		if ev.read != nil && conflicts(ev.read, ev.readType, written) {
+			panic("two-value assign place reads the earlier target " + written[0] + ", which the printers cannot order")
 		}
 	}
 }
@@ -571,7 +573,8 @@ func (c *checker) checkExpr(e *Expr) *Type {
 		} else if d, ok := c.p.ConstMap[e.Name]; ok {
 			c.ensureConst(d)
 			e.Typ = d.Inferred
-			e.Untyped = d.Type == nil
+			// A constant declared without a type is still typed when its value is, as in const w = uint16(3).
+			e.Untyped = d.Type == nil && !c.constTyped(d.Value)
 		} else if d, ok := c.p.VarMap[e.Name]; ok {
 			e.Typ = d.Inferred
 		} else {
@@ -1029,7 +1032,7 @@ func (c *checker) fold(e *Expr) *big.Int {
 		case "^":
 			r := x.Not(x)
 			// The complement of a typed unsigned constant stays inside its type, as in ^uint32(0).
-			if !e.X.Untyped && e.X.Typ != nil && e.X.Typ.IsInteger() && !e.X.Typ.Signed() {
+			if c.constTyped(e.X) && e.X.Typ != nil && e.X.Typ.IsInteger() && !e.X.Typ.Signed() {
 				r = truncateTo(r, e.X.Typ)
 			}
 			return r
@@ -1081,6 +1084,46 @@ func (c *checker) fold(e *Expr) *big.Int {
 		}
 	}
 	panic("cannot fold constant expression " + e.K)
+}
+
+// constTyped reports whether a constant expression is typed in Go.
+// The checker gives untyped constants the type of their context, so the Untyped flag can't tell anymore.
+// A conversion is typed, a named constant is typed when its declaration is, and an operator is typed when any of its operands is, except that a shift only looks at its left operand.
+func (c *checker) constTyped(e *Expr) bool {
+	switch e.K {
+	case "conv":
+		return true
+	case "ident":
+		d, ok := c.p.ConstMap[e.Name]
+		if !ok {
+			return false
+		}
+		if !d.typedKnown {
+			d.typed = d.Type != nil || c.constTyped(d.Value)
+			d.typedKnown = true
+		}
+		return d.typed
+	case "unary":
+		return c.constTyped(e.X)
+	case "binary":
+		if e.Op == "<<" || e.Op == ">>" {
+			return c.constTyped(e.X)
+		}
+		return c.constTyped(e.X) || c.constTyped(e.Y)
+	case "builtin":
+		for _, a := range e.Args {
+			if c.constTyped(a) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ConstBelow reports whether e is a constant integer in the range [0, n).
+func ConstBelow(p *Program, e *Expr, n int) bool {
+	v, ok := FoldConst(p, e)
+	return ok && v.Sign() >= 0 && v.Cmp(big.NewInt(int64(n))) < 0
 }
 
 // FoldConst evaluates a constant integer expression at the precision Go uses and returns the value its type holds.

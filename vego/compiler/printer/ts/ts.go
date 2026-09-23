@@ -8,8 +8,9 @@
 // int64 and uint64 map to bigint, so they stay exact at every width.
 // The 32-bit and narrower types wrap with the ToInt32 and ToUint32 idioms and Math.imul.
 //
-// Structs become classes with a clone method.
+// Structs become classes with a clone method, and a set method that overwrites the object in place.
 // Go copies a struct on assignment, and JavaScript shares it, so the printer clones at every site where a stored or returned value comes from a place expression.
+// When a pointer or a view may still reach the target of a store, the store overwrites the object in place instead, so the alias sees the new value as it would in Go.
 // Slices become immutable headers over typed arrays or plain arrays, so sharing a header is as safe as copying a Go slice header.
 //
 // The functions take no memory context: the garbage collector owns every buffer.
@@ -64,6 +65,8 @@ type gen struct {
 	loops []*loopInfo
 	// switchDepth counts the switch statements between the innermost loop and the current statement.
 	switchDepth int
+	// viewed holds the variables of the current function whose arrays get sliced somewhere in its body.
+	viewed map[string]bool
 
 	// lits maps string literal bytes to the module-level constant that holds them.
 	lits     map[string]string
@@ -110,10 +113,10 @@ func ident(name string) string {
 }
 
 // field maps a struct field name.
-// A property can carry any name, but the class methods clone and eq, and the static elem, must stay free.
+// Any name works as a property, except those of the class methods clone, set and eq, and of the static elem.
 func field(name string) string {
 	switch name {
-	case "clone", "eq", "elem", "constructor", "prototype", "__proto__":
+	case "clone", "set", "eq", "elem", "constructor", "prototype", "__proto__":
 		return name + "_"
 	}
 	if strings.HasSuffix(name, "_") {
@@ -134,12 +137,15 @@ func (g *gen) file() string {
 		g.constDecl(d)
 	}
 	g.wf("\n")
+	// Classes come before the globals, because a struct global constructs one and a class can't be used before its declaration runs.
+	for _, s := range g.p.Types {
+		g.structDecl(s)
+	}
 	for _, d := range g.p.Vars {
 		g.wf("export const %s: %s = %s;\n", ident(d.Name), g.typ(d.Inferred), g.expr(d.Value))
 	}
-	g.wf("\n")
-	for _, s := range g.p.Types {
-		g.structDecl(s)
+	if len(g.p.Vars) > 0 {
+		g.wf("\n")
 	}
 	for _, f := range g.p.Funcs {
 		g.emitFunc(f)
@@ -290,7 +296,7 @@ func (g *gen) elem(t *compiler.Type) string {
 	case compiler.KStruct:
 		return ident(t.Name) + ".elem"
 	case compiler.KArray:
-		return fmt.Sprintf("vg.arrayElem(() => %s, (a) => %s, %d)", g.zero(t), g.cloneOf(t, "a"), g.width(t))
+		return fmt.Sprintf("vg.arrayElem(() => %s, %s, %d)", g.zero(t), g.elem(t.Elem), g.width(t))
 	}
 	fatal("no element descriptor for", t)
 	return ""
@@ -426,6 +432,17 @@ func (g *gen) structDecl(s *compiler.StructDecl) {
 	g.wf("    }\n\n")
 	g.wf("    clone(): %s {\n", name)
 	g.wf("        return new %s(%s);\n", name, strings.Join(cloneArgs, ", "))
+	g.wf("    }\n\n")
+	// No program name maps to src_, so the parameter can't shadow a class that an array field needs.
+	g.wf("    set(src_: %s): void {\n", name)
+	for _, f := range s.Fields {
+		dst, src := "this."+field(f.Name), "src_."+field(f.Name)
+		if needsClone(f.Type) {
+			g.wf("        %s;\n", g.setInto(f.Type, dst, src))
+		} else {
+			g.wf("        %s = %s;\n", dst, src)
+		}
+	}
 	g.wf("    }\n")
 	if comparable(g, &compiler.Type{K: compiler.KStruct, Name: s.Name}) {
 		var terms []string
@@ -450,6 +467,14 @@ func (g *gen) emitFunc(f *compiler.FuncDecl) {
 	g.temps = nil
 	g.loops = nil
 	g.switchDepth = 0
+	g.viewed = map[string]bool{}
+	compiler.WalkBody(f.Body, func(e *compiler.Expr) {
+		if e.K == "slice_expr" && e.X.Typ.K == compiler.KArray {
+			if root, ok := localRoot(e.X); ok {
+				g.viewed[root] = true
+			}
+		}
+	}, nil)
 	var params []string
 	for _, pa := range f.Params {
 		params = append(params, ident(pa.Name)+": "+g.typ(pa.Type))
@@ -510,13 +535,14 @@ func (g *gen) stored(e *compiler.Expr) string {
 }
 
 // returned renders a return value.
-// A local that is not a parameter owns its value, so it needs no copy; every other place does.
-func (g *gen) returned(e *compiler.Expr) string {
+// A local goes away with the return, so it can be handed out without a copy, unless the same return hands it out twice.
+// A parameter may share the caller's object and a global is shared by everyone, so those get copied, like fields and elements.
+func (g *gen) returned(e *compiler.Expr, twice bool) string {
 	code := g.expr(e)
 	if !needsClone(e.Typ) || !isPlace(e) {
 		return code
 	}
-	if e.K == "ident" && !g.isParam(e.Name) {
+	if e.K == "ident" && !twice && g.fn.Info[e.Name] != nil && !g.isParam(e.Name) {
 		return code
 	}
 	return g.cloneOf(e.Typ, code)
@@ -539,6 +565,106 @@ func isPlace(e *compiler.Expr) bool {
 		return true
 	}
 	return false
+}
+
+// localRoot returns the variable that directly holds the place e.
+// It returns false when e goes through a pointer or a slice, since no variable of the function owns that storage.
+func localRoot(e *compiler.Expr) (string, bool) {
+	for {
+		switch e.K {
+		case "ident":
+			return e.Name, true
+		case "field":
+			if e.X.Typ.K == compiler.KPtr {
+				return "", false
+			}
+		case "index":
+			if e.X.Typ.K != compiler.KArray {
+				return "", false
+			}
+		default:
+			return "", false
+		}
+		e = e.X
+	}
+}
+
+// borrows reports whether e takes the address of root, or of a part of it.
+func borrows(e *compiler.Expr, root string) bool {
+	found := false
+	compiler.WalkExpr(e, func(x *compiler.Expr) {
+		if x.K == "unary" && x.Op == "&" {
+			if r, ok := localRoot(x.X); ok && r == root {
+				found = true
+			}
+		}
+	})
+	return found
+}
+
+// argument renders one call argument.
+// Go passes a copy of a struct or an array, but a callee never writes to its value parameters, because the checker shadows them.
+// So the callee can share the caller's object, unless the call can change that object while it runs.
+func (g *gen) argument(a *compiler.Expr, args []*compiler.Expr) string {
+	code := g.expr(a)
+	if needsClone(a.Typ) && isPlace(a) && g.callCanWrite(a, args) {
+		return g.cloneOf(a.Typ, code)
+	}
+	return code
+}
+
+// callCanWrite reports whether a call with these arguments can change its argument a, which is a place.
+// The call can reach a local variable only through its address, or through a view if the function slices one of its arrays.
+// Anything else lives behind a pointer or in a slice, which the call may reach through any argument that shares storage or has side effects.
+func (g *gen) callCanWrite(a *compiler.Expr, args []*compiler.Expr) bool {
+	root, local := localRoot(a)
+	for _, b := range args {
+		reach := compiler.Impure(b) || g.p.SharesStorage(b.Typ)
+		if local {
+			reach = borrows(b, root) || (g.viewed[root] && reach)
+		}
+		if reach {
+			return true
+		}
+	}
+	return false
+}
+
+// copiesInto reports whether a store into l must overwrite the struct or array already there, rather than replace it.
+// A Go store doesn't move the value, so a pointer or a view of the old value sees the new one.
+// Something behind a pointer or in a slice may be aliased anywhere up the call stack.
+// A local variable can only be aliased by a view the function takes itself, because an address taken for a call is gone once the call returns.
+func (g *gen) copiesInto(l *compiler.Expr) bool {
+	if !needsClone(l.Typ) {
+		return false
+	}
+	root, local := localRoot(l)
+	return !local || g.viewed[root]
+}
+
+// setInto renders a copy of the struct or array value src into the existing object dst.
+func (g *gen) setInto(t *compiler.Type, dst, src string) string {
+	if t.K == compiler.KArray && typedArray(t.Elem) == "" {
+		return fmt.Sprintf("vg.setArr(%s, %s, %s)", g.elem(t.Elem), dst, src)
+	}
+	return dst + ".set(" + src + ")"
+}
+
+// put renders the store of value into place, the rendered form of l.
+func (g *gen) put(l *compiler.Expr, place, value string) string {
+	if g.copiesInto(l) {
+		return g.setInto(l.Typ, place, value)
+	}
+	return place + " = " + value
+}
+
+// assigned renders the value an assignment stores into l.
+// It skips the clone when the store overwrites the existing object anyway.
+func (g *gen) assigned(l, v *compiler.Expr) string {
+	if g.copiesInto(l) {
+		return g.expr(v)
+	}
+	return g.stored(v)
 }
 
 func (g *gen) stmt(s *compiler.Stmt, depth int) {
@@ -587,7 +713,7 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 			g.wf("%s;\n", g.expr(s.Value))
 			return
 		}
-		g.wf("%s;\n", g.store(l, g.stored(s.Value), compiler.Impure(s.Value)))
+		g.wf("%s;\n", g.store(l, g.assigned(l, s.Value), compiler.Impure(s.Value)))
 	case "op_assign":
 		g.indent(depth)
 		g.wf("%s;\n", g.opAssign(s))
@@ -626,9 +752,11 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 		case 0:
 			g.wf("return;\n")
 		case 1:
-			g.wf("return %s;\n", g.returned(s.Values[0]))
+			g.wf("return %s;\n", g.returned(s.Values[0], false))
 		default:
-			g.wf("return [%s, %s];\n", g.returned(s.Values[0]), g.returned(s.Values[1]))
+			a, b := s.Values[0], s.Values[1]
+			twice := a.K == "ident" && b.K == "ident" && a.Name == b.Name
+			g.wf("return [%s, %s];\n", g.returned(a, false), g.returned(b, twice))
 		}
 	case "expr_stmt":
 		g.indent(depth)
@@ -726,7 +854,7 @@ func (g *gen) inlineStmt(s *compiler.Stmt) string {
 		if len(s.Lhs) != 1 {
 			fatal("two-value assign in loop post")
 		}
-		return g.store(s.Lhs[0], g.stored(s.Value), compiler.Impure(s.Value))
+		return g.store(s.Lhs[0], g.assigned(s.Lhs[0], s.Value), compiler.Impure(s.Value))
 	case "op_assign":
 		return g.opAssign(s)
 	case "expr_stmt":
@@ -862,28 +990,28 @@ func (g *gen) resetNames(f *compiler.FuncDecl) {
 // When the index or the value has side effects, the base and the index are pinned first, so they evaluate once and before the value, as in Go.
 func (g *gen) store(l *compiler.Expr, value string, impureValue bool) string {
 	if l.K != "index" {
-		return g.expr(l) + " = " + value
+		return g.put(l, g.expr(l), value)
 	}
 	base := l.X
 	switch base.Typ.K {
 	case compiler.KSlice:
 		if !impureValue && !g.needsPin(base, l.Index) {
 			b := g.expr(base)
-			return fmt.Sprintf("%s.buf[%s.off + vg.ix(%s, %s.len)] = %s", b, b, g.idx(l.Index), b, value)
+			return g.put(l, fmt.Sprintf("%s.buf[%s.off + vg.ix(%s, %s.len)]", b, b, g.idx(l.Index), b), value)
 		}
 		bt := g.hoisted(base.Typ)
 		it := g.hoisted(compiler.TInt)
-		return fmt.Sprintf("(%s = %s, %s = vg.ix(%s, %s.len), %s.buf[%s.off + %s] = %s)",
-			bt, g.expr(base), it, g.idx(l.Index), bt, bt, bt, it, value)
+		return fmt.Sprintf("(%s = %s, %s = vg.ix(%s, %s.len), %s)",
+			bt, g.expr(base), it, g.idx(l.Index), bt, g.put(l, fmt.Sprintf("%s.buf[%s.off + %s]", bt, bt, it), value))
 	case compiler.KArray:
 		n := g.arrayLen(base.Typ)
 		if !impureValue && !compiler.Impure(l.Index) && !compiler.Impure(base) {
-			return fmt.Sprintf("%s[%s] = %s", g.expr(base), g.arrIdx(l.Index, n), value)
+			return g.put(l, fmt.Sprintf("%s[%s]", g.expr(base), g.arrIdx(l.Index, n)), value)
 		}
 		bt := g.hoisted(base.Typ)
 		it := g.hoisted(compiler.TInt)
-		return fmt.Sprintf("(%s = %s, %s = %s, %s[%s] = %s)",
-			bt, g.expr(base), it, g.arrIdx(l.Index, n), bt, it, value)
+		return fmt.Sprintf("(%s = %s, %s = %s, %s)",
+			bt, g.expr(base), it, g.arrIdx(l.Index, n), g.put(l, fmt.Sprintf("%s[%s]", bt, it), value))
 	}
 	fatal("store into", base.Typ)
 	return ""
@@ -949,7 +1077,30 @@ func (g *gen) idx(e *compiler.Expr) string {
 	return g.expr(e)
 }
 
+// constLiteral renders a constant integer expression as a single literal of its type.
+// Go computes constant expressions exactly, so partial results must not wrap or round the way they would in the expression's type.
+// Literals, named constants and negated literals already come out exact, so they keep their source form.
+// A negated named constant is folded, because its value may be negative, and a minus sign in front of a negative bigint literal doesn't parse.
+func (g *gen) constLiteral(e *compiler.Expr) (string, bool) {
+	switch e.K {
+	case "int", "char", "ident":
+		return "", false
+	case "unary":
+		if e.Op == "-" && (e.X.K == "int" || e.X.K == "char") {
+			return "", false
+		}
+	}
+	v, ok := compiler.FoldConst(g.p, e)
+	if !ok {
+		return "", false
+	}
+	return g.constLit(v, e.Typ), true
+}
+
 func (g *gen) expr(e *compiler.Expr) string {
+	if lit, ok := g.constLiteral(e); ok {
+		return lit
+	}
 	switch e.K {
 	case "int", "char":
 		v, ok := new(big.Int).SetString(e.Value, 10)
@@ -1016,7 +1167,7 @@ func (g *gen) expr(e *compiler.Expr) string {
 	case "call":
 		var args []string
 		for _, a := range e.Args {
-			args = append(args, g.expr(a))
+			args = append(args, g.argument(a, e.Args))
 		}
 		return ident(e.Name) + "(" + strings.Join(args, ", ") + ")"
 	case "builtin":
@@ -1169,11 +1320,6 @@ func (g *gen) conv(e *compiler.Expr) string {
 	if to.K == compiler.KSlice {
 		return "vg.bytesFromStr(" + g.expr(e.X) + ")"
 	}
-	if e.X.IsConst {
-		if v := g.foldConst(e.X); v != nil {
-			return g.constLit(truncate(v, to), to)
-		}
-	}
 	x := g.expr(e.X)
 	from := e.X.Typ
 	if isBig(from) {
@@ -1234,73 +1380,6 @@ func (g *gen) conv(e *compiler.Expr) string {
 	}
 	fatal("conversion to", to)
 	return ""
-}
-
-// foldConst evaluates a constant expression, or returns nil when the printer cannot fold it.
-// The checker folded every constant declaration; this covers the literal forms that conversions apply to.
-func (g *gen) foldConst(e *compiler.Expr) *big.Int {
-	switch e.K {
-	case "int", "char", "ident":
-		return g.constOf(e)
-	case "unary":
-		v := g.foldConst(e.X)
-		if v == nil {
-			return nil
-		}
-		switch e.Op {
-		case "-":
-			return v.Neg(v)
-		case "^":
-			return v.Not(v)
-		}
-	case "conv":
-		v := g.foldConst(e.X)
-		if v == nil {
-			return nil
-		}
-		return truncate(v, e.TypeRef)
-	case "binary":
-		x, y := g.foldConst(e.X), g.foldConst(e.Y)
-		if x == nil || y == nil {
-			return nil
-		}
-		switch e.Op {
-		case "+":
-			return x.Add(x, y)
-		case "-":
-			return x.Sub(x, y)
-		case "*":
-			return x.Mul(x, y)
-		case "<<":
-			return x.Lsh(x, uint(y.Uint64()))
-		case ">>":
-			return x.Rsh(x, uint(y.Uint64()))
-		case "|":
-			return x.Or(x, y)
-		case "&":
-			return x.And(x, y)
-		case "^":
-			return x.Xor(x, y)
-		}
-	}
-	return nil
-}
-
-// truncate reduces a value to the width and sign of an integer type, as a Go conversion does.
-func truncate(v *big.Int, t *compiler.Type) *big.Int {
-	if !t.IsInteger() {
-		return v
-	}
-	width := uint(t.Width())
-	mod := new(big.Int).Lsh(big.NewInt(1), width)
-	out := new(big.Int).Mod(v, mod)
-	if t.Signed() {
-		half := new(big.Int).Rsh(mod, 1)
-		if out.Cmp(half) >= 0 {
-			out.Sub(out, mod)
-		}
-	}
-	return out
 }
 
 func (g *gen) unary(e *compiler.Expr) string {
@@ -1424,14 +1503,19 @@ func (g *gen) arith(op string, t *compiler.Type, x string, yExpr *compiler.Expr)
 		case "&^":
 			return fmt.Sprintf(wrap, x+" & ~"+y)
 		case "<<":
-			return fmt.Sprintf(wrap, x+" << "+g.bigCount(yExpr))
+			return fmt.Sprintf(wrap, x+" << "+g.bigCount(yExpr, t.Width()))
 		case ">>":
-			return fmt.Sprintf("(%s >> %s)", x, g.bigCount(yExpr))
+			return fmt.Sprintf("(%s >> %s)", x, g.bigCount(yExpr, t.Width()))
 		}
 		fatal("unknown operator", op)
 	}
 	if isBig(yExpr.Typ) && (op == "<<" || op == ">>") {
 		y = "vg.intOf(" + y + ")"
+	}
+	// JavaScript takes shift counts modulo 32, so an out-of-range count must be caught here.
+	// Shifts on int go through shl64 and shr64, which do their own check.
+	if (op == "<<" || op == ">>") && t.K != compiler.KInt && !compiler.ConstBelow(g.p, yExpr, t.Width()) {
+		y = fmt.Sprintf("vg.shiftBy(%s, %d)", y, t.Width())
 	}
 	switch t.K {
 	case compiler.KU8, compiler.KU16:
@@ -1515,17 +1599,17 @@ func (g *gen) arith(op string, t *compiler.Type, x string, yExpr *compiler.Expr)
 	return ""
 }
 
-// bigCount renders a shift count as a bigint.
-func (g *gen) bigCount(e *compiler.Expr) string {
-	if e.IsConst {
-		if v := g.foldConst(e); v != nil {
-			return v.String() + "n"
-		}
+// bigCount renders the count of a shift on a bigint of the given width.
+// The count is checked at run time unless it's a constant within the width.
+func (g *gen) bigCount(e *compiler.Expr, width int) string {
+	if compiler.ConstBelow(g.p, e, width) {
+		v, _ := compiler.FoldConst(g.p, e)
+		return v.String() + "n"
 	}
 	if isBig(e.Typ) {
-		return g.expr(e)
+		return fmt.Sprintf("vg.shiftCountBig(%s, %d)", g.expr(e), width)
 	}
-	return "vg.shiftCount(" + g.expr(e) + ")"
+	return fmt.Sprintf("vg.shiftCount(%s, %d)", g.expr(e), width)
 }
 
 func (g *gen) composite(e *compiler.Expr) string {

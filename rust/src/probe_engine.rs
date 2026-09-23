@@ -255,7 +255,7 @@ pub fn AndNotProbe(a: u32, b: u32) -> u32 {
 }
 
 pub fn ShiftProbe(x: u64, n: i64) -> u64 {
-    return ((x << n) >> (n).wrapping_div(2i64));
+    return ((x << vg::shift_count(n, 64)) >> vg::shift_count((n).wrapping_div(2i64), 64));
 }
 
 pub fn ConvProbe(x: i64) -> u64 {

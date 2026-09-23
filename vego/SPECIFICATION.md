@@ -41,6 +41,9 @@ Nothing else is allowed at the top level.
 In particular there are no methods, no interfaces, no type aliases, no named scalar types, and no generic declarations.
 Package declarations must not use target-runtime names: `vg`, `std`, `Str`, `Slice`, `self`, `Self`, `crate`, `super`, `mem`, or any name starting with `Tup_`.
 Locals with a conflicting name are renamed during translation.
+Identifiers are ASCII.
+No declaration other than a struct field may be named `true`, `false` or `nil`, and no type declaration may reuse a predeclared type name such as `int32`.
+The JSON form writes those names as literals and type names, so shadowing them would change what the program means.
 
 ## 2. Types
 
@@ -87,6 +90,7 @@ A translator maps them to a pointer-and-length pair (`&[u8]`, `std::string_view`
 `s[i:j]` is a substring view.
 `len(s)` is the byte count.
 Strings compare with `==`, `!=`, `<`, `<=`, `>`, `>=` in byte order.
+String literals must be valid UTF-8, because the JSON form stores them as JSON strings.
 There is no range loop over a string (that would decode UTF-8 implicitly).
 Programs decode bytes explicitly.
 
@@ -166,9 +170,12 @@ func name(p1 T1, p2 *S, buf []int32) (int32, bool) { ... }
 Allowed statements, with their exact Go form:
 
 - Declaration: `var x T`, `var x T = e`, `x := e`.
-- Assignment: `lhs = e`, and compound `lhs += e`, `-=`, `*=`, `/=`, `%=`, `|=`, `&=`, `^=`, `<<=`, `>>=`, `&^=` on scalars.
+- Assignment: `lhs = e`, and compound `lhs += e`, `-=`, `*=`, `/=`, `%=`, `|=`, `&=`, `^=`, `<<=`, `>>=`, `&^=` on integers.
 - Two-value forms, only from a two-result call: `a, b := f(...)`, `a, b = f(...)`.
   The blank identifier `_` can discard either value.
+  A short declaration declares new names only, and an existing variable takes the `=` form.
+  Go evaluates both targets before assigning, but the translations assign one after the other.
+  So the second target must not read what the first one writes, whether through an index or through the header of a slice it indexes.
   No other multi-assignment exists.
   There is no tuple swap.
 - Increment and decrement: `i++`, `i--`.
@@ -181,6 +188,7 @@ Allowed statements, with their exact Go form:
     `v` is a copy of the element.
     Only the `i` form is allowed when the element type contains a slice.
     `for range e { }` with no variables is also allowed.
+    With at most one variable, Go does not evaluate an array operand, because its length is constant, so such an operand must not contain an index expression.
 - `switch tag { case c1, c2: ... default: ... }` where `tag` is a scalar expression and every case value is a constant.
   No `fallthrough`, no empty-tag `switch {}`, no init statement, no type switch.
 - `break` and `continue`, without labels.
@@ -247,6 +255,8 @@ The model gives every buffer exactly one owner, which is what lets translators f
    A view can be indexed, sliced further, passed as an argument, and bound to a local.
    It must not be assigned to a struct field, stored into a slice element, or returned.
    It must also not be used after an assignment or an append to the owner it came from.
+   A view of a local array must not be stored in a variable declared outside the array's block, because the translations drop the array at the end of its block.
+   The variables of a for or range header belong to a single iteration, as in Go.
 4. Function parameters of slice type are views.
    A function may read and write elements of a slice parameter, and may not store the parameter itself anywhere that outlives the call.
 5. A function result of slice type transfers ownership to the caller.
@@ -276,6 +286,10 @@ Capacities from `make` and from slicing are exact and identical in every target.
 
 `vegoc check` checks what is decidable locally.
 A write into a slice-typed field or element must be a fresh buffer, a move, or a self-truncation.
+It also follows views through each function, and through what each function can return.
+It rejects a view of a local array that is returned, or kept in a variable declared outside the array's block.
+It rejects a value that points into a local array, or into the struct or buffer a parameter points to, when it is stored in a field or an element, placed in a composite literal, appended, or passed inside a struct or array by value.
+A slice read from a field, such as `p.s`, can still move elsewhere under the rules above.
 Nothing writes package-level data.
 `&` stays on struct variables and fields.
 The "not used again" move clauses and rule 9 stay with the program author.
@@ -285,8 +299,11 @@ Lean models the resulting aliasing behavior but does not recheck those ownership
 
 Vego semantics are Go semantics, restricted:
 
-- Evaluation order is left to right.
-  Function arguments evaluate in order.
+- Calls evaluate from left to right, as do the arguments of a call and the operands of `&&` and `||`.
+  Go doesn't specify when the other operands are evaluated relative to those calls.
+  So a statement must not read a variable before a call that can write to it, in source order.
+  `vegoc check` rejects such a read when it names the variable.
+  A read through another view of the same buffer is up to the program author.
 - All values are zero-initialized: integers to 0, bools to false, strings to "", slices to empty, structs field by field.
 - There is one thread.
   Nothing in the subset synchronizes.
@@ -417,7 +434,7 @@ The subset was chosen so each construct has a direct target form:
 | multiple results   | generated struct  | struct / pair      | tuple              | struct               | tuple                      |
 | append             | runtime helper    | push_back / insert | extend / push      | appendSlice / append | runtime helper             |
 | copy               | memmove           | memmove            | copy_within / copy | @memmove             | typed-array or loop copy   |
-| abort on bad index | assert            | assert / at()      | panic (checked)    | safety check         | checked RangeError         |
+| abort on bad index | vg_check          | VG_CHECK           | panic (checked)    | safety check         | checked RangeError         |
 
 (*) An owned result string (rule 6.5) becomes std::string, String, or an allocated []u8 in the target.
 The exemption of rule 6.7 makes both representations valid for stored strings.

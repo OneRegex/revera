@@ -263,12 +263,15 @@ func (r *run) checkGenerated() Result {
 	return r.record(repoScope, "generated", Passed, start, "")
 }
 
-// localeDataCopies lists every checked-in copy of the locale blob, relative to the repository root.
-var localeDataCopies = []string{
+// LocaleDataCopies lists every checked-in copy of the locale blob, relative to the repository root.
+// genlocale writes all of them, and the kit checks that they stay identical.
+var LocaleDataCopies = []string{
+	"go/data.bin",
 	"dev/internal/reference/locale/data.bin",
 	"native/c/data.bin",
 	"native/cpp/data.bin",
 	"rust/src/data.bin",
+	"ts/src/data.bin",
 	"zig/src/data.bin",
 }
 
@@ -277,7 +280,7 @@ var localeDataCopies = []string{
 func LocaleDataProblems(repo string) []string {
 	var problems []string
 	embedded := revera.EmbeddedLocaleData()
-	for _, rel := range localeDataCopies {
+	for _, rel := range LocaleDataCopies {
 		data, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
 		if err != nil {
 			problems = append(problems, rel+": "+err.Error())

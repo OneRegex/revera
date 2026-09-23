@@ -160,10 +160,6 @@ func (g *gen) constPlain(e *compiler.Expr) string {
 		return e.Value
 	case "ident":
 		return ident(e.Name)
-	case "unary":
-		return "-(" + g.constPlain(e.X) + ")"
-	case "binary":
-		return "(" + g.constPlain(e.X) + " " + e.Op + " " + g.constPlain(e.Y) + ")"
 	}
 	fatal("unsupported array length expression", e.K)
 	return ""
@@ -618,10 +614,13 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 	case "op_assign":
 		op := s.Op
 		val := g.expr(s.Value)
-		if op == "&^=" {
+		switch op {
+		case "&^=":
 			// Rust has no &^=, so the printer complements the value and uses &=.
 			op = "&="
 			val = "!(" + val + ")"
+		case "<<=", ">>=":
+			val = g.shiftCount(s.Lhs[0].Typ, s.Value, val)
 		}
 		g.assignOperation(depth, s.Lhs[0], val, op)
 	case "if":
@@ -1069,12 +1068,23 @@ func (g *gen) binary(e *compiler.Expr) string {
 		return fmt.Sprintf("(%s / %s)", x, y)
 	case "%":
 		return fmt.Sprintf("(%s %% %s)", x, y)
+	case "<<", ">>":
+		return fmt.Sprintf("(%s %s %s)", x, e.Op, g.shiftCount(e.Typ, e.Y, y))
 	case "&", "|", "^", "==", "!=",
-		"<", "<=", ">", ">=", "&&", "||", "<<", ">>":
+		"<", "<=", ">", ">=", "&&", "||":
 		return fmt.Sprintf("(%s %s %s)", x, e.Op, y)
 	}
 	fatal("unknown binary op", e.Op)
 	return ""
+}
+
+// shiftCount wraps y, the count of a shift on a value of type t, in vg::shift_count.
+// A constant count within the width is left alone, so constant expressions stay constant.
+func (g *gen) shiftCount(t *compiler.Type, e *compiler.Expr, y string) string {
+	if compiler.ConstBelow(g.p, e, t.Width()) {
+		return y
+	}
+	return fmt.Sprintf("vg::shift_count(%s, %d)", y, t.Width())
 }
 
 func (g *gen) composite(e *compiler.Expr) string {

@@ -263,6 +263,7 @@ Compilation offsets refer to the pattern.
 Escape and backreference errors produced while parsing replacement text refer to the replacement.
 
 A search usually fails with a `"capacity"` error when its subject exceeds the engine's capacity for that pattern.
+Compilation throws it for a pattern that nests parentheses more than 256 deep.
 The same error is used to fail closed if a compile-time-selected one-pass capture walk detects an internal inconsistency.
 
 Numeric arguments such as a replacement limit or contract size throw `RangeError` when they are not integers.

@@ -38,6 +38,8 @@ type BackendContract struct {
 //     HasOnePass and HasSolver are mutually exclusive.
 //
 // Every value saturates at 1<<62, which marks a bound too large to be useful.
+// The figures assume a pmatch of at most NumSub()+1 elements, which is what every host API passes.
+// Each extra element costs one more step, since Exec clears it.
 // The per-call workspace counts once.
 // Each capture backend includes the shared window allocations.
 // ContractHeapBytes combines the matcher with the selected capture backend.
@@ -140,9 +142,10 @@ func ContractFor(re *Regexp, maxInput int) Contract {
 	var c Contract
 	c.MaxInput = int(length)
 	c.Matcher = matcherContract(re, length, atom)
-	if re.progOK && re.nsub > 0 && re.flags&FlagNoSub == 0 {
+	// When a subtree was pruned with a zero minimum length, every offset request falls back to ESpace in Exec, so no capture backend can run.
+	if re.progOK && re.prog.failMin != 0 && re.nsub > 0 && re.flags&FlagNoSub == 0 {
 		if re.onePass {
-			c.OnePass = onePassContract(re, length, atom)
+			c.OnePass = onePassContract(re, length)
 			c.HasOnePass = true
 		} else {
 			c.Solver = solverContract(re, length, atom)
@@ -160,8 +163,9 @@ func matcherContract(re *Regexp, length int64, atom int64) BackendContract {
 		// The expanded program passed the size cap.
 		// Exec then only counts the subject characters against the minimum length, once in bytes and once in characters.
 		// It allocates nothing.
+		// On top of the count, it pays for its own call, the trivialNullMatch call, and the error it returns.
 		b.StackBytes = matcherStackBytes
-		b.Steps = cAdd(cMul(2, length), 2)
+		b.Steps = cAdd(runeCountSteps(length), 3)
 		return b
 	}
 	n := int64(len(re.prog.ins))
@@ -193,6 +197,11 @@ func matcherContract(re *Regexp, length int64, atom int64) BackendContract {
 		boundaries = min(boundaries, int64(re.prog.depth)+3)
 	}
 	steps := cAdd(cAdd(24+ring, length), cMul(boundaries, perBoundary))
+	if re.prog.failMin != failMinNone {
+		// Before phase A, Exec counts the characters of any subject long enough to reach the pruned subtree, then tests for a trivial null match.
+		// When the pattern is anchored, the figure above only covers a few boundaries, so it can't absorb that count.
+		steps = cAdd(steps, cAdd(runeCountSteps(length), 1))
+	}
 
 	// A bracket probe can start the deepest lookup below the fixed frames.
 	stack := int64(matcherStackBytes) + multiLookupFrames*frameBytes
@@ -201,6 +210,15 @@ func matcherContract(re *Regexp, length int64, atom int64) BackendContract {
 	b.StackBytes = stack
 	b.Steps = steps
 	return b
+}
+
+// runeCountSteps bounds one runeCount call over length bytes.
+// Each loop pass pays its test, a decodeRuneAt call, and a utf8Cont call per byte the decoder looks at.
+// An invalid sequence that fails after k such calls advances one byte for 2+k steps, and the k bytes it looked past are then counted again at two steps each.
+// That's at most three steps per byte, and valid input costs less.
+// The call and the final loop test add two.
+func runeCountSteps(length int64) int64 {
+	return cAdd(cMul(3, length), 2)
 }
 
 // captureHeap bounds the allocations every capture call performs before its backend runs.
@@ -215,20 +233,68 @@ func captureHeap(re *Regexp, length int64) int64 {
 	return cAdd(cAdd(payload, allowance), 64)
 }
 
-// onePassContract bounds the phase B capture walk.
-// The walk allocates nothing itself.
-// Its structural factor covers recursive visits and the fixed scans around them, including both concat scans.
-// Each group visit also clears the groups nested inside it, so the group count joins the per-visit cost.
-func onePassContract(re *Regexp, length int64, atom int64) BackendContract {
+// onePassContract bounds the phase B capture walk, which allocates nothing itself.
+func onePassContract(re *Regexp, length int64) BackendContract {
 	var b BackendContract
-	perVisit := cAdd(atom, int64(re.nsub)+1)
 	b.HeapBytes = captureHeap(re, length)
 	// Two entry frames sit above the walk, and a bracket test can start a lookup below it.
 	b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 2+singleLookupFrames),
 		frameBytes)
-	b.Steps = cMul(cMul(astSize(re.nodes, re.root), cAdd(length, 2)),
-		perVisit)
+	// Besides the walk, the capture phase decodes the window and fills in up to nsub+1 spans.
+	lc := localeLookupCosts(&re.loc)
+	once, perChar := onePassWalk(re, &lc, re.root, false)
+	steps := cAdd(once, cMul(length, perChar))
+	steps = cAdd(steps, runeCountSteps(length))
+	b.Steps = cAdd(steps, 5*int64(re.nsub)+14)
 	return b
+}
+
+// onePassVisitCost is the cost of one onePassCaps visit of node ni, not counting its children.
+func onePassVisitCost(re *Regexp, lc *lookupCosts, ni int32) int64 {
+	count := int64(len(re.nodes[ni].ch))
+	switch re.nodes[ni].op {
+	case opChar:
+		if re.flags&FlagICase != 0 {
+			return int64(len(re.nodes[ni].fold)) + 4
+		}
+	case opBracket:
+		return cAdd(1, matchesOneCost(re.brackets, re.nodes[ni].br, lc))
+	case opGroup:
+		return 3 + 2*int64(len(re.nested[re.nodes[ni].index]))
+	case opConcat:
+		return 3 + 3*count
+	case opAlt:
+		cost := 3 + 4*count
+		for i := 0; i < len(re.nodes[ni].firsts); i++ {
+			cost += int64(len(re.nodes[ni].firsts[i]))
+		}
+		return cost
+	}
+	return 2
+}
+
+// onePassWalk splits the cost of walking the subtree at ni into a fixed part and a part paid per character.
+// A node outside any repetition is visited once.
+// A node inside one is visited once per iteration, and iterations match disjoint, nonempty spans, so that's at most once per character.
+// Each iteration also pays one loop test.
+func onePassWalk(re *Regexp, lc *lookupCosts, ni int32, repeated bool) (int64, int64) {
+	once := int64(0)
+	perChar := int64(0)
+	if repeated {
+		perChar = onePassVisitCost(re, lc, ni)
+	} else {
+		once = onePassVisitCost(re, lc, ni)
+	}
+	isRepeat := re.nodes[ni].op == opRepeat
+	for i := 0; i < len(re.nodes[ni].ch); i++ {
+		o, p := onePassWalk(re, lc, re.nodes[ni].ch[i], repeated || isRepeat)
+		once = cAdd(once, o)
+		perChar = cAdd(perChar, p)
+		if isRepeat {
+			perChar = cAdd(perChar, 1)
+		}
+	}
+	return once, perChar
 }
 
 // solverContract bounds the phase B memoized parse search.
@@ -266,15 +332,6 @@ func solverContract(re *Regexp, length int64, atom int64) BackendContract {
 	return b
 }
 
-// astSize returns the pattern node count under ni.
-func astSize(nodes []node, ni int32) int64 {
-	total := int64(1)
-	for i := 0; i < len(nodes[ni].ch); i++ {
-		total = cAdd(total, astSize(nodes, nodes[ni].ch[i]))
-	}
-	return total
-}
-
 // astHeight returns the pattern tree height under ni.
 func astHeight(nodes []node, ni int32) int64 {
 	deepest := int64(0)
@@ -304,8 +361,8 @@ func atomCostNode(nodes []node, brs []bracketSet, lc *lookupCosts, ni int32) int
 	return cost
 }
 
-// The bracket figures count loop-meter units, one per call and one per loop iteration, so that the contract
-// stays above the meter of the interpreted engine.
+// The bracket figures are in loop-meter units, so the contract stays above what the interpreted engine's meter counts.
+// That meter ticks once per call and once per loop test, including the last one that fails.
 // Each helper prices the engine function it is named after.
 
 // searchSteps bounds the probes of a binary search over count entries.
@@ -321,7 +378,7 @@ func searchSteps(count int) int64 {
 const profileRowCost = 13
 
 func u32ContainsCost(count int) int64 {
-	return 1 + 3*searchSteps(count)
+	return 2 + 3*searchSteps(count)
 }
 
 func findPairCost(count int) int64 {
@@ -333,11 +390,11 @@ func findCaseCost(count int) int64 {
 }
 
 func pairSourcesRunCost(count int, preimages int64) int64 {
-	return 5 + 3*searchSteps(count) + 5*preimages
+	return 6 + 3*searchSteps(count) + 5*preimages
 }
 
 func compareSequenceCost(length int64) int64 {
-	return 5 + 3*length
+	return 6 + 3*length
 }
 
 // lookupCosts holds the prices of the locale lookups a bracket test can call, one per function it names.
@@ -381,7 +438,7 @@ func localeLookupCosts(l *Locale) lookupCosts {
 		upper = secInvUpperTurkic
 		lower = secInvLowerTurkic
 	}
-	lc.casePreimages = 2 + pairSourcesRunCost(sectionLen(l, upper)/8, lc.preimages) +
+	lc.casePreimages = 3 + pairSourcesRunCost(sectionLen(l, upper)/8, lc.preimages) +
 		pairSourcesRunCost(sectionLen(l, lower)/8, lc.preimages) +
 		lc.preimages*(2+lc.preimages)
 	return lc
@@ -390,9 +447,9 @@ func localeLookupCosts(l *Locale) lookupCosts {
 // elementIDCost prices one elementID call over a sequence of length characters.
 func elementIDCost(lc *lookupCosts, length int64) int64 {
 	if length == 1 {
-		return 3
+		return 4
 	}
-	return 2 + 2*length + lc.sequenceSearch*(1+compareSequenceCost(length))
+	return 4 + 2*length + lc.sequenceSearch*(1+compareSequenceCost(length))
 }
 
 func collatingElementIDCost(lc *lookupCosts, length int64) int64 {
@@ -411,7 +468,7 @@ func primaryEqualCost(lc *lookupCosts, left int64, right int64) int64 {
 
 // equivsCost prices the comparison of a sequence of length characters with every equivalence class.
 func equivsCost(brs []bracketSet, bi int32, lc *lookupCosts, length int64) int64 {
-	cost := int64(0)
+	cost := int64(1)
 	for i := 0; i < len(brs[bi].equivs); i++ {
 		cost = cAdd(cost, 1+primaryEqualCost(lc, length, int64(len(brs[bi].equivs[i]))))
 	}
@@ -419,7 +476,7 @@ func equivsCost(brs []bracketSet, bi int32, lc *lookupCosts, length int64) int64
 }
 
 func positiveSingleCost(brs []bracketSet, bi int32, lc *lookupCosts) int64 {
-	cost := 2 + searchSteps(len(brs[bi].ranges))
+	cost := 3 + searchSteps(len(brs[bi].ranges))
 	if brs[bi].classMask != 0 {
 		cost += lc.classMask
 	}
@@ -430,7 +487,7 @@ func matchesOneCost(brs []bracketSet, bi int32, lc *lookupCosts) int64 {
 	positive := positiveSingleCost(brs, bi, lc)
 	cost := cAdd(1, positive)
 	if brs[bi].icase {
-		cost = cAdd(cost, cAdd(lc.casePreimages,
+		cost = cAdd(cost, cAdd(lc.casePreimages+1,
 			cMul(lc.preimages, cAdd(1, positive))))
 	}
 	return cost
@@ -438,15 +495,15 @@ func matchesOneCost(brs []bracketSet, bi int32, lc *lookupCosts) int64 {
 
 // candidateLeafCost prices the membership test of one candidate sequence in equivCandidate.
 func candidateLeafCost(brs []bracketSet, bi int32, lc *lookupCosts, length int64) int64 {
-	return cAdd(1+collatingElementIDCost(lc, length), equivsCost(brs, bi, lc, length))
+	return cAdd(2+collatingElementIDCost(lc, length), equivsCost(brs, bi, lc, length))
 }
 
 // probeCost prices one bracketMatchesMulti call over a lookahead of length characters.
 func probeCost(brs []bracketSet, bi int32, lc *lookupCosts, length int64) int64 {
-	cost := cAdd(2, int64(len(brs[bi].elems)))
-	counterpart := int64(1)
+	cost := cAdd(3, int64(len(brs[bi].elems)))
+	counterpart := int64(2)
 	if brs[bi].icase {
-		counterpart = 1 + 2*lc.caseConvert
+		counterpart = 4 + 2*lc.caseConvert
 	}
 	for i := 0; i < len(brs[bi].elems); i++ {
 		if int64(len(brs[bi].elems[i])) == length {
@@ -458,16 +515,17 @@ func probeCost(brs []bracketSet, bi int32, lc *lookupCosts, length int64) int64 
 	}
 	leaf := candidateLeafCost(brs, bi, lc, length)
 	if !brs[bi].icase {
-		return cAdd(cost, cAdd(length+1, leaf))
+		return cAdd(cost, cAdd(length, leaf))
 	}
-	// ICase tries every case candidate of the lookahead, so the recursion has (preimages+1)^length leaves and
-	// fewer inner nodes.
+	// With ICase, every case variant of each lookahead character is tried, so the recursion has at most (preimages+1)^length leaves, and one inner node per shorter prefix.
 	candidates := int64(1)
+	inner := int64(0)
 	for i := int64(0); i < length; i++ {
+		inner = cAdd(inner, candidates)
 		candidates = cMul(candidates, lc.preimages+1)
 	}
-	return cAdd(cost, cMul(candidates,
-		cAdd(2+lc.preimages, cAdd(lc.casePreimages, leaf))))
+	return cAdd(cost, cAdd(cMul(inner, cAdd(2+lc.preimages, lc.casePreimages)),
+		cMul(candidates, leaf)))
 }
 
 // bracketAtomCost bounds the work of one live bracket instruction at one boundary: the single-character test
@@ -477,7 +535,8 @@ func bracketAtomCost(brs []bracketSet, bi int32, lc *lookupCosts) int64 {
 	if brs[bi].multiLens == 0 {
 		return cost
 	}
-	cost = cAdd(cost, maxElemAhead-1)
+	// The length loop in paConsume runs its test at most maxElemAhead times, counting the last one that fails.
+	cost = cAdd(cost, maxElemAhead)
 	for length := 2; length <= maxElemAhead; length++ {
 		if brs[bi].multiLens&(1<<length) != 0 {
 			cost = cAdd(cost, probeCost(brs, bi, lc, int64(length)))

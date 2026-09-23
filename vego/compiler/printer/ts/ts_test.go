@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/oneregex/revera/vego/compiler"
+	"github.com/oneregex/revera/vego/compiler/export"
 )
 
 func load(t *testing.T, src string) *compiler.Program {
@@ -234,5 +235,277 @@ func TestRangeOverArrayValueCopiesTheArray(t *testing.T) {
 	want := "const _t1 = a.slice();"
 	if !strings.Contains(out, want) {
 		t.Errorf("generated output does not contain %q:\n%s", want, out)
+	}
+}
+
+// emitSample exports a Go package and prints it as TypeScript.
+func emitSample(t *testing.T, source string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "sample.go"), []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	blob, violations, err := export.Package(dir)
+	if err != nil || len(violations) != 0 {
+		t.Fatalf("export: %v %v", err, violations)
+	}
+	out, err := Emit(load(t, string(blob)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// runSample prints a Go package as TypeScript and runs it with node against the real runtime.
+// Every function whose name starts with T takes no argument and returns an integer.
+// The result holds one "Name = value" line per such function, in declaration order.
+func runSample(t *testing.T, source string) string {
+	t.Helper()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	engine := emitSample(t, source)
+	runtime, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "ts", "src", "vg.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var main strings.Builder
+	main.WriteString("import * as e from \"./engine.ts\";\n")
+	for _, line := range strings.Split(engine, "\n") {
+		name, ok := strings.CutPrefix(line, "export function T")
+		if !ok {
+			continue
+		}
+		name = "T" + name[:strings.Index(name, "(")]
+		main.WriteString("console.log(\"" + name + " = \" + String(e." + name + "()));\n")
+	}
+	dir := t.TempDir()
+	for name, content := range map[string]string{
+		"engine.ts":    engine,
+		"vg.ts":        string(runtime),
+		"main.ts":      main.String(),
+		"package.json": "{\"type\": \"module\"}\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cmd := exec.Command(node, "--no-warnings", "main.ts")
+	cmd.Dir = dir
+	got, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("node: %v\n%s\n%s", err, got, engine)
+	}
+	return string(got)
+}
+
+func wantAll(t *testing.T, out string, want ...string) {
+	t.Helper()
+	for _, w := range want {
+		if !strings.Contains(out, w) {
+			t.Errorf("generated output does not contain %q:\n%s", w, out)
+		}
+	}
+}
+
+// aliasSample writes to storage that is also reachable under another name: through a pointer, a view, a slice or a global.
+// The expected values come from go run.
+const aliasSample = `package sample
+
+type In struct {
+	A   int64
+	Arr [2]int64
+}
+
+type Out struct {
+	N int64
+	P In
+}
+
+var table = In{A: 1}
+
+var row = [3]int32{1, 2, 3}
+
+func readAfterWrite(v Out, p *Out) int64 {
+	p.N = 5
+	p.P.Arr[0] = 6
+	return v.N*10 + v.P.Arr[0]
+}
+
+func TValueParam() int64 {
+	var o Out
+	o.N = 1
+	o.P.Arr[0] = 2
+	return readAfterWrite(o, &o)
+}
+
+func TOtherBorrow() int64 {
+	var a Out
+	a.N = 3
+	var o Out
+	return readAfterWrite(a, &o)
+}
+
+func readAfterSliceWrite(v In, s []In) int64 {
+	s[0].A = 9
+	return v.A
+}
+
+func TValueParamSlice() int64 {
+	s := make([]In, 1)
+	s[0].A = 4
+	return readAfterSliceWrite(s[0], s)
+}
+
+func getRow() [3]int32 {
+	return row
+}
+
+func getTable() In {
+	return table
+}
+
+func TGlobalReturn() int64 {
+	r := getRow()
+	r[0] = 9
+	t := getTable()
+	t.A = 7
+	return int64(row[0])*10 + int64(getRow()[0]) + getTable().A*100
+}
+
+func dup() (In, In) {
+	var x In
+	x.A = 1
+	return x, x
+}
+
+func TDupReturn() int64 {
+	a, b := dup()
+	a.A = 5
+	return b.A
+}
+
+func setThenWrite(p *In, q *Out) int64 {
+	q.P = In{A: 1}
+	p.A = 5
+	return q.P.A
+}
+
+func TBorrowedStore() int64 {
+	var o Out
+	return setThenWrite(&o.P, &o)
+}
+
+func TViewedStore() int64 {
+	var a [2]int64
+	v := a[:]
+	a = [2]int64{7, 8}
+	s := make([]In, 1)
+	w := s[0].Arr[:]
+	s[0] = In{Arr: [2]int64{4, 6}}
+	return v[0]*10 + v[1] + w[0]*1000 + w[1]*100
+}
+
+func TLocalStore() int64 {
+	var x In
+	x = In{A: 2}
+	return x.A
+}
+
+func TCopyView() int64 {
+	d := make([]In, 1)
+	src := make([]In, 1)
+	src[0].Arr[1] = 3
+	v := d[0].Arr[:]
+	copy(d, src)
+	return v[1]
+}
+`
+
+// constSample holds constant expressions whose exact value differs from what evaluating them in the context type would give.
+const constSample = `package sample
+
+const neg = -5
+
+func id8(x uint8) uint8 {
+	return x
+}
+
+func TConstNot() int64 {
+	a := uint64(^uint32(0))
+	b := int64(^uint8(0))
+	return int64(a%100000) + b*100000
+}
+
+func TUntyped() int64 {
+	var d int32 = (1 << 40) >> 20
+	f := id8(3) * ((512 - 2) / 2 / 64)
+	return int64(d)*100 + int64(f)
+}
+
+func TNegConst() int64 {
+	var y int64 = -neg
+	return y
+}
+`
+
+func TestValueArgumentIsCopiedWhenTheCallCanWriteIt(t *testing.T) {
+	out := emitSample(t, aliasSample)
+	wantAll(t, out,
+		"return readAfterWrite(o.clone(), o);",
+		"return readAfterSliceWrite(s.buf[s.off + vg.ix(0, s.len)].clone(), s);",
+		// A pointer to another variable can't reach the argument.
+		"return readAfterWrite(a, o);",
+	)
+}
+
+func TestReturnedGlobalsAndRepeatedLocalsAreCopied(t *testing.T) {
+	out := emitSample(t, aliasSample)
+	wantAll(t, out, "return row.slice();", "return table.clone();", "return [x, x.clone()];")
+}
+
+func TestStructGlobalFollowsItsClass(t *testing.T) {
+	out := emitSample(t, aliasSample)
+	class, global := strings.Index(out, "export class In {"), strings.Index(out, "export const table: In = new In(1n);")
+	if class < 0 || global < 0 || global < class {
+		t.Errorf("the global must follow the class it constructs:\n%s", out)
+	}
+}
+
+func TestStoreThatAnAliasCanReachCopiesIntoTheObject(t *testing.T) {
+	out := emitSample(t, aliasSample)
+	wantAll(t, out,
+		"set(src_: In): void {",
+		"this.Arr.set(src_.Arr);",
+		"q.P.set(new In(1n));",
+		"a.set(new BigInt64Array([7n, 8n]));",
+		"s.buf[s.off + vg.ix(0, s.len)].set(new In(0n, new BigInt64Array([4n, 6n])));",
+		// Nothing views x, so the store can replace its object.
+		"x = new In(2n);",
+	)
+}
+
+func TestConstantComplementKeepsTheOperandWidth(t *testing.T) {
+	wantAll(t, emitSample(t, constSample), "const a: bigint = 4294967295n;", "const b: bigint = 255n;")
+}
+
+func TestUntypedConstantExpressionFoldsExactly(t *testing.T) {
+	wantAll(t, emitSample(t, constSample), "const d: number = 1048576;", "const f: number = ((id8(3) * 3) & 0xff);")
+}
+
+func TestNegatedConstantFoldsToALiteral(t *testing.T) {
+	wantAll(t, emitSample(t, constSample), "const y: bigint = 5n;")
+}
+
+func TestAliasAndConstantSamplesMatchGo(t *testing.T) {
+	for _, tc := range []struct{ source, want string }{
+		{aliasSample, "TValueParam = 12\nTOtherBorrow = 30\nTValueParamSlice = 4\nTGlobalReturn = 111\nTDupReturn = 1\n" +
+			"TBorrowedStore = 5\nTViewedStore = 4678\nTLocalStore = 2\nTCopyView = 3\n"},
+		{constSample, "TConstNot = 25567295\nTUntyped = 104857609\nTNegConst = 5\n"},
+	} {
+		if got := runSample(t, tc.source); got != tc.want {
+			t.Errorf("node output:\n%s\nwant:\n%s", got, tc.want)
+		}
 	}
 }

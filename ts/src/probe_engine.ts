@@ -6,7 +6,6 @@ const _s1: vg.Str = vg.lit("a");
 
 export const minI64: number = (-9223372036854775808);
 
-
 export class Counter {
     n: number;
     log: vg.Slice<number>;
@@ -18,6 +17,11 @@ export class Counter {
 
     clone(): Counter {
         return new Counter(this.n, this.log);
+    }
+
+    set(src_: Counter): void {
+        this.n = src_.n;
+        this.log = src_.log;
     }
 
     static readonly elem: vg.Elem<Counter> = vg.structElem(() => new Counter(), 40);
@@ -34,6 +38,11 @@ export class Tagged {
 
     clone(): Tagged {
         return new Tagged(this.Tags.slice(), this.N);
+    }
+
+    set(src_: Tagged): void {
+        vg.setArr(vg.STR, this.Tags, src_.Tags);
+        this.N = src_.N;
     }
 
     static eq(a: Tagged, b: Tagged): boolean {
@@ -220,7 +229,7 @@ export function AndNotProbe(a: number, b: number): number {
 }
 
 export function ShiftProbe(x: bigint, n: number): bigint {
-    return (BigInt.asUintN(64, x << vg.shiftCount(n)) >> vg.shiftCount(vg.div(n, 2)));
+    return (BigInt.asUintN(64, x << vg.shiftCount(n, 64)) >> vg.shiftCount(vg.div(n, 2), 64));
 }
 
 export function ConvProbe(x: bigint): bigint {

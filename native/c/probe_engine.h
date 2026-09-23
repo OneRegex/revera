@@ -133,8 +133,8 @@ static inline bool probe_arr_i64_3_eq(probe_arr_i64_3 a, probe_arr_i64_3 b) {
 }
 
 static inline probe_slice_i32 probe_slice_i32_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    int32_t *p = (int32_t *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(int32_t));
+    vg_check(0 <= n && n <= c);
+    int32_t *p = (int32_t *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(int32_t)));
     memset(p, 0, (size_t)c * sizeof(int32_t));
     return (probe_slice_i32){p, n, c};
 }
@@ -148,7 +148,7 @@ static inline probe_slice_i32 probe_slice_i32_grow(vg_arena *mem, probe_slice_i3
     if (newcap < need) {
         newcap = need;
     }
-    int32_t *p = (int32_t *)vg_arena_alloc(mem, (size_t)newcap * sizeof(int32_t));
+    int32_t *p = (int32_t *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(int32_t)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(int32_t));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(int32_t));
@@ -177,7 +177,7 @@ static inline probe_slice_i32 probe_slice_i32_append_slice(vg_arena *mem, probe_
 }
 
 static inline probe_slice_i32 probe_slice_i32_sub(probe_slice_i32 s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (probe_slice_i32){0};
     }
@@ -193,7 +193,7 @@ static inline probe_slice_i32 probe_slice_i32_head(probe_slice_i32 s, int64_t hi
 }
 
 static inline int32_t *probe_slice_i32_at(probe_slice_i32 s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -214,8 +214,8 @@ static inline probe_slice_i32 probe_slice_i32_of(vg_arena *mem, const int32_t *e
 }
 
 static inline probe_slice_u8 probe_slice_u8_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    uint8_t *p = (uint8_t *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(uint8_t));
+    vg_check(0 <= n && n <= c);
+    uint8_t *p = (uint8_t *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(uint8_t)));
     memset(p, 0, (size_t)c * sizeof(uint8_t));
     return (probe_slice_u8){p, n, c};
 }
@@ -229,7 +229,7 @@ static inline probe_slice_u8 probe_slice_u8_grow(vg_arena *mem, probe_slice_u8 s
     if (newcap < need) {
         newcap = need;
     }
-    uint8_t *p = (uint8_t *)vg_arena_alloc(mem, (size_t)newcap * sizeof(uint8_t));
+    uint8_t *p = (uint8_t *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(uint8_t)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(uint8_t));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(uint8_t));
@@ -258,7 +258,7 @@ static inline probe_slice_u8 probe_slice_u8_append_slice(vg_arena *mem, probe_sl
 }
 
 static inline probe_slice_u8 probe_slice_u8_sub(probe_slice_u8 s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (probe_slice_u8){0};
     }
@@ -274,7 +274,7 @@ static inline probe_slice_u8 probe_slice_u8_head(probe_slice_u8 s, int64_t hi) {
 }
 
 static inline uint8_t *probe_slice_u8_at(probe_slice_u8 s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -330,8 +330,8 @@ static inline int64_t probe_slice_u8_copy_str(probe_slice_u8 dst, vg_str src) {
 }
 
 static inline probe_slice_i64 probe_slice_i64_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    int64_t *p = (int64_t *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(int64_t));
+    vg_check(0 <= n && n <= c);
+    int64_t *p = (int64_t *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(int64_t)));
     memset(p, 0, (size_t)c * sizeof(int64_t));
     return (probe_slice_i64){p, n, c};
 }
@@ -345,7 +345,7 @@ static inline probe_slice_i64 probe_slice_i64_grow(vg_arena *mem, probe_slice_i6
     if (newcap < need) {
         newcap = need;
     }
-    int64_t *p = (int64_t *)vg_arena_alloc(mem, (size_t)newcap * sizeof(int64_t));
+    int64_t *p = (int64_t *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(int64_t)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(int64_t));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(int64_t));
@@ -374,7 +374,7 @@ static inline probe_slice_i64 probe_slice_i64_append_slice(vg_arena *mem, probe_
 }
 
 static inline probe_slice_i64 probe_slice_i64_sub(probe_slice_i64 s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (probe_slice_i64){0};
     }
@@ -390,7 +390,7 @@ static inline probe_slice_i64 probe_slice_i64_head(probe_slice_i64 s, int64_t hi
 }
 
 static inline int64_t *probe_slice_i64_at(probe_slice_i64 s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -411,8 +411,8 @@ static inline probe_slice_i64 probe_slice_i64_of(vg_arena *mem, const int64_t *e
 }
 
 static inline probe_slice_u64 probe_slice_u64_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    uint64_t *p = (uint64_t *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(uint64_t));
+    vg_check(0 <= n && n <= c);
+    uint64_t *p = (uint64_t *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(uint64_t)));
     memset(p, 0, (size_t)c * sizeof(uint64_t));
     return (probe_slice_u64){p, n, c};
 }
@@ -426,7 +426,7 @@ static inline probe_slice_u64 probe_slice_u64_grow(vg_arena *mem, probe_slice_u6
     if (newcap < need) {
         newcap = need;
     }
-    uint64_t *p = (uint64_t *)vg_arena_alloc(mem, (size_t)newcap * sizeof(uint64_t));
+    uint64_t *p = (uint64_t *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(uint64_t)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(uint64_t));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(uint64_t));
@@ -455,7 +455,7 @@ static inline probe_slice_u64 probe_slice_u64_append_slice(vg_arena *mem, probe_
 }
 
 static inline probe_slice_u64 probe_slice_u64_sub(probe_slice_u64 s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (probe_slice_u64){0};
     }
@@ -471,7 +471,7 @@ static inline probe_slice_u64 probe_slice_u64_head(probe_slice_u64 s, int64_t hi
 }
 
 static inline uint64_t *probe_slice_u64_at(probe_slice_u64 s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -492,17 +492,17 @@ static inline probe_slice_u64 probe_slice_u64_of(vg_arena *mem, const uint64_t *
 }
 
 static inline probe_slice_i64 probe_arr_i64_5_slice(probe_arr_i64_5 *a, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= 5);
+    vg_check(0 <= lo && lo <= hi && hi <= 5);
     return (probe_slice_i64){a->v + lo, hi - lo, 5 - lo};
 }
 
 static inline probe_slice_i32 probe_arr_i32_0_slice(probe_arr_i32_0 *a, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= 0);
+    vg_check(0 <= lo && lo <= hi && hi <= 0);
     return (probe_slice_i32){(int32_t *)(void *)a, 0, 0};
 }
 
 static inline probe_slice_i64 probe_arr_i64_3_slice(probe_arr_i64_3 *a, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= 3);
+    vg_check(0 <= lo && lo <= hi && hi <= 3);
     return (probe_slice_i64){a->v + lo, hi - lo, 3 - lo};
 }
 

@@ -11,8 +11,8 @@
 
 #include <algorithm>
 #include <array>
-#include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <initializer_list>
@@ -22,6 +22,15 @@
 #include <vector>
 
 namespace vg {
+
+// check_failed ends the program when a runtime check fails, where Go would panic.
+[[noreturn]] inline void check_failed(const char* cond, const char* file, int line) {
+    std::fprintf(stderr, "%s:%d: check failed: %s\n", file, line, cond);
+    std::abort();
+}
+
+// VG_CHECK isn't assert, because NDEBUG must not remove the checks the generated code relies on.
+#define VG_CHECK(cond) ((cond) ? void(0) : ::vg::check_failed(#cond, __FILE__, __LINE__))
 
 class Arena {
   public:
@@ -66,6 +75,8 @@ T* alloc_elems(Arena& mem, int64_t n) {
     if (n < 1) {
         n = 1;
     }
+    // Abort if the byte size overflows, like Go's makeslice.
+    VG_CHECK(uint64_t(n) <= SIZE_MAX / sizeof(T));
     return static_cast<T*>(mem.alloc(size_t(n) * sizeof(T)));
 }
 
@@ -77,12 +88,12 @@ struct Str {
     int64_t len = 0;
 
     uint8_t operator[](int64_t i) const {
-        assert(i >= 0 && i < len);
+        VG_CHECK(i >= 0 && i < len);
         return uint8_t(p[i]);
     }
 
     Str sub(int64_t lo, int64_t hi) const {
-        assert(0 <= lo && lo <= hi && hi <= len);
+        VG_CHECK(0 <= lo && lo <= hi && hi <= len);
         if (p == nullptr) {
             return Str{};
         }
@@ -140,12 +151,12 @@ struct Slice {
     int64_t cap = 0;
 
     T& operator[](int64_t i) const {
-        assert(i >= 0 && i < len);
+        VG_CHECK(i >= 0 && i < len);
         return p[i];
     }
 
     Slice sub(int64_t lo, int64_t hi) const {
-        assert(0 <= lo && lo <= hi && hi <= cap);
+        VG_CHECK(0 <= lo && lo <= hi && hi <= cap);
         if (p == nullptr) {
             return Slice{};
         }
@@ -173,7 +184,7 @@ Slice<T> make_cap(Arena& mem, int64_t n, int64_t c) {
     // Value initialization of every generated type is all zero bytes.
     // One memset therefore replaces per-element construction.
     static_assert(std::is_trivially_copyable_v<T>);
-    assert(0 <= n && n <= c);
+    VG_CHECK(0 <= n && n <= c);
     T* p = alloc_elems<T>(mem, c);
     std::memset(p, 0, size_t(c) * sizeof(T));
     return Slice<T>{p, n, c};
@@ -253,12 +264,39 @@ inline int64_t vcopy_str(Slice<uint8_t> dst, Str src) {
     return n;
 }
 
+// at indexes an array and aborts on a bad index, like Go, where std::array leaves it undefined.
+template <typename T, size_t N>
+T& at(std::array<T, N>& a, int64_t i) {
+    VG_CHECK(i >= 0 && uint64_t(i) < N);
+    return a[size_t(i)];
+}
+
+template <typename T, size_t N>
+const T& at(const std::array<T, N>& a, int64_t i) {
+    VG_CHECK(i >= 0 && uint64_t(i) < N);
+    return a[size_t(i)];
+}
+
+// udivisor checks the divisor of an unsigned division or remainder, which C++ leaves undefined at zero.
+inline uint64_t udivisor(uint64_t b) {
+    VG_CHECK(b != 0);
+    return b;
+}
+
+// shift_count aborts unless 0 <= n < width, where width is the size of the shifted operand in bits.
+// Go panics on a negative count and Vego aborts on one past the width, but C++ leaves both undefined.
+// An unsigned count too big for int64_t turns negative here, so it fails the check too.
+inline int64_t shift_count(int64_t n, int64_t width) {
+    VG_CHECK(n >= 0 && n < width);
+    return n;
+}
+
 // sdiv and srem are Go's truncating division and remainder.
 // Go defines MinInt / -1 as MinInt, which wraps, and MinInt % -1 as 0.
 // C++ leaves that pair undefined even with -fwrapv.
 template <typename T>
 T sdiv(T a, T b) {
-    assert(b != 0);
+    VG_CHECK(b != 0);
     if (b == T(-1)) {
         return T(0U - typename std::make_unsigned<T>::type(a));
     }
@@ -267,7 +305,7 @@ T sdiv(T a, T b) {
 
 template <typename T>
 T srem(T a, T b) {
-    assert(b != 0);
+    VG_CHECK(b != 0);
     if (b == T(-1)) {
         return 0;
     }
@@ -302,7 +340,7 @@ inline Str str_from_bytes(Arena& mem, Slice<uint8_t> b) {
 
 template <typename T, size_t N>
 Slice<T> arr_slice(std::array<T, N>& a, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= int64_t(N));
+    VG_CHECK(0 <= lo && lo <= hi && hi <= int64_t(N));
     if (N == 0) {
         // std::array<T, 0>::data() may be null, but a Go slice of a zero-length array is non-nil.
         // The pointer therefore addresses the array object itself, which has real storage.

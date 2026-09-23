@@ -171,6 +171,8 @@ rv_locale_open(const char *name, const char *collation_type, rv_locale *result)
     const char *modifier;
     int locale_index;
     int type_id;
+    /* Built locally, so a failed open leaves *result untouched. */
+    rv_locale opened;
 
     if (result == NULL || !rv_normalize_name(name, normalized)) return false;
     modifier = rv_embedded_modifier(name);
@@ -187,10 +189,11 @@ rv_locale_open(const char *name, const char *collation_type, rv_locale *result)
         if (normalized_type[0] != '\0' && strcmp(normalized_type, "standard") != 0) {
             return false;
         }
-        result->locale_index = RV_POSIX_LOCALE_INDEX;
-        result->collation_profile = RV_POSIX_COLLATION_PROFILE;
-        result->case_profile = 0;
-        result->is_posix = 1;
+        opened.locale_index = RV_POSIX_LOCALE_INDEX;
+        opened.collation_profile = RV_POSIX_COLLATION_PROFILE;
+        opened.case_profile = 0;
+        opened.is_posix = 1;
+        *result = opened;
         return true;
     }
 
@@ -198,11 +201,12 @@ rv_locale_open(const char *name, const char *collation_type, rv_locale *result)
             rv_locale_name_offsets, rv_locales_count);
     if (locale_index < 0) return false;
 
-    result->locale_index = (uint16_t) locale_index;
-    result->case_profile = rv_locales[locale_index].case_profile;
-    result->is_posix = 0;
+    opened.locale_index = (uint16_t) locale_index;
+    opened.case_profile = rv_locales[locale_index].case_profile;
+    opened.is_posix = 0;
     if (normalized_type[0] == '\0') {
-        result->collation_profile = rv_locales[locale_index].default_collation;
+        opened.collation_profile = rv_locales[locale_index].default_collation;
+        *result = opened;
         return true;
     }
 
@@ -217,7 +221,8 @@ rv_locale_open(const char *name, const char *collation_type, rv_locale *result)
             uint32_t middle = low + (high - low) / 2;
             const rv_type_row *row = &rv_locale_types[middle];
             if (row->type_id == (uint16_t) type_id) {
-                result->collation_profile = row->collation_profile;
+                opened.collation_profile = row->collation_profile;
+                *result = opened;
                 return true;
             }
             if (row->type_id > (uint16_t) type_id) high = middle;

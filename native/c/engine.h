@@ -112,6 +112,7 @@
 #define revera_eng_opGroup ((uint8_t)(8))
 #define revera_eng_infinite ((int64_t)(((int64_t)(0ULL - (uint64_t)(1LL)))))
 #define revera_eng_lenInf ((int64_t)(1073741824LL))
+#define revera_eng_maxNesting ((int64_t)(256LL))
 #define revera_eng_invalidRune ((int32_t)(((int32_t)(0ULL - (uint64_t)(1)))))
 
 typedef struct revera_eng_runeRange revera_eng_runeRange;
@@ -445,8 +446,8 @@ struct revera_eng_Locale {
 struct revera_eng_LocaleRow {
     int64_t TypeFirst;
     int64_t TypeCount;
-    uint8_t CaseProfile;
-    uint16_t DefaultCollation;
+    uint32_t CaseProfile;
+    uint32_t DefaultCollation;
 };
 
 struct revera_eng_localeRequest {
@@ -595,6 +596,7 @@ struct revera_eng_parser {
     int64_t pos;
     uint32_t flags;
     int64_t groups;
+    int64_t depth;
     revera_eng_slice_node nodes;
     revera_eng_slice_bracketSet brackets;
     revera_eng_Error err;
@@ -897,8 +899,8 @@ static inline bool revera_eng_arr_i32_1_eq(revera_eng_arr_i32_1 a, revera_eng_ar
 }
 
 static inline revera_eng_slice_runeRange revera_eng_slice_runeRange_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_runeRange *p = (revera_eng_runeRange *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_runeRange));
+    vg_check(0 <= n && n <= c);
+    revera_eng_runeRange *p = (revera_eng_runeRange *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_runeRange)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_runeRange));
     return (revera_eng_slice_runeRange){p, n, c};
 }
@@ -912,7 +914,7 @@ static inline revera_eng_slice_runeRange revera_eng_slice_runeRange_grow(vg_aren
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_runeRange *p = (revera_eng_runeRange *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_runeRange));
+    revera_eng_runeRange *p = (revera_eng_runeRange *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_runeRange)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_runeRange));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_runeRange));
@@ -941,7 +943,7 @@ static inline revera_eng_slice_runeRange revera_eng_slice_runeRange_append_slice
 }
 
 static inline revera_eng_slice_runeRange revera_eng_slice_runeRange_sub(revera_eng_slice_runeRange s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_runeRange){0};
     }
@@ -957,7 +959,7 @@ static inline revera_eng_slice_runeRange revera_eng_slice_runeRange_head(revera_
 }
 
 static inline revera_eng_runeRange *revera_eng_slice_runeRange_at(revera_eng_slice_runeRange s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -978,8 +980,8 @@ static inline revera_eng_slice_runeRange revera_eng_slice_runeRange_of(vg_arena 
 }
 
 static inline revera_eng_slice_i32 revera_eng_slice_i32_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    int32_t *p = (int32_t *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(int32_t));
+    vg_check(0 <= n && n <= c);
+    int32_t *p = (int32_t *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(int32_t)));
     memset(p, 0, (size_t)c * sizeof(int32_t));
     return (revera_eng_slice_i32){p, n, c};
 }
@@ -993,7 +995,7 @@ static inline revera_eng_slice_i32 revera_eng_slice_i32_grow(vg_arena *mem, reve
     if (newcap < need) {
         newcap = need;
     }
-    int32_t *p = (int32_t *)vg_arena_alloc(mem, (size_t)newcap * sizeof(int32_t));
+    int32_t *p = (int32_t *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(int32_t)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(int32_t));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(int32_t));
@@ -1022,7 +1024,7 @@ static inline revera_eng_slice_i32 revera_eng_slice_i32_append_slice(vg_arena *m
 }
 
 static inline revera_eng_slice_i32 revera_eng_slice_i32_sub(revera_eng_slice_i32 s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_i32){0};
     }
@@ -1038,7 +1040,7 @@ static inline revera_eng_slice_i32 revera_eng_slice_i32_head(revera_eng_slice_i3
 }
 
 static inline int32_t *revera_eng_slice_i32_at(revera_eng_slice_i32 s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1059,8 +1061,8 @@ static inline revera_eng_slice_i32 revera_eng_slice_i32_of(vg_arena *mem, const 
 }
 
 static inline revera_eng_slice_slice_i32 revera_eng_slice_slice_i32_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_slice_i32 *p = (revera_eng_slice_i32 *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_slice_i32));
+    vg_check(0 <= n && n <= c);
+    revera_eng_slice_i32 *p = (revera_eng_slice_i32 *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_slice_i32)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_slice_i32));
     return (revera_eng_slice_slice_i32){p, n, c};
 }
@@ -1074,7 +1076,7 @@ static inline revera_eng_slice_slice_i32 revera_eng_slice_slice_i32_grow(vg_aren
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_slice_i32 *p = (revera_eng_slice_i32 *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_slice_i32));
+    revera_eng_slice_i32 *p = (revera_eng_slice_i32 *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_slice_i32)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_slice_i32));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_slice_i32));
@@ -1103,7 +1105,7 @@ static inline revera_eng_slice_slice_i32 revera_eng_slice_slice_i32_append_slice
 }
 
 static inline revera_eng_slice_slice_i32 revera_eng_slice_slice_i32_sub(revera_eng_slice_slice_i32 s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_slice_i32){0};
     }
@@ -1119,7 +1121,7 @@ static inline revera_eng_slice_slice_i32 revera_eng_slice_slice_i32_head(revera_
 }
 
 static inline revera_eng_slice_i32 *revera_eng_slice_slice_i32_at(revera_eng_slice_slice_i32 s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1140,8 +1142,8 @@ static inline revera_eng_slice_slice_i32 revera_eng_slice_slice_i32_of(vg_arena 
 }
 
 static inline revera_eng_slice_i64 revera_eng_slice_i64_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    int64_t *p = (int64_t *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(int64_t));
+    vg_check(0 <= n && n <= c);
+    int64_t *p = (int64_t *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(int64_t)));
     memset(p, 0, (size_t)c * sizeof(int64_t));
     return (revera_eng_slice_i64){p, n, c};
 }
@@ -1155,7 +1157,7 @@ static inline revera_eng_slice_i64 revera_eng_slice_i64_grow(vg_arena *mem, reve
     if (newcap < need) {
         newcap = need;
     }
-    int64_t *p = (int64_t *)vg_arena_alloc(mem, (size_t)newcap * sizeof(int64_t));
+    int64_t *p = (int64_t *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(int64_t)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(int64_t));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(int64_t));
@@ -1184,7 +1186,7 @@ static inline revera_eng_slice_i64 revera_eng_slice_i64_append_slice(vg_arena *m
 }
 
 static inline revera_eng_slice_i64 revera_eng_slice_i64_sub(revera_eng_slice_i64 s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_i64){0};
     }
@@ -1200,7 +1202,7 @@ static inline revera_eng_slice_i64 revera_eng_slice_i64_head(revera_eng_slice_i6
 }
 
 static inline int64_t *revera_eng_slice_i64_at(revera_eng_slice_i64 s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1221,8 +1223,8 @@ static inline revera_eng_slice_i64 revera_eng_slice_i64_of(vg_arena *mem, const 
 }
 
 static inline revera_eng_slice_ptree revera_eng_slice_ptree_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_ptree *p = (revera_eng_ptree *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_ptree));
+    vg_check(0 <= n && n <= c);
+    revera_eng_ptree *p = (revera_eng_ptree *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_ptree)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_ptree));
     return (revera_eng_slice_ptree){p, n, c};
 }
@@ -1236,7 +1238,7 @@ static inline revera_eng_slice_ptree revera_eng_slice_ptree_grow(vg_arena *mem, 
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_ptree *p = (revera_eng_ptree *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_ptree));
+    revera_eng_ptree *p = (revera_eng_ptree *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_ptree)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_ptree));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_ptree));
@@ -1265,7 +1267,7 @@ static inline revera_eng_slice_ptree revera_eng_slice_ptree_append_slice(vg_aren
 }
 
 static inline revera_eng_slice_ptree revera_eng_slice_ptree_sub(revera_eng_slice_ptree s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_ptree){0};
     }
@@ -1281,7 +1283,7 @@ static inline revera_eng_slice_ptree revera_eng_slice_ptree_head(revera_eng_slic
 }
 
 static inline revera_eng_ptree *revera_eng_slice_ptree_at(revera_eng_slice_ptree s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1302,8 +1304,8 @@ static inline revera_eng_slice_ptree revera_eng_slice_ptree_of(vg_arena *mem, co
 }
 
 static inline revera_eng_slice_u32 revera_eng_slice_u32_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    uint32_t *p = (uint32_t *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(uint32_t));
+    vg_check(0 <= n && n <= c);
+    uint32_t *p = (uint32_t *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(uint32_t)));
     memset(p, 0, (size_t)c * sizeof(uint32_t));
     return (revera_eng_slice_u32){p, n, c};
 }
@@ -1317,7 +1319,7 @@ static inline revera_eng_slice_u32 revera_eng_slice_u32_grow(vg_arena *mem, reve
     if (newcap < need) {
         newcap = need;
     }
-    uint32_t *p = (uint32_t *)vg_arena_alloc(mem, (size_t)newcap * sizeof(uint32_t));
+    uint32_t *p = (uint32_t *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(uint32_t)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(uint32_t));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(uint32_t));
@@ -1346,7 +1348,7 @@ static inline revera_eng_slice_u32 revera_eng_slice_u32_append_slice(vg_arena *m
 }
 
 static inline revera_eng_slice_u32 revera_eng_slice_u32_sub(revera_eng_slice_u32 s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_u32){0};
     }
@@ -1362,7 +1364,7 @@ static inline revera_eng_slice_u32 revera_eng_slice_u32_head(revera_eng_slice_u3
 }
 
 static inline uint32_t *revera_eng_slice_u32_at(revera_eng_slice_u32 s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1383,8 +1385,8 @@ static inline revera_eng_slice_u32 revera_eng_slice_u32_of(vg_arena *mem, const 
 }
 
 static inline revera_eng_slice_slotTable revera_eng_slice_slotTable_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_slotTable *p = (revera_eng_slotTable *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_slotTable));
+    vg_check(0 <= n && n <= c);
+    revera_eng_slotTable *p = (revera_eng_slotTable *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_slotTable)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_slotTable));
     return (revera_eng_slice_slotTable){p, n, c};
 }
@@ -1398,7 +1400,7 @@ static inline revera_eng_slice_slotTable revera_eng_slice_slotTable_grow(vg_aren
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_slotTable *p = (revera_eng_slotTable *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_slotTable));
+    revera_eng_slotTable *p = (revera_eng_slotTable *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_slotTable)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_slotTable));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_slotTable));
@@ -1427,7 +1429,7 @@ static inline revera_eng_slice_slotTable revera_eng_slice_slotTable_append_slice
 }
 
 static inline revera_eng_slice_slotTable revera_eng_slice_slotTable_sub(revera_eng_slice_slotTable s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_slotTable){0};
     }
@@ -1443,7 +1445,7 @@ static inline revera_eng_slice_slotTable revera_eng_slice_slotTable_head(revera_
 }
 
 static inline revera_eng_slotTable *revera_eng_slice_slotTable_at(revera_eng_slice_slotTable s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1464,8 +1466,8 @@ static inline revera_eng_slice_slotTable revera_eng_slice_slotTable_of(vg_arena 
 }
 
 static inline revera_eng_slice_u8 revera_eng_slice_u8_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    uint8_t *p = (uint8_t *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(uint8_t));
+    vg_check(0 <= n && n <= c);
+    uint8_t *p = (uint8_t *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(uint8_t)));
     memset(p, 0, (size_t)c * sizeof(uint8_t));
     return (revera_eng_slice_u8){p, n, c};
 }
@@ -1479,7 +1481,7 @@ static inline revera_eng_slice_u8 revera_eng_slice_u8_grow(vg_arena *mem, revera
     if (newcap < need) {
         newcap = need;
     }
-    uint8_t *p = (uint8_t *)vg_arena_alloc(mem, (size_t)newcap * sizeof(uint8_t));
+    uint8_t *p = (uint8_t *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(uint8_t)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(uint8_t));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(uint8_t));
@@ -1508,7 +1510,7 @@ static inline revera_eng_slice_u8 revera_eng_slice_u8_append_slice(vg_arena *mem
 }
 
 static inline revera_eng_slice_u8 revera_eng_slice_u8_sub(revera_eng_slice_u8 s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_u8){0};
     }
@@ -1524,7 +1526,7 @@ static inline revera_eng_slice_u8 revera_eng_slice_u8_head(revera_eng_slice_u8 s
 }
 
 static inline uint8_t *revera_eng_slice_u8_at(revera_eng_slice_u8 s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1580,8 +1582,8 @@ static inline int64_t revera_eng_slice_u8_copy_str(revera_eng_slice_u8 dst, vg_s
 }
 
 static inline revera_eng_slice_memoKey revera_eng_slice_memoKey_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_memoKey *p = (revera_eng_memoKey *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_memoKey));
+    vg_check(0 <= n && n <= c);
+    revera_eng_memoKey *p = (revera_eng_memoKey *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_memoKey)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_memoKey));
     return (revera_eng_slice_memoKey){p, n, c};
 }
@@ -1595,7 +1597,7 @@ static inline revera_eng_slice_memoKey revera_eng_slice_memoKey_grow(vg_arena *m
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_memoKey *p = (revera_eng_memoKey *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_memoKey));
+    revera_eng_memoKey *p = (revera_eng_memoKey *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_memoKey)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_memoKey));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_memoKey));
@@ -1624,7 +1626,7 @@ static inline revera_eng_slice_memoKey revera_eng_slice_memoKey_append_slice(vg_
 }
 
 static inline revera_eng_slice_memoKey revera_eng_slice_memoKey_sub(revera_eng_slice_memoKey s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_memoKey){0};
     }
@@ -1640,7 +1642,7 @@ static inline revera_eng_slice_memoKey revera_eng_slice_memoKey_head(revera_eng_
 }
 
 static inline revera_eng_memoKey *revera_eng_slice_memoKey_at(revera_eng_slice_memoKey s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1661,8 +1663,8 @@ static inline revera_eng_slice_memoKey revera_eng_slice_memoKey_of(vg_arena *mem
 }
 
 static inline revera_eng_slice_memoVal revera_eng_slice_memoVal_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_memoVal *p = (revera_eng_memoVal *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_memoVal));
+    vg_check(0 <= n && n <= c);
+    revera_eng_memoVal *p = (revera_eng_memoVal *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_memoVal)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_memoVal));
     return (revera_eng_slice_memoVal){p, n, c};
 }
@@ -1676,7 +1678,7 @@ static inline revera_eng_slice_memoVal revera_eng_slice_memoVal_grow(vg_arena *m
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_memoVal *p = (revera_eng_memoVal *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_memoVal));
+    revera_eng_memoVal *p = (revera_eng_memoVal *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_memoVal)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_memoVal));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_memoVal));
@@ -1705,7 +1707,7 @@ static inline revera_eng_slice_memoVal revera_eng_slice_memoVal_append_slice(vg_
 }
 
 static inline revera_eng_slice_memoVal revera_eng_slice_memoVal_sub(revera_eng_slice_memoVal s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_memoVal){0};
     }
@@ -1721,7 +1723,7 @@ static inline revera_eng_slice_memoVal revera_eng_slice_memoVal_head(revera_eng_
 }
 
 static inline revera_eng_memoVal *revera_eng_slice_memoVal_at(revera_eng_slice_memoVal s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1742,8 +1744,8 @@ static inline revera_eng_slice_memoVal revera_eng_slice_memoVal_of(vg_arena *mem
 }
 
 static inline revera_eng_slice_instr revera_eng_slice_instr_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_instr *p = (revera_eng_instr *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_instr));
+    vg_check(0 <= n && n <= c);
+    revera_eng_instr *p = (revera_eng_instr *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_instr)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_instr));
     return (revera_eng_slice_instr){p, n, c};
 }
@@ -1757,7 +1759,7 @@ static inline revera_eng_slice_instr revera_eng_slice_instr_grow(vg_arena *mem, 
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_instr *p = (revera_eng_instr *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_instr));
+    revera_eng_instr *p = (revera_eng_instr *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_instr)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_instr));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_instr));
@@ -1786,7 +1788,7 @@ static inline revera_eng_slice_instr revera_eng_slice_instr_append_slice(vg_aren
 }
 
 static inline revera_eng_slice_instr revera_eng_slice_instr_sub(revera_eng_slice_instr s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_instr){0};
     }
@@ -1802,7 +1804,7 @@ static inline revera_eng_slice_instr revera_eng_slice_instr_head(revera_eng_slic
 }
 
 static inline revera_eng_instr *revera_eng_slice_instr_at(revera_eng_slice_instr s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1823,8 +1825,8 @@ static inline revera_eng_slice_instr revera_eng_slice_instr_of(vg_arena *mem, co
 }
 
 static inline revera_eng_slice_patchSlot revera_eng_slice_patchSlot_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_patchSlot *p = (revera_eng_patchSlot *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_patchSlot));
+    vg_check(0 <= n && n <= c);
+    revera_eng_patchSlot *p = (revera_eng_patchSlot *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_patchSlot)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_patchSlot));
     return (revera_eng_slice_patchSlot){p, n, c};
 }
@@ -1838,7 +1840,7 @@ static inline revera_eng_slice_patchSlot revera_eng_slice_patchSlot_grow(vg_aren
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_patchSlot *p = (revera_eng_patchSlot *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_patchSlot));
+    revera_eng_patchSlot *p = (revera_eng_patchSlot *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_patchSlot)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_patchSlot));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_patchSlot));
@@ -1867,7 +1869,7 @@ static inline revera_eng_slice_patchSlot revera_eng_slice_patchSlot_append_slice
 }
 
 static inline revera_eng_slice_patchSlot revera_eng_slice_patchSlot_sub(revera_eng_slice_patchSlot s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_patchSlot){0};
     }
@@ -1883,7 +1885,7 @@ static inline revera_eng_slice_patchSlot revera_eng_slice_patchSlot_head(revera_
 }
 
 static inline revera_eng_patchSlot *revera_eng_slice_patchSlot_at(revera_eng_slice_patchSlot s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1904,8 +1906,8 @@ static inline revera_eng_slice_patchSlot revera_eng_slice_patchSlot_of(vg_arena 
 }
 
 static inline revera_eng_slice_node revera_eng_slice_node_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_node *p = (revera_eng_node *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_node));
+    vg_check(0 <= n && n <= c);
+    revera_eng_node *p = (revera_eng_node *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_node)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_node));
     return (revera_eng_slice_node){p, n, c};
 }
@@ -1919,7 +1921,7 @@ static inline revera_eng_slice_node revera_eng_slice_node_grow(vg_arena *mem, re
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_node *p = (revera_eng_node *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_node));
+    revera_eng_node *p = (revera_eng_node *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_node)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_node));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_node));
@@ -1948,7 +1950,7 @@ static inline revera_eng_slice_node revera_eng_slice_node_append_slice(vg_arena 
 }
 
 static inline revera_eng_slice_node revera_eng_slice_node_sub(revera_eng_slice_node s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_node){0};
     }
@@ -1964,7 +1966,7 @@ static inline revera_eng_slice_node revera_eng_slice_node_head(revera_eng_slice_
 }
 
 static inline revera_eng_node *revera_eng_slice_node_at(revera_eng_slice_node s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -1985,8 +1987,8 @@ static inline revera_eng_slice_node revera_eng_slice_node_of(vg_arena *mem, cons
 }
 
 static inline revera_eng_slice_bracketSet revera_eng_slice_bracketSet_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_bracketSet *p = (revera_eng_bracketSet *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_bracketSet));
+    vg_check(0 <= n && n <= c);
+    revera_eng_bracketSet *p = (revera_eng_bracketSet *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_bracketSet)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_bracketSet));
     return (revera_eng_slice_bracketSet){p, n, c};
 }
@@ -2000,7 +2002,7 @@ static inline revera_eng_slice_bracketSet revera_eng_slice_bracketSet_grow(vg_ar
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_bracketSet *p = (revera_eng_bracketSet *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_bracketSet));
+    revera_eng_bracketSet *p = (revera_eng_bracketSet *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_bracketSet)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_bracketSet));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_bracketSet));
@@ -2029,7 +2031,7 @@ static inline revera_eng_slice_bracketSet revera_eng_slice_bracketSet_append_sli
 }
 
 static inline revera_eng_slice_bracketSet revera_eng_slice_bracketSet_sub(revera_eng_slice_bracketSet s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_bracketSet){0};
     }
@@ -2045,7 +2047,7 @@ static inline revera_eng_slice_bracketSet revera_eng_slice_bracketSet_head(rever
 }
 
 static inline revera_eng_bracketSet *revera_eng_slice_bracketSet_at(revera_eng_slice_bracketSet s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -2066,8 +2068,8 @@ static inline revera_eng_slice_bracketSet revera_eng_slice_bracketSet_of(vg_aren
 }
 
 static inline revera_eng_slice_Match revera_eng_slice_Match_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_Match *p = (revera_eng_Match *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_Match));
+    vg_check(0 <= n && n <= c);
+    revera_eng_Match *p = (revera_eng_Match *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_Match)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_Match));
     return (revera_eng_slice_Match){p, n, c};
 }
@@ -2081,7 +2083,7 @@ static inline revera_eng_slice_Match revera_eng_slice_Match_grow(vg_arena *mem, 
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_Match *p = (revera_eng_Match *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_Match));
+    revera_eng_Match *p = (revera_eng_Match *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_Match)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_Match));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_Match));
@@ -2110,7 +2112,7 @@ static inline revera_eng_slice_Match revera_eng_slice_Match_append_slice(vg_aren
 }
 
 static inline revera_eng_slice_Match revera_eng_slice_Match_sub(revera_eng_slice_Match s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_Match){0};
     }
@@ -2126,7 +2128,7 @@ static inline revera_eng_slice_Match revera_eng_slice_Match_head(revera_eng_slic
 }
 
 static inline revera_eng_Match *revera_eng_slice_Match_at(revera_eng_slice_Match s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -2147,8 +2149,8 @@ static inline revera_eng_slice_Match revera_eng_slice_Match_of(vg_arena *mem, co
 }
 
 static inline revera_eng_slice_bool revera_eng_slice_bool_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    bool *p = (bool *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(bool));
+    vg_check(0 <= n && n <= c);
+    bool *p = (bool *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(bool)));
     memset(p, 0, (size_t)c * sizeof(bool));
     return (revera_eng_slice_bool){p, n, c};
 }
@@ -2162,7 +2164,7 @@ static inline revera_eng_slice_bool revera_eng_slice_bool_grow(vg_arena *mem, re
     if (newcap < need) {
         newcap = need;
     }
-    bool *p = (bool *)vg_arena_alloc(mem, (size_t)newcap * sizeof(bool));
+    bool *p = (bool *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(bool)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(bool));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(bool));
@@ -2191,7 +2193,7 @@ static inline revera_eng_slice_bool revera_eng_slice_bool_append_slice(vg_arena 
 }
 
 static inline revera_eng_slice_bool revera_eng_slice_bool_sub(revera_eng_slice_bool s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_bool){0};
     }
@@ -2207,7 +2209,7 @@ static inline revera_eng_slice_bool revera_eng_slice_bool_head(revera_eng_slice_
 }
 
 static inline bool *revera_eng_slice_bool_at(revera_eng_slice_bool s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -2228,8 +2230,8 @@ static inline revera_eng_slice_bool revera_eng_slice_bool_of(vg_arena *mem, cons
 }
 
 static inline revera_eng_slice_replPart revera_eng_slice_replPart_make_cap(vg_arena *mem, int64_t n, int64_t c) {
-    assert(0 <= n && n <= c);
-    revera_eng_replPart *p = (revera_eng_replPart *)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(revera_eng_replPart));
+    vg_check(0 <= n && n <= c);
+    revera_eng_replPart *p = (revera_eng_replPart *)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(revera_eng_replPart)));
     memset(p, 0, (size_t)c * sizeof(revera_eng_replPart));
     return (revera_eng_slice_replPart){p, n, c};
 }
@@ -2243,7 +2245,7 @@ static inline revera_eng_slice_replPart revera_eng_slice_replPart_grow(vg_arena 
     if (newcap < need) {
         newcap = need;
     }
-    revera_eng_replPart *p = (revera_eng_replPart *)vg_arena_alloc(mem, (size_t)newcap * sizeof(revera_eng_replPart));
+    revera_eng_replPart *p = (revera_eng_replPart *)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(revera_eng_replPart)));
     memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(revera_eng_replPart));
     if (s.p != NULL && s.len > 0) {
         memcpy(p, s.p, (size_t)s.len * sizeof(revera_eng_replPart));
@@ -2272,7 +2274,7 @@ static inline revera_eng_slice_replPart revera_eng_slice_replPart_append_slice(v
 }
 
 static inline revera_eng_slice_replPart revera_eng_slice_replPart_sub(revera_eng_slice_replPart s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.cap);
+    vg_check(0 <= lo && lo <= hi && hi <= s.cap);
     if (s.p == NULL) {
         return (revera_eng_slice_replPart){0};
     }
@@ -2288,7 +2290,7 @@ static inline revera_eng_slice_replPart revera_eng_slice_replPart_head(revera_en
 }
 
 static inline revera_eng_replPart *revera_eng_slice_replPart_at(revera_eng_slice_replPart s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return &s.p[i];
 }
 
@@ -2309,22 +2311,22 @@ static inline revera_eng_slice_replPart revera_eng_slice_replPart_of(vg_arena *m
 }
 
 static inline revera_eng_slice_i32 revera_eng_arr_i32_8_slice(revera_eng_arr_i32_8 *a, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= 8);
+    vg_check(0 <= lo && lo <= hi && hi <= 8);
     return (revera_eng_slice_i32){a->v + lo, hi - lo, 8 - lo};
 }
 
 static inline revera_eng_slice_i32 revera_eng_arr_i32_16_slice(revera_eng_arr_i32_16 *a, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= 16);
+    vg_check(0 <= lo && lo <= hi && hi <= 16);
     return (revera_eng_slice_i32){a->v + lo, hi - lo, 16 - lo};
 }
 
 static inline revera_eng_slice_bool revera_eng_arr_bool_256_slice(revera_eng_arr_bool_256 *a, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= 256);
+    vg_check(0 <= lo && lo <= hi && hi <= 256);
     return (revera_eng_slice_bool){a->v + lo, hi - lo, 256 - lo};
 }
 
 static inline revera_eng_slice_i32 revera_eng_arr_i32_1_slice(revera_eng_arr_i32_1 *a, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= 1);
+    vg_check(0 <= lo && lo <= hi && hi <= 1);
     return (revera_eng_slice_i32){a->v + lo, hi - lo, 1 - lo};
 }
 
@@ -2366,10 +2368,12 @@ int64_t revera_eng_ContractStackBytes(revera_eng_Contract *c);
 int64_t revera_eng_ContractSteps(revera_eng_Contract *c);
 revera_eng_Contract revera_eng_ContractFor(revera_eng_Regexp *re, int64_t maxInput);
 revera_eng_BackendContract revera_eng_matcherContract(revera_eng_Regexp *re, int64_t length, int64_t atom);
+int64_t revera_eng_runeCountSteps(int64_t length);
 int64_t revera_eng_captureHeap(revera_eng_Regexp *re, int64_t length);
-revera_eng_BackendContract revera_eng_onePassContract(revera_eng_Regexp *re, int64_t length, int64_t atom);
+revera_eng_BackendContract revera_eng_onePassContract(revera_eng_Regexp *re, int64_t length);
+int64_t revera_eng_onePassVisitCost(revera_eng_Regexp *re, revera_eng_lookupCosts *lc, int32_t ni);
+revera_eng_Tup_i64_i64 revera_eng_onePassWalk(revera_eng_Regexp *re, revera_eng_lookupCosts *lc, int32_t ni, bool repeated);
 revera_eng_BackendContract revera_eng_solverContract(revera_eng_Regexp *re, int64_t length, int64_t atom);
-int64_t revera_eng_astSize(revera_eng_slice_node nodes, int32_t ni);
 int64_t revera_eng_astHeight(revera_eng_slice_node nodes, int32_t ni);
 int64_t revera_eng_atomCost(revera_eng_Regexp *re);
 int64_t revera_eng_atomCostNode(revera_eng_slice_node nodes, revera_eng_slice_bracketSet brs, revera_eng_lookupCosts *lc, int32_t ni);

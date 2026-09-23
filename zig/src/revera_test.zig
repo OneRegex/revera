@@ -96,6 +96,36 @@ test "iterators walk every match" {
     try testing.expectEqual(2, count);
 }
 
+test "a capture iterator retried after OutOfMemory still reports every match" {
+    // Each round makes a later allocation fail once, then lets the retry through.
+    var skip: usize = 0;
+    while (true) : (skip += 1) {
+        var failing = testing.FailingAllocator.init(gpa, .{});
+        var re = try revera.Regex.compile(failing.allocator(), "(a)[0-9]", .{});
+        defer re.deinit();
+        var it = try re.captureMatches("a1a2a3");
+        failing.fail_index = failing.alloc_index + skip;
+        var starts: [3]usize = undefined;
+        var n: usize = 0;
+        while (true) {
+            const next = it.next() catch |err| {
+                try testing.expectEqual(error.OutOfMemory, err);
+                failing.fail_index = std.math.maxInt(usize);
+                continue;
+            };
+            var caps = next orelse break;
+            defer caps.deinit();
+            try testing.expect(n < starts.len);
+            starts[n] = caps.get(0).?.start;
+            n += 1;
+        }
+        try testing.expectEqualSlices(usize, &.{ 0, 2, 4 }, starts[0..n]);
+        if (!failing.has_induced_failure) {
+            break;
+        }
+    }
+}
+
 test "replacement" {
     var re = try revera.Regex.compile(gpa, "(a+)(b*)", .{});
     defer re.deinit();
@@ -175,7 +205,7 @@ test "contract grows with the input bound" {
     try testing.expect(one_pass.solver == null);
     try testing.expectEqual(37_757, one_pass.heap_bytes);
     try testing.expectEqual(6_144, one_pass.stack_bytes);
-    try testing.expectEqual(937_980, one_pass.steps);
+    try testing.expectEqual(925_986, one_pass.steps);
 }
 
 test "one expression serves several threads" {

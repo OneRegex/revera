@@ -248,6 +248,15 @@ pub fn array_index(i: i64, len: usize) -> usize {
     i as usize
 }
 
+// shift_count panics unless 0 <= n < width, where width is the size of the shifted operand in bits.
+// Go panics on a negative count and Vego aborts on one past the width, but a release build without overflow checks would silently mask the count.
+// The count keeps its type, so an in-range shift works exactly as before.
+#[inline(always)]
+pub fn shift_count<T: Copy + PartialOrd + From<u8>>(n: T, width: u8) -> T {
+    assert!(n >= T::from(0u8) && n < T::from(width), "shift count out of range");
+    n
+}
+
 pub fn make<T>(mem: &Arena, n: i64) -> Slice<T> {
     make_cap(mem, n, n)
 }
@@ -421,5 +430,17 @@ mod tests {
         assert_eq!(array_index(3, 4), 3);
         assert!(std::panic::catch_unwind(|| array_index(-1, 4)).is_err());
         assert!(std::panic::catch_unwind(|| array_index(4, 4)).is_err());
+    }
+
+    #[test]
+    fn shift_count_rejects_a_count_outside_the_width() {
+        assert_eq!(shift_count(0i64, 64), 0);
+        assert_eq!(shift_count(63i64, 64), 63);
+        assert_eq!(shift_count(31i32, 32), 31);
+        assert_eq!(shift_count(7u8, 8), 7);
+        assert!(std::panic::catch_unwind(|| shift_count(-1i64, 64)).is_err());
+        assert!(std::panic::catch_unwind(|| shift_count(i32::MIN, 32)).is_err());
+        assert!(std::panic::catch_unwind(|| shift_count(64i64, 64)).is_err());
+        assert!(std::panic::catch_unwind(|| shift_count(8u64, 8)).is_err());
     }
 }

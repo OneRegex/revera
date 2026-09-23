@@ -177,7 +177,7 @@ static void contract_grows_with_the_input_bound() {
     check(one_pass.one_pass.has_value() && !one_pass.solver.has_value(),
           "one-pass contract backend");
     check(one_pass.heap_bytes == 37757 && one_pass.stack_bytes == 6144 &&
-              one_pass.steps == 937980,
+              one_pass.steps == 925986,
           "one-pass contract figures");
 }
 

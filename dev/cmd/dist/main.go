@@ -1,19 +1,16 @@
-// Command dist stages the release assets: the Zig package archive, the native package archive,
-// the two IR files, and a manifest with the source commit, the vegoc version, the IR digest and
-// the checksum of every asset.
+// Command dist stages the release assets: the Zig package archive, the native package archive, the two IR files, and a manifest with the source commit, the vegoc version, the IR digest and the checksum of every asset.
 //
 // Usage:
 //
 //	dist [-repo path] [-commit ref] [-allow-dirty] [-unreleased] [-out dir]
 //
-// Every file comes out of the recorded commit, through git archive, so the manifest and the
-// archives cannot disagree. A dirty tracked tree is refused unless -allow-dirty is given, in which
-// case the working tree is read instead and the manifest says so.
-// A release also requires the Cargo version to match the archived packages and a dated changelog
-// section for that version; -unreleased drops both checks so a tree between releases can still be
-// staged and tested, and marks the manifest accordingly.
-// The archives carry no timestamps but the commit time, no ownership and no platform metadata,
-// so two runs on one commit produce the same bytes.
+// Every file is read from the recorded commit as a raw git blob, so the manifest and the archives always agree, and local git settings can't change them.
+// A dirty tracked tree is refused unless -allow-dirty is given, in which case the working tree is read instead and the manifest says so.
+//
+// A release also requires the Cargo version to match the archived packages, and a dated changelog section for that version.
+// -unreleased drops both checks, so a tree between releases can still be staged and tested, and marks the manifest accordingly.
+//
+// The archives carry no timestamps other than the commit time, no ownership and no platform metadata, so two runs on the same commit produce the same bytes.
 package main
 
 import (
@@ -24,7 +21,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -36,7 +37,6 @@ import (
 	"time"
 
 	"github.com/oneregex/revera/dev/internal/conformance"
-	"github.com/oneregex/revera/vego/compiler"
 )
 
 // licenseCopies are the package directories that carry their own copy of the root license files.
@@ -56,7 +56,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	commitRef := flags.String("commit", "HEAD", "the commit to build the assets from")
 	allowDirty := flags.Bool("allow-dirty", false, "read the working tree instead of the commit when tracked files are modified")
 	unreleased := flags.Bool("unreleased", false, "stage a tree that is not release-ready: skip the Cargo version and changelog checks")
-	outDir := flags.String("out", "", "output directory (default tmp/dist below the repository root)")
+	outDir := flags.String("out", "", "output directory, new or holding only earlier dist assets (default tmp/dist below the repository root)")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -97,7 +97,8 @@ type source interface {
 	list(rel string) ([]string, error)
 }
 
-// commitSource reads a commit through git archive, so nothing outside the commit can leak in.
+// commitSource holds the raw blobs of a commit, so nothing outside the commit can leak in.
+// git archive isn't used, because it applies core.autocrlf and $GIT_DIR/info/attributes.
 type commitSource struct {
 	files map[string]tarEntry
 }
@@ -108,28 +109,63 @@ type tarEntry struct {
 }
 
 func loadCommit(repo, commit string) (*commitSource, error) {
-	out, err := git(repo, "archive", "--format=tar", commit)
+	listing, err := git(repo, "ls-tree", "-r", "-z", "--full-tree", commit)
+	if err != nil {
+		return nil, err
+	}
+	type blob struct {
+		name string
+		oid  string
+		exec bool
+	}
+	var blobs []blob
+	var request bytes.Buffer
+	for _, line := range strings.Split(string(listing), "\x00") {
+		if line == "" {
+			continue
+		}
+		meta, name, ok := strings.Cut(line, "\t")
+		fields := strings.Fields(meta)
+		if !ok || len(fields) != 3 {
+			return nil, fmt.Errorf("unexpected git ls-tree entry %q", line)
+		}
+		// The archives only carry regular files, not symbolic links or submodules.
+		mode, kind, oid := fields[0], fields[1], fields[2]
+		if kind != "blob" || (mode != "100644" && mode != "100755") {
+			continue
+		}
+		blobs = append(blobs, blob{name: name, oid: oid, exec: mode == "100755"})
+		request.WriteString(oid + "\n")
+	}
+
+	out, err := gitStdin(repo, &request, "cat-file", "--batch")
 	if err != nil {
 		return nil, err
 	}
 	src := &commitSource{files: map[string]tarEntry{}}
-	tr := tar.NewReader(bytes.NewReader(out))
-	for {
-		hdr, err := tr.Next()
-		if errors.Is(err, io.EOF) {
-			break
+	reader := bytes.NewReader(out)
+	for _, b := range blobs {
+		// Each object comes back as "<oid> blob <size>\n<content>\n".
+		var oid, kind string
+		var size int
+		if _, err := fmt.Fscanf(reader, "%s %s %d\n", &oid, &kind, &size); err != nil {
+			return nil, fmt.Errorf("read %s from git cat-file: %w", b.name, err)
 		}
-		if err != nil {
-			return nil, fmt.Errorf("read git archive: %w", err)
+		if oid != b.oid || kind != "blob" || size < 0 {
+			return nil, fmt.Errorf("read %s from git cat-file: got %s %s", b.name, oid, kind)
 		}
-		if hdr.Typeflag != tar.TypeReg {
-			continue
+		pos := len(out) - reader.Len()
+		if size > reader.Len() {
+			return nil, fmt.Errorf("read %s from git cat-file: %w", b.name, io.ErrUnexpectedEOF)
 		}
-		data, err := io.ReadAll(tr)
-		if err != nil {
-			return nil, fmt.Errorf("read %s from git archive: %w", hdr.Name, err)
+		data := out[pos : pos+size : pos+size]
+		if _, err := reader.Seek(int64(size), io.SeekCurrent); err != nil {
+			return nil, err
 		}
-		src.files[hdr.Name] = tarEntry{data: data, exec: hdr.Mode&0o111 != 0}
+		if c, err := reader.ReadByte(); err != nil || c != '\n' {
+			return nil, fmt.Errorf("read %s from git cat-file: missing object terminator", b.name)
+		}
+		src.files[b.name] = tarEntry{data: data, exec: b.exec}
 	}
 	return src, nil
 }
@@ -159,7 +195,7 @@ func (s *commitSource) list(rel string) ([]string, error) {
 	return out, nil
 }
 
-// treeSource reads the working tree; only the tracked files count, like git archive.
+// treeSource reads the working tree, but only the tracked files, as in a commit.
 type treeSource struct {
 	repo    string
 	tracked map[string]bool
@@ -213,8 +249,13 @@ func (s *treeSource) list(rel string) ([]string, error) {
 }
 
 func git(repo string, args ...string) ([]byte, error) {
+	return gitStdin(repo, nil, args...)
+}
+
+func gitStdin(repo string, stdin io.Reader, args ...string) ([]byte, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = repo
+	cmd.Stdin = stdin
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -264,6 +305,10 @@ func stage(repo, commitRef string, allowDirty, unreleased bool, outDir string) (
 	if err != nil {
 		return "", err
 	}
+	vegocVersion, err := toolchainVersion(src)
+	if err != nil {
+		return "", err
+	}
 	if err := checkLicenses(src); err != nil {
 		return "", err
 	}
@@ -273,10 +318,7 @@ func stage(repo, commitRef string, allowDirty, unreleased bool, outDir string) (
 		}
 	}
 
-	if err := os.RemoveAll(outDir); err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	if err := clearStaging(outDir); err != nil {
 		return "", err
 	}
 	type asset struct {
@@ -329,7 +371,7 @@ func stage(repo, commitRef string, allowDirty, unreleased bool, outDir string) (
 	}
 	fmt.Fprintf(&manifest, "revera %s\n", versionLine)
 	fmt.Fprintf(&manifest, "commit %s\n", commitLine)
-	fmt.Fprintf(&manifest, "vegoc %s\n", compiler.Version)
+	fmt.Fprintf(&manifest, "vegoc %s\n", vegocVersion)
 	fmt.Fprintf(&manifest, "ir-digest sha256:%x\n", sha256.Sum256(reveraIR))
 	for _, a := range assets {
 		if err := os.WriteFile(filepath.Join(outDir, a.name), a.data, 0o644); err != nil {
@@ -350,6 +392,7 @@ var (
 	cmakeVersionPattern = regexp.MustCompile(`(?s)project\(\s*revera\s.*?VERSION\s+([0-9][^\s)]*)`)
 	zigPathsPattern     = regexp.MustCompile(`(?s)\.paths\s*=\s*\.\{(.*?)\}`)
 	zigPathPattern      = regexp.MustCompile(`"([^"]*)"`)
+	stagedNamePattern   = regexp.MustCompile(`^(revera-(zig|native)-.+\.tar\.gz|revera-.+\.manifest|revera\.vego\.json|probe\.vego\.json)$`)
 	changelogPattern    = `(?m)^## %s - (\d{4}-\d{2}-\d{2})\s*$`
 )
 
@@ -389,6 +432,61 @@ func packageVersion(src source, unreleased bool) (string, error) {
 		return "", fmt.Errorf("the package versions disagree: zig %s, rust %s, native %s; align them or stage with -unreleased", zig, cargo, cmake)
 	}
 	return zig, nil
+}
+
+// clearStaging removes the assets of a previous run and creates the directory when it is missing.
+// It refuses a directory that holds anything else, so a mistyped -out can't delete unrelated files.
+func clearStaging(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return os.MkdirAll(dir, 0o755)
+	}
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if !e.Type().IsRegular() || !stagedNamePattern.MatchString(e.Name()) {
+			return fmt.Errorf("%s holds %s, which dist does not stage; choose a new or empty output directory", dir, e.Name())
+		}
+	}
+	for _, e := range entries {
+		if err := os.Remove(filepath.Join(dir, e.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// toolchainVersion reads the vegoc version from the staged tree, since the running binary may come from a different checkout.
+// The file is parsed properly, so a Version in a comment or a string can't be mistaken for the constant.
+func toolchainVersion(src source) (string, error) {
+	const rel = "vego/compiler/ir.go"
+	data, _, err := src.read(rel)
+	if err != nil {
+		return "", err
+	}
+	file, err := parser.ParseFile(token.NewFileSet(), rel, data, parser.SkipObjectResolution)
+	if err != nil {
+		return "", err
+	}
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || gd.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			vs := spec.(*ast.ValueSpec)
+			for i, name := range vs.Names {
+				if name.Name != "Version" || i >= len(vs.Values) {
+					continue
+				}
+				if lit, ok := vs.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					return strconv.Unquote(lit.Value)
+				}
+			}
+		}
+	}
+	return "", errors.New(rel + ": no Version string constant found")
 }
 
 // checkLicenses requires the root license files and identical copies in every package directory.

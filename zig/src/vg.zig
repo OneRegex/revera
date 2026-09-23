@@ -293,6 +293,17 @@ pub fn bytesFromStr(gpa: Allocator, s: Str) Allocator.Error!Slice(u8) {
     return out;
 }
 
+// min and max are Go's min and max.
+// @min and @max narrow the result type when an operand is comptime-known, but Go keeps the type of the operands.
+// That's their peer type, or comptime_int when both are untyped constants.
+pub inline fn min(a: anytype, b: anytype) @TypeOf(a, b) {
+    return @min(a, b);
+}
+
+pub inline fn max(a: anytype, b: anytype) @TypeOf(a, b) {
+    return @max(a, b);
+}
+
 // cv converts between integer types with Go semantics.
 // It widens with the sign of the source, then truncates to the target width and reinterprets.
 pub inline fn cv(comptime B: type, x: anytype) B {

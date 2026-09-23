@@ -20,7 +20,8 @@ jobs:
           go-version-file: go/go.mod
       - run: make check-generated
       - name: License copies are current
-        run: sh dev/sync-licenses.sh && git diff --exit-code
+        # git diff alone misses a deleted copy, which the sync recreates as an untracked file.
+        run: sh dev/sync-licenses.sh && git status --short && test -z "$(git status --porcelain)"
 
   go:
     name: Go modules

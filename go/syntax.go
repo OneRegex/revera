@@ -24,6 +24,11 @@ const infinite = -1
 // lenInf saturates node length bounds far above any supported span.
 const lenInf = 1 << 30
 
+// maxNesting is the deepest parenthesis nesting that compiles.
+// The parser and the later passes are recursive, so a deeper pattern fails with ESpace instead of running out of stack.
+// A pattern of up to 256 bytes can't nest deeper than that, so the minimum capacity of section 3.4 still holds.
+const maxNesting = 256
+
 type node struct {
 	op uint8
 	ch []int32 // child node indexes, in order
@@ -54,7 +59,9 @@ type parser struct {
 	pos   int
 	flags uint32
 	// groups counts opening parentheses in pattern order.
-	groups   int
+	groups int
+	// depth counts the groups open at the current position.
+	depth    int
 	nodes    []node
 	brackets []bracketSet
 	// err keeps the first failure.
@@ -208,10 +215,15 @@ func parseExpr(p *parser, loc *Locale) int32 {
 	var primary int32
 	switch c {
 	case '(':
+		if p.depth == maxNesting {
+			return fail(p, ErrESpace, start)
+		}
 		p.pos++
 		p.groups++
 		index := p.groups
+		p.depth++
 		sub := parseAlt(p, loc, true)
+		p.depth--
 		if sub < 0 {
 			return -1
 		}

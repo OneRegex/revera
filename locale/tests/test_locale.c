@@ -21,6 +21,17 @@ test_lookup(void)
     assert(rv_locale_open("es-MX", "trad", &locale));
     assert(!rv_locale_open("not-a-cldr-locale", NULL, &locale));
     assert(!rv_locale_open("fr", "not-a-collation", &locale));
+    {
+        /* A failed open must leave the previous locale intact, not half of the new one. */
+        rv_locale before;
+        assert(rv_locale_open("C", NULL, &locale));
+        before = locale;
+        assert(!rv_locale_open("fr", "not-a-collation", &locale));
+        assert(locale.locale_index == before.locale_index);
+        assert(locale.collation_profile == before.collation_profile);
+        assert(locale.case_profile == before.case_profile);
+        assert(locale.is_posix == before.is_posix);
+    }
     assert(!rv_locale_open("fr.ISO-8859-1", NULL, &locale));
     assert(!rv_locale_open("fr.u-t-f-8", NULL, &locale));
     assert(!rv_locale_open("fr.UTF--8", NULL, &locale));

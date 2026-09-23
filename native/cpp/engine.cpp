@@ -78,7 +78,7 @@ int32_t parseBracket(vg::Arena& mem, parser& p, Locale& loc) {
             b.equivs = vg::append(mem, b.equivs, item.seq);
         } break;
         case itemClass: {
-            b.classMask |= uint16_t(1 << item.vego_class);
+            b.classMask |= uint16_t(1 << vg::shift_count(item.vego_class, 16));
         } break;
         default: break;
         }
@@ -251,11 +251,11 @@ void sortRanges(vg::Arena& mem, vg::Slice<runeRange> rr) {
 void finalizeBracket(vg::Arena& mem, bracketSet& b, Locale& loc) {
     if (((!b.negated) && ((vg::len(b.elems) > 0LL) || (vg::len(b.equivs) > 0LL)))) {
         for (int64_t i = 0LL; (i < vg::len(b.elems)); i += 1LL) {
-            b.multiLens |= uint16_t(1 << vg::len(b.elems[i]));
+            b.multiLens |= uint16_t(1 << vg::shift_count(vg::len(b.elems[i]), 16));
         }
         if ((vg::len(b.equivs) > 0LL)) {
             for (int64_t length = 2LL; ([&]{ auto _t1 = length; auto _t2 = localeMaxElementLength(loc); return (_t1 <= _t2); }()); length += 1LL) {
-                b.multiLens |= uint16_t(1 << length);
+                b.multiLens |= uint16_t(1 << vg::shift_count(length, 16));
             }
         }
     }
@@ -303,7 +303,7 @@ bool bracketPositiveSingle(vg::Slice<bracketSet> brs, int32_t bi, Locale& loc, i
         return true;
     }
     std::array<int32_t, 1> single{};
-    single[size_t(0LL)] = c;
+    vg::at(single, 0LL) = c;
     for (int64_t i = 0LL; (i < vg::len(brs[bi].equivs)); i += 1LL) {
         if (localePrimaryEqual(loc, vg::arr_slice(single, 0, 1), brs[bi].equivs[i])) {
             return true;
@@ -329,7 +329,7 @@ bool bracketMatchesOne(vg::Slice<bracketSet> brs, int32_t bi, Locale& loc, int32
     preimageBuf buf{};
     localeCasePreimages(loc, buf, c);
     for (int64_t i = 0LL; (i < buf.n); i += 1LL) {
-        if (([&]{ auto _t3 = bracketPositiveSingle(brs, bi, loc, buf.r[size_t(i)]); auto _t4 = want; return (_t3 == _t4); }())) {
+        if (([&]{ auto _t3 = bracketPositiveSingle(brs, bi, loc, vg::at(buf.r, i)); auto _t4 = want; return (_t3 == _t4); }())) {
             return true;
         }
     }
@@ -388,7 +388,7 @@ bool equivCandidate(vg::Slice<bracketSet> brs, int32_t bi, Locale& loc, vg::Slic
         }
         return false;
     }
-    candidate.r[size_t(at)] = t[at];
+    vg::at(candidate.r, at) = t[at];
     if (equivCandidate(brs, bi, loc, t, candidate, (at + 1LL))) {
         return true;
     }
@@ -398,7 +398,7 @@ bool equivCandidate(vg::Slice<bracketSet> brs, int32_t bi, Locale& loc, vg::Slic
     preimageBuf buf{};
     localeCasePreimages(loc, buf, t[at]);
     for (int64_t i_2 = 0LL; (i_2 < buf.n); i_2 += 1LL) {
-        candidate.r[size_t(at)] = buf.r[size_t(i_2)];
+        vg::at(candidate.r, at) = vg::at(buf.r, i_2);
         if (equivCandidate(brs, bi, loc, t, candidate, (at + 1LL))) {
             return true;
         }
@@ -947,9 +947,9 @@ Contract ContractFor(Regexp& re, int64_t maxInput) {
     Contract c{};
     c.MaxInput = int64_t(length);
     c.Matcher = matcherContract(re, length, atom);
-    if (((re.progOK && (re.nsub > 0LL)) && (uint32_t(re.flags & FlagNoSub) == 0U))) {
+    if ((((re.progOK && (re.prog.failMin != 0LL)) && (re.nsub > 0LL)) && (uint32_t(re.flags & FlagNoSub) == 0U))) {
         if (re.onePass) {
-            c.OnePass = onePassContract(re, length, atom);
+            c.OnePass = onePassContract(re, length);
             c.HasOnePass = true;
         } else {
             c.Solver = solverContract(re, length, atom);
@@ -963,7 +963,7 @@ BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
     BackendContract b{};
     if ((!re.progOK)) {
         b.StackBytes = matcherStackBytes;
-        b.Steps = cAdd(cMul(2LL, length), 2LL);
+        b.Steps = cAdd(runeCountSteps(length), 3LL);
         return b;
     }
     int64_t n = int64_t(vg::len(re.prog.ins));
@@ -983,11 +983,18 @@ BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
         boundaries = std::min<int64_t>(boundaries, (int64_t(re.prog.depth) + 3LL));
     }
     int64_t steps = ([&]{ auto _t15 = cAdd((24LL + ring), length); auto _t16 = cMul(boundaries, perBoundary); return cAdd(_t15, _t16); }());
+    if ((re.prog.failMin != failMinNone)) {
+        steps = ([&]{ auto _t17 = steps; auto _t18 = cAdd(runeCountSteps(length), 1LL); return cAdd(_t17, _t18); }());
+    }
     int64_t stack = 6144LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
     return b;
+}
+
+int64_t runeCountSteps(int64_t length) {
+    return cAdd(cMul(3LL, length), 2LL);
 }
 
 int64_t captureHeap(Regexp& re, int64_t length) {
@@ -998,13 +1005,69 @@ int64_t captureHeap(Regexp& re, int64_t length) {
     return cAdd(cAdd(payload, allowance), 64LL);
 }
 
-BackendContract onePassContract(Regexp& re, int64_t length, int64_t atom) {
+BackendContract onePassContract(Regexp& re, int64_t length) {
     BackendContract b{};
-    int64_t perVisit = cAdd(atom, (int64_t(re.nsub) + 1LL));
     b.HeapBytes = captureHeap(re, length);
     b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 10LL), frameBytes);
-    b.Steps = ([&]{ auto _t1 = ([&]{ auto _t2 = astSize(re.nodes, re.root); auto _t3 = cAdd(length, 2LL); return cMul(_t2, _t3); }()); auto _t4 = perVisit; return cMul(_t1, _t4); }());
+    lookupCosts lc = localeLookupCosts(re.loc);
+    auto _t1 = onePassWalk(re, lc, re.root, false);
+    int64_t once = _t1.r0;
+    int64_t perChar = _t1.r1;
+    int64_t steps = ([&]{ auto _t2 = once; auto _t3 = cMul(length, perChar); return cAdd(_t2, _t3); }());
+    steps = ([&]{ auto _t4 = steps; auto _t5 = runeCountSteps(length); return cAdd(_t4, _t5); }());
+    b.Steps = cAdd(steps, ((5LL * int64_t(re.nsub)) + 14LL));
     return b;
+}
+
+int64_t onePassVisitCost(Regexp& re, lookupCosts& lc, int32_t ni) {
+    int64_t count = int64_t(vg::len(re.nodes[ni].ch));
+    switch (re.nodes[ni].op) {
+    case opChar: {
+        if ((uint32_t(re.flags & FlagICase) != 0U)) {
+            return (int64_t(vg::len(re.nodes[ni].fold)) + 4LL);
+        }
+    } break;
+    case opBracket: {
+        return cAdd(1LL, matchesOneCost(re.brackets, re.nodes[ni].br, lc));
+    } break;
+    case opGroup: {
+        return (3LL + (2LL * int64_t(vg::len(re.nested[re.nodes[ni].vego_index]))));
+    } break;
+    case opConcat: {
+        return (3LL + (3LL * count));
+    } break;
+    case opAlt: {
+        int64_t cost = (3LL + (4LL * count));
+        for (int64_t i = 0LL; (i < vg::len(re.nodes[ni].firsts)); i += 1LL) {
+            cost += int64_t(vg::len(re.nodes[ni].firsts[i]));
+        }
+        return cost;
+    } break;
+    default: break;
+    }
+    return 2LL;
+}
+
+Tup_i64_i64 onePassWalk(Regexp& re, lookupCosts& lc, int32_t ni, bool repeated) {
+    int64_t once = 0LL;
+    int64_t perChar = 0LL;
+    if (repeated) {
+        perChar = onePassVisitCost(re, lc, ni);
+    } else {
+        once = onePassVisitCost(re, lc, ni);
+    }
+    bool isRepeat = (re.nodes[ni].op == opRepeat);
+    for (int64_t i = 0LL; (i < vg::len(re.nodes[ni].ch)); i += 1LL) {
+        auto _t1 = onePassWalk(re, lc, re.nodes[ni].ch[i], (repeated || isRepeat));
+        int64_t o = _t1.r0;
+        int64_t p = _t1.r1;
+        once = cAdd(once, o);
+        perChar = cAdd(perChar, p);
+        if (isRepeat) {
+            perChar = cAdd(perChar, 1LL);
+        }
+    }
+    return Tup_i64_i64{once, perChar};
 }
 
 BackendContract solverContract(Regexp& re, int64_t length, int64_t atom) {
@@ -1023,14 +1086,6 @@ BackendContract solverContract(Regexp& re, int64_t length, int64_t atom) {
     b.StackBytes = stack;
     b.Steps = steps;
     return b;
-}
-
-int64_t astSize(vg::Slice<node> nodes, int32_t ni) {
-    int64_t total = 1LL;
-    for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
-        total = ([&]{ auto _t1 = total; auto _t2 = astSize(nodes, nodes[ni].ch[i]); return cAdd(_t1, _t2); }());
-    }
-    return total;
 }
 
 int64_t astHeight(vg::Slice<node> nodes, int32_t ni) {
@@ -1074,7 +1129,7 @@ int64_t searchSteps(int64_t count) {
 }
 
 int64_t u32ContainsCost(int64_t count) {
-    return (1LL + (3LL * searchSteps(count)));
+    return (2LL + (3LL * searchSteps(count)));
 }
 
 int64_t findPairCost(int64_t count) {
@@ -1086,11 +1141,11 @@ int64_t findCaseCost(int64_t count) {
 }
 
 int64_t pairSourcesRunCost(int64_t count, int64_t preimages) {
-    return ([&]{ auto _t1 = (5LL + (3LL * searchSteps(count))); auto _t2 = (5LL * preimages); return (_t1 + _t2); }());
+    return ([&]{ auto _t1 = (6LL + (3LL * searchSteps(count))); auto _t2 = (5LL * preimages); return (_t1 + _t2); }());
 }
 
 int64_t compareSequenceCost(int64_t length) {
-    return (5LL + (3LL * length));
+    return (6LL + (3LL * length));
 }
 
 lookupCosts localeLookupCosts(Locale& l) {
@@ -1117,15 +1172,15 @@ lookupCosts localeLookupCosts(Locale& l) {
         upper = secInvUpperTurkic;
         lower = secInvLowerTurkic;
     }
-    lc.casePreimages = ([&]{ auto _t7 = ([&]{ auto _t9 = (2LL + ([&]{ auto _t11 = vg::sdiv<int64_t>(sectionLen(l, upper), 8LL); auto _t12 = lc.preimages; return pairSourcesRunCost(_t11, _t12); }())); auto _t10 = ([&]{ auto _t13 = vg::sdiv<int64_t>(sectionLen(l, lower), 8LL); auto _t14 = lc.preimages; return pairSourcesRunCost(_t13, _t14); }()); return (_t9 + _t10); }()); auto _t8 = (lc.preimages * (2LL + lc.preimages)); return (_t7 + _t8); }());
+    lc.casePreimages = ([&]{ auto _t7 = ([&]{ auto _t9 = (3LL + ([&]{ auto _t11 = vg::sdiv<int64_t>(sectionLen(l, upper), 8LL); auto _t12 = lc.preimages; return pairSourcesRunCost(_t11, _t12); }())); auto _t10 = ([&]{ auto _t13 = vg::sdiv<int64_t>(sectionLen(l, lower), 8LL); auto _t14 = lc.preimages; return pairSourcesRunCost(_t13, _t14); }()); return (_t9 + _t10); }()); auto _t8 = (lc.preimages * (2LL + lc.preimages)); return (_t7 + _t8); }());
     return lc;
 }
 
 int64_t elementIDCost(lookupCosts& lc, int64_t length) {
     if ((length == 1LL)) {
-        return 3LL;
+        return 4LL;
     }
-    return ([&]{ auto _t1 = (2LL + (2LL * length)); auto _t2 = ([&]{ auto _t3 = lc.sequenceSearch; auto _t4 = (1LL + compareSequenceCost(length)); return (_t3 * _t4); }()); return (_t1 + _t2); }());
+    return ([&]{ auto _t1 = (4LL + (2LL * length)); auto _t2 = ([&]{ auto _t3 = lc.sequenceSearch; auto _t4 = (1LL + compareSequenceCost(length)); return (_t3 * _t4); }()); return (_t1 + _t2); }());
 }
 
 int64_t collatingElementIDCost(lookupCosts& lc, int64_t length) {
@@ -1141,7 +1196,7 @@ int64_t primaryEqualCost(lookupCosts& lc, int64_t left, int64_t right) {
 }
 
 int64_t equivsCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc, int64_t length) {
-    int64_t cost = 0LL;
+    int64_t cost = 1LL;
     for (int64_t i = 0LL; (i < vg::len(brs[bi].equivs)); i += 1LL) {
         cost = ([&]{ auto _t1 = cost; auto _t2 = (1LL + primaryEqualCost(lc, length, int64_t(vg::len(brs[bi].equivs[i])))); return cAdd(_t1, _t2); }());
     }
@@ -1149,7 +1204,7 @@ int64_t equivsCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc, int64
 }
 
 int64_t positiveSingleCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc) {
-    int64_t cost = (2LL + searchSteps(vg::len(brs[bi].ranges)));
+    int64_t cost = (3LL + searchSteps(vg::len(brs[bi].ranges)));
     if ((brs[bi].classMask != 0)) {
         cost += lc.classMask;
     }
@@ -1160,20 +1215,20 @@ int64_t matchesOneCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc) {
     int64_t positive = positiveSingleCost(brs, bi, lc);
     int64_t cost = cAdd(1LL, positive);
     if (brs[bi].icase) {
-        cost = ([&]{ auto _t1 = cost; auto _t2 = ([&]{ auto _t3 = lc.casePreimages; auto _t4 = ([&]{ auto _t5 = lc.preimages; auto _t6 = cAdd(1LL, positive); return cMul(_t5, _t6); }()); return cAdd(_t3, _t4); }()); return cAdd(_t1, _t2); }());
+        cost = ([&]{ auto _t1 = cost; auto _t2 = ([&]{ auto _t3 = (lc.casePreimages + 1LL); auto _t4 = ([&]{ auto _t5 = lc.preimages; auto _t6 = cAdd(1LL, positive); return cMul(_t5, _t6); }()); return cAdd(_t3, _t4); }()); return cAdd(_t1, _t2); }());
     }
     return cost;
 }
 
 int64_t candidateLeafCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc, int64_t length) {
-    return ([&]{ auto _t1 = (1LL + collatingElementIDCost(lc, length)); auto _t2 = equivsCost(brs, bi, lc, length); return cAdd(_t1, _t2); }());
+    return ([&]{ auto _t1 = (2LL + collatingElementIDCost(lc, length)); auto _t2 = equivsCost(brs, bi, lc, length); return cAdd(_t1, _t2); }());
 }
 
 int64_t probeCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc, int64_t length) {
-    int64_t cost = cAdd(2LL, int64_t(vg::len(brs[bi].elems)));
-    int64_t counterpart = 1LL;
+    int64_t cost = cAdd(3LL, int64_t(vg::len(brs[bi].elems)));
+    int64_t counterpart = 2LL;
     if (brs[bi].icase) {
-        counterpart = (1LL + (2LL * lc.caseConvert));
+        counterpart = (4LL + (2LL * lc.caseConvert));
     }
     for (int64_t i = 0LL; (i < vg::len(brs[bi].elems)); i += 1LL) {
         if ((int64_t(vg::len(brs[bi].elems[i])) == length)) {
@@ -1185,13 +1240,15 @@ int64_t probeCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc, int64_
     }
     int64_t leaf = candidateLeafCost(brs, bi, lc, length);
     if ((!brs[bi].icase)) {
-        return ([&]{ auto _t3 = cost; auto _t4 = cAdd((length + 1LL), leaf); return cAdd(_t3, _t4); }());
+        return ([&]{ auto _t3 = cost; auto _t4 = cAdd(length, leaf); return cAdd(_t3, _t4); }());
     }
     int64_t candidates = 1LL;
+    int64_t inner = 0LL;
     for (int64_t i_2 = 0LL; (i_2 < length); i_2 += 1LL) {
+        inner = cAdd(inner, candidates);
         candidates = cMul(candidates, (lc.preimages + 1LL));
     }
-    return ([&]{ auto _t5 = cost; auto _t6 = ([&]{ auto _t7 = candidates; auto _t8 = ([&]{ auto _t9 = (2LL + lc.preimages); auto _t10 = cAdd(lc.casePreimages, leaf); return cAdd(_t9, _t10); }()); return cMul(_t7, _t8); }()); return cAdd(_t5, _t6); }());
+    return ([&]{ auto _t5 = cost; auto _t6 = ([&]{ auto _t7 = ([&]{ auto _t8 = inner; auto _t9 = cAdd((2LL + lc.preimages), lc.casePreimages); return cMul(_t8, _t9); }()); auto _t10 = cMul(candidates, leaf); return cAdd(_t7, _t10); }()); return cAdd(_t5, _t6); }());
 }
 
 int64_t bracketAtomCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc) {
@@ -1199,9 +1256,9 @@ int64_t bracketAtomCost(vg::Slice<bracketSet> brs, int32_t bi, lookupCosts& lc) 
     if ((brs[bi].multiLens == 0)) {
         return cost;
     }
-    cost = cAdd(cost, 7LL);
+    cost = cAdd(cost, maxElemAhead);
     for (int64_t length = 2LL; (length <= maxElemAhead); length += 1LL) {
-        if ((uint16_t(brs[bi].multiLens & uint16_t(1 << length)) != 0)) {
+        if ((uint16_t(brs[bi].multiLens & uint16_t(1 << vg::shift_count(length, 16))) != 0)) {
             cost = ([&]{ auto _t1 = cost; auto _t2 = probeCost(brs, bi, lc, int64_t(length)); return cAdd(_t1, _t2); }());
         }
     }
@@ -1592,7 +1649,7 @@ void paConsume(vg::Arena& mem, phaseAState& e, engineWS& ws, Regexp& re, int64_t
                 aheadReady = true;
             }
             for (int64_t length = 2LL; (length <= vg::len(ws.ahead)); length += 1LL) {
-                if ((uint16_t(re.brackets[bi].multiLens & uint16_t(1 << length)) == 0)) {
+                if ((uint16_t(re.brackets[bi].multiLens & uint16_t(1 << vg::shift_count(length, 16))) == 0)) {
                     continue;
                 }
                 if (bracketMatchesMulti(re.brackets, bi, re.loc, ws.ahead.head(length))) {
@@ -1626,7 +1683,7 @@ int64_t scanAhead(phaseAState& e, Regexp& re) {
         return (e.pos + idx);
     }
     for (int64_t i = e.pos; (i < vg::len(e.subject)); i += 1LL) {
-        if (re.prog.scan.stop[size_t(e.subject[i])]) {
+        if (vg::at(re.prog.scan.stop, e.subject[i])) {
             return i;
         }
     }
@@ -1870,22 +1927,22 @@ uint32_t u32Raw(vg::Str blob, int64_t off) {
 }
 
 uint16_t u16At(Locale& l, int64_t sec, int64_t vego_index) {
-    int64_t off = (l.sec[size_t(sec)].Off + (2LL * vego_index));
+    int64_t off = (vg::at(l.sec, sec).Off + (2LL * vego_index));
     return uint16_t(uint16_t(l.blob[off]) | uint16_t(uint16_t(l.blob[(off + 1LL)]) << 8LL));
 }
 
 uint32_t u32At(Locale& l, int64_t sec, int64_t vego_index) {
-    return u32Raw(l.blob, (l.sec[size_t(sec)].Off + (4LL * vego_index)));
+    return u32Raw(l.blob, (vg::at(l.sec, sec).Off + (4LL * vego_index)));
 }
 
 int64_t sectionLen(Locale& l, int64_t sec) {
-    return (l.sec[size_t(sec)].End - l.sec[size_t(sec)].Off);
+    return (vg::at(l.sec, sec).End - vg::at(l.sec, sec).Off);
 }
 
 vg::Str byteString(Locale& l, int64_t sec, int64_t off) {
-    int64_t start = (l.sec[size_t(sec)].Off + off);
+    int64_t start = (vg::at(l.sec, sec).Off + off);
     int64_t end = start;
-    while (((end < l.sec[size_t(sec)].End) && (l.blob[end] != 0))) {
+    while (((end < vg::at(l.sec, sec).End) && (l.blob[end] != 0))) {
         end += 1LL;
     }
     return l.blob.sub(start, end);
@@ -1907,8 +1964,8 @@ bool localeLoad(Locale& l, vg::Str blob) {
         if (((cursor + length) > vg::len(blob))) {
             return false;
         }
-        l.sec[size_t(i)].Off = cursor;
-        l.sec[size_t(i)].End = (cursor + length);
+        vg::at(l.sec, i).Off = cursor;
+        vg::at(l.sec, i).End = (cursor + length);
         cursor += length;
     }
     if ((cursor != vg::len(blob))) {
@@ -2016,7 +2073,7 @@ bool localeValidate(Locale& l) {
     int64_t typeRowCount = vg::sdiv<int64_t>(sectionLen(l, secLocaleTypes), 4LL);
     for (int64_t i_6 = 0LL; (i_6 < count); i_6 += 1LL) {
         LocaleRow row_2 = localeRowAt(l, i_6);
-        if ((((row_2.TypeFirst + row_2.TypeCount) > typeRowCount) || (int64_t(row_2.DefaultCollation) >= profileCount))) {
+        if (((((row_2.TypeFirst + row_2.TypeCount) > typeRowCount) || (row_2.CaseProfile > 1U)) || (int64_t(row_2.DefaultCollation) >= profileCount))) {
             return false;
         }
     }
@@ -2173,8 +2230,8 @@ LocaleRow localeRowAt(Locale& l, int64_t vego_index) {
     LocaleRow row{};
     row.TypeFirst = int64_t(u32At(l, secLocales, (base + 1LL)));
     row.TypeCount = int64_t(u32At(l, secLocales, (base + 2LL)));
-    row.CaseProfile = uint8_t(u32At(l, secLocales, (base + 3LL)));
-    row.DefaultCollation = uint16_t(u32At(l, secLocales, (base + 4LL)));
+    row.CaseProfile = u32At(l, secLocales, (base + 3LL));
+    row.DefaultCollation = u32At(l, secLocales, (base + 4LL));
     return row;
 }
 
@@ -2241,10 +2298,10 @@ Tup_t4c6f63616c65x_bool resolveLocale(Locale& data, localeRequest req) {
         return Tup_t4c6f63616c65x_bool{invalid, false};
     }
     LocaleRow row = localeRowAt(result, vego_index);
-    result.caseProfile = row.CaseProfile;
+    result.caseProfile = uint8_t(row.CaseProfile);
     result.valid = true;
     if ((vg::len(req.ctype) == 0LL)) {
-        result.collationProfile = row.DefaultCollation;
+        result.collationProfile = uint16_t(row.DefaultCollation);
         return Tup_t4c6f63616c65x_bool{result, true};
     }
     int64_t typeNameCount = vg::sdiv<int64_t>(sectionLen(result, secTypeNameOffsets), 4LL);
@@ -2306,7 +2363,7 @@ Tup_t4c6f63616c65x_bool LocaleOpen(vg::Arena& mem, vg::Str blob, vg::Str name, v
 
 Tup_u8_bool classByName(vg::Str name) {
     for (int64_t i = 0LL; (i < numClasses); i += 1LL) {
-        if (vg::streq(classNames[size_t(i)], name)) {
+        if (vg::streq(vg::at(classNames, i), name)) {
             return Tup_u8_bool{uint8_t(i), true};
         }
     }
@@ -2451,7 +2508,7 @@ void pairSourcesRun(Locale& l, preimageBuf& buf, int64_t sec, int32_t r) {
         if (([&]{ auto _t3 = int32_t(u32At(l, sec, (2LL * low))); auto _t4 = r; return (_t3 != _t4); }())) {
             break;
         }
-        buf.r[size_t(buf.n)] = int32_t(u32At(l, sec, ((2LL * low) + 1LL)));
+        vg::at(buf.r, buf.n) = int32_t(u32At(l, sec, ((2LL * low) + 1LL)));
         buf.n += 1LL;
         low += 1LL;
     }
@@ -2489,11 +2546,11 @@ void localeCasePreimages(Locale& l, preimageBuf& buf, int32_t r) {
     }
     if (l.posix) {
         if (((r >= 65) && (r <= 90))) {
-            buf.r[size_t(0LL)] = int32_t(r + 32);
+            vg::at(buf.r, 0LL) = int32_t(r + 32);
             buf.n = 1LL;
         }
         if (((r >= 97) && (r <= 122))) {
-            buf.r[size_t(0LL)] = int32_t(r - 32);
+            vg::at(buf.r, 0LL) = int32_t(r - 32);
             buf.n = 1LL;
         }
         return;
@@ -2508,9 +2565,9 @@ void localeCasePreimages(Locale& l, preimageBuf& buf, int32_t r) {
     pairSourcesRun(l, buf, lowerSec, r);
     int64_t w = 0LL;
     for (int64_t i = 0LL; (i < buf.n); i += 1LL) {
-        int32_t candidate = buf.r[size_t(i)];
+        int32_t candidate = vg::at(buf.r, i);
         if (((candidate != r) && (!runesContain(vg::arr_slice(buf.r, 0LL, w), candidate)))) {
-            buf.r[size_t(w)] = candidate;
+            vg::at(buf.r, w) = candidate;
             w += 1LL;
         }
     }
@@ -3175,12 +3232,12 @@ int64_t buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
         case iFail: {
         } break;
         case iRune: {
-            { auto&& _t1 = ([&]() -> decltype(auto) { auto&& _t2 = pr.scan.stop; auto _t3 = utf8LeadByte(int32_t(pr.ins[pc].arg)); return _t2[size_t(_t3)]; }()); _t1 = true; }
+            { auto&& _t1 = ([&]() -> decltype(auto) { auto&& _t2 = pr.scan.stop; auto _t3 = utf8LeadByte(int32_t(pr.ins[pc].arg)); return vg::at(_t2, _t3); }()); _t1 = true; }
         } break;
         case iRuneFold: {
             uint32_t set = pr.ins[pc].arg;
             for (int64_t i = 0LL; (i < vg::len(pr.foldSets[set])); i += 1LL) {
-                { auto&& _t4 = ([&]() -> decltype(auto) { auto&& _t5 = pr.scan.stop; auto _t6 = utf8LeadByte(pr.foldSets[set][i]); return _t5[size_t(_t6)]; }()); _t4 = true; }
+                { auto&& _t4 = ([&]() -> decltype(auto) { auto&& _t5 = pr.scan.stop; auto _t6 = utf8LeadByte(pr.foldSets[set][i]); return vg::at(_t5, _t6); }()); _t4 = true; }
             }
         } break;
         default: {
@@ -3194,12 +3251,12 @@ int64_t buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
         return 0LL;
     }
     if (newlineMode) {
-        pr.scan.stop[size_t(10LL)] = true;
+        vg::at(pr.scan.stop, 10LL) = true;
     }
     pr.scan.enabled = true;
     int64_t count = 0LL;
     for (int64_t b = 0LL; (b < 256LL); b += 1LL) {
-        if (pr.scan.stop[size_t(b)]) {
+        if (vg::at(pr.scan.stop, b)) {
             count += 1LL;
             pr.scan.b = uint8_t(b);
         }
@@ -3502,7 +3559,7 @@ frag emitRepeat(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t n
     if (nodes[ni].minimal) {
         int64_t slot = nodes[ni].vego_index;
         if ((slot < maskWidth)) {
-            mask_v |= (1ULL << slot);
+            mask_v |= (1ULL << vg::shift_count(slot, 64));
         } else {
             vg::Slice<uint32_t> grown = vg::make<uint32_t>(mem, (vg::len(extra_v) + 1LL));
             (void)(vg::vcopy(grown, extra_v));
@@ -4080,10 +4137,15 @@ int32_t parseExpr(vg::Arena& mem, parser& p, Locale& loc) {
     int32_t primary{};
     switch (c) {
     case 40: {
+        if ((p.depth == maxNesting)) {
+            return fail(p, ErrESpace, start);
+        }
         p.pos += 1LL;
         p.groups += 1LL;
         int64_t vego_index = p.groups;
+        p.depth += 1LL;
         int32_t sub = parseAlt(mem, p, loc, true);
+        p.depth -= 1LL;
         if ((sub < 0)) {
             return int32_t(0ULL - uint64_t(1));
         }

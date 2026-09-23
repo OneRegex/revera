@@ -31,7 +31,7 @@ func TestContractSelectsReachableBackends(t *testing.T) {
 	}
 	if ContractHeapBytes(&groupedContract) != 37757 ||
 		ContractStackBytes(&groupedContract) != 6144 ||
-		ContractSteps(&groupedContract) != 937980 {
+		ContractSteps(&groupedContract) != 925986 {
 		t.Fatalf("one-pass contract has unexpected totals: %+v", groupedContract)
 	}
 
@@ -111,21 +111,21 @@ func TestBracketAtomCost(t *testing.T) {
 		flags   uint32
 		want    int64
 	}{
-		{"[a-z]", 0, 4},
-		{"[a-z]", FlagICase, 10},
-		{"[a-zA-Z0-9_]", 0, 6},
-		{"[[:alpha:]]", 0, 6},
-		{"[^a-z]", 0, 4},
-		{"[[=a=]]", 0, 13},
-		{"[[=a=]]", FlagICase, 28},
+		{"[a-z]", 0, 6},
+		{"[a-z]", FlagICase, 15},
+		{"[a-zA-Z0-9_]", 0, 8},
+		{"[[:alpha:]]", 0, 8},
+		{"[^a-z]", 0, 6},
+		{"[[=a=]]", 0, 17},
+		{"[[=a=]]", FlagICase, 37},
 	}
 	for _, tc := range fixed {
 		if got := atom(tc.pattern, posix, tc.flags); got != tc.want {
 			t.Errorf("atomCost(%q, POSIX, %d) = %d, want %d", tc.pattern, tc.flags, got, tc.want)
 		}
 	}
-	if got := atom("[[.ch.]]", czech, 0); got != 15 {
-		t.Errorf("atomCost([[.ch.]], cs) = %d, want 15", got)
+	if got := atom("[[.ch.]]", czech, 0); got != 21 {
+		t.Errorf("atomCost([[.ch.]], cs) = %d, want 21", got)
 	}
 	plain := atom("[[=a=]]", czech, 0)
 	if plain <= atom("[[=a=]]", posix, 0) || plain < 1000 {

@@ -128,6 +128,7 @@ pub const opRepeat: u8 = 7;
 pub const opGroup: u8 = 8;
 pub const infinite = (-%1);
 pub const lenInf = (1 << 30);
+pub const maxNesting = 256;
 pub const invalidRune: i32 = (-%1);
 
 pub const classNames: [numClasses]vg.Str = [numClasses]vg.Str{ vg.lit("alnum"), vg.lit("alpha"), vg.lit("blank"), vg.lit("cntrl"), vg.lit("digit"), vg.lit("graph"), vg.lit("lower"), vg.lit("print"), vg.lit("punct"), vg.lit("space"), vg.lit("upper"), vg.lit("xdigit") };
@@ -305,8 +306,8 @@ pub const Locale = struct {
 pub const LocaleRow = struct {
     TypeFirst: i64 = 0,
     TypeCount: i64 = 0,
-    CaseProfile: u8 = 0,
-    DefaultCollation: u16 = 0,
+    CaseProfile: u32 = 0,
+    DefaultCollation: u32 = 0,
 };
 
 pub const localeRequest = struct {
@@ -447,6 +448,7 @@ pub const parser = struct {
     pos: i64 = 0,
     flags: u32 = 0,
     groups: i64 = 0,
+    depth: i64 = 0,
     nodes: vg.Slice(node) = .{},
     brackets: vg.Slice(bracketSet) = .{},
     err: Error = .{},
@@ -680,8 +682,8 @@ pub fn sortRanges(mem: vg.Allocator, rr: vg.Slice(runeRange)) vg.Allocator.Error
             {
                 var lo: i64 = 0;
                 while ((lo < n)) : (lo +%= (2 *% width)) {
-                    const mid: i64 = @min((lo +% width), n);
-                    const hi: i64 = @min((lo +% (2 *% width)), n);
+                    const mid: i64 = vg.min((lo +% width), n);
+                    const hi: i64 = vg.min((lo +% (2 *% width)), n);
                     var i: i64 = lo;
                     var j: i64 = mid;
                     var w: i64 = lo;
@@ -920,13 +922,13 @@ pub fn bracketMinChars(brs: vg.Slice(bracketSet), bi: i32, loc: *Locale) i64 {
     {
         var i: i64 = 0;
         while ((i < brs.at(bi).*.elems.len)) : (i +%= 1) {
-            best = @min(best, brs.at(bi).*.elems.at(i).*.len);
+            best = vg.min(best, brs.at(bi).*.elems.at(i).*.len);
         }
     }
     {
         var i_2: i64 = 0;
         while ((i_2 < brs.at(bi).*.equivs.len)) : (i_2 +%= 1) {
-            best = @min(best, localeMinEquivLength(loc, brs.at(bi).*.equivs.at(i_2).*));
+            best = vg.min(best, localeMinEquivLength(loc, brs.at(bi).*.equivs.at(i_2).*));
         }
     }
     return best;
@@ -1044,7 +1046,7 @@ pub fn structCmp(s: *capSolver, re: *Regexp, a: i32, b: i32) i64 {
             }
         },
         opRepeat => {
-            const limit: i64 = @min(lenA, lenB);
+            const limit: i64 = vg.min(lenA, lenB);
             {
                 var idx_2: i64 = 0;
                 while ((idx_2 < limit)) : (idx_2 +%= 1) {
@@ -1235,11 +1237,11 @@ pub fn bestConcat(mem: vg.Allocator, s: *capSolver, re: *Regexp, d: *decoded, ni
     const head0: i32 = re.nodes.at(ni).*.ch.at(idx).*;
     var lo: i64 = (i +% re.nodes.at(head0).*.minL);
     if ((re.nodes.at(ni).*.sufMax.at((idx +% 1)).* < lenInf)) {
-        lo = @max(lo, (j -% re.nodes.at(ni).*.sufMax.at((idx +% 1)).*));
+        lo = vg.max(lo, (j -% re.nodes.at(ni).*.sufMax.at((idx +% 1)).*));
     }
     var hi: i64 = (j -% re.nodes.at(ni).*.sufMin.at((idx +% 1)).*);
     if ((re.nodes.at(head0).*.maxL < lenInf)) {
-        hi = @min(hi, (i +% re.nodes.at(head0).*.maxL));
+        hi = vg.min(hi, (i +% re.nodes.at(head0).*.maxL));
     }
     {
         var m: i64 = lo;
@@ -1317,7 +1319,7 @@ pub fn bestRep(mem: vg.Allocator, s: *capSolver, re: *Regexp, d: *decoded, ni: i
     const canTake: bool = ((re.nodes.at(ni).*.max == infinite) or (done_v < re.nodes.at(ni).*.max));
     if ((canTake and (!(hasEmpty and (done_v >= re.nodes.at(ni).*.min))))) {
         const child: i32 = re.nodes.at(ni).*.ch.at(0).*;
-        const tailMin: i64 = satMul(@max(((re.nodes.at(ni).*.min -% done_v) -% 1), 0), re.nodes.at(child).*.minL);
+        const tailMin: i64 = satMul(vg.max(((re.nodes.at(ni).*.min -% done_v) -% 1), 0), re.nodes.at(child).*.minL);
         var tailMax: i64 = lenInf;
         if ((re.nodes.at(ni).*.max != infinite)) {
             tailMax = satMul(((re.nodes.at(ni).*.max -% done_v) -% 1), re.nodes.at(child).*.maxL);
@@ -1328,11 +1330,11 @@ pub fn bestRep(mem: vg.Allocator, s: *capSolver, re: *Regexp, d: *decoded, ni: i
         }
         var lo: i64 = (i +% re.nodes.at(child).*.minL);
         if ((tailMax < lenInf)) {
-            lo = @max(lo, (j -% tailMax));
+            lo = vg.max(lo, (j -% tailMax));
         }
         var hi: i64 = (j -% tailMin);
         if ((re.nodes.at(child).*.maxL < lenInf)) {
-            hi = @min(hi, (i +% re.nodes.at(child).*.maxL));
+            hi = vg.min(hi, (i +% re.nodes.at(child).*.maxL));
         }
         {
             var m: i64 = lo;
@@ -1454,7 +1456,7 @@ pub fn ContractHeapBytes(c: *Contract) i64 {
         capture = c.OnePass.HeapBytes;
     }
     if (c.HasSolver) {
-        capture = @max(capture, c.Solver.HeapBytes);
+        capture = vg.max(capture, c.Solver.HeapBytes);
     }
     return cAdd(c.Matcher.HeapBytes, capture);
 }
@@ -1462,10 +1464,10 @@ pub fn ContractHeapBytes(c: *Contract) i64 {
 pub fn ContractStackBytes(c: *Contract) i64 {
     var deepest: i64 = c.Matcher.StackBytes;
     if (c.HasOnePass) {
-        deepest = @max(deepest, c.OnePass.StackBytes);
+        deepest = vg.max(deepest, c.OnePass.StackBytes);
     }
     if (c.HasSolver) {
-        deepest = @max(deepest, c.Solver.StackBytes);
+        deepest = vg.max(deepest, c.Solver.StackBytes);
     }
     return deepest;
 }
@@ -1482,14 +1484,14 @@ pub fn ContractSteps(c: *Contract) i64 {
 }
 
 pub fn ContractFor(re: *Regexp, maxInput: i64) Contract {
-    const length: i64 = vg.cv(i64, @min(@max(maxInput, 0), subjectLimit));
+    const length: i64 = vg.cv(i64, vg.min(vg.max(maxInput, 0), subjectLimit));
     const atom: i64 = atomCost(re);
     var c: Contract = .{};
     c.MaxInput = vg.cv(i64, length);
     c.Matcher = matcherContract(re, length, atom);
-    if (((re.progOK and (re.nsub > 0)) and ((re.flags & FlagNoSub) == 0))) {
+    if ((((re.progOK and (re.prog.failMin != 0)) and (re.nsub > 0)) and ((re.flags & FlagNoSub) == 0))) {
         if (re.onePass) {
-            c.OnePass = onePassContract(re, length, atom);
+            c.OnePass = onePassContract(re, length);
             c.HasOnePass = true;
         } else {
             c.Solver = solverContract(re, length, atom);
@@ -1503,7 +1505,7 @@ pub fn matcherContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     var b: BackendContract = .{};
     if ((!re.progOK)) {
         b.StackBytes = matcherStackBytes;
-        b.Steps = cAdd(cMul(2, length), 2);
+        b.Steps = cAdd(runeCountSteps(length), 3);
         return b;
     }
     const n: i64 = vg.cv(i64, re.prog.ins.len);
@@ -1520,14 +1522,21 @@ pub fn matcherContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     perBoundary = cAdd(perBoundary, cAdd(cAdd(n, cMul(2, k)), cAdd(cMul(4, ring), 38)));
     var boundaries: i64 = cAdd(length, 1);
     if ((re.prog.depth >= 0)) {
-        boundaries = @min(boundaries, (vg.cv(i64, re.prog.depth) +% 3));
+        boundaries = vg.min(boundaries, (vg.cv(i64, re.prog.depth) +% 3));
     }
-    const steps: i64 = cAdd(cAdd((24 +% ring), length), cMul(boundaries, perBoundary));
+    var steps: i64 = cAdd(cAdd((24 +% ring), length), cMul(boundaries, perBoundary));
+    if ((re.prog.failMin != failMinNone)) {
+        steps = cAdd(steps, cAdd(runeCountSteps(length), 1));
+    }
     const stack: i64 = (vg.cv(i64, matcherStackBytes) +% (multiLookupFrames *% frameBytes));
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
     return b;
+}
+
+pub fn runeCountSteps(length: i64) i64 {
+    return cAdd(cMul(3, length), 2);
 }
 
 pub fn captureHeap(re: *Regexp, length: i64) i64 {
@@ -1538,19 +1547,81 @@ pub fn captureHeap(re: *Regexp, length: i64) i64 {
     return cAdd(cAdd(payload, allowance), 64);
 }
 
-pub fn onePassContract(re: *Regexp, length: i64, atom: i64) BackendContract {
+pub fn onePassContract(re: *Regexp, length: i64) BackendContract {
     var b: BackendContract = .{};
-    const perVisit: i64 = cAdd(atom, (vg.cv(i64, re.nsub) +% 1));
     b.HeapBytes = captureHeap(re, length);
     b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), (2 +% singleLookupFrames)), frameBytes);
-    b.Steps = cMul(cMul(astSize(re.nodes, re.root), cAdd(length, 2)), perVisit);
+    var lc: lookupCosts = localeLookupCosts(&re.loc);
+    const _t1 = onePassWalk(re, &lc, re.root, false);
+    const once: i64 = _t1[0];
+    const perChar: i64 = _t1[1];
+    var steps: i64 = cAdd(once, cMul(length, perChar));
+    steps = cAdd(steps, runeCountSteps(length));
+    b.Steps = cAdd(steps, ((5 *% vg.cv(i64, re.nsub)) +% 14));
     return b;
+}
+
+pub fn onePassVisitCost(re: *Regexp, lc: *lookupCosts, ni: i32) i64 {
+    const count: i64 = vg.cv(i64, re.nodes.at(ni).*.ch.len);
+    switch (re.nodes.at(ni).*.op) {
+        opChar => {
+            if (((re.flags & FlagICase) != 0)) {
+                return (vg.cv(i64, re.nodes.at(ni).*.fold.len) +% 4);
+            }
+        },
+        opBracket => {
+            return cAdd(1, matchesOneCost(re.brackets, re.nodes.at(ni).*.br, lc));
+        },
+        opGroup => {
+            return (3 +% (2 *% vg.cv(i64, re.nested.at(re.nodes.at(ni).*.index).*.len)));
+        },
+        opConcat => {
+            return (3 +% (3 *% count));
+        },
+        opAlt => {
+            var cost: i64 = (3 +% (4 *% count));
+            {
+                var i: i64 = 0;
+                while ((i < re.nodes.at(ni).*.firsts.len)) : (i +%= 1) {
+                    cost +%= vg.cv(i64, re.nodes.at(ni).*.firsts.at(i).*.len);
+                }
+            }
+            return cost;
+        },
+        else => {},
+    }
+    return 2;
+}
+
+pub fn onePassWalk(re: *Regexp, lc: *lookupCosts, ni: i32, repeated: bool) Tup_i64_i64 {
+    var once: i64 = vg.cv(i64, 0);
+    var perChar: i64 = vg.cv(i64, 0);
+    if (repeated) {
+        perChar = onePassVisitCost(re, lc, ni);
+    } else {
+        once = onePassVisitCost(re, lc, ni);
+    }
+    const isRepeat: bool = (re.nodes.at(ni).*.op == opRepeat);
+    {
+        var i: i64 = 0;
+        while ((i < re.nodes.at(ni).*.ch.len)) : (i +%= 1) {
+            const _t1 = onePassWalk(re, lc, re.nodes.at(ni).*.ch.at(i).*, (repeated or isRepeat));
+            const o: i64 = _t1[0];
+            const p: i64 = _t1[1];
+            once = cAdd(once, o);
+            perChar = cAdd(perChar, p);
+            if (isRepeat) {
+                perChar = cAdd(perChar, 1);
+            }
+        }
+    }
+    return .{ once, perChar };
 }
 
 pub fn solverContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     var b: BackendContract = .{};
     const depth: i64 = solverDepth(re.nodes, re.root, length);
-    const structural: i64 = @min(solverSteps(re.nodes, re.root, length), cAdd(capWorkLimit, depth));
+    const structural: i64 = vg.min(solverSteps(re.nodes, re.root, length), cAdd(capWorkLimit, depth));
     const tree: i64 = treeNodes(re.nodes, re.root, length);
     const perStep: i64 = cAdd(atom, cAdd(cMul(2, tree), (cMul(2, vg.cv(i64, re.minSlots)) +% 4)));
     const steps: i64 = cAdd(cMul(structural, perStep), cMul(tree, (vg.cv(i64, re.nsub) +% 2)));
@@ -1565,23 +1636,12 @@ pub fn solverContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     return b;
 }
 
-pub fn astSize(nodes: vg.Slice(node), ni: i32) i64 {
-    var total: i64 = vg.cv(i64, 1);
-    {
-        var i: i64 = 0;
-        while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-            total = cAdd(total, astSize(nodes, nodes.at(ni).*.ch.at(i).*));
-        }
-    }
-    return total;
-}
-
 pub fn astHeight(nodes: vg.Slice(node), ni: i32) i64 {
     var deepest: i64 = vg.cv(i64, 0);
     {
         var i: i64 = 0;
         while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-            deepest = @max(deepest, astHeight(nodes, nodes.at(ni).*.ch.at(i).*));
+            deepest = vg.max(deepest, astHeight(nodes, nodes.at(ni).*.ch.at(i).*));
         }
     }
     return (deepest +% 1);
@@ -1606,7 +1666,7 @@ pub fn atomCostNode(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), lc: *looku
     {
         var i: i64 = 0;
         while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-            cost = @max(cost, atomCostNode(nodes, brs, lc, nodes.at(ni).*.ch.at(i).*));
+            cost = vg.max(cost, atomCostNode(nodes, brs, lc, nodes.at(ni).*.ch.at(i).*));
         }
     }
     return cost;
@@ -1623,7 +1683,7 @@ pub fn searchSteps(count: i64) i64 {
 }
 
 pub fn u32ContainsCost(count: i64) i64 {
-    return (1 +% (3 *% searchSteps(count)));
+    return (2 +% (3 *% searchSteps(count)));
 }
 
 pub fn findPairCost(count: i64) i64 {
@@ -1635,11 +1695,11 @@ pub fn findCaseCost(count: i64) i64 {
 }
 
 pub fn pairSourcesRunCost(count: i64, preimages: i64) i64 {
-    return ((5 +% (3 *% searchSteps(count))) +% (5 *% preimages));
+    return ((6 +% (3 *% searchSteps(count))) +% (5 *% preimages));
 }
 
 pub fn compareSequenceCost(length: i64) i64 {
-    return (5 +% (3 *% length));
+    return (6 +% (3 *% length));
 }
 
 pub fn localeLookupCosts(l: *Locale) lookupCosts {
@@ -1666,15 +1726,15 @@ pub fn localeLookupCosts(l: *Locale) lookupCosts {
         upper = secInvUpperTurkic;
         lower = secInvLowerTurkic;
     }
-    lc.casePreimages = (((2 +% pairSourcesRunCost(vg.divT(sectionLen(l, upper), 8), lc.preimages)) +% pairSourcesRunCost(vg.divT(sectionLen(l, lower), 8), lc.preimages)) +% (lc.preimages *% (2 +% lc.preimages)));
+    lc.casePreimages = (((3 +% pairSourcesRunCost(vg.divT(sectionLen(l, upper), 8), lc.preimages)) +% pairSourcesRunCost(vg.divT(sectionLen(l, lower), 8), lc.preimages)) +% (lc.preimages *% (2 +% lc.preimages)));
     return lc;
 }
 
 pub fn elementIDCost(lc: *lookupCosts, length: i64) i64 {
     if ((length == 1)) {
-        return 3;
+        return 4;
     }
-    return ((2 +% (2 *% length)) +% (lc.sequenceSearch *% (1 +% compareSequenceCost(length))));
+    return ((4 +% (2 *% length)) +% (lc.sequenceSearch *% (1 +% compareSequenceCost(length))));
 }
 
 pub fn collatingElementIDCost(lc: *lookupCosts, length: i64) i64 {
@@ -1690,7 +1750,7 @@ pub fn primaryEqualCost(lc: *lookupCosts, left: i64, right: i64) i64 {
 }
 
 pub fn equivsCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts, length: i64) i64 {
-    var cost: i64 = vg.cv(i64, 0);
+    var cost: i64 = vg.cv(i64, 1);
     {
         var i: i64 = 0;
         while ((i < brs.at(bi).*.equivs.len)) : (i +%= 1) {
@@ -1701,7 +1761,7 @@ pub fn equivsCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts, length: 
 }
 
 pub fn positiveSingleCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts) i64 {
-    var cost: i64 = (2 +% searchSteps(brs.at(bi).*.ranges.len));
+    var cost: i64 = (3 +% searchSteps(brs.at(bi).*.ranges.len));
     if ((brs.at(bi).*.classMask != 0)) {
         cost +%= lc.classMask;
     }
@@ -1712,20 +1772,20 @@ pub fn matchesOneCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts) i64 
     const positive: i64 = positiveSingleCost(brs, bi, lc);
     var cost: i64 = cAdd(1, positive);
     if (brs.at(bi).*.icase) {
-        cost = cAdd(cost, cAdd(lc.casePreimages, cMul(lc.preimages, cAdd(1, positive))));
+        cost = cAdd(cost, cAdd((lc.casePreimages +% 1), cMul(lc.preimages, cAdd(1, positive))));
     }
     return cost;
 }
 
 pub fn candidateLeafCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts, length: i64) i64 {
-    return cAdd((1 +% collatingElementIDCost(lc, length)), equivsCost(brs, bi, lc, length));
+    return cAdd((2 +% collatingElementIDCost(lc, length)), equivsCost(brs, bi, lc, length));
 }
 
 pub fn probeCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts, length: i64) i64 {
-    var cost: i64 = cAdd(2, vg.cv(i64, brs.at(bi).*.elems.len));
-    var counterpart: i64 = vg.cv(i64, 1);
+    var cost: i64 = cAdd(3, vg.cv(i64, brs.at(bi).*.elems.len));
+    var counterpart: i64 = vg.cv(i64, 2);
     if (brs.at(bi).*.icase) {
-        counterpart = (1 +% (2 *% lc.caseConvert));
+        counterpart = (4 +% (2 *% lc.caseConvert));
     }
     {
         var i: i64 = 0;
@@ -1740,16 +1800,18 @@ pub fn probeCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts, length: i
     }
     const leaf: i64 = candidateLeafCost(brs, bi, lc, length);
     if ((!brs.at(bi).*.icase)) {
-        return cAdd(cost, cAdd((length +% 1), leaf));
+        return cAdd(cost, cAdd(length, leaf));
     }
     var candidates: i64 = vg.cv(i64, 1);
+    var inner: i64 = vg.cv(i64, 0);
     {
         var i_2: i64 = vg.cv(i64, 0);
         while ((i_2 < length)) : (i_2 +%= 1) {
+            inner = cAdd(inner, candidates);
             candidates = cMul(candidates, (lc.preimages +% 1));
         }
     }
-    return cAdd(cost, cMul(candidates, cAdd((2 +% lc.preimages), cAdd(lc.casePreimages, leaf))));
+    return cAdd(cost, cAdd(cMul(inner, cAdd((2 +% lc.preimages), lc.casePreimages)), cMul(candidates, leaf)));
 }
 
 pub fn bracketAtomCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts) i64 {
@@ -1757,7 +1819,7 @@ pub fn bracketAtomCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts) i64
     if ((brs.at(bi).*.multiLens == 0)) {
         return cost;
     }
-    cost = cAdd(cost, (maxElemAhead -% 1));
+    cost = cAdd(cost, maxElemAhead);
     {
         var length: i64 = 2;
         while ((length <= maxElemAhead)) : (length +%= 1) {
@@ -1800,7 +1862,7 @@ pub fn solverSteps(nodes: vg.Slice(node), ni: i32, length: i64) i64 {
 pub fn repInstances(nodes: vg.Slice(node), ni: i32, length: i64) i64 {
     var instances: i64 = cAdd(length, (vg.cv(i64, nodes.at(ni).*.min) +% 1));
     if ((nodes.at(ni).*.max != infinite)) {
-        instances = @min(instances, vg.cv(i64, nodes.at(ni).*.max));
+        instances = vg.min(instances, vg.cv(i64, nodes.at(ni).*.max));
     }
     return instances;
 }
@@ -1812,7 +1874,7 @@ pub fn solverDepth(nodes: vg.Slice(node), ni: i32, length: i64) i64 {
             {
                 var i: i64 = 0;
                 while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-                    deepest = @max(deepest, solverDepth(nodes, nodes.at(ni).*.ch.at(i).*, length));
+                    deepest = vg.max(deepest, solverDepth(nodes, nodes.at(ni).*.ch.at(i).*, length));
                 }
             }
             if ((nodes.at(ni).*.op == opConcat)) {
@@ -1835,7 +1897,7 @@ pub fn treeNodes(nodes: vg.Slice(node), ni: i32, length: i64) i64 {
             {
                 var i: i64 = 0;
                 while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-                    widest = @max(widest, treeNodes(nodes, nodes.at(ni).*.ch.at(i).*, length));
+                    widest = vg.max(widest, treeNodes(nodes, nodes.at(ni).*.ch.at(i).*, length));
                 }
             }
             return cAdd(widest, 1);
@@ -1872,7 +1934,7 @@ pub fn solverFanout(nodes: vg.Slice(node), ni: i32, length: i64) i64 {
     {
         var i: i64 = 0;
         while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-            widest = @max(widest, solverFanout(nodes, nodes.at(ni).*.ch.at(i).*, length));
+            widest = vg.max(widest, solverFanout(nodes, nodes.at(ni).*.ch.at(i).*, length));
         }
     }
     return widest;
@@ -2245,7 +2307,7 @@ pub fn continuationFlags(re: *Regexp, subject: vg.Str, pos: i64, eflags: u32) u3
         return eflags;
     }
     if ((((re.flags & FlagNewline) != 0) and (subject.byte((pos -% 1)) == 10))) {
-        return (eflags & ~(ExecNotBOL));
+        return (eflags & ~(@as(u32, ExecNotBOL)));
     }
     return (eflags | ExecNotBOL);
 }
@@ -2648,7 +2710,7 @@ pub fn localeValidate(l: *Locale) bool {
         var i_6: i64 = 0;
         while ((i_6 < count)) : (i_6 +%= 1) {
             const row_2: LocaleRow = localeRowAt(l, i_6);
-            if ((((row_2.TypeFirst +% row_2.TypeCount) > typeRowCount) or (vg.cv(i64, row_2.DefaultCollation) >= profileCount))) {
+            if (((((row_2.TypeFirst +% row_2.TypeCount) > typeRowCount) or (row_2.CaseProfile > 1)) or (vg.cv(i64, row_2.DefaultCollation) >= profileCount))) {
                 return false;
             }
         }
@@ -2821,8 +2883,8 @@ pub fn localeRowAt(l: *Locale, index: i64) LocaleRow {
     var row: LocaleRow = .{};
     row.TypeFirst = vg.cv(i64, u32At(l, secLocales, (base +% 1)));
     row.TypeCount = vg.cv(i64, u32At(l, secLocales, (base +% 2)));
-    row.CaseProfile = vg.cv(u8, u32At(l, secLocales, (base +% 3)));
-    row.DefaultCollation = vg.cv(u16, u32At(l, secLocales, (base +% 4)));
+    row.CaseProfile = u32At(l, secLocales, (base +% 3));
+    row.DefaultCollation = u32At(l, secLocales, (base +% 4));
     return row;
 }
 
@@ -2889,10 +2951,10 @@ pub fn resolveLocale(data: *Locale, req: localeRequest) Tup_t4c6f63616c65x_bool 
         return .{ invalid, false };
     }
     const row: LocaleRow = localeRowAt(&result, index);
-    result.caseProfile = row.CaseProfile;
+    result.caseProfile = vg.cv(u8, row.CaseProfile);
     result.valid = true;
     if ((req.ctype.len == 0)) {
-        result.collationProfile = row.DefaultCollation;
+        result.collationProfile = vg.cv(u16, row.DefaultCollation);
         return .{ result, true };
     }
     const typeNameCount: i64 = vg.divT(sectionLen(&result, secTypeNameOffsets), 4);
@@ -3123,7 +3185,7 @@ pub fn maxPairRun(l: *Locale, sec: i64) i64 {
                 run = 1;
                 last = target;
             }
-            longest = @max(longest, run);
+            longest = vg.max(longest, run);
         }
     }
     return longest;
@@ -3185,7 +3247,7 @@ pub fn localeToLower(l: *Locale, r: i32) i32 {
 pub fn compareSequence(l: *Locale, seq: vg.Slice(i32), index: i64) i64 {
     const off: i64 = vg.cv(i64, u32At(l, secSequences, (2 *% index)));
     const length: i64 = vg.cv(i64, u32At(l, secSequences, ((2 *% index) +% 1)));
-    const common: i64 = @min(length, seq.len);
+    const common: i64 = vg.min(length, seq.len);
     {
         var i: i64 = 0;
         while ((i < common)) : (i +%= 1) {
@@ -3311,7 +3373,7 @@ pub fn LocaleCollatingPrefix(l: *Locale, seq: vg.Slice(i32)) i64 {
     if (((!l.valid) or (seq.len == 0))) {
         return 0;
     }
-    const maximum: i64 = @min(seq.len, l.maxSeq);
+    const maximum: i64 = vg.min(seq.len, l.maxSeq);
     {
         var candidate: i64 = maximum;
         while ((candidate >= 2)) : (candidate -%= 1) {
@@ -3432,7 +3494,7 @@ pub fn minTokenLength(l: *Locale, sec: i64, first: i64, count: i64, token: u64, 
                 continue;
             }
             const index: i64 = vg.cv(i64, (candidate -% firstSequenceID));
-            best_v = @min(best_v, vg.cv(i64, u32At(l, secSequences, ((2 *% index) +% 1))));
+            best_v = vg.min(best_v, vg.cv(i64, u32At(l, secSequences, ((2 *% index) +% 1))));
         }
     }
     return best_v;
@@ -4075,7 +4137,7 @@ pub fn progDepth(mem: vg.Allocator, pr: *program) vg.Allocator.Error!i64 {
                 {
                     var pc_2: i64 = 0;
                     while ((pc_2 < n)) : (pc_2 +%= 1) {
-                        best = @max(best, depth.at(pc_2).*);
+                        best = vg.max(best, depth.at(pc_2).*);
                     }
                 }
                 return vg.cv(i64, best);
@@ -4262,7 +4324,7 @@ pub fn emitRepeat(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), ni:
         var fi: instr = .{};
         fi.op = iFail;
         const idx: u32 = try addInstr(mem, b, fi);
-        b.failMin = @min(b.failMin, nodes.at(ni).*.minL);
+        b.failMin = vg.min(b.failMin, nodes.at(ni).*.minL);
         var f: frag = .{};
         f.start = idx;
         return f;
@@ -4303,7 +4365,7 @@ pub fn emitRepeat(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), ni:
         _ = fragAppend(b, &result, haveResult, try emitStar(mem, b, nodes, child, mask_v, extra_v));
         return result;
     }
-    var skips: vg.Slice(patchSlot) = try vg.makeCap(mem, patchSlot, 0, @max((hi -% lo), 1));
+    var skips: vg.Slice(patchSlot) = try vg.makeCap(mem, patchSlot, 0, vg.max((hi -% lo), 1));
     {
         var i_2: i64 = lo;
         while ((i_2 < hi)) : (i_2 +%= 1) {
@@ -4451,7 +4513,7 @@ pub fn minMatchChars(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), loc: *Loc
             {
                 var i_2: i64 = 0;
                 while ((i_2 < nodes.at(ni).*.ch.len)) : (i_2 +%= 1) {
-                    best = @min(best, minMatchChars(nodes, brs, loc, nodes.at(ni).*.ch.at(i_2).*));
+                    best = vg.min(best, minMatchChars(nodes, brs, loc, nodes.at(ni).*.ch.at(i_2).*));
                 }
             }
             return best;
@@ -4461,7 +4523,7 @@ pub fn minMatchChars(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), loc: *Loc
                 return 0;
             }
             const product: i64 = (nodes.at(ni).*.min *% minMatchChars(nodes, brs, loc, nodes.at(ni).*.ch.at(0).*));
-            return @min(product, lengthCap);
+            return vg.min(product, lengthCap);
         },
         else => {},
     }
@@ -4881,10 +4943,15 @@ pub fn parseExpr(mem: vg.Allocator, p: *parser, loc: *Locale) vg.Allocator.Error
     var primary: i32 = 0;
     switch (c) {
         40 => {
+            if ((p.depth == maxNesting)) {
+                return fail(p, ErrESpace, start);
+            }
             p.pos +%= 1;
             p.groups +%= 1;
             const index: i64 = p.groups;
+            p.depth +%= 1;
             const sub: i32 = try parseAlt(mem, p, loc, true);
+            p.depth -%= 1;
             if ((sub < 0)) {
                 return (-%1);
             }
@@ -5077,7 +5144,7 @@ pub fn parseCount(p: *parser) Tup_i64_bool {
 }
 
 pub fn satAdd(a: i64, b: i64) i64 {
-    return @min((a +% b), lenInf);
+    return vg.min((a +% b), lenInf);
 }
 
 pub fn satMul(a: i64, b: i64) i64 {
@@ -5138,8 +5205,8 @@ pub fn computeLengths(mem: vg.Allocator, nodes: vg.Slice(node), loc: *Locale, br
                 var i_2: i64 = 0;
                 while ((i_2 < nodes.at(ni).*.ch.len)) : (i_2 +%= 1) {
                     const child_3: i32 = nodes.at(ni).*.ch.at(i_2).*;
-                    nodes.at(ni).*.minL = @min(nodes.at(ni).*.minL, nodes.at(child_3).*.minL);
-                    nodes.at(ni).*.maxL = @max(nodes.at(ni).*.maxL, nodes.at(child_3).*.maxL);
+                    nodes.at(ni).*.minL = vg.min(nodes.at(ni).*.minL, nodes.at(child_3).*.minL);
+                    nodes.at(ni).*.maxL = vg.max(nodes.at(ni).*.maxL, nodes.at(child_3).*.maxL);
                 }
             }
         },

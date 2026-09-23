@@ -94,9 +94,9 @@ int64_t PartialArray() {
     std::array<vg::Str, 3> names = std::array<vg::Str, 3>{vg::lit("a")};
     int64_t t = 0LL;
     for (int64_t i = 0LL; (i < 5LL); i += 1LL) {
-        t = ((t * 10LL) + a[size_t(i)]);
+        t = ((t * 10LL) + vg::at(a, i));
     }
-    return (((t * 10LL) + int64_t(vg::len(names[size_t(1LL)]))) + int64_t(vg::len(names[size_t(0LL)])));
+    return (((t * 10LL) + int64_t(vg::len(vg::at(names, 1LL)))) + int64_t(vg::len(vg::at(names, 0LL))));
 }
 
 bool TaggedEq(Tagged a, Tagged b) {
@@ -179,7 +179,7 @@ uint32_t AndNotProbe(uint32_t a, uint32_t b) {
 }
 
 uint64_t ShiftProbe(uint64_t x, int64_t n) {
-    return ((x << n) >> vg::sdiv<int64_t>(n, 2LL));
+    return ((x << vg::shift_count(n, 64)) >> vg::shift_count(vg::sdiv<int64_t>(n, 2LL), 64));
 }
 
 uint64_t ConvProbe(int64_t x) {
@@ -221,14 +221,14 @@ int64_t MakeU64(vg::Arena& mem, uint64_t n) {
 
 std::array<int64_t, 3> mkTriple(int64_t x) {
     std::array<int64_t, 3> a{};
-    a[size_t(0LL)] = x;
-    a[size_t(1LL)] = (x + 1LL);
-    a[size_t(2LL)] = (x + 2LL);
+    vg::at(a, 0LL) = x;
+    vg::at(a, 1LL) = (x + 1LL);
+    vg::at(a, 2LL) = (x + 2LL);
     return a;
 }
 
 int64_t PickArray(vg::Arena& mem, Counter& c) {
-    int64_t v = ([&]() { auto&& _t1 = mkTriple(40LL); auto _t2 = bump(mem, c, 2); return _t1[size_t(_t2)]; }());
+    int64_t v = ([&]() { auto&& _t1 = mkTriple(40LL); auto _t2 = bump(mem, c, 2); return vg::at(_t1, _t2); }());
     return ([&]{ auto _t3 = (v * 10000LL); auto _t4 = logCode(c); return (_t3 + _t4); }());
 }
 

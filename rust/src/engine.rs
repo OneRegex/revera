@@ -114,6 +114,7 @@ pub const opRepeat: u8 = 7u8;
 pub const opGroup: u8 = 8u8;
 pub const infinite: i64 = (1i64).wrapping_neg();
 pub const lenInf: i64 = 1073741824i64;
+pub const maxNesting: i64 = 256i64;
 pub const invalidRune: i32 = (1i32).wrapping_neg();
 
 pub static classNames: [vg::Str; (numClasses) as usize] = [vg::lit(b"alnum"), vg::lit(b"alpha"), vg::lit(b"blank"), vg::lit(b"cntrl"), vg::lit(b"digit"), vg::lit(b"graph"), vg::lit(b"lower"), vg::lit(b"print"), vg::lit(b"punct"), vg::lit(b"space"), vg::lit(b"upper"), vg::lit(b"xdigit")];
@@ -313,8 +314,8 @@ pub struct Locale {
 pub struct LocaleRow {
     pub TypeFirst: i64,
     pub TypeCount: i64,
-    pub CaseProfile: u8,
-    pub DefaultCollation: u16,
+    pub CaseProfile: u32,
+    pub DefaultCollation: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -473,6 +474,7 @@ pub struct parser {
     pub pos: i64,
     pub flags: u32,
     pub groups: i64,
+    pub depth: i64,
     pub nodes: vg::Slice<node>,
     pub brackets: vg::Slice<bracketSet>,
     pub err: Error,
@@ -560,7 +562,7 @@ pub fn parseBracket(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
             } else if _t23 == itemEquiv {
                 b.equivs = vg::append(mem, b.equivs, item.seq);
             } else if _t23 == itemClass {
-                b.classMask |= (1u16 << item.class);
+                b.classMask |= (1u16 << vg::shift_count(item.class, 16));
             }
         }
     }
@@ -760,7 +762,7 @@ pub fn finalizeBracket(mem: &vg::Arena, b: &mut bracketSet, loc: &mut Locale) {
             let mut i: i64 = 0i64;
             '_b1: while (i < b.elems.len) {
                 '_c1: {
-                    b.multiLens |= (1u16 << b.elems.get(i).len);
+                    b.multiLens |= (1u16 << vg::shift_count(b.elems.get(i).len, 16));
                 }
                 i = (i).wrapping_add(1i64);
             }
@@ -770,7 +772,7 @@ pub fn finalizeBracket(mem: &vg::Arena, b: &mut bracketSet, loc: &mut Locale) {
                 let mut length: i64 = 2i64;
                 '_b2: while (length <= localeMaxElementLength(loc)) {
                     '_c2: {
-                        b.multiLens |= (1u16 << length);
+                        b.multiLens |= (1u16 << vg::shift_count(length, 16));
                     }
                     length = (length).wrapping_add(1i64);
                 }
@@ -1593,12 +1595,12 @@ pub fn ContractFor(re: &mut Regexp, maxInput: i64) -> Contract {
     let mut c: Contract = vg::zero();
     c.MaxInput = ((length) as i64);
     c.Matcher = { let _t1 = length; let _t2 = atom; matcherContract(re, _t1, _t2) };
-    if ((re.progOK && (re.nsub > 0i64)) && ((re.flags & FlagNoSub) == 0u32)) {
+    if (((re.progOK && (re.prog.failMin != 0i64)) && (re.nsub > 0i64)) && ((re.flags & FlagNoSub) == 0u32)) {
         if re.onePass {
-            c.OnePass = { let _t3 = length; let _t4 = atom; onePassContract(re, _t3, _t4) };
+            c.OnePass = { let _t3 = length; onePassContract(re, _t3) };
             c.HasOnePass = true;
         } else {
-            c.Solver = { let _t5 = length; let _t6 = atom; solverContract(re, _t5, _t6) };
+            c.Solver = { let _t4 = length; let _t5 = atom; solverContract(re, _t4, _t5) };
             c.HasSolver = true;
         }
     }
@@ -1609,7 +1611,7 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
     let mut b: BackendContract = vg::zero();
     if (!re.progOK) {
         b.StackBytes = matcherStackBytes;
-        b.Steps = cAdd(cMul(2i64, length), 2i64);
+        b.Steps = cAdd(runeCountSteps(length), 3i64);
         return b;
     }
     let n: i64 = ((re.prog.ins.len) as i64);
@@ -1628,12 +1630,19 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
     if (re.prog.depth >= 0i64) {
         boundaries = std::cmp::min(boundaries, (((re.prog.depth) as i64)).wrapping_add(3i64));
     }
-    let steps: i64 = cAdd(cAdd((24i64).wrapping_add(ring), length), cMul(boundaries, perBoundary));
+    let mut steps: i64 = cAdd(cAdd((24i64).wrapping_add(ring), length), cMul(boundaries, perBoundary));
+    if (re.prog.failMin != failMinNone) {
+        steps = cAdd(steps, cAdd(runeCountSteps(length), 1i64));
+    }
     let stack: i64 = 6144i64;
     b.HeapBytes = heap;
     b.StackBytes = stack;
     b.Steps = steps;
     return b;
+}
+
+pub fn runeCountSteps(length: i64) -> i64 {
+    return cAdd(cMul(3i64, length), 2i64);
 }
 
 pub fn captureHeap(re: &mut Regexp, length: i64) -> i64 {
@@ -1644,13 +1653,77 @@ pub fn captureHeap(re: &mut Regexp, length: i64) -> i64 {
     return cAdd(cAdd(payload, allowance), 64i64);
 }
 
-pub fn onePassContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContract {
+pub fn onePassContract(re: &mut Regexp, length: i64) -> BackendContract {
     let mut b: BackendContract = vg::zero();
-    let perVisit: i64 = cAdd(atom, (((re.nsub) as i64)).wrapping_add(1i64));
     b.HeapBytes = { let _t1 = length; captureHeap(re, _t1) };
     b.StackBytes = cMul(cAdd(astHeight(re.nodes, re.root), 10i64), frameBytes);
-    b.Steps = cMul(cMul(astSize(re.nodes, re.root), cAdd(length, 2i64)), perVisit);
+    let mut lc: lookupCosts = localeLookupCosts(&mut re.loc);
+    let _t2 = { let _t3 = re.root; let _t4 = false; onePassWalk(re, &mut lc, _t3, _t4) };
+    let once: i64 = _t2.0;
+    let perChar: i64 = _t2.1;
+    let mut steps: i64 = cAdd(once, cMul(length, perChar));
+    steps = cAdd(steps, runeCountSteps(length));
+    b.Steps = cAdd(steps, ((5i64).wrapping_mul(((re.nsub) as i64))).wrapping_add(14i64));
     return b;
+}
+
+pub fn onePassVisitCost(re: &mut Regexp, lc: &mut lookupCosts, ni: i32) -> i64 {
+    let count: i64 = ((re.nodes.get(((ni) as i64)).ch.len) as i64);
+    {
+        let _t1 = re.nodes.get(((ni) as i64)).op;
+        if _t1 == opChar {
+            if ((re.flags & FlagICase) != 0u32) {
+                return (((re.nodes.get(((ni) as i64)).fold.len) as i64)).wrapping_add(4i64);
+            }
+        } else if _t1 == opBracket {
+            return cAdd(1i64, { let _t2 = re.brackets; let _t3 = re.nodes.get(((ni) as i64)).br; matchesOneCost(_t2, _t3, lc) });
+        } else if _t1 == opGroup {
+            return (3i64).wrapping_add((2i64).wrapping_mul(((re.nested.get(re.nodes.get(((ni) as i64)).index).len) as i64)));
+        } else if _t1 == opConcat {
+            return (3i64).wrapping_add((3i64).wrapping_mul(count));
+        } else if _t1 == opAlt {
+            let mut cost: i64 = (3i64).wrapping_add((4i64).wrapping_mul(count));
+            {
+                let mut i: i64 = 0i64;
+                '_b4: while (i < re.nodes.get(((ni) as i64)).firsts.len) {
+                    '_c4: {
+                        cost = (cost).wrapping_add(((re.nodes.get(((ni) as i64)).firsts.get(i).len) as i64));
+                    }
+                    i = (i).wrapping_add(1i64);
+                }
+            }
+            return cost;
+        }
+    }
+    return 2i64;
+}
+
+pub fn onePassWalk(re: &mut Regexp, lc: &mut lookupCosts, ni: i32, repeated: bool) -> (i64, i64) {
+    let mut once: i64 = 0i64;
+    let mut perChar: i64 = 0i64;
+    if repeated {
+        perChar = { let _t1 = ni; onePassVisitCost(re, lc, _t1) };
+    } else {
+        once = { let _t2 = ni; onePassVisitCost(re, lc, _t2) };
+    }
+    let isRepeat: bool = (re.nodes.get(((ni) as i64)).op == opRepeat);
+    {
+        let mut i: i64 = 0i64;
+        '_b3: while (i < re.nodes.get(((ni) as i64)).ch.len) {
+            '_c3: {
+                let _t4 = { let _t5 = re.nodes.get(((ni) as i64)).ch.get(i); let _t6 = (repeated || isRepeat); onePassWalk(re, lc, _t5, _t6) };
+                let o: i64 = _t4.0;
+                let p: i64 = _t4.1;
+                once = cAdd(once, o);
+                perChar = cAdd(perChar, p);
+                if isRepeat {
+                    perChar = cAdd(perChar, 1i64);
+                }
+            }
+            i = (i).wrapping_add(1i64);
+        }
+    }
+    return (once, perChar);
 }
 
 pub fn solverContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContract {
@@ -1669,20 +1742,6 @@ pub fn solverContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContrac
     b.StackBytes = stack;
     b.Steps = steps;
     return b;
-}
-
-pub fn astSize(nodes: vg::Slice<node>, ni: i32) -> i64 {
-    let mut total: i64 = 1i64;
-    {
-        let mut i: i64 = 0i64;
-        '_b1: while (i < nodes.get(((ni) as i64)).ch.len) {
-            '_c1: {
-                total = cAdd(total, astSize(nodes, nodes.get(((ni) as i64)).ch.get(i)));
-            }
-            i = (i).wrapping_add(1i64);
-        }
-    }
-    return total;
 }
 
 pub fn astHeight(nodes: vg::Slice<node>, ni: i32) -> i64 {
@@ -1737,7 +1796,7 @@ pub fn searchSteps(count: i64) -> i64 {
 }
 
 pub fn u32ContainsCost(count: i64) -> i64 {
-    return (1i64).wrapping_add((3i64).wrapping_mul(searchSteps(count)));
+    return (2i64).wrapping_add((3i64).wrapping_mul(searchSteps(count)));
 }
 
 pub fn findPairCost(count: i64) -> i64 {
@@ -1749,11 +1808,11 @@ pub fn findCaseCost(count: i64) -> i64 {
 }
 
 pub fn pairSourcesRunCost(count: i64, preimages: i64) -> i64 {
-    return ((5i64).wrapping_add((3i64).wrapping_mul(searchSteps(count)))).wrapping_add((5i64).wrapping_mul(preimages));
+    return ((6i64).wrapping_add((3i64).wrapping_mul(searchSteps(count)))).wrapping_add((5i64).wrapping_mul(preimages));
 }
 
 pub fn compareSequenceCost(length: i64) -> i64 {
-    return (5i64).wrapping_add((3i64).wrapping_mul(length));
+    return (6i64).wrapping_add((3i64).wrapping_mul(length));
 }
 
 pub fn localeLookupCosts(l: &mut Locale) -> lookupCosts {
@@ -1780,15 +1839,15 @@ pub fn localeLookupCosts(l: &mut Locale) -> lookupCosts {
         upper = secInvUpperTurkic;
         lower = secInvLowerTurkic;
     }
-    lc.casePreimages = (((2i64).wrapping_add(pairSourcesRunCost(({ let _t7 = upper; sectionLen(l, _t7) }).wrapping_div(8i64), lc.preimages))).wrapping_add(pairSourcesRunCost(({ let _t8 = lower; sectionLen(l, _t8) }).wrapping_div(8i64), lc.preimages))).wrapping_add((lc.preimages).wrapping_mul((2i64).wrapping_add(lc.preimages)));
+    lc.casePreimages = (((3i64).wrapping_add(pairSourcesRunCost(({ let _t7 = upper; sectionLen(l, _t7) }).wrapping_div(8i64), lc.preimages))).wrapping_add(pairSourcesRunCost(({ let _t8 = lower; sectionLen(l, _t8) }).wrapping_div(8i64), lc.preimages))).wrapping_add((lc.preimages).wrapping_mul((2i64).wrapping_add(lc.preimages)));
     return lc;
 }
 
 pub fn elementIDCost(lc: &mut lookupCosts, length: i64) -> i64 {
     if (length == 1i64) {
-        return 3i64;
+        return 4i64;
     }
-    return ((2i64).wrapping_add((2i64).wrapping_mul(length))).wrapping_add((lc.sequenceSearch).wrapping_mul((1i64).wrapping_add(compareSequenceCost(length))));
+    return ((4i64).wrapping_add((2i64).wrapping_mul(length))).wrapping_add((lc.sequenceSearch).wrapping_mul((1i64).wrapping_add(compareSequenceCost(length))));
 }
 
 pub fn collatingElementIDCost(lc: &mut lookupCosts, length: i64) -> i64 {
@@ -1804,7 +1863,7 @@ pub fn primaryEqualCost(lc: &mut lookupCosts, left: i64, right: i64) -> i64 {
 }
 
 pub fn equivsCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, length: i64) -> i64 {
-    let mut cost: i64 = 0i64;
+    let mut cost: i64 = 1i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < brs.get(((bi) as i64)).equivs.len) {
@@ -1818,7 +1877,7 @@ pub fn equivsCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, len
 }
 
 pub fn positiveSingleCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts) -> i64 {
-    let mut cost: i64 = (2i64).wrapping_add(searchSteps(brs.get(((bi) as i64)).ranges.len));
+    let mut cost: i64 = (3i64).wrapping_add(searchSteps(brs.get(((bi) as i64)).ranges.len));
     if (brs.get(((bi) as i64)).classMask != 0u16) {
         cost = (cost).wrapping_add(lc.classMask);
     }
@@ -1829,20 +1888,20 @@ pub fn matchesOneCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts)
     let positive: i64 = { let _t1 = brs; let _t2 = bi; positiveSingleCost(_t1, _t2, lc) };
     let mut cost: i64 = cAdd(1i64, positive);
     if brs.get(((bi) as i64)).icase {
-        cost = cAdd(cost, cAdd(lc.casePreimages, cMul(lc.preimages, cAdd(1i64, positive))));
+        cost = cAdd(cost, cAdd((lc.casePreimages).wrapping_add(1i64), cMul(lc.preimages, cAdd(1i64, positive))));
     }
     return cost;
 }
 
 pub fn candidateLeafCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, length: i64) -> i64 {
-    return cAdd((1i64).wrapping_add({ let _t1 = length; collatingElementIDCost(lc, _t1) }), { let _t2 = brs; let _t3 = bi; let _t4 = length; equivsCost(_t2, _t3, lc, _t4) });
+    return cAdd((2i64).wrapping_add({ let _t1 = length; collatingElementIDCost(lc, _t1) }), { let _t2 = brs; let _t3 = bi; let _t4 = length; equivsCost(_t2, _t3, lc, _t4) });
 }
 
 pub fn probeCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, length: i64) -> i64 {
-    let mut cost: i64 = cAdd(2i64, ((brs.get(((bi) as i64)).elems.len) as i64));
-    let mut counterpart: i64 = 1i64;
+    let mut cost: i64 = cAdd(3i64, ((brs.get(((bi) as i64)).elems.len) as i64));
+    let mut counterpart: i64 = 2i64;
     if brs.get(((bi) as i64)).icase {
-        counterpart = (1i64).wrapping_add((2i64).wrapping_mul(lc.caseConvert));
+        counterpart = (4i64).wrapping_add((2i64).wrapping_mul(lc.caseConvert));
     }
     {
         let mut i: i64 = 0i64;
@@ -1860,19 +1919,21 @@ pub fn probeCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts, leng
     }
     let leaf: i64 = { let _t2 = brs; let _t3 = bi; let _t4 = length; candidateLeafCost(_t2, _t3, lc, _t4) };
     if (!brs.get(((bi) as i64)).icase) {
-        return cAdd(cost, cAdd((length).wrapping_add(1i64), leaf));
+        return cAdd(cost, cAdd(length, leaf));
     }
     let mut candidates: i64 = 1i64;
+    let mut inner: i64 = 0i64;
     {
         let mut i_2: i64 = 0i64;
         '_b5: while (i_2 < length) {
             '_c5: {
+                inner = cAdd(inner, candidates);
                 candidates = cMul(candidates, (lc.preimages).wrapping_add(1i64));
             }
             i_2 = (i_2).wrapping_add(1i64);
         }
     }
-    return cAdd(cost, cMul(candidates, cAdd((2i64).wrapping_add(lc.preimages), cAdd(lc.casePreimages, leaf))));
+    return cAdd(cost, cAdd(cMul(inner, cAdd((2i64).wrapping_add(lc.preimages), lc.casePreimages)), cMul(candidates, leaf)));
 }
 
 pub fn bracketAtomCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts) -> i64 {
@@ -1880,12 +1941,12 @@ pub fn bracketAtomCost(brs: vg::Slice<bracketSet>, bi: i32, lc: &mut lookupCosts
     if (brs.get(((bi) as i64)).multiLens == 0u16) {
         return cost;
     }
-    cost = cAdd(cost, 7i64);
+    cost = cAdd(cost, maxElemAhead);
     {
         let mut length: i64 = 2i64;
         '_b3: while (length <= maxElemAhead) {
             '_c3: {
-                if ((brs.get(((bi) as i64)).multiLens & (1u16 << length)) != 0u16) {
+                if ((brs.get(((bi) as i64)).multiLens & (1u16 << vg::shift_count(length, 16))) != 0u16) {
                     cost = cAdd(cost, { let _t4 = brs; let _t5 = bi; let _t6 = ((length) as i64); probeCost(_t4, _t5, lc, _t6) });
                 }
             }
@@ -2343,7 +2404,7 @@ pub fn paConsume(mem: &vg::Arena, e: &mut phaseAState, ws: &mut engineWS, re: &m
                             let mut length: i64 = 2i64;
                             '_b23: while (length <= ws.ahead.len) {
                                 '_c23: {
-                                    if ((re.brackets.get(((bi) as i64)).multiLens & (1u16 << length)) == 0u16) {
+                                    if ((re.brackets.get(((bi) as i64)).multiLens & (1u16 << vg::shift_count(length, 16))) == 0u16) {
                                         break '_c23;
                                     }
                                     if { let _t24 = re.brackets; let _t25 = bi; let _t26 = ws.ahead.head(length); bracketMatchesMulti(_t24, _t25, &mut re.loc, _t26) } {
@@ -2822,7 +2883,7 @@ pub fn localeValidate(l: &mut Locale) -> bool {
         '_b59: while (i_6 < count) {
             '_c59: {
                 let row_2: LocaleRow = { let _t60 = i_6; localeRowAt(l, _t60) };
-                if (((row_2.TypeFirst).wrapping_add(row_2.TypeCount) > typeRowCount) || (((row_2.DefaultCollation) as i64) >= profileCount)) {
+                if ((((row_2.TypeFirst).wrapping_add(row_2.TypeCount) > typeRowCount) || (row_2.CaseProfile > 1u32)) || (((row_2.DefaultCollation) as i64) >= profileCount)) {
                     return false;
                 }
             }
@@ -3012,8 +3073,8 @@ pub fn localeRowAt(l: &mut Locale, index: i64) -> LocaleRow {
     let mut row: LocaleRow = vg::zero();
     row.TypeFirst = (({ let _t1 = secLocales; let _t2 = (base).wrapping_add(1i64); u32At(l, _t1, _t2) }) as i64);
     row.TypeCount = (({ let _t3 = secLocales; let _t4 = (base).wrapping_add(2i64); u32At(l, _t3, _t4) }) as i64);
-    row.CaseProfile = (({ let _t5 = secLocales; let _t6 = (base).wrapping_add(3i64); u32At(l, _t5, _t6) }) as u8);
-    row.DefaultCollation = (({ let _t7 = secLocales; let _t8 = (base).wrapping_add(4i64); u32At(l, _t7, _t8) }) as u16);
+    row.CaseProfile = { let _t5 = secLocales; let _t6 = (base).wrapping_add(3i64); u32At(l, _t5, _t6) };
+    row.DefaultCollation = { let _t7 = secLocales; let _t8 = (base).wrapping_add(4i64); u32At(l, _t7, _t8) };
     return row;
 }
 
@@ -3080,10 +3141,10 @@ pub fn resolveLocale(data: &mut Locale, req: localeRequest) -> (Locale, bool) {
         return (invalid, false);
     }
     let row: LocaleRow = { let _t5 = index; localeRowAt(&mut result, _t5) };
-    result.caseProfile = row.CaseProfile;
+    result.caseProfile = ((row.CaseProfile) as u8);
     result.valid = true;
     if (req.ctype.len == 0i64) {
-        result.collationProfile = row.DefaultCollation;
+        result.collationProfile = ((row.DefaultCollation) as u16);
         return (result, true);
     }
     let typeNameCount: i64 = ({ let _t6 = secTypeNameOffsets; sectionLen(&mut result, _t6) }).wrapping_div(4i64);
@@ -4553,7 +4614,7 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
     if nodes.get(((ni) as i64)).minimal {
         let slot: i64 = nodes.get(((ni) as i64)).index;
         if (slot < maskWidth) {
-            mask_v |= (1u64 << slot);
+            mask_v |= (1u64 << vg::shift_count(slot, 64));
         } else {
             let grown: vg::Slice<u32> = vg::make::<u32>(mem, (extra_v.len).wrapping_add(1i64));
             let _ = vg::vcopy(grown, extra_v);
@@ -5190,20 +5251,25 @@ pub fn parseExpr(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
     {
         let _t7 = c;
         if _t7 == 40u8 {
+            if (p.depth == maxNesting) {
+                return { let _t8 = ErrESpace; let _t9 = start; fail(p, _t8, _t9) };
+            }
             p.pos = (p.pos).wrapping_add(1i64);
             p.groups = (p.groups).wrapping_add(1i64);
             let index: i64 = p.groups;
-            let sub: i32 = { let _t8 = true; parseAlt(mem, p, loc, _t8) };
+            p.depth = (p.depth).wrapping_add(1i64);
+            let sub: i32 = { let _t10 = true; parseAlt(mem, p, loc, _t10) };
+            p.depth = (p.depth).wrapping_sub(1i64);
             if (sub < 0i32) {
                 return (1i32).wrapping_neg();
             }
             if (peekByte(p) != 41u8) {
-                return { let _t9 = ErrEParen; let _t10 = start; fail(p, _t9, _t10) };
+                return { let _t11 = ErrEParen; let _t12 = start; fail(p, _t11, _t12) };
             }
             p.pos = (p.pos).wrapping_add(1i64);
-            primary = { let _t11 = opGroup; addNode(mem, p, _t11) };
-            p.nodes.update(((primary) as i64), vg::append(mem, p.nodes.get(((primary) as i64)).ch, sub), |mut _t13, _t12| { _t13.ch = _t12; _t13 });
-            p.nodes.update(((primary) as i64), index, |mut _t15, _t14| { _t15.index = _t14; _t15 });
+            primary = { let _t13 = opGroup; addNode(mem, p, _t13) };
+            p.nodes.update(((primary) as i64), vg::append(mem, p.nodes.get(((primary) as i64)).ch, sub), |mut _t15, _t14| { _t15.ch = _t14; _t15 });
+            p.nodes.update(((primary) as i64), index, |mut _t17, _t16| { _t17.index = _t16; _t17 });
         } else if _t7 == 91u8 {
             primary = parseBracket(mem, p, loc);
             if (primary < 0i32) {
@@ -5212,29 +5278,29 @@ pub fn parseExpr(mem: &vg::Arena, p: &mut parser, loc: &mut Locale) -> i32 {
         } else if _t7 == 92u8 {
             p.pos = (p.pos).wrapping_add(1i64);
             if eof(p) {
-                return { let _t16 = ErrEEscape; let _t17 = start; fail(p, _t16, _t17) };
+                return { let _t18 = ErrEEscape; let _t19 = start; fail(p, _t18, _t19) };
             }
             let r: i32 = nextRune(p);
             if (r < 0i32) {
                 return (1i32).wrapping_neg();
             }
             if ((((((((((((((r == 94i32) || (r == 46i32)) || (r == 91i32)) || (r == 93i32)) || (r == 36i32)) || (r == 40i32)) || (r == 41i32)) || (r == 124i32)) || (r == 42i32)) || (r == 43i32)) || (r == 63i32)) || (r == 123i32)) || (r == 125i32)) || (r == 92i32)) {
-                primary = { let _t18 = r; charNode(mem, p, loc, _t18) };
+                primary = { let _t20 = r; charNode(mem, p, loc, _t20) };
             } else {
-                return { let _t19 = ErrBadPat; let _t20 = start; fail(p, _t19, _t20) };
+                return { let _t21 = ErrBadPat; let _t22 = start; fail(p, _t21, _t22) };
             }
         } else if _t7 == 46u8 {
             p.pos = (p.pos).wrapping_add(1i64);
-            primary = { let _t21 = opAny; addNode(mem, p, _t21) };
+            primary = { let _t23 = opAny; addNode(mem, p, _t23) };
         } else {
             let r_2: i32 = nextRune(p);
             if (r_2 < 0i32) {
                 return (1i32).wrapping_neg();
             }
-            primary = { let _t22 = r_2; charNode(mem, p, loc, _t22) };
+            primary = { let _t24 = r_2; charNode(mem, p, loc, _t24) };
         }
     }
-    return { let _t23 = primary; parseDup(mem, p, _t23) };
+    return { let _t25 = primary; parseDup(mem, p, _t25) };
 }
 
 pub fn charNode(mem: &vg::Arena, p: &mut parser, loc: &mut Locale, r: i32) -> i32 {

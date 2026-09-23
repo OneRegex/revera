@@ -259,6 +259,8 @@ type ValueDecl struct {
 	// Filled by the checker.
 	Inferred *Type    // declared type, or the default type
 	ConstVal *big.Int // folded value for integer constants
+	// typed caches whether the constant is typed in Go, and typedKnown says whether it has been computed.
+	typed, typedKnown bool
 }
 
 type StructDecl struct {

@@ -293,13 +293,14 @@ export class Regex {
     /** Compiles a pattern, or throws a RegexError. */
     constructor(pattern: Text, options: RegexOptions = {}) {
         const locale = options.locale ?? Locale.posix();
-        const res = engine.Compile(bytes(pattern), locale.inner, flagsOf(options));
+        const flags = flagsOf(options);
+        const res = engine.Compile(bytes(pattern), locale.inner, flags);
         if (res[1].Code !== engine.ErrNone) {
             raise(res[1]);
         }
         this.re = res[0];
         this.groups = engine.NumSub(this.re) + 1;
-        this.noSub = (options.noCaptures ?? false) === true;
+        this.noSub = (flags & engine.FlagNoSub) !== 0;
     }
 
     /** The number of groups a Captures holds, counting the whole match. */
@@ -398,7 +399,11 @@ export class Regex {
 
     /** The same as replaceAll, returning the bytes of the result. */
     replaceAllBytes(subject: Text, replacement: Text, limit: number = -1): Uint8Array {
-        const res = engine.ReplaceAll(this.re, bytes(subject), bytes(replacement), integer(limit, "limit"), 0);
+        // The engine counts the limit down with checked integer arithmetic, which throws outside the safe range.
+        // No subject holds that many matches, so clamping doesn't change any result.
+        integer(limit, "limit");
+        const bound = limit < 0 ? -1 : Math.min(limit, Number.MAX_SAFE_INTEGER);
+        const res = engine.ReplaceAll(this.re, bytes(subject), bytes(replacement), bound, 0);
         if (res[1].Code !== engine.ErrNone) {
             raise(res[1]);
         }

@@ -17,12 +17,12 @@ test("64-bit arithmetic stays exact or throws", () => {
     assert.throws(() => vg.rem(2 ** 62, 3), RangeError);
 
     assert.equal(vg.shl64(1, 40), 2 ** 40);
-    assert.equal(vg.shl64(1, 64), 0);
+    assert.throws(() => vg.shl64(1, 64), RangeError);
     assert.throws(() => vg.shl64(1, 60), RangeError);
     assert.throws(() => vg.shl64(1, -1), RangeError);
     assert.equal(vg.shr64(-5, 1), -3);
     assert.equal(vg.shr64(2 ** 62, 2), 2 ** 60);
-    assert.equal(vg.shr64(-1, 64), -1);
+    assert.throws(() => vg.shr64(-1, 64), RangeError);
     assert.throws(() => vg.shr64(1, -1), RangeError);
 
     assert.equal(vg.and64(2 ** 40 + 5, 7), 5);

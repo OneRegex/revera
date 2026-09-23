@@ -1,6 +1,7 @@
 package rust
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -178,6 +179,101 @@ func TestArithmeticUsesWrappingOperations(t *testing.T) {
 	if got, want := g.b.String(), "a = (a).wrapping_mul(b);\n"; got != want {
 		t.Fatalf("multiplication assignment = %q, want %q", got, want)
 	}
+}
+
+func TestShiftCountIsCheckedAgainstTheWidth(t *testing.T) {
+	g := &gen{p: &compiler.Program{}, fn: &compiler.FuncDecl{Info: map[string]*compiler.LocalInfo{}}}
+	a := &compiler.Expr{K: "ident", Name: "a", Typ: compiler.TU64}
+	for _, test := range []struct {
+		op    string
+		count *compiler.Expr
+		want  string
+	}{
+		{"<<", &compiler.Expr{K: "ident", Name: "n", Typ: compiler.TInt}, "(a << vg::shift_count(n, 64))"},
+		{">>", &compiler.Expr{K: "ident", Name: "n", Typ: compiler.TI32}, "(a >> vg::shift_count(n, 64))"},
+		{"<<", &compiler.Expr{K: "ident", Name: "n", Typ: compiler.TU8}, "(a << vg::shift_count(n, 64))"},
+		{">>", &compiler.Expr{K: "int", Value: "3", Typ: compiler.TInt, IsConst: true}, "(a >> 3i64)"},
+	} {
+		expr := &compiler.Expr{K: "binary", Op: test.op, X: a, Y: test.count, Typ: a.Typ}
+		if got := g.binary(expr); got != test.want {
+			t.Errorf("%s by %s = %q, want %q", test.op, test.count.Typ, got, test.want)
+		}
+	}
+
+	g.stmt(&compiler.Stmt{
+		K: "op_assign", Op: ">>=",
+		Lhs:   []*compiler.Expr{{K: "ident", Name: "a", Typ: compiler.TU8}},
+		Value: &compiler.Expr{K: "ident", Name: "n", Typ: compiler.TI64},
+	}, 0)
+	if got, want := g.b.String(), "a >>= vg::shift_count(n, 8);\n"; got != want {
+		t.Fatalf("shift assignment = %q, want %q", got, want)
+	}
+}
+
+// TestShiftsCompileForEveryCountType compiles a shift of every integer type by a count of every integer type.
+// It then runs a negative count without overflow checks, as the release profile does, and expects a panic.
+func TestShiftsCompileForEveryCountType(t *testing.T) {
+	rustc, err := exec.LookPath("rustc")
+	if err != nil {
+		t.Skip("rustc is not installed")
+	}
+	vgrs, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "rust", "src", "vg.rs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := (&gen{p: shiftProgram(t)}).file()
+	main := `mod vg;
+mod engine;
+fn main() {
+    println!("{}", engine::shl_int64_int(5, 3));
+    println!("{}", engine::shl_int64_int(5, -1));
+}
+`
+	dir := t.TempDir()
+	for name, content := range map[string]string{"engine.rs": out, "vg.rs": string(vgrs), "main.rs": main} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cmd := exec.Command(rustc, "--edition=2021", "-O", "-C", "overflow-checks=off", "-A", "warnings", "main.rs", "-o", "shifts")
+	cmd.Dir = dir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("rustc failed: %v\n%s", err, output)
+	}
+	output, err := exec.Command(filepath.Join(dir, "shifts")).CombinedOutput()
+	if err == nil || !strings.HasPrefix(string(output), "5\n") || !strings.Contains(string(output), "shift count out of range") {
+		t.Fatalf("a negative shift count did not panic after a valid shift: %v\n%s", err, output)
+	}
+}
+
+// shiftProgram builds a checked Vego program with one function per pair of integer operand and count types.
+// shl_X_C(x, n) shifts x left and right by n, through both the compound and the plain operators.
+func shiftProgram(t *testing.T) *compiler.Program {
+	t.Helper()
+	types := []string{"uint8", "uint16", "uint32", "uint64", "int32", "int64", "int"}
+	var funcs []string
+	for _, x := range types {
+		for _, c := range types {
+			funcs = append(funcs, fmt.Sprintf(`{"k":"func","name":"shl_%s_%s",
+				"params":[{"name":"x","type":{"k":"named","name":"%s"}},{"name":"n","type":{"k":"named","name":"%s"}}],
+				"results":[{"k":"named","name":"%s"}],
+				"body":[
+					{"k":"op_assign","lhs":{"k":"ident","name":"x"},"op":"<<=","value":{"k":"ident","name":"n"}},
+					{"k":"op_assign","lhs":{"k":"ident","name":"x"},"op":">>=","value":{"k":"ident","name":"n"}},
+					{"k":"return","values":[{"k":"binary","op":">>",
+						"x":{"k":"binary","op":"<<","x":{"k":"ident","name":"x"},"y":{"k":"ident","name":"n"}},
+						"y":{"k":"ident","name":"n"}}]}]}`, x, c, x, c, x))
+		}
+	}
+	src := `{"vego":1,"package":"shifts","consts":[],"vars":[],"types":[],"funcs":[` + strings.Join(funcs, ",") + `]}`
+	p, err := compiler.Load([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := compiler.Check(p); err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
 
 func TestImpureArrayAssignmentChecksIndexBeforeValue(t *testing.T) {

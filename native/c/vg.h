@@ -12,11 +12,50 @@
 #ifndef VG_H
 #define VG_H
 
-#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// vg_check aborts when a runtime check fails, where Go would panic.
+// It isn't assert, because NDEBUG must not remove the checks the generated code relies on.
+#define vg_check(cond) ((cond) ? (void)0 : vg_check_failed(#cond, __FILE__, __LINE__))
+
+// Marking the failure path noreturn and cold lets the compiler assume the condition holds afterwards, and drop the checks that become redundant, as it does with assert.
+#if defined(__GNUC__)
+__attribute__((cold))
+#endif
+_Noreturn static inline void vg_check_failed(const char *cond, const char *file, int line) {
+    fprintf(stderr, "%s:%d: check failed: %s\n", file, line, cond);
+    abort();
+}
+
+// vg_index checks an array index against the array length.
+static inline int64_t vg_index(int64_t i, int64_t n) {
+    vg_check(i >= 0 && i < n);
+    return i;
+}
+
+// vg_udivisor checks the divisor of an unsigned division or remainder, which C leaves undefined at zero.
+static inline uint64_t vg_udivisor(uint64_t b) {
+    vg_check(b != 0);
+    return b;
+}
+
+// vg_shift_count aborts unless 0 <= n < width, where width is the size of the shifted operand in bits.
+// Go panics on a negative count and Vego aborts on one past the width, but C leaves both undefined.
+// An unsigned count too big for int64_t turns negative here, so it fails the check too.
+static inline int64_t vg_shift_count(int64_t n, int64_t width) {
+    vg_check(n >= 0 && n < width);
+    return n;
+}
+
+// vg_alloc_bytes returns the byte size of count elements, and aborts when it overflows, like Go's makeslice.
+static inline size_t vg_alloc_bytes(int64_t count, size_t size) {
+    vg_check(count >= 0 && (uint64_t)count <= SIZE_MAX / size);
+    return (size_t)count * size;
+}
 
 // vg_arena is a growing list of malloc blocks that free together.
 // Its zero value is a valid empty arena.
@@ -78,12 +117,12 @@ typedef struct {
 #define vg_lit(s) ((vg_str){"" s, (int64_t)sizeof(s) - 1})
 
 static inline uint8_t vg_str_at(vg_str s, int64_t i) {
-    assert(i >= 0 && i < s.len);
+    vg_check(i >= 0 && i < s.len);
     return (uint8_t)s.p[i];
 }
 
 static inline vg_str vg_str_sub(vg_str s, int64_t lo, int64_t hi) {
-    assert(0 <= lo && lo <= hi && hi <= s.len);
+    vg_check(0 <= lo && lo <= hi && hi <= s.len);
     if (s.p == NULL) {
         return (vg_str){0};
     }
@@ -131,7 +170,7 @@ static inline vg_str vg_str_dup(vg_arena *mem, vg_str s) {
 // C leaves that pair undefined even with -fwrapv.
 
 static inline int64_t vg_sdiv_i64(int64_t a, int64_t b) {
-    assert(b != 0);
+    vg_check(b != 0);
     if (b == -1) {
         return (int64_t)(0ULL - (uint64_t)a);
     }
@@ -139,7 +178,7 @@ static inline int64_t vg_sdiv_i64(int64_t a, int64_t b) {
 }
 
 static inline int64_t vg_srem_i64(int64_t a, int64_t b) {
-    assert(b != 0);
+    vg_check(b != 0);
     if (b == -1) {
         return 0;
     }
@@ -147,7 +186,7 @@ static inline int64_t vg_srem_i64(int64_t a, int64_t b) {
 }
 
 static inline int32_t vg_sdiv_i32(int32_t a, int32_t b) {
-    assert(b != 0);
+    vg_check(b != 0);
     if (b == -1) {
         return (int32_t)(0U - (uint32_t)a);
     }
@@ -155,7 +194,7 @@ static inline int32_t vg_sdiv_i32(int32_t a, int32_t b) {
 }
 
 static inline int32_t vg_srem_i32(int32_t a, int32_t b) {
-    assert(b != 0);
+    vg_check(b != 0);
     if (b == -1) {
         return 0;
     }

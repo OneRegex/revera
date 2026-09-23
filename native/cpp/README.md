@@ -45,6 +45,7 @@ The contract's heap figure bounds the engine's fixed-width allocation requests, 
 Capture figures include conservative allocator-rounding allowances.
 Runtime object headers, general allocator metadata, map buckets, and similar bookkeeping are outside the model.
 Capacity failures normally mean a limit was exceeded, but they are also used to fail closed if a selected one-pass capture walk detects an internal inconsistency.
+Compilation reports one for a pattern that nests parentheses more than 256 deep.
 
 The CMake package in the parent directory builds this port as `librevera_cxx`, installs the header as `<revera/revera.hpp>`, and exports the target `Revera::CXX`.
 That is the way to use it from another project.
@@ -97,7 +98,8 @@ The same thing from the repository root is `make generate GENERATION_TARGETS=cpp
 
 `cd ../../dev && go run ./cmd/conform -backend ../native/cpp` runs the whole conformance kit against this port.
 
-The Makefile invokes `$(CXX)`, normally `c++`, with `-std=c++20 -O2 -fwrapv` and keeps its assertions on.
+The Makefile invokes `$(CXX)`, normally `c++`, with `-std=c++20 -O2 -fwrapv`.
+The engine's runtime checks do not depend on `NDEBUG`, so every build keeps them, a CMake Release build included.
 Because this build uses `#embed`, `CXX` must resolve to Clang 19 or GCC 15 or later.
 Override it explicitly when necessary, for example `make CXX=clang++-19 all`.
 

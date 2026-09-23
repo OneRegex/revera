@@ -491,7 +491,7 @@ func (g *gen) emitEqHelpers(h *strings.Builder) {
 }
 
 // emitSliceHelpers emits the slice machinery, one family per element type.
-// The semantics mirror vg.hpp of the C++ target: zeroed allocations, doubling growth with a zeroed spare region, and asserted bounds.
+// It behaves like vg.hpp in the C++ target: zeroed allocations, capacity doubling with a zeroed spare region, and checked bounds.
 func (g *gen) emitSliceHelpers(h *strings.Builder) {
 	for _, key := range g.sliceOrder {
 		t := g.sliceTypes[key]
@@ -500,15 +500,15 @@ func (g *gen) emitSliceHelpers(h *strings.Builder) {
 		ep := g.declPtr(t.Elem, "")
 		ep = strings.TrimSuffix(ep, " ")
 		fmt.Fprintf(h, "static inline %s %s_make_cap(vg_arena *mem, int64_t n, int64_t c) {\n", s, s)
-		fmt.Fprintf(h, "    assert(0 <= n && n <= c);\n")
-		fmt.Fprintf(h, "    %sp = (%s)vg_arena_alloc(mem, (size_t)(c < 1 ? 1 : c) * sizeof(%s));\n", g.declPtr(t.Elem, ""), ep, e)
+		fmt.Fprintf(h, "    vg_check(0 <= n && n <= c);\n")
+		fmt.Fprintf(h, "    %sp = (%s)vg_arena_alloc(mem, vg_alloc_bytes(c < 1 ? 1 : c, sizeof(%s)));\n", g.declPtr(t.Elem, ""), ep, e)
 		fmt.Fprintf(h, "    memset(p, 0, (size_t)c * sizeof(%s));\n", e)
 		fmt.Fprintf(h, "    return (%s){p, n, c};\n}\n\n", s)
 		fmt.Fprintf(h, "static inline %s %s_make(vg_arena *mem, int64_t n) {\n    return %s_make_cap(mem, n, n);\n}\n\n", s, s, s)
 		fmt.Fprintf(h, "static inline %s %s_grow(vg_arena *mem, %s s, int64_t need) {\n", s, s, s)
 		fmt.Fprintf(h, "    int64_t newcap = s.cap * 2 < 8 ? 8 : s.cap * 2;\n")
 		fmt.Fprintf(h, "    if (newcap < need) {\n        newcap = need;\n    }\n")
-		fmt.Fprintf(h, "    %sp = (%s)vg_arena_alloc(mem, (size_t)newcap * sizeof(%s));\n", g.declPtr(t.Elem, ""), ep, e)
+		fmt.Fprintf(h, "    %sp = (%s)vg_arena_alloc(mem, vg_alloc_bytes(newcap, sizeof(%s)));\n", g.declPtr(t.Elem, ""), ep, e)
 		fmt.Fprintf(h, "    memset(p + s.len, 0, (size_t)(newcap - s.len) * sizeof(%s));\n", e)
 		fmt.Fprintf(h, "    if (s.p != NULL && s.len > 0) {\n        memcpy(p, s.p, (size_t)s.len * sizeof(%s));\n    }\n", e)
 		fmt.Fprintf(h, "    return (%s){p, s.len, newcap};\n}\n\n", s)
@@ -520,13 +520,13 @@ func (g *gen) emitSliceHelpers(h *strings.Builder) {
 		fmt.Fprintf(h, "    if (more.len > 0) {\n        memmove(s.p + s.len, more.p, (size_t)more.len * sizeof(%s));\n    }\n", e)
 		fmt.Fprintf(h, "    s.len += more.len;\n    return s;\n}\n\n")
 		fmt.Fprintf(h, "static inline %s %s_sub(%s s, int64_t lo, int64_t hi) {\n", s, s, s)
-		fmt.Fprintf(h, "    assert(0 <= lo && lo <= hi && hi <= s.cap);\n")
+		fmt.Fprintf(h, "    vg_check(0 <= lo && lo <= hi && hi <= s.cap);\n")
 		fmt.Fprintf(h, "    if (s.p == NULL) {\n        return (%s){0};\n    }\n", s)
 		fmt.Fprintf(h, "    return (%s){s.p + lo, hi - lo, s.cap - lo};\n}\n\n", s)
 		fmt.Fprintf(h, "static inline %s %s_tail(%s s, int64_t lo) {\n    return %s_sub(s, lo, s.len);\n}\n\n", s, s, s, s)
 		fmt.Fprintf(h, "static inline %s %s_head(%s s, int64_t hi) {\n    return %s_sub(s, 0, hi);\n}\n\n", s, s, s, s)
 		fmt.Fprintf(h, "static inline %s%s_at(%s s, int64_t i) {\n", g.declPtr(t.Elem, ""), s, s)
-		fmt.Fprintf(h, "    assert(i >= 0 && i < s.len);\n    return &s.p[i];\n}\n\n")
+		fmt.Fprintf(h, "    vg_check(i >= 0 && i < s.len);\n    return &s.p[i];\n}\n\n")
 		fmt.Fprintf(h, "static inline int64_t %s_copy(%s dst, %s src) {\n", s, s, s)
 		fmt.Fprintf(h, "    int64_t n = dst.len < src.len ? dst.len : src.len;\n")
 		fmt.Fprintf(h, "    if (n > 0) {\n        memmove(dst.p, src.p, (size_t)n * sizeof(%s));\n    }\n    return n;\n}\n\n", e)
@@ -568,7 +568,7 @@ func (g *gen) emitArrayHelpers(h *strings.Builder) {
 		a := g.arrName(t)
 		s := g.sliceName(st)
 		fmt.Fprintf(h, "static inline %s %s_slice(%s *a, int64_t lo, int64_t hi) {\n", s, a, a)
-		fmt.Fprintf(h, "    assert(0 <= lo && lo <= hi && hi <= %d);\n", t.ALenVal)
+		fmt.Fprintf(h, "    vg_check(0 <= lo && lo <= hi && hi <= %d);\n", t.ALenVal)
 		if t.ALenVal == 0 {
 			// A Go slice of a zero-length array is non-nil, so the pointer addresses the array object itself.
 			// With cap 0, nothing ever dereferences it.
@@ -921,6 +921,9 @@ func (g *gen) emitAssign2(s *compiler.Stmt, depth int) {
 // Those forms therefore need a rewrite.
 func (g *gen) opAssign(s *compiler.Stmt, place, val string) string {
 	t := s.Lhs[0].Typ
+	if s.Op == "<<=" || s.Op == ">>=" {
+		val = g.shiftCount(t, s.Value, val)
+	}
 	switch s.Op {
 	case "&^=":
 		return fmt.Sprintf("%s &= ~(%s)", place, val)
@@ -928,10 +931,12 @@ func (g *gen) opAssign(s *compiler.Stmt, place, val string) string {
 		if t.Signed() {
 			return fmt.Sprintf("%s = vg_sdiv_%s(%s, %s)", place, g.mangle(t), place, val)
 		}
+		return fmt.Sprintf("%s /= vg_udivisor(%s)", place, val)
 	case "%=":
 		if t.Signed() {
 			return fmt.Sprintf("%s = vg_srem_%s(%s, %s)", place, g.mangle(t), place, val)
 		}
+		return fmt.Sprintf("%s %%= vg_udivisor(%s)", place, val)
 	case "<<=":
 		if t.Signed() || t.Width() < 32 {
 			return fmt.Sprintf("%s = %s", place, g.shiftLeft(t, place, val))
@@ -952,6 +957,15 @@ func (g *gen) shiftLeft(t *compiler.Type, x, y string) string {
 		u = "uint32_t"
 	}
 	return fmt.Sprintf("(%s)((%s)(%s) << (%s))", g.typ(t), u, x, y)
+}
+
+// shiftCount wraps y, the count of a shift on a value of type t, in vg_shift_count.
+// A constant count within the width is left alone, since it can end up in a case label.
+func (g *gen) shiftCount(t *compiler.Type, e *compiler.Expr, y string) string {
+	if compiler.ConstBelow(g.p, e, t.Width()) {
+		return y
+	}
+	return fmt.Sprintf("vg_shift_count(%s, %d)", y, t.Width())
 }
 
 // emitFor lowers a Go for statement.
@@ -1262,10 +1276,11 @@ func (g *gen) index(e *compiler.Expr) string {
 	case compiler.KStr:
 		return fmt.Sprintf("vg_str_at(%s, %s)", base, idx)
 	case compiler.KArray:
+		// C doesn't check array indexes, but Go aborts on a bad one.
 		if arrayByPtr {
-			return fmt.Sprintf("%s->v[%s]", base, idx)
+			return fmt.Sprintf("%s->v[vg_index(%s, %d)]", base, idx, e.X.Typ.ALenVal)
 		}
-		return fmt.Sprintf("%s.v[%s]", base, idx)
+		return fmt.Sprintf("%s.v[vg_index(%s, %d)]", base, idx, e.X.Typ.ALenVal)
 	}
 	fatal("index of", e.X.Typ)
 	return ""
@@ -1503,20 +1518,23 @@ func (g *gen) binary(e *compiler.Expr) string {
 			// Go defines MinInt / -1 as MinInt, which C leaves undefined even under -fwrapv.
 			return fmt.Sprintf("vg_sdiv_%s(%s, %s)", g.mangle(e.Typ), x, y)
 		}
-		body = fmt.Sprintf("%s / %s", x, y)
+		body = fmt.Sprintf("%s / vg_udivisor(%s)", x, y)
 	case "%":
 		if e.Typ.Signed() {
 			return fmt.Sprintf("vg_srem_%s(%s, %s)", g.mangle(e.Typ), x, y)
 		}
-		body = fmt.Sprintf("%s %% %s", x, y)
+		body = fmt.Sprintf("%s %% vg_udivisor(%s)", x, y)
 	case "&^":
 		body = fmt.Sprintf("%s & ~(%s)", x, y)
 	case "<<":
+		y = g.shiftCount(e.Typ, e.Y, y)
 		if e.Typ.Signed() || e.Typ.Width() < 32 {
 			return g.shiftLeft(e.Typ, x, y)
 		}
 		body = fmt.Sprintf("%s << %s", x, y)
-	case "+", "-", "*", "&", "|", "^", ">>":
+	case ">>":
+		body = fmt.Sprintf("%s >> %s", x, g.shiftCount(e.Typ, e.Y, y))
+	case "+", "-", "*", "&", "|", "^":
 		body = fmt.Sprintf("%s %s %s", x, e.Op, y)
 	default:
 		fatal("unknown binary op", e.Op)

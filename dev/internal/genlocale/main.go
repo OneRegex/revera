@@ -249,18 +249,6 @@ func run(inputPath, outputPath string) error {
 	return nil
 }
 
-// DataCopies lists every checked-in copy of the locale blob, relative to the repository root.
-// The conformance kit checks that they stay byte-identical.
-var DataCopies = []string{
-	"go/data.bin",
-	"dev/internal/reference/locale/data.bin",
-	"rust/src/data.bin",
-	"zig/src/data.bin",
-	"ts/src/data.bin",
-	"native/c/data.bin",
-	"native/cpp/data.bin",
-}
-
 func main() {
 	var input string
 	var outputs []string
@@ -279,7 +267,7 @@ func main() {
 			os.Exit(1)
 		}
 		input = filepath.Join(repo, "locale", "rv_locale_data.inc")
-		for _, rel := range DataCopies {
+		for _, rel := range conformance.LocaleDataCopies {
 			outputs = append(outputs, filepath.Join(repo, filepath.FromSlash(rel)))
 		}
 	}

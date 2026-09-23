@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/oneregex/revera/vego/compiler"
 )
@@ -76,11 +77,51 @@ type checker struct {
 	// breakable tracks the enclosing break targets, innermost last.
 	// True marks a loop, and false marks a switch.
 	breakable []bool
+	// views maps each slice variable, and each pointer or slice parameter, to the storage it may point into.
+	// A local array stands for itself with its block, and a scope without a parent stands for the storage a parameter points to.
+	views map[types.Object][]*types.Scope
+	// params gives the position of the parameter each scope without a parent stands for.
+	params map[*types.Scope]int
+	// fn is the function being checked, and returns records, for each function, the parameters whose storage its result may point into.
+	fn      types.Object
+	returns map[types.Object]map[int]bool
 }
 
 func (c *checker) errorf(pos token.Pos, format string, args ...any) {
 	where := c.fset.Position(pos)
 	c.errs = append(c.errs, fmt.Sprintf("%s: %s", where, fmt.Sprintf(format, args...)))
+}
+
+// checkDeclaredNames applies the rules that hold for every declared name.
+// The JSON form writes true, false and nil as literals, and refers to the scalar types by name, so a declaration that shadows one of them would change its meaning.
+// Struct fields are exempt, because a selector never resolves to a predeclared name.
+// Names must be ASCII, and a local variable can't be a pointer.
+func (c *checker) checkDeclaredNames() {
+	var ids []*ast.Ident
+	for id, obj := range c.info.Defs {
+		if obj != nil && id.Name != "_" {
+			ids = append(ids, id)
+		}
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i].Pos() < ids[j].Pos() })
+	for _, id := range ids {
+		obj := c.info.Defs[id]
+		v, isVar := obj.(*types.Var)
+		_, isType := obj.(*types.TypeName)
+		literal := id.Name == "true" || id.Name == "false" || id.Name == "nil"
+		if (literal && !(isVar && v.IsField())) || (isType && types.Universe.Lookup(id.Name) != nil) {
+			c.errorf(id.Pos(), "%s redeclares a predeclared identifier", id.Name)
+		}
+		for i := 0; i < len(id.Name); i++ {
+			if id.Name[i] >= utf8.RuneSelf {
+				c.errorf(id.Pos(), "identifier %s is not ASCII", id.Name)
+				break
+			}
+		}
+		if isVar && v.Kind() == types.LocalVar && isPointerType(v.Type()) {
+			c.errorf(id.Pos(), "pointer locals are not in the subset")
+		}
+	}
 }
 
 func (c *checker) checkPackageName(name *ast.Ident) {
@@ -147,7 +188,8 @@ func Package(dir string) ([]byte, []string, error) {
 		return nil, nil, fmt.Errorf("type check: %w", terr)
 	}
 
-	c := &checker{fset: fset, info: info, pkg: pkg, structs: map[string]bool{}}
+	c := &checker{fset: fset, info: info, pkg: pkg, structs: map[string]bool{}, views: map[types.Object][]*types.Scope{},
+		params: map[*types.Scope]int{}, returns: map[types.Object]map[int]bool{}}
 	for _, f := range files {
 		for _, d := range f.Decls {
 			if gd, ok := d.(*ast.GenDecl); ok && gd.Tok == token.TYPE {
@@ -160,6 +202,8 @@ func Package(dir string) ([]byte, []string, error) {
 			}
 		}
 	}
+
+	c.summarizeReturns(files)
 
 	doc := map[string]any{
 		"vego":    1,
@@ -185,6 +229,7 @@ func Package(dir string) ([]byte, []string, error) {
 			}
 		}
 	}
+	c.checkDeclaredNames()
 	doc["consts"] = orEmpty(consts)
 	doc["vars"] = orEmpty(vars)
 	doc["types"] = orEmpty(typeDecls)
@@ -412,6 +457,47 @@ func (c *checker) typeDecls(decl *ast.GenDecl) []any {
 	return out
 }
 
+// summarizeReturns records which parameters each function may return a view of.
+// It checks every function until the records stop growing, because what a call returns depends on the record of the callee.
+func (c *checker) summarizeReturns(files []*ast.File) {
+	errs := c.errs
+	for grew := true; grew; {
+		before := 0
+		for _, r := range c.returns {
+			before += len(r)
+		}
+		c.views = map[types.Object][]*types.Scope{}
+		c.params = map[*types.Scope]int{}
+		for _, f := range files {
+			for _, d := range f.Decls {
+				if fd, ok := d.(*ast.FuncDecl); ok {
+					c.funcDecl(fd)
+				}
+			}
+		}
+		after := 0
+		for _, r := range c.returns {
+			after += len(r)
+		}
+		grew = after > before
+	}
+	c.errs = errs
+	c.views = map[types.Object][]*types.Scope{}
+	c.params = map[*types.Scope]int{}
+}
+
+// seedParam gives a pointer or slice parameter a scope without a parent, which stands for the struct or the buffer it points to.
+// That storage may be a local array of a caller.
+// A struct or an array passed by value needs none, because it never holds a view.
+func (c *checker) seedParam(v types.Object, index int) {
+	switch v.Type().Underlying().(type) {
+	case *types.Pointer, *types.Slice:
+		scope := types.NewScope(nil, v.Pos(), v.Pos(), v.Name())
+		c.params[scope] = index
+		c.views[v] = []*types.Scope{scope}
+	}
+}
+
 func (c *checker) funcDecl(decl *ast.FuncDecl) any {
 	c.checkPackageName(decl.Name)
 	if decl.Recv != nil {
@@ -432,6 +518,9 @@ func (c *checker) funcDecl(decl *ast.FuncDecl) any {
 		for _, name := range f.Names {
 			params = append(params, map[string]any{
 				"name": name.Name, "type": c.typeRefParam(f.Type)})
+			if v := c.info.Defs[name]; v != nil {
+				c.seedParam(v, len(params)-1)
+			}
 		}
 	}
 	var results []any
@@ -450,6 +539,7 @@ func (c *checker) funcDecl(decl *ast.FuncDecl) any {
 		}
 	}
 	c.breakable = c.breakable[:0]
+	c.fn = c.info.Defs[decl.Name]
 	var body []any
 	if decl.Body == nil {
 		c.errorf(decl.Pos(), "function declarations without a body are not in the subset")
@@ -489,6 +579,7 @@ func (c *checker) stmt(s ast.Stmt) any {
 			entry["type"] = nil
 		}
 		if len(vs.Values) == 1 {
+			c.trackViews(vs.Names[0], vs.Values[0])
 			entry["value"] = c.expr(vs.Values[0])
 		} else {
 			entry["value"] = nil
@@ -565,6 +656,16 @@ func (c *checker) stmt(s ast.Stmt) any {
 	case *ast.ReturnStmt:
 		var values []any
 		for _, e := range st.Results {
+			for _, scope := range c.arraysViewed(e) {
+				if scope.Parent() != nil {
+					c.errorf(e.Pos(), "a view of a local array must not be returned")
+					break
+				}
+				if c.returns[c.fn] == nil {
+					c.returns[c.fn] = map[int]bool{}
+				}
+				c.returns[c.fn][c.params[scope]] = true
+			}
 			values = append(values, c.expr(e))
 		}
 		return map[string]any{"k": "return", "values": orEmpty(values)}
@@ -589,6 +690,10 @@ func (c *checker) assign(st *ast.AssignStmt) any {
 				c.errorf(l.Pos(), "short declaration must bind identifiers")
 				continue
 			}
+			if id.Name != "_" && c.info.Defs[id] == nil {
+				// Go assigns to the existing variable, while the JSON form declares a new one.
+				c.errorf(id.Pos(), "short declaration reuses %s; assign it with = instead", id.Name)
+			}
 			names = append(names, id.Name)
 		}
 		if len(st.Rhs) != 1 {
@@ -600,6 +705,13 @@ func (c *checker) assign(st *ast.AssignStmt) any {
 		if len(st.Lhs) == 2 {
 			if _, ok := st.Rhs[0].(*ast.CallExpr); !ok {
 				c.errorf(st.Pos(), "a two-name declaration needs a call")
+			}
+		}
+		if len(st.Rhs) == 1 {
+			for _, l := range st.Lhs {
+				if id, ok := l.(*ast.Ident); ok {
+					c.trackViews(id, st.Rhs[0])
+				}
 			}
 		}
 		return map[string]any{"k": "define", "names": names,
@@ -623,6 +735,13 @@ func (c *checker) assign(st *ast.AssignStmt) any {
 			if len(st.Lhs) == 1 {
 				c.checkSliceStore(l, st.Rhs[0])
 			}
+			if len(st.Rhs) == 1 {
+				if id, ok := l.(*ast.Ident); ok {
+					c.trackViews(id, st.Rhs[0])
+				} else {
+					c.checkStored(st.Rhs[0])
+				}
+			}
 			lhs = append(lhs, c.expr(l))
 		}
 		return map[string]any{"k": "assign", "lhs": lhs,
@@ -635,6 +754,9 @@ func (c *checker) assign(st *ast.AssignStmt) any {
 		return map[string]any{"k": "block", "body": []any{}}
 	}
 	c.checkAssignable(st.Lhs[0])
+	if !isInteger(c.info.Types[st.Lhs[0]].Type) {
+		c.errorf(st.Pos(), "compound assignment applies only to integers")
+	}
 	return map[string]any{"k": "op_assign", "op": op,
 		"lhs": c.expr(st.Lhs[0]), "value": c.expr(st.Rhs[0])}
 }
@@ -691,6 +813,11 @@ func (c *checker) rangeStmt(st *ast.RangeStmt) any {
 			c.errorf(st.X.Pos(), "range is only over slices, arrays, and int counts")
 		}
 	}
+	// With at most one variable, Go doesn't evaluate an array operand, since it only needs the length.
+	// The translations do evaluate it, so an out-of-range index in it could abort there.
+	if (st.Value == nil || isBlank(st.Value)) && isArrayType(overType) && containsIndex(st.X) {
+		c.errorf(st.X.Pos(), "range over an indexed array with at most one variable is not in the subset; range over its length")
+	}
 	entry := map[string]any{"k": "range", "over": c.expr(st.X)}
 	entry["idx"] = nil
 	entry["val"] = nil
@@ -719,6 +846,174 @@ func (c *checker) rangeStmt(st *ast.RangeStmt) any {
 	return entry
 }
 
+// trackViews records what the slice variable id may point into once it holds value.
+// In Go, an array lives as long as any view of it, but the translations drop it at the end of its block.
+// So a view must not be stored in a variable declared outside that block.
+// Variables declared in a for or range header belong to the loop's own scope, so a view of one can't leave the loop either, which matches Go giving each iteration its own copy.
+func (c *checker) trackViews(id *ast.Ident, value ast.Expr) {
+	holder := c.info.Defs[id]
+	if holder == nil {
+		holder = c.info.Uses[id]
+	}
+	if holder == nil || !isSliceType(holder.Type()) {
+		return
+	}
+	for _, scope := range c.arraysViewed(value) {
+		for outer := scope.Parent(); outer != nil; outer = outer.Parent() {
+			if outer == holder.Parent() {
+				c.errorf(value.Pos(), "a view of a local array must not outlive the array")
+				return
+			}
+		}
+		c.views[holder] = append(c.views[holder], scope)
+	}
+}
+
+// checkStored rejects a view that goes into a field or an element, as rules 3 and 4 of the buffer model say.
+// That covers a view of a local array, and the struct or buffer a parameter points to.
+// So no field or element ever holds a view, whichever function stores it, and a struct value never holds one either.
+func (c *checker) checkStored(value ast.Expr) {
+	if len(c.arraysViewed(value)) > 0 {
+		c.errorf(value.Pos(), "a view must not be stored in a field or an element")
+	}
+}
+
+// storageOf returns the storage holding the place e.
+// That's the block of its variable, the struct a pointer parameter points to, or what a slice points into.
+func (c *checker) storageOf(e ast.Expr) []*types.Scope {
+	for {
+		switch x := e.(type) {
+		case *ast.ParenExpr:
+			e = x.X
+		case *ast.SelectorExpr:
+			if isPointerType(c.info.Types[x.X].Type) {
+				return c.arraysViewed(x.X)
+			}
+			e = x.X
+		case *ast.IndexExpr:
+			if !isArrayType(c.info.Types[x.X].Type) {
+				return c.arraysViewed(x.X)
+			}
+			e = x.X
+		case *ast.Ident:
+			v, ok := c.info.Uses[x].(*types.Var)
+			if !ok || v.Kind() == types.PackageVar {
+				return nil
+			}
+			return []*types.Scope{v.Parent()}
+		default:
+			return nil
+		}
+	}
+}
+
+// arraysViewed returns the storage the value e may point into.
+// Only a slice variable, a pointer or slice parameter, a slice expression, an address, and a call can point into storage, since fields and elements hold no view.
+func (c *checker) arraysViewed(e ast.Expr) []*types.Scope {
+	switch x := e.(type) {
+	case *ast.ParenExpr:
+		return c.arraysViewed(x.X)
+	case *ast.Ident:
+		return c.views[c.info.Uses[x]]
+	case *ast.SliceExpr:
+		if !isArrayType(c.info.Types[x.X].Type) {
+			return c.arraysViewed(x.X)
+		}
+		return c.storageOf(x.X)
+	case *ast.UnaryExpr:
+		if x.Op == token.AND {
+			return c.storageOf(x.X)
+		}
+	case *ast.CompositeLit:
+		var scopes []*types.Scope
+		for _, el := range x.Elts {
+			if kv, ok := el.(*ast.KeyValueExpr); ok {
+				el = kv.Value
+			}
+			scopes = append(scopes, c.arraysViewed(el)...)
+		}
+		return scopes
+	case *ast.CallExpr:
+		return c.callViews(x)
+	}
+	return nil
+}
+
+// callViews returns the storage the result of a call may point into.
+// A function's result may point into what the arguments it can return point into, and append's result into the buffer of its first operand.
+// A result that isn't a slice points nowhere, because a struct or an array never holds a view.
+func (c *checker) callViews(x *ast.CallExpr) []*types.Scope {
+	if !returnsSlice(c.info.Types[x].Type) {
+		return nil
+	}
+	id, ok := x.Fun.(*ast.Ident)
+	if !ok {
+		return nil
+	}
+	switch fn := c.info.Uses[id].(type) {
+	case *types.Func:
+		var scopes []*types.Scope
+		for i, a := range x.Args {
+			if c.returns[fn][i] {
+				scopes = append(scopes, c.arraysViewed(a)...)
+			}
+		}
+		return scopes
+	case *types.Builtin:
+		if fn.Name() == "append" {
+			return c.arraysViewed(x.Args[0])
+		}
+	}
+	return nil
+}
+
+// checkAppended applies checkStored to the elements an append stores into the buffer of its first operand, whatever happens to its result.
+// The elements of a spread operand hold no view, like every element.
+func (c *checker) checkAppended(x *ast.CallExpr) {
+	for i, a := range x.Args[1:] {
+		if !(x.Ellipsis.IsValid() && i == len(x.Args)-2) {
+			c.checkStored(a)
+		}
+	}
+}
+
+// returnsSlice reports whether t, or one of the results of a call when t is a tuple, is a slice.
+func returnsSlice(t types.Type) bool {
+	if tuple, ok := t.(*types.Tuple); ok {
+		for i := 0; i < tuple.Len(); i++ {
+			if isSliceType(tuple.At(i).Type()) {
+				return true
+			}
+		}
+		return false
+	}
+	return isSliceType(t)
+}
+
+func isBlank(e ast.Expr) bool {
+	id, ok := e.(*ast.Ident)
+	return ok && id.Name == "_"
+}
+
+func containsIndex(e ast.Expr) bool {
+	found := false
+	ast.Inspect(e, func(n ast.Node) bool {
+		if _, ok := n.(*ast.IndexExpr); ok {
+			found = true
+		}
+		return !found
+	})
+	return found
+}
+
+func isInteger(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	b, ok := t.Underlying().(*types.Basic)
+	return ok && b.Info()&types.IsInteger != 0
+}
+
 func containsSlice(t types.Type) bool {
 	switch u := t.Underlying().(type) {
 	case *types.Slice:
@@ -741,6 +1036,22 @@ func isSwitchScalar(t types.Type) bool {
 	}
 	b, ok := t.Underlying().(*types.Basic)
 	return ok && b.Info()&(types.IsBoolean|types.IsInteger) != 0
+}
+
+func isArrayType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	_, ok := t.Underlying().(*types.Array)
+	return ok
+}
+
+func isSliceType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	_, ok := t.Underlying().(*types.Slice)
+	return ok
 }
 
 func isPointerType(t types.Type) bool {
@@ -835,6 +1146,9 @@ func (c *checker) expr(e ast.Expr) any {
 			s, err := strconv.Unquote(x.Value)
 			if err != nil {
 				c.errorf(x.Pos(), "bad string literal")
+			}
+			if !utf8.ValidString(s) {
+				c.errorf(x.Pos(), "string literal is not valid UTF-8, which the JSON form cannot carry")
 			}
 			return map[string]any{"k": "str", "value": s}
 		}
@@ -972,8 +1286,31 @@ func (c *checker) checkAddress(e ast.Expr) {
 		c.errorf(e.Pos(), "& applies only to struct variables and fields")
 		return
 	}
+	// A slice element can move if its buffer grows during the call, so its address, and the address of its fields, can't be taken.
+	if c.indexesSlice(e) {
+		c.errorf(e.Pos(), "& on a slice element is not in the subset")
+	}
 	if c.globalBase(e) != nil {
 		c.errorf(e.Pos(), "& on package-level data is not in the subset")
+	}
+}
+
+// indexesSlice reports whether the place e goes through an element of a slice.
+func (c *checker) indexesSlice(e ast.Expr) bool {
+	for {
+		switch x := e.(type) {
+		case *ast.IndexExpr:
+			if isSliceType(c.info.Types[x.X].Type) {
+				return true
+			}
+			e = x.X
+		case *ast.SelectorExpr:
+			e = x.X
+		case *ast.ParenExpr:
+			e = x.X
+		default:
+			return false
+		}
 	}
 }
 
@@ -996,6 +1333,9 @@ func (c *checker) call(x *ast.CallExpr) any {
 	if b, isBuiltin := obj.(*types.Builtin); isBuiltin {
 		if !allowedBuiltins[b.Name()] {
 			c.errorf(x.Pos(), "builtin %s is not in the subset", b.Name())
+		}
+		if b.Name() == "append" {
+			c.checkAppended(x)
 		}
 		return c.builtin(x, b.Name())
 	}
@@ -1069,6 +1409,18 @@ func (c *checker) builtin(x *ast.CallExpr, name string) any {
 	if (name == "min" || name == "max") && len(x.Args) != 2 {
 		c.errorf(x.Pos(), "%s takes exactly two arguments", name)
 	}
+	if name == "min" || name == "max" {
+		for _, a := range x.Args {
+			if !isInteger(c.info.Types[a].Type) {
+				c.errorf(a.Pos(), "%s applies only to integers", name)
+			}
+		}
+	}
+	if name == "cap" && len(x.Args) == 1 {
+		if t := c.info.Types[x.Args[0]].Type; t != nil && !isSliceType(t) {
+			c.errorf(x.Pos(), "cap applies only to slices")
+		}
+	}
 	return entry
 }
 
@@ -1090,6 +1442,7 @@ func (c *checker) composite(x *ast.CompositeLit) any {
 				c.errorf(el.Pos(), "struct literals need field keys")
 				continue
 			}
+			c.checkStored(kv.Value)
 			fields = append(fields, map[string]any{
 				"name":  kv.Key.(*ast.Ident).Name,
 				"value": c.expr(kv.Value)})
@@ -1103,6 +1456,7 @@ func (c *checker) composite(x *ast.CompositeLit) any {
 			c.errorf(el.Pos(), "keyed elements are not in the subset")
 			continue
 		}
+		c.checkStored(el)
 		elems = append(elems, c.expr(el))
 	}
 	entry["elems"] = orEmpty(elems)

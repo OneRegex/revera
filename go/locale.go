@@ -279,6 +279,7 @@ func localeValidate(l *Locale) bool {
 	for i := 0; i < count; i++ {
 		row := localeRowAt(l, i)
 		if row.TypeFirst+row.TypeCount > typeRowCount ||
+			row.CaseProfile > 1 ||
 			int(row.DefaultCollation) >= profileCount {
 			return false
 		}
@@ -447,8 +448,8 @@ func localesCount(l *Locale) int {
 type LocaleRow struct {
 	TypeFirst        int
 	TypeCount        int
-	CaseProfile      uint8
-	DefaultCollation uint16
+	CaseProfile      uint32
+	DefaultCollation uint32
 }
 
 func localeRowAt(l *Locale, index int) LocaleRow {
@@ -456,8 +457,8 @@ func localeRowAt(l *Locale, index int) LocaleRow {
 	var row LocaleRow
 	row.TypeFirst = int(u32At(l, secLocales, base+1))
 	row.TypeCount = int(u32At(l, secLocales, base+2))
-	row.CaseProfile = uint8(u32At(l, secLocales, base+3))
-	row.DefaultCollation = uint16(u32At(l, secLocales, base+4))
+	row.CaseProfile = u32At(l, secLocales, base+3)
+	row.DefaultCollation = u32At(l, secLocales, base+4)
 	return row
 }
 
@@ -531,10 +532,10 @@ func resolveLocale(data *Locale, req localeRequest) (Locale, bool) {
 		return invalid, false
 	}
 	row := localeRowAt(&result, index)
-	result.caseProfile = row.CaseProfile
+	result.caseProfile = uint8(row.CaseProfile)
 	result.valid = true
 	if len(req.ctype) == 0 {
-		result.collationProfile = row.DefaultCollation
+		result.collationProfile = uint16(row.DefaultCollation)
 		return result, true
 	}
 

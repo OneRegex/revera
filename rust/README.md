@@ -225,6 +225,7 @@ fn main() {
 ```
 
 `ErrorKind::Capacity` usually means the requested work exceeded an engine capacity limit.
+Compilation reports it for a pattern that nests parentheses more than 256 deep.
 It is also the fail-closed result if a compile-time-selected one-pass capture walk detects an internal inconsistency.
 
 Do not treat every `Err` as invalid syntax, and do not discard iterator errors with `filter_map` unless that is an intentional policy.

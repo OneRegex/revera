@@ -87,7 +87,8 @@ export interface Buf<T> {
 }
 
 // Elem describes one element type: how to allocate a zeroed buffer, the zero value, and how to move elements.
-// Struct elements move by cloning, because Go copies them by value.
+// Struct and array elements are moved by copying into the existing destination objects, rather than replacing them.
+// That way, a view of an array inside a destination sees the new contents, as it would in Go.
 export interface Elem<T> {
     alloc(n: number): Buf<T>;
     zero(): T;
@@ -190,7 +191,7 @@ export const NIL: Slice<any> = new Slice<any>(null as unknown as Buf<any>, 0, 0,
 export const SLICE: Elem<Slice<any>> = refElem(NIL, 32);
 
 // structElem describes a struct element type from its zero-value constructor.
-export function structElem<T extends { clone(): T }>(make: () => T, width: number): Elem<T> {
+export function structElem<T extends { set(v: T): void }>(make: () => T, width: number): Elem<T> {
     return {
         alloc(n: number): Buf<T> {
             stats.count++;
@@ -205,24 +206,24 @@ export function structElem<T extends { clone(): T }>(make: () => T, width: numbe
         move(dst, d, src, s, n) {
             if (dst === src && d > s) {
                 for (let i = n - 1; i >= 0; i--) {
-                    dst[d + i] = src[s + i].clone();
+                    dst[d + i].set(src[s + i]);
                 }
                 return;
             }
             for (let i = 0; i < n; i++) {
-                dst[d + i] = src[s + i].clone();
+                dst[d + i].set(src[s + i]);
             }
         },
     };
 }
 
-// arrayElem describes a fixed-size array element type from its zero-value constructor and its clone function.
-export function arrayElem<T>(make: () => T, clone: (a: T) => T, width: number): Elem<T> {
+// arrayElem describes a fixed-size array element type from its zero-value constructor and the descriptor of its own elements.
+export function arrayElem<A extends Buf<E>, E>(make: () => A, inner: Elem<E>, width: number): Elem<A> {
     return {
-        alloc(n: number): Buf<T> {
+        alloc(n: number): Buf<A> {
             stats.count++;
             stats.bytes += n * width;
-            const out: T[] = new Array(n);
+            const out: A[] = new Array(n);
             for (let i = 0; i < n; i++) {
                 out[i] = make();
             }
@@ -232,15 +233,20 @@ export function arrayElem<T>(make: () => T, clone: (a: T) => T, width: number): 
         move(dst, d, src, s, n) {
             if (dst === src && d > s) {
                 for (let i = n - 1; i >= 0; i--) {
-                    dst[d + i] = clone(src[s + i]);
+                    setArr(inner, dst[d + i], src[s + i]);
                 }
                 return;
             }
             for (let i = 0; i < n; i++) {
-                dst[d + i] = clone(src[s + i]);
+                setArr(inner, dst[d + i], src[s + i]);
             }
         },
     };
+}
+
+// setArr copies a fixed-size array into another one of the same length.
+export function setArr<E>(inner: Elem<E>, dst: Buf<E>, src: Buf<E>): void {
+    inner.move(dst, 0, src, 0, dst.length);
 }
 
 export function make<T>(el: Elem<T>, n: number, c: number = n): Slice<T> {
@@ -449,25 +455,24 @@ export function remBig(a: bigint, b: bigint): bigint {
     return a % b;
 }
 
-// A negative shift count is a runtime panic in Go, and a count of 64 or more shifts every bit out.
+// shl64 and shr64 shift a 64-bit int held in a number.
+// Like the other shifts, they abort on a negative count, as Go does, and on one past the width, as Vego does.
 export function shl64(a: number, n: number): number {
-    if (n < 0) {
-        fail("negative shift count");
-    }
-    if (n >= 64) {
-        return 0;
-    }
+    shiftBy(n, 64);
     return chk(a * Math.pow(2, n));
 }
 
 export function shr64(a: number, n: number): number {
-    if (n < 0) {
-        fail("negative shift count");
-    }
-    if (n >= 64) {
-        return a < 0 ? -1 : 0;
-    }
+    shiftBy(n, 64);
     return Math.floor(a / Math.pow(2, n));
+}
+
+// shiftBy checks the count of a shift on a number of the given width, which JavaScript would otherwise take modulo 32.
+export function shiftBy(n: number, width: number): number {
+    if (n < 0 || n >= width) {
+        fail("shift count out of range");
+    }
+    return n;
 }
 
 // The 64-bit bitwise operators split a number into a high and a low half when it does not fit 32 bits.
@@ -522,12 +527,16 @@ export function intOf(b: bigint): number {
     return Number(v);
 }
 
-// shiftCount turns a number shift count into a bigint, and rejects a negative one as Go does.
-export function shiftCount(n: number): bigint {
-    if (n < 0) {
-        fail("negative shift count");
+// shiftCount and shiftCountBig check the count of a shift on a 64-bit bigint, and return it as a bigint.
+export function shiftCount(n: number, width: number): bigint {
+    return BigInt(shiftBy(n, width));
+}
+
+export function shiftCountBig(n: bigint, width: number): bigint {
+    if (n < 0n || n >= BigInt(width)) {
+        fail("shift count out of range");
     }
-    return BigInt(n);
+    return n;
 }
 
 export function minBig(a: bigint, b: bigint): bigint {

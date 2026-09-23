@@ -43,7 +43,7 @@ The engines do not read these tables directly.
 cd ../dev && go run ./internal/genlocale
 ```
 
-The copies are `go/data.bin`, `dev/internal/reference/locale/data.bin`, `rust/src/data.bin`, `zig/src/data.bin`, `native/c/data.bin` and `native/cpp/data.bin`.
+The copies are `go/data.bin`, `dev/internal/reference/locale/data.bin`, `rust/src/data.bin`, `zig/src/data.bin`, `ts/src/data.bin`, `native/c/data.bin` and `native/cpp/data.bin`.
 The conformance kit checks that they stay byte-identical, and that `lean/data/localedata.hex` matches them.
 From `dev/`, write selected outputs by passing the input followed by one or more output paths: `go run ./internal/genlocale INPUT.inc OUTPUT.bin...`.
 

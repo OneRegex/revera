@@ -113,6 +113,11 @@ func exportPackage(dir string, stderr io.Writer) ([]byte, bool) {
 		fmt.Fprintf(stderr, "%d subset violation(s)\n", len(violations))
 		return nil, false
 	}
+	// The emitters check the IR too, so check and export run the same checks, to accept exactly what emit accepts.
+	if _, err := load(blob); err != nil {
+		fmt.Fprintln(stderr, err)
+		return nil, false
+	}
 	return blob, true
 }
 

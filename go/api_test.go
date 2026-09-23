@@ -155,6 +155,26 @@ func TestAPIErrors(t *testing.T) {
 	}
 }
 
+func TestAPINestingLimit(t *testing.T) {
+	deepest := strings.Repeat("(", maxNesting) + "a" + strings.Repeat(")", maxNesting)
+	re, err := New(deepest)
+	if err != nil {
+		t.Fatalf("nesting %d: %v", maxNesting, err)
+	}
+	groups, err := re.FindStringSubmatch("a")
+	if err != nil || len(groups) != maxNesting+1 || groups[maxNesting] != "a" {
+		t.Fatalf("nesting %d: %d groups, %v", maxNesting, len(groups), err)
+	}
+	// Unbalanced parentheses used to recurse once per byte until the stack ran out.
+	for _, pattern := range []string{"(" + deepest + ")", strings.Repeat("(", 4096)} {
+		_, err := New(pattern)
+		e, ok := err.(Error)
+		if !ok || e.Code != ErrESpace || e.Pos != maxNesting {
+			t.Fatalf("%d bytes: expected ErrESpace at byte %d, got %v", len(pattern), maxNesting, err)
+		}
+	}
+}
+
 func TestAPIConcurrentSearch(t *testing.T) {
 	re := MustNew("[0-9]+")
 	var wg sync.WaitGroup
