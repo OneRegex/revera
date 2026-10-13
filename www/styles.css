@@ -18,7 +18,9 @@
   --focus: #2fd3b5;
 
   --blue: #5b8cff;
+  --link: #5b8cff;
   --teal: #2fd3b5;
+  --teal-text: #2fd3b5;
   --violet: #a488ff;
   --accent-soft: rgba(91, 140, 255, 0.13);
   --teal-soft: rgba(47, 211, 181, 0.12);
@@ -26,6 +28,7 @@
 
   --code-bg: #0b1222;
   --code-text: #d8e1f1;
+  --code-muted: #7888a8;
   --shadow: 0 10px 30px rgba(2, 6, 20, 0.5);
   --shadow-lg: 0 24px 60px rgba(2, 6, 20, 0.55);
   --radius: 14px;
@@ -42,8 +45,10 @@ html[data-theme="light"] {
   --border-soft: #e5eaf4;
   --text: #141d2f;
   --text-dim: #4b566c;
-  --text-faint: #66718a;
+  --text-faint: #5f6a82;
   --focus: #2f5fd6;
+  --link: #2f5fd6;
+  --teal-text: #0b7563;
   --accent-soft: rgba(59, 100, 220, 0.1);
   --teal-soft: rgba(20, 160, 135, 0.12);
   --code-bg: #0f172b;
@@ -70,7 +75,7 @@ h1 { font-size: clamp(2.3rem, 5.2vw, 3.9rem); font-weight: 800; }
 h2 { font-size: clamp(1.7rem, 3.4vw, 2.5rem); }
 h3 { font-size: 1.15rem; }
 p { margin: 0 0 1em; }
-a { color: var(--blue); text-decoration: none; }
+a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
 strong { font-weight: 600; color: var(--text); }
 code {
@@ -107,7 +112,7 @@ main:focus { outline: none; }
   font-size: 0.78rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--teal);
+  color: var(--teal-text);
   margin-bottom: 0.8rem;
 }
 
@@ -213,7 +218,7 @@ html[data-theme="light"] .icon-moon { display: none; }
   border-radius: var(--radius); box-shadow: var(--shadow-lg); overflow: hidden;
 }
 .code-window__bar { display: flex; align-items: center; gap: 7px; padding: 0.7rem 1rem; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-soft); }
-.code-window__title { margin-left: 0.5rem; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-faint); }
+.code-window__title { margin-left: 0.5rem; font-family: var(--font-mono); font-size: 0.76rem; color: var(--code-muted); }
 .dot { width: 11px; height: 11px; border-radius: 50%; }
 .dot--r { background: #ff5f57; } .dot--y { background: #febc2e; } .dot--g { background: #28c840; }
 .code-window__body {
@@ -228,7 +233,7 @@ html[data-theme="light"] .icon-moon { display: none; }
   font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.3;
 }
 .float-tag span { display: block; font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 0.2rem; }
-.float-tag strong { color: var(--teal); font-weight: 600; }
+.float-tag strong { color: var(--teal-text); font-weight: 600; }
 .float-tag--tr { top: -18px; right: -14px; }
 .float-tag--bl { bottom: -18px; left: -14px; }
 
@@ -238,11 +243,11 @@ html[data-theme="light"] .icon-moon { display: none; }
 .tok-fn { color: #7fd6ff; }
 .tok-str { color: #9be7c4; }
 .tok-num { color: #f2b96b; }
-.tok-cmt { color: #6f7f9e; font-style: italic; }
+.tok-cmt { color: var(--code-muted); font-style: italic; }
 .tok-out { color: #d7c9ff; }
 .tok-key { color: #7ea6ff; }
 .tok-prompt { color: var(--teal); }
-.tok-dim { color: #6f7f9e; }
+.tok-dim { color: var(--code-muted); }
 
 /* Strip under the hero */
 
@@ -317,7 +322,7 @@ html[data-theme="light"] .icon-moon { display: none; }
 .codeblock__tabs { display: flex; align-items: center; gap: 4px; padding: 0.55rem 0.8rem; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-soft); flex-wrap: wrap; }
 .codeblock__tablist { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .codeblock__tab {
-  background: transparent; border: 1px solid transparent; color: var(--text-faint);
+  background: transparent; border: 1px solid transparent; color: var(--code-muted);
   font-family: var(--font-mono); font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 8px; cursor: pointer;
 }
 .codeblock__tab:hover { color: var(--text); }
@@ -332,7 +337,7 @@ html[data-theme="light"] .codeblock__copy { color: #c9d2e6; border-color: rgba(2
   white-space: pre; min-width: 0; max-width: 100%;
 }
 .codeblock__panes .pane.is-active { display: block; }
-.codeblock__foot { padding: 0.8rem 1.4rem; border-top: 1px solid var(--border-soft); font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-faint); }
+.codeblock__foot { padding: 0.8rem 1.4rem; border-top: 1px solid var(--border-soft); font-family: var(--font-mono); font-size: 0.8rem; color: var(--code-muted); }
 .codeblock__foot code { background: none; padding: 0; color: var(--teal); }
 
 .install {
