@@ -121,9 +121,19 @@ pub fn Slice(comptime T: type) type {
 }
 
 fn allocElems(gpa: Allocator, comptime T: type, n: i64) Allocator.Error![*]T {
-    const count: usize = @intCast(@max(n, 1));
+    const count = try allocationCount(usize, n);
     const buf = try gpa.alloc(T, count);
     return buf.ptr;
+}
+
+fn allocationCount(comptime Size: type, n: i64) Allocator.Error!Size {
+    return std.math.cast(Size, @max(n, 1)) orelse error.OutOfMemory;
+}
+
+test "allocation count fits the address size" {
+    const maximum = std.math.maxInt(u32);
+    try std.testing.expectEqual(maximum, try allocationCount(u32, maximum));
+    try std.testing.expectError(error.OutOfMemory, allocationCount(u32, @as(i64, maximum) + 1));
 }
 
 pub fn make(gpa: Allocator, comptime T: type, n: i64) Allocator.Error!Slice(T) {
@@ -229,6 +239,19 @@ pub fn arrSlice(comptime T: type, arr: anytype, lo: i64, hi: i64) Slice(T) {
     };
 }
 
+pub fn arrayIndex(comptime n: usize, i: anytype) usize {
+    const I = @TypeOf(i);
+    if (I != comptime_int and @typeInfo(I).int.signedness == .signed) {
+        check(i >= 0);
+    }
+    check(i < n);
+    return @intCast(i);
+}
+
+pub fn shiftCount(comptime T: type, n: anytype) std.math.Log2Int(T) {
+    return std.math.cast(std.math.Log2Int(T), n) orelse @panic("Vego runtime check failed");
+}
+
 pub fn sliceOf(gpa: Allocator, comptime T: type, src: anytype) Allocator.Error!Slice(T) {
     const out = try make(gpa, T, @intCast(src.len));
     @memcpy(out.p.?[0..src.len], src);
@@ -268,6 +291,7 @@ pub fn structEq(a: anytype, b: @TypeOf(a)) bool {
 // The plain Zig builtins trap on that pair.
 pub fn divT(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
     const T = @TypeOf(a);
+    check(b != 0);
     if (T != comptime_int and @typeInfo(T).int.signedness == .signed) {
         if (b == -1) {
             return 0 -% a;
@@ -278,6 +302,7 @@ pub fn divT(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
 
 pub fn remT(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
     const T = @TypeOf(a);
+    check(b != 0);
     if (T != comptime_int and @typeInfo(T).int.signedness == .signed) {
         if (b == -1) {
             return 0;

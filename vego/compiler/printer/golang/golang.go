@@ -11,6 +11,7 @@ import (
 	"go/format"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type object = map[string]any
@@ -276,8 +277,14 @@ func emitStmt(b *strings.Builder, s object, depth int) {
 func expr(e any) string {
 	o := e.(object)
 	switch o["k"].(string) {
-	case "int", "char":
+	case "int":
 		return o["value"].(string)
+	case "char":
+		v, err := strconv.ParseInt(o["value"].(string), 10, 32)
+		if err != nil || !utf8.ValidRune(rune(v)) {
+			fatal("invalid character value", o["value"])
+		}
+		return strconv.QuoteRune(rune(v))
 	case "str":
 		return strconv.Quote(o["value"].(string))
 	case "bool":

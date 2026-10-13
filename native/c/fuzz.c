@@ -51,45 +51,45 @@ static void fuzz_one(const uint8_t *data, size_t size) {
 
     // One arena serves the whole input and frees everything when the call ends.
     vg_arena mem = {0};
-    revera_eng_Locale loc = revera_eng_LocalePOSIX();
+    ENG(Locale) loc = ENG(LocalePOSIX)();
     if (data[1] & 0x30) {
         vg_str name = (data[1] & 0x10) ? vg_lit("cs") : vg_lit("tr");
-        revera_eng_Locale base = base_locale();
-        revera_eng_Tup_t4c6f63616c65x_bool sel =
-            revera_eng_LocaleSelect(&mem, &base, name, (vg_str){0});
+        ENG(Locale) base = base_locale();
+        ENG_TUPLE(Tup_t4c6f63616c65x_bool) sel =
+            ENG(LocaleSelect)(&mem, &base, name, (vg_str){0});
         if (!sel.r1) {
             vg_arena_free(&mem);
             return;
         }
         loc = sel.r0;
     }
-    revera_eng_Tup_t526567657870x_t4572726f72x compiled =
-        revera_eng_Compile(&mem, pattern, loc, cflags);
-    if (compiled.r1.Code != 0) {
+    ENG_TUPLE(Tup_t526567657870x_t4572726f72x) compiled =
+        ENG(Compile)(&mem, pattern, loc, cflags);
+    if (compiled.r1.vego_f_Code != 0) {
         vg_arena_free(&mem);
         return;
     }
-    revera_eng_Regexp re = compiled.r0;
-    revera_eng_slice_Match pmatch =
-        revera_eng_slice_Match_make(&mem, revera_eng_NumSub(&re) + 1);
-    (void)revera_eng_Exec(&mem, &re, subject, pmatch, eflags);
-    (void)revera_eng_ReplaceAll(&mem, &re, subject, replacement, -1, eflags);
-    revera_eng_Tup_t4d6174636849746572x_t4572726f72x init =
-        revera_eng_MatchIterInit(&re, 3);
-    if (init.r1.Code == 0) {
-        revera_eng_MatchIter iter = init.r0;
+    ENG(Regexp) re = compiled.r0;
+    ENG_TYPE(st4d61746368x) pmatch =
+        ENG_TYPE(st4d61746368x_make)(&mem, ENG(NumSub)(&re) + 1);
+    (void)ENG(Exec)(&mem, &re, subject, pmatch, eflags);
+    (void)ENG(ReplaceAll)(&mem, &re, subject, replacement, -1, eflags);
+    ENG_TUPLE(Tup_t4d6174636849746572x_t4572726f72x) init =
+        ENG(MatchIterInit)(&re, 3);
+    if (init.r1.vego_f_Code == 0) {
+        ENG(MatchIter) iter = init.r0;
         for (;;) {
-            revera_eng_Tup_bool_t4572726f72x next =
-                revera_eng_MatchIterNext(&mem, &re, &iter, subject, eflags, pmatch);
-            if (next.r1.Code != 0 || !next.r0) {
+            ENG_TUPLE(Tup_bool_t4572726f72x) next =
+                ENG(MatchIterNext)(&mem, &re, &iter, subject, eflags, pmatch);
+            if (next.r1.vego_f_Code != 0 || !next.r0) {
                 break;
             }
         }
     }
-    revera_eng_Contract c = revera_eng_ContractFor(&re, subject.len);
-    (void)revera_eng_ContractHeapBytes(&c);
-    (void)revera_eng_ContractStackBytes(&c);
-    (void)revera_eng_ContractSteps(&c);
+    ENG(Contract) c = ENG(ContractFor)(&re, subject.len);
+    (void)ENG(ContractHeapBytes)(&c);
+    (void)ENG(ContractStackBytes)(&c);
+    (void)ENG(ContractSteps)(&c);
     vg_arena_free(&mem);
 }
 

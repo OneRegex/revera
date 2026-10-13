@@ -112,15 +112,25 @@ func (c *checker) checkDeclaredNames() {
 		if (literal && !(isVar && v.IsField())) || (isType && types.Universe.Lookup(id.Name) != nil) {
 			c.errorf(id.Pos(), "%s redeclares a predeclared identifier", id.Name)
 		}
-		for i := 0; i < len(id.Name); i++ {
-			if id.Name[i] >= utf8.RuneSelf {
-				c.errorf(id.Pos(), "identifier %s is not ASCII", id.Name)
-				break
-			}
-		}
+		c.checkASCIIName(id)
 		if isVar && v.Kind() == types.LocalVar && isPointerType(v.Type()) {
 			c.errorf(id.Pos(), "pointer locals are not in the subset")
 		}
+	}
+}
+
+func (c *checker) checkASCIIName(id *ast.Ident) {
+	for i := 0; i < len(id.Name); i++ {
+		if id.Name[i] >= utf8.RuneSelf {
+			c.errorf(id.Pos(), "identifier %s is not ASCII", id.Name)
+			return
+		}
+	}
+}
+
+func (c *checker) checkNonBlankName(id *ast.Ident, kind string) {
+	if id.Name == "_" {
+		c.errorf(id.Pos(), "the blank identifier cannot declare a %s", kind)
 	}
 }
 
@@ -190,6 +200,8 @@ func Package(dir string) ([]byte, []string, error) {
 
 	c := &checker{fset: fset, info: info, pkg: pkg, structs: map[string]bool{}, views: map[types.Object][]*types.Scope{},
 		params: map[*types.Scope]int{}, returns: map[types.Object]map[int]bool{}}
+	c.checkPackageName(files[0].Name)
+	c.checkASCIIName(files[0].Name)
 	for _, f := range files {
 		for _, d := range f.Decls {
 			if gd, ok := d.(*ast.GenDecl); ok && gd.Tok == token.TYPE {
@@ -301,6 +313,7 @@ func (c *checker) constDecls(decl *ast.GenDecl) []any {
 			continue
 		}
 		for i, name := range vs.Names {
+			c.checkNonBlankName(name, "constant")
 			c.checkPackageName(name)
 			c.forbidIota(vs.Values[i])
 			if vs.Type == nil {
@@ -361,6 +374,7 @@ func (c *checker) varDecls(decl *ast.GenDecl) []any {
 			continue
 		}
 		for i, name := range vs.Names {
+			c.checkNonBlankName(name, "package variable")
 			c.checkPackageName(name)
 			c.checkConstInitializer(vs.Values[i])
 			if obj := c.info.Defs[name]; obj != nil {
@@ -422,6 +436,7 @@ func (c *checker) typeDecls(decl *ast.GenDecl) []any {
 	var out []any
 	for _, s := range decl.Specs {
 		ts := s.(*ast.TypeSpec)
+		c.checkNonBlankName(ts.Name, "type")
 		c.checkPackageName(ts.Name)
 		if ts.Assign.IsValid() {
 			c.errorf(ts.Pos(), "type aliases are not in the subset")
@@ -447,6 +462,7 @@ func (c *checker) typeDecls(decl *ast.GenDecl) []any {
 				continue
 			}
 			for _, name := range f.Names {
+				c.checkNonBlankName(name, "struct field")
 				fields = append(fields, map[string]any{
 					"name": name.Name, "type": c.typeRef(f.Type)})
 			}
@@ -499,6 +515,7 @@ func (c *checker) seedParam(v types.Object, index int) {
 }
 
 func (c *checker) funcDecl(decl *ast.FuncDecl) any {
+	c.checkNonBlankName(decl.Name, "function")
 	c.checkPackageName(decl.Name)
 	if decl.Recv != nil {
 		c.errorf(decl.Pos(), "methods are not in the subset")
@@ -516,6 +533,7 @@ func (c *checker) funcDecl(decl *ast.FuncDecl) any {
 			continue
 		}
 		for _, name := range f.Names {
+			c.checkNonBlankName(name, "parameter")
 			params = append(params, map[string]any{
 				"name": name.Name, "type": c.typeRefParam(f.Type)})
 			if v := c.info.Defs[name]; v != nil {
@@ -572,6 +590,7 @@ func (c *checker) stmt(s ast.Stmt) any {
 		if len(vs.Names) != 1 {
 			c.errorf(st.Pos(), "one variable per declaration")
 		}
+		c.checkNonBlankName(vs.Names[0], "local variable")
 		entry := map[string]any{"k": "var_decl", "name": vs.Names[0].Name}
 		if vs.Type != nil {
 			entry["type"] = c.typeRef(vs.Type)
@@ -613,8 +632,9 @@ func (c *checker) stmt(s ast.Stmt) any {
 		c.breakable = append(c.breakable, true)
 		entry := map[string]any{"k": "for"}
 		if st.Init != nil {
-			if _, ok := st.Init.(*ast.AssignStmt); !ok {
-				c.errorf(st.Init.Pos(), "loop init must be a short declaration")
+			as, ok := st.Init.(*ast.AssignStmt)
+			if !ok || as.Tok != token.DEFINE || len(as.Lhs) != 1 || len(as.Rhs) != 1 {
+				c.errorf(st.Init.Pos(), "loop init must declare one variable from one expression")
 			}
 			entry["init"] = c.stmt(st.Init)
 		} else {
@@ -626,6 +646,7 @@ func (c *checker) stmt(s ast.Stmt) any {
 			entry["cond"] = nil
 		}
 		if st.Post != nil {
+			c.checkLoopPost(st.Post)
 			entry["post"] = c.stmt(st.Post)
 		} else {
 			entry["post"] = nil
@@ -679,6 +700,22 @@ func (c *checker) stmt(s ast.Stmt) any {
 	}
 	c.errorf(s.Pos(), "statement outside the subset: %T", s)
 	return map[string]any{"k": "block", "body": []any{}}
+}
+
+func (c *checker) checkLoopPost(s ast.Stmt) {
+	switch st := s.(type) {
+	case *ast.AssignStmt:
+		if len(st.Lhs) != 1 || len(st.Rhs) != 1 {
+			c.errorf(st.Pos(), "loop post must assign one value")
+		} else if isBlank(st.Lhs[0]) {
+			c.errorf(st.Lhs[0].Pos(), "the blank identifier cannot be a loop post target")
+		}
+	case *ast.IncDecStmt:
+	case *ast.ExprStmt:
+		// stmt checks that this is a call.
+	default:
+		c.errorf(st.Pos(), "loop post statement is not in the subset")
+	}
 }
 
 func (c *checker) assign(st *ast.AssignStmt) any {
@@ -764,6 +801,8 @@ func (c *checker) assign(st *ast.AssignStmt) any {
 // checkSliceStore applies the locally decidable part of the buffer model.
 // A slice-typed struct field or element takes only a fresh buffer, a moved variable or field, or a truncation of itself.
 func (c *checker) checkSliceStore(lhs ast.Expr, rhs ast.Expr) {
+	lhs = ast.Unparen(lhs)
+	rhs = ast.Unparen(rhs)
 	switch lhs.(type) {
 	case *ast.SelectorExpr, *ast.IndexExpr:
 	default:
@@ -782,12 +821,52 @@ func (c *checker) checkSliceStore(lhs ast.Expr, rhs ast.Expr) {
 		// Fresh buffers, call results, and moves.
 		return
 	case *ast.SliceExpr:
-		if types.ExprString(r.X) == types.ExprString(lhs) {
+		if sameExpr(r.X, lhs) {
 			// Truncation of the same owner.
 			return
 		}
 	}
 	c.errorf(rhs.Pos(), "a slice field takes a fresh buffer, a move, or a truncation of itself")
+}
+
+// sameExpr reports whether a and b are the same expression, ignoring parentheses.
+// Calls never match, since they can return something different each time.
+func sameExpr(a, b ast.Expr) bool {
+	a = ast.Unparen(a)
+	b = ast.Unparen(b)
+	switch x := a.(type) {
+	case *ast.Ident:
+		y, ok := b.(*ast.Ident)
+		return ok && x.Name == y.Name
+	case *ast.BasicLit:
+		y, ok := b.(*ast.BasicLit)
+		return ok && x.Kind == y.Kind && x.Value == y.Value
+	case *ast.SelectorExpr:
+		y, ok := b.(*ast.SelectorExpr)
+		return ok && x.Sel.Name == y.Sel.Name && sameExpr(x.X, y.X)
+	case *ast.IndexExpr:
+		y, ok := b.(*ast.IndexExpr)
+		return ok && sameExpr(x.X, y.X) && sameExpr(x.Index, y.Index)
+	case *ast.SliceExpr:
+		y, ok := b.(*ast.SliceExpr)
+		return ok && x.Slice3 == y.Slice3 && sameExpr(x.X, y.X) &&
+			sameOptionalExpr(x.Low, y.Low) && sameOptionalExpr(x.High, y.High) &&
+			sameOptionalExpr(x.Max, y.Max)
+	case *ast.UnaryExpr:
+		y, ok := b.(*ast.UnaryExpr)
+		return ok && x.Op == y.Op && sameExpr(x.X, y.X)
+	case *ast.BinaryExpr:
+		y, ok := b.(*ast.BinaryExpr)
+		return ok && x.Op == y.Op && sameExpr(x.X, y.X) && sameExpr(x.Y, y.Y)
+	}
+	return false
+}
+
+func sameOptionalExpr(a, b ast.Expr) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return sameExpr(a, b)
 }
 
 // checkAssignable rejects writes to package-level variables.
@@ -1131,7 +1210,11 @@ func (c *checker) expr(e ast.Expr) any {
 	case *ast.BasicLit:
 		switch x.Kind {
 		case token.INT:
-			v, err := strconv.ParseUint(strings.ReplaceAll(x.Value, "_", ""), 0, 64)
+			if len(x.Value) > 1 && x.Value[0] == '0' && x.Value[1] != 'x' && x.Value[1] != 'X' {
+				c.errorf(x.Pos(), "only decimal and hexadecimal integer literals are in the subset")
+				return map[string]any{"k": "int", "value": "0"}
+			}
+			v, err := strconv.ParseUint(x.Value, 0, 64)
 			if err != nil {
 				c.errorf(x.Pos(), "unsupported integer literal %s", x.Value)
 			}

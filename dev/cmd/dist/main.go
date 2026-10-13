@@ -197,20 +197,35 @@ func (s *commitSource) list(rel string) ([]string, error) {
 
 // treeSource reads the working tree, but only the tracked files, as in a commit.
 type treeSource struct {
-	repo    string
+	root    *os.Root
 	tracked map[string]bool
 }
 
 func loadTree(repo string) (*treeSource, error) {
-	out, err := git(repo, "ls-files", "-z")
+	out, err := git(repo, "ls-files", "--stage", "-z")
 	if err != nil {
 		return nil, err
 	}
-	src := &treeSource{repo: repo, tracked: map[string]bool{}}
-	for _, name := range strings.Split(string(out), "\x00") {
-		if name != "" {
+	src := &treeSource{tracked: map[string]bool{}}
+	for _, entry := range strings.Split(string(out), "\x00") {
+		if entry == "" {
+			continue
+		}
+		meta, name, ok := strings.Cut(entry, "\t")
+		fields := strings.Fields(meta)
+		if !ok || len(fields) != 3 {
+			return nil, fmt.Errorf("unexpected git ls-files entry %q", entry)
+		}
+		if fields[2] != "0" {
+			return nil, fmt.Errorf("%s: unmerged index entry", name)
+		}
+		if fields[0] == "100644" || fields[0] == "100755" {
 			src.tracked[name] = true
 		}
+	}
+	src.root, err = os.OpenRoot(repo)
+	if err != nil {
+		return nil, err
 	}
 	return src, nil
 }
@@ -219,16 +234,82 @@ func (s *treeSource) read(rel string) ([]byte, bool, error) {
 	if !s.tracked[rel] {
 		return nil, false, fmt.Errorf("%s: not tracked by git", rel)
 	}
-	full := filepath.Join(s.repo, filepath.FromSlash(rel))
-	info, err := os.Stat(full)
+	file, info, err := openTreeFile(s.root, rel)
 	if err != nil {
 		return nil, false, err
 	}
-	data, err := os.ReadFile(full)
+	defer file.Close()
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, false, err
 	}
 	return data, info.Mode()&0o111 != 0, nil
+}
+
+func openTreeFile(root *os.Root, rel string) (*os.File, fs.FileInfo, error) {
+	parts := strings.Split(rel, "/")
+	current := root
+	var opened []*os.Root
+	defer func() {
+		for _, dir := range opened {
+			dir.Close()
+		}
+	}()
+	for i, part := range parts[:len(parts)-1] {
+		name := filepath.FromSlash(part)
+		before, err := current.Lstat(name)
+		if err != nil {
+			return nil, nil, err
+		}
+		component := strings.Join(parts[:i+1], "/")
+		if before.Mode()&fs.ModeSymlink != 0 {
+			return nil, nil, fmt.Errorf("%s: directory path contains a symlink: %s", rel, component)
+		}
+		if !before.IsDir() {
+			return nil, nil, fmt.Errorf("%s: directory path contains a non-directory: %s", rel, component)
+		}
+		next, err := current.OpenRoot(name)
+		if err != nil {
+			return nil, nil, err
+		}
+		after, err := next.Stat(".")
+		if err != nil {
+			next.Close()
+			return nil, nil, err
+		}
+		if !os.SameFile(before, after) {
+			next.Close()
+			return nil, nil, fmt.Errorf("%s: directory changed while it was opened: %s", rel, component)
+		}
+		opened = append(opened, next)
+		current = next
+	}
+	name := filepath.FromSlash(parts[len(parts)-1])
+	before, err := current.Lstat(name)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !before.Mode().IsRegular() {
+		return nil, nil, fmt.Errorf("%s: working tree path is not a regular file", rel)
+	}
+	file, err := current.OpenFile(name, readOnlyFlags, 0)
+	if err != nil {
+		return nil, nil, err
+	}
+	after, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, nil, err
+	}
+	if !after.Mode().IsRegular() {
+		file.Close()
+		return nil, nil, fmt.Errorf("%s: working tree path is not a regular file", rel)
+	}
+	if !os.SameFile(before, after) {
+		file.Close()
+		return nil, nil, fmt.Errorf("%s: working tree path changed while it was opened", rel)
+	}
+	return file, after, nil
 }
 
 func (s *treeSource) list(rel string) ([]string, error) {
@@ -283,7 +364,12 @@ func stage(repo, commitRef string, allowDirty, unreleased bool, outDir string) (
 	case dirty && commitRef == "HEAD" && !allowDirty:
 		return "", errors.New("tracked files are modified; commit them, name a commit with -commit, or pass -allow-dirty to stage the working tree")
 	case dirty && commitRef == "HEAD":
-		src, err = loadTree(repo)
+		var tree *treeSource
+		tree, err = loadTree(repo)
+		if err == nil {
+			defer tree.root.Close()
+		}
+		src = tree
 		commitLine += " (dirty working tree)"
 	default:
 		src, err = loadCommit(repo, commit)

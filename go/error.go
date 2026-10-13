@@ -1,11 +1,12 @@
 package revera
 
-// Error reports a compilation or execution failure.
+// Error reports a compilation, execution, or replacement failure.
 // A Code of ErrNone means success.
 // The other values mirror the <regex.h> error constants.
 type Error struct {
 	Code int32
-	// Pos is the byte offset in the pattern where compilation failed, or -1 when the error has no position.
+	// Pos is the byte offset of the error in the pattern, or in the replacement text for a replacement error.
+	// It is -1 when the error has no position.
 	Pos int
 }
 

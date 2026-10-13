@@ -51,10 +51,11 @@ func (c Code) String() string {
 	return "error " + strconv.Itoa(int(c))
 }
 
-// Error reports a compilation or execution failure.
+// Error reports a compilation, execution, or replacement failure.
 type Error struct {
 	Code Code
-	// Pos is the byte offset in the pattern where compilation failed, or -1 when the error has no position.
+	// Pos is the byte offset of the error in the pattern, or in the replacement text for a replacement error.
+	// It is -1 when the error has no position.
 	Pos int
 }
 

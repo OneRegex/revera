@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"unicode/utf8"
 )
 
 // Version is the version of the Vego toolchain, which vegoc prints and the release manifest records.
@@ -473,6 +474,9 @@ func TupName(pair [2]*Type) string {
 type object = map[string]any
 
 func Load(blob []byte) (p *Program, err error) {
+	if !utf8.Valid(blob) {
+		return nil, fmt.Errorf("invalid Vego JSON: input is not valid UTF-8")
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			p = nil
@@ -547,7 +551,7 @@ func Load(blob []byte) (p *Program, err error) {
 		for _, r := range o["results"].([]any) {
 			f.Results = append(f.Results, loadType(r))
 		}
-		f.Body = loadBody(o["body"])
+		f.Body = loadRequiredBody(o["body"], "function")
 		p.Funcs = append(p.Funcs, f)
 		p.FuncMap[f.Name] = f
 	}
@@ -618,6 +622,13 @@ func loadBody(b any) []*Stmt {
 	return out
 }
 
+func loadRequiredBody(b any, owner string) []*Stmt {
+	if b == nil {
+		panic(owner + " body is null")
+	}
+	return loadBody(b)
+}
+
 func loadStmt(o object) *Stmt {
 	s := &Stmt{K: o["k"].(string)}
 	switch s.K {
@@ -647,16 +658,19 @@ func loadStmt(o object) *Stmt {
 		// x++ and x-- become x += 1 and x -= 1.
 		// The operand is a place expression, so the rewrite is exact.
 		s.K = "op_assign"
-		if o["op"].(string) == "++" {
+		switch o["op"].(string) {
+		case "++":
 			s.Op = "+="
-		} else {
+		case "--":
 			s.Op = "-="
+		default:
+			panic("unknown increment or decrement operator")
 		}
 		s.Lhs = []*Expr{loadExpr(o["lhs"])}
 		s.Value = &Expr{K: "int", Value: "1"}
 	case "if":
 		s.Cond = loadExpr(o["cond"])
-		s.Then = loadBody(o["then"])
+		s.Then = loadRequiredBody(o["then"], "if")
 		if o["else"] != nil {
 			s.Else = loadBody(o["else"])
 			s.HasElse = true
@@ -671,16 +685,28 @@ func loadStmt(o object) *Stmt {
 		if o["post"] != nil {
 			s.Post = loadStmt(o["post"].(object))
 		}
-		s.Body = loadBody(o["body"])
+		s.Body = loadRequiredBody(o["body"], "for")
 	case "range":
 		if o["idx"] != nil {
 			s.IdxName = o["idx"].(string)
+			if s.IdxName == "" {
+				panic("range index variable is empty")
+			}
 		}
 		if o["val"] != nil {
 			s.ValName = o["val"].(string)
+			if s.ValName == "" {
+				panic("range value variable is empty")
+			}
+			if o["idx"] == nil {
+				panic("range value requires an index variable")
+			}
+		}
+		if s.IdxName == "_" && (o["val"] == nil || s.ValName == "_") {
+			panic("range declaration has no variables")
 		}
 		s.Value = loadExpr(o["over"])
-		s.Body = loadBody(o["body"])
+		s.Body = loadRequiredBody(o["body"], "range")
 	case "switch":
 		s.Tag = loadExpr(o["tag"])
 		for _, raw := range o["cases"].([]any) {
@@ -689,7 +715,10 @@ func loadStmt(o object) *Stmt {
 			for _, v := range co["values"].([]any) {
 				c.Values = append(c.Values, loadExpr(v))
 			}
-			c.Body = loadBody(co["body"])
+			if len(c.Values) == 0 {
+				panic("switch case has no values")
+			}
+			c.Body = loadRequiredBody(co["body"], "switch case")
 			s.Cases = append(s.Cases, c)
 		}
 		if o["default"] != nil {
@@ -704,7 +733,7 @@ func loadStmt(o object) *Stmt {
 	case "expr_stmt":
 		s.Value = loadExpr(o["value"])
 	case "block":
-		s.Body = loadBody(o["body"])
+		s.Body = loadRequiredBody(o["body"], "block")
 	default:
 		panic("unknown statement kind " + s.K)
 	}
@@ -715,8 +744,22 @@ func loadExpr(e any) *Expr {
 	o := e.(object)
 	x := &Expr{K: o["k"].(string)}
 	switch x.K {
-	case "int", "char":
+	case "int":
 		x.Value = o["value"].(string)
+		if !validDecimal(x.Value) {
+			panic("invalid integer value " + x.Value)
+		}
+		if _, err := strconv.ParseUint(x.Value, 10, 64); err != nil {
+			panic("integer value is outside uint64 " + x.Value)
+		}
+	case "char":
+		x.Value = o["value"].(string)
+		if !validDecimal(x.Value) {
+			panic("invalid character value " + x.Value)
+		}
+		if v, err := strconv.ParseInt(x.Value, 10, 32); err != nil || !utf8.ValidRune(rune(v)) {
+			panic("invalid character value " + x.Value)
+		}
 	case "str":
 		x.Value = o["value"].(string)
 	case "bool":
@@ -747,9 +790,11 @@ func loadExpr(e any) *Expr {
 		for _, a := range o["args"].([]any) {
 			x.Args = append(x.Args, loadExpr(a))
 		}
-		if sp, ok := o["spread"].(bool); ok {
-			x.Spread = sp
+		sp, ok := o["spread"].(bool)
+		if !ok {
+			panic("builtin spread must be a bool")
 		}
+		x.Spread = sp
 		if o["type"] != nil {
 			x.TypeRef = loadType(o["type"])
 		}
@@ -765,13 +810,21 @@ func loadExpr(e any) *Expr {
 		x.Y = loadExpr(o["y"])
 	case "composite":
 		x.TypeRef = loadType(o["type"])
-		if fs, ok := o["fields"]; ok && fs != nil {
-			for _, f := range fs.([]any) {
+		fields, hasFields := o["fields"]
+		elems, hasElems := o["elems"]
+		if x.TypeRef.K == KStruct {
+			if !hasFields || fields == nil || hasElems {
+				panic("struct composite must use fields")
+			}
+			for _, f := range fields.([]any) {
 				fo := f.(object)
 				x.Fields = append(x.Fields, CompositeField{Name: fo["name"].(string), Value: loadExpr(fo["value"])})
 			}
 		} else {
-			for _, el := range o["elems"].([]any) {
+			if !hasElems || elems == nil || hasFields {
+				panic("array and slice composites must use elements")
+			}
+			for _, el := range elems.([]any) {
 				x.Elems = append(x.Elems, loadExpr(el))
 			}
 		}
@@ -779,4 +832,22 @@ func loadExpr(e any) *Expr {
 		panic("unknown expression kind " + x.K)
 	}
 	return x
+}
+
+func validDecimal(s string) bool {
+	if s == "" {
+		return false
+	}
+	if s[0] == '0' {
+		return len(s) == 1
+	}
+	if s[0] < '1' || s[0] > '9' {
+		return false
+	}
+	for i := 1; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }

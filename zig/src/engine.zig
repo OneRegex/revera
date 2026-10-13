@@ -533,7 +533,7 @@ pub fn parseBracket(mem: vg.Allocator, p: *parser, loc: *Locale) vg.Allocator.Er
                 b.equivs = try vg.append(mem, vg.Slice(i32), b.equivs, item.seq);
             },
             itemClass => {
-                b.classMask |= (@as(u16, 1) << @intCast(item.class));
+                b.classMask |= (@as(u16, 1) << vg.shiftCount(u16, item.class));
             },
             else => {},
         }
@@ -720,14 +720,14 @@ pub fn finalizeBracket(mem: vg.Allocator, b: *bracketSet, loc: *Locale) vg.Alloc
         {
             var i: i64 = 0;
             while ((i < b.elems.len)) : (i +%= 1) {
-                b.multiLens |= (@as(u16, 1) << @intCast(b.elems.at(i).*.len));
+                b.multiLens |= (@as(u16, 1) << vg.shiftCount(u16, b.elems.at(i).*.len));
             }
         }
         if ((b.equivs.len > 0)) {
             {
                 var length: i64 = 2;
                 while ((length <= localeMaxElementLength(loc))) : (length +%= 1) {
-                    b.multiLens |= (@as(u16, 1) << @intCast(length));
+                    b.multiLens |= (@as(u16, 1) << vg.shiftCount(u16, length));
                 }
             }
         }
@@ -810,7 +810,7 @@ pub fn bracketMatchesOne(brs: vg.Slice(bracketSet), bi: i32, loc: *Locale, c: i3
     {
         var i: i64 = 0;
         while ((i < buf.n)) : (i +%= 1) {
-            if ((bracketPositiveSingle(brs, bi, loc, buf.r[@intCast(i)]) == want)) {
+            if ((bracketPositiveSingle(brs, bi, loc, buf.r[vg.arrayIndex(16, i)]) == want)) {
                 return true;
             }
         }
@@ -879,7 +879,7 @@ pub fn equivCandidate(brs: vg.Slice(bracketSet), bi: i32, loc: *Locale, t: vg.Sl
         }
         return false;
     }
-    candidate.r[@intCast(at)] = t.at(at).*;
+    candidate.r[vg.arrayIndex(8, at)] = t.at(at).*;
     if (equivCandidate(brs, bi, loc, t, candidate, (at +% 1))) {
         return true;
     }
@@ -891,7 +891,7 @@ pub fn equivCandidate(brs: vg.Slice(bracketSet), bi: i32, loc: *Locale, t: vg.Sl
     {
         var i_2: i64 = 0;
         while ((i_2 < buf.n)) : (i_2 +%= 1) {
-            candidate.r[@intCast(at)] = buf.r[@intCast(i_2)];
+            candidate.r[vg.arrayIndex(8, at)] = buf.r[vg.arrayIndex(16, i_2)];
             if (equivCandidate(brs, bi, loc, t, candidate, (at +% 1))) {
                 return true;
             }
@@ -1823,7 +1823,7 @@ pub fn bracketAtomCost(brs: vg.Slice(bracketSet), bi: i32, lc: *lookupCosts) i64
     {
         var length: i64 = 2;
         while ((length <= maxElemAhead)) : (length +%= 1) {
-            if (((brs.at(bi).*.multiLens & (@as(u16, 1) << @intCast(length))) != 0)) {
+            if (((brs.at(bi).*.multiLens & (@as(u16, 1) << vg.shiftCount(u16, length))) != 0)) {
                 cost = cAdd(cost, probeCost(brs, bi, lc, vg.cv(i64, length)));
             }
         }
@@ -2252,7 +2252,7 @@ pub fn paConsume(mem: vg.Allocator, e: *phaseAState, ws: *engineWS, re: *Regexp,
                     {
                         var length: i64 = 2;
                         while ((length <= ws.ahead.len)) : (length +%= 1) {
-                            if (((re.brackets.at(bi).*.multiLens & (@as(u16, 1) << @intCast(length))) == 0)) {
+                            if (((re.brackets.at(bi).*.multiLens & (@as(u16, 1) << vg.shiftCount(u16, length))) == 0)) {
                                 continue;
                             }
                             if (bracketMatchesMulti(re.brackets, bi, &re.loc, ws.ahead.head(length))) {
@@ -2290,7 +2290,7 @@ pub fn scanAhead(e: *phaseAState, re: *Regexp) i64 {
     {
         var i: i64 = e.pos;
         while ((i < e.subject.len)) : (i +%= 1) {
-            if (re.prog.scan.stop[@intCast(e.subject.byte(i))]) {
+            if (re.prog.scan.stop[vg.arrayIndex(256, e.subject.byte(i))]) {
                 return i;
             }
         }
@@ -2544,22 +2544,22 @@ pub fn u32Raw(blob: vg.Str, off: i64) u32 {
 }
 
 pub fn u16At(l: *Locale, sec: i64, index: i64) u16 {
-    const off: i64 = (l.sec[@intCast(sec)].Off +% (2 *% index));
+    const off: i64 = (l.sec[vg.arrayIndex(23, sec)].Off +% (2 *% index));
     return (vg.cv(u16, l.blob.byte(off)) | (vg.cv(u16, l.blob.byte((off +% 1))) << 8));
 }
 
 pub fn u32At(l: *Locale, sec: i64, index: i64) u32 {
-    return u32Raw(l.blob, (l.sec[@intCast(sec)].Off +% (4 *% index)));
+    return u32Raw(l.blob, (l.sec[vg.arrayIndex(23, sec)].Off +% (4 *% index)));
 }
 
 pub fn sectionLen(l: *Locale, sec: i64) i64 {
-    return (l.sec[@intCast(sec)].End -% l.sec[@intCast(sec)].Off);
+    return (l.sec[vg.arrayIndex(23, sec)].End -% l.sec[vg.arrayIndex(23, sec)].Off);
 }
 
 pub fn byteString(l: *Locale, sec: i64, off: i64) vg.Str {
-    const start: i64 = (l.sec[@intCast(sec)].Off +% off);
+    const start: i64 = (l.sec[vg.arrayIndex(23, sec)].Off +% off);
     var end: i64 = start;
-    while (((end < l.sec[@intCast(sec)].End) and (l.blob.byte(end) != 0))) {
+    while (((end < l.sec[vg.arrayIndex(23, sec)].End) and (l.blob.byte(end) != 0))) {
         end +%= 1;
     }
     return l.blob.sub(start, end);
@@ -2583,8 +2583,8 @@ pub fn localeLoad(l: *Locale, blob: vg.Str) bool {
             if (((cursor +% length) > blob.len)) {
                 return false;
             }
-            l.sec[@intCast(i)].Off = cursor;
-            l.sec[@intCast(i)].End = (cursor +% length);
+            l.sec[vg.arrayIndex(23, i)].Off = cursor;
+            l.sec[vg.arrayIndex(23, i)].End = (cursor +% length);
             cursor +%= length;
         }
     }
@@ -3018,7 +3018,7 @@ pub fn classByName(name: vg.Str) Tup_u8_bool {
     {
         var i: i64 = 0;
         while ((i < numClasses)) : (i +%= 1) {
-            if (vg.streq(classNames[@intCast(i)], name)) {
+            if (vg.streq(classNames[vg.arrayIndex(12, i)], name)) {
                 return .{ vg.cv(u8, i), true };
             }
         }
@@ -3164,7 +3164,7 @@ pub fn pairSourcesRun(l: *Locale, buf: *preimageBuf, sec: i64, r: i32) void {
         if ((vg.cv(i32, u32At(l, sec, (2 *% low))) != r)) {
             break;
         }
-        buf.r[@intCast(buf.n)] = vg.cv(i32, u32At(l, sec, ((2 *% low) +% 1)));
+        buf.r[vg.arrayIndex(16, buf.n)] = vg.cv(i32, u32At(l, sec, ((2 *% low) +% 1)));
         buf.n +%= 1;
         low +%= 1;
     }
@@ -3226,9 +3226,9 @@ pub fn localeCasePreimages(l: *Locale, buf: *preimageBuf, r: i32) void {
     {
         var i: i64 = 0;
         while ((i < buf.n)) : (i +%= 1) {
-            const candidate: i32 = buf.r[@intCast(i)];
+            const candidate: i32 = buf.r[vg.arrayIndex(16, i)];
             if (((candidate != r) and (!runesContain(vg.arrSlice(i32, &buf.r, 0, w), candidate)))) {
-                buf.r[@intCast(w)] = candidate;
+                buf.r[vg.arrayIndex(16, w)] = candidate;
                 w +%= 1;
             }
         }
@@ -3972,14 +3972,14 @@ pub fn buildScanFilter(mem: vg.Allocator, pr: *program, newlineMode: bool) vg.Al
             iFail => {
             },
             iRune => {
-                pr.scan.stop[@intCast(utf8LeadByte(vg.cv(i32, pr.ins.at(pc).*.arg)))] = true;
+                pr.scan.stop[vg.arrayIndex(256, utf8LeadByte(vg.cv(i32, pr.ins.at(pc).*.arg)))] = true;
             },
             iRuneFold => {
                 const set: u32 = pr.ins.at(pc).*.arg;
                 {
                     var i: i64 = 0;
                     while ((i < pr.foldSets.at(set).*.len)) : (i +%= 1) {
-                        pr.scan.stop[@intCast(utf8LeadByte(pr.foldSets.at(set).*.at(i).*))] = true;
+                        pr.scan.stop[vg.arrayIndex(256, utf8LeadByte(pr.foldSets.at(set).*.at(i).*))] = true;
                     }
                 }
             },
@@ -4001,7 +4001,7 @@ pub fn buildScanFilter(mem: vg.Allocator, pr: *program, newlineMode: bool) vg.Al
     {
         var b: i64 = 0;
         while ((b < 256)) : (b +%= 1) {
-            if (pr.scan.stop[@intCast(b)]) {
+            if (pr.scan.stop[vg.arrayIndex(256, b)]) {
                 count +%= 1;
                 pr.scan.b = vg.cv(u8, b);
             }
@@ -4332,7 +4332,7 @@ pub fn emitRepeat(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), ni:
     if (nodes.at(ni).*.minimal) {
         const slot: i64 = nodes.at(ni).*.index;
         if ((slot < maskWidth)) {
-            mask_v |= (@as(u64, vg.cv(u64, 1)) << @intCast(slot));
+            mask_v |= (@as(u64, vg.cv(u64, 1)) << vg.shiftCount(u64, slot));
         } else {
             const grown: vg.Slice(u32) = try vg.make(mem, u32, (extra_v.len +% 1));
             _ = vg.copy(u32, grown, extra_v);

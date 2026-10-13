@@ -44,6 +44,8 @@ Locals with a conflicting name are renamed during translation.
 Identifiers are ASCII.
 No declaration other than a struct field may be named `true`, `false` or `nil`, and no type declaration may reuse a predeclared type name such as `int32`.
 The JSON form writes those names as literals and type names, so shadowing them would change what the program means.
+The blank identifier `_` cannot name a constant, variable, type, struct field, function, or parameter.
+It can still discard a value in assignments, two-result short declarations, and range clauses.
 
 ## 2. Types
 
@@ -140,7 +142,8 @@ Every constant is written out.
 Grouped `const (...)` blocks are allowed.
 Each entry needs an explicit value.
 An untyped integer constant defaults to `int` and must fit signed 64-bit range.
-An untyped character constant defaults to `int32` and must fit signed 32-bit range.
+A character constant must be a valid Unicode character, from U+0000 to U+D7FF or from U+E000 to U+10FFFF.
+An untyped character constant defaults to `int32`.
 An explicitly typed constant is checked against its declared scalar type instead.
 
 ### 3.2 Package-level variables
@@ -184,6 +187,8 @@ Allowed statements, with their exact Go form:
 - `for` in three forms:
   - `for cond { }`
   - `for i := e; cond; post { }`
+    The init statement declares one variable.
+    `post` is an increment, a decrement, a call, or a plain or compound assignment to one target other than `_`.
   - `for i := range e { }` and `for i, v := range e { }` where `e` is a slice, an array, or an `int` count.
     `v` is a copy of the element.
     Only the `i` form is allowed when the element type contains a slice.
@@ -481,7 +486,7 @@ The six targets keep the two levels apart like this:
 | Target     | Generated engine       | Public API               |
 | ---------- | ---------------------- | ------------------------ |
 | Go         | package `revera`       | methods in `*_host.go`   |
-| C          | `revera_eng_` names    | `revera.h`               |
+| C          | `vego_` names          | `revera.h`               |
 | C++        | `revera::engine`       | `revera` in `revera.hpp` |
 | Rust       | hidden `engine` module | crate root, `lib.rs`     |
 | Zig        | `engine.zig`           | `revera.zig` module      |

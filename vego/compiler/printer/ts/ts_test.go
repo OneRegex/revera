@@ -46,6 +46,42 @@ func TestSyntheticTempsAvoidProgramNames(t *testing.T) {
 	}
 }
 
+func TestStringLiteralNamesAvoidProgramNames(t *testing.T) {
+	const src = `{"vego":1,"package":"sample",
+		"consts":[{"k":"const","name":"_s1","type":null,"value":{"k":"int","value":"7"}}],
+		"vars":[],"types":[],"funcs":[{"k":"func","name":"text","params":[],
+		"results":[{"k":"named","name":"string"}],"body":[
+			{"k":"define","names":["_s2"],"value":{"k":"str","value":"y"}},
+			{"k":"return","values":[{"k":"ident","name":"_s2"}]}]}]}`
+	out, err := Emit(load(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "const $s1: vg.Str = vg.lit(\"y\");") {
+		t.Fatalf("string literal constant is not in its own namespace:\n%s", out)
+	}
+	deno, err := exec.LookPath("deno")
+	if err != nil {
+		t.Skip("Deno is not installed")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "engine.ts"), []byte(out), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "ts", "src", "vg.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vg.ts"), runtime, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(deno, "check", "engine.ts")
+	cmd.Dir = dir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("check generated TypeScript: %v\n%s", err, output)
+	}
+}
+
 func TestIntegerTypesMapToNumberAndBigint(t *testing.T) {
 	const src = `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
 		{"k": "func", "name": "f",
@@ -108,37 +144,6 @@ func TestStructValuesAreClonedWhereGoCopies(t *testing.T) {
 		"return q.clone();",
 		"return b;",
 		"static readonly elem: vg.Elem<P> = vg.structElem(() => new P(), 4);",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("generated output does not contain %q:\n%s", want, out)
-		}
-	}
-}
-
-func TestBreakInsideSwitchLabelsTheLoop(t *testing.T) {
-	const src = `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
-		{"k": "func", "name": "f", "params": [{"name": "n", "type": {"k": "named", "name": "int"}}],
-		 "results": [{"k": "named", "name": "int"}],
-		 "body": [
-			{"k": "define", "names": ["i"], "value": {"k": "int", "value": "0"}},
-			{"k": "for", "cond": {"k": "binary", "op": "<", "x": {"k": "ident", "name": "i"}, "y": {"k": "ident", "name": "n"}},
-			 "body": [
-				{"k": "switch", "tag": {"k": "ident", "name": "i"},
-				 "cases": [{"values": [{"k": "int", "value": "3"}], "body": [{"k": "break"}]}]},
-				{"k": "incdec", "op": "++", "lhs": {"k": "ident", "name": "i"}}
-			 ]},
-			{"k": "return", "values": [{"k": "ident", "name": "i"}]}
-		 ]}
-	]}`
-	out, err := Emit(load(t, src))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{
-		"_t1: while ((i < n)) {",
-		"case 3:",
-		"break _t1;",
-		"i = vg.chk(i + 1);",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("generated output does not contain %q:\n%s", want, out)

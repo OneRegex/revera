@@ -152,7 +152,7 @@ def probeReport (tp : TProgram) : P (List String) := do
 
 /-- The reference output of the Go original, one line per probe. -/
 def probeExpected : List String :=
-  ((include_str "../data/probe.expected").trim.splitOn "\n")
+  ((include_str "../data/probe.expected").trimAscii.copy.splitOn "\n")
 
 /-- The checked probe program. -/
 def probeChecked : Except String TProgram :=

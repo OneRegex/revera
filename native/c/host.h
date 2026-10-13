@@ -12,6 +12,11 @@
 
 #include "engine.h"
 
+// Generated names carry an encoded namespace, so these macros spell it once.
+#define ENG(name) vego_g_7265766572615f656e67x_##name
+#define ENG_TYPE(code) vego_t_7265766572615f656e67x_##code
+#define ENG_TUPLE(code) vego_q_7265766572615f656e67x_##code
+
 // read_line reads one line of any length into *buf, growing it as needed.
 // It returns the length without the newline, or -1 at the end of the input.
 static inline long read_line(char **buf, size_t *cap) {
@@ -48,12 +53,12 @@ static const unsigned char data_bin[] = {
 
 // LocaleLoad validates the whole blob, so the result is worth keeping for the life of the process.
 // The hosts are single threaded, so a plain static flag is enough for the lazy init.
-static inline revera_eng_Locale base_locale(void) {
+static inline ENG(Locale) base_locale(void) {
     static bool loaded = false;
-    static revera_eng_Locale base;
+    static ENG(Locale) base;
     if (!loaded) {
-        revera_eng_Tup_t4c6f63616c65x_bool res =
-            revera_eng_LocaleLoad((vg_str){(const char *)data_bin, (int64_t)sizeof(data_bin)});
+        ENG_TUPLE(Tup_t4c6f63616c65x_bool) res =
+            ENG(LocaleLoad)((vg_str){(const char *)data_bin, (int64_t)sizeof(data_bin)});
         if (!res.r1) {
             fputs("embedded locale data failed to load\n", stderr);
             abort();
@@ -80,7 +85,7 @@ static inline vg_str decode(vg_arena *mem, const char *tok) {
         return (vg_str){0};
     }
     int64_t n = (int64_t)(strlen(tok) / 2);
-    revera_eng_slice_u8 buf = revera_eng_slice_u8_make(mem, n);
+    ENG_TYPE(su8) buf = ENG_TYPE(su8_make)(mem, n);
     for (int64_t i = 0; i < n; i++) {
         buf.p[i] = (uint8_t)(hexval(tok[2 * i]) << 4 | hexval(tok[2 * i + 1]));
     }

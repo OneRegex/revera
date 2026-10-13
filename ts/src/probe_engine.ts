@@ -2,7 +2,7 @@
 
 import * as vg from "./vg.ts";
 
-const _s1: vg.Str = vg.lit("a");
+const $s1: vg.Str = vg.lit("a");
 
 export const minI64: number = (-9223372036854775808);
 
@@ -140,7 +140,7 @@ export function RangeIntProbe(n: number): bigint {
 
 export function PartialArray(): bigint {
     const a: BigInt64Array = new BigInt64Array([7n, 9n, 0n, 0n, 0n]);
-    const names: vg.Str[] = [_s1, vg.EMPTY, vg.EMPTY];
+    const names: vg.Str[] = [$s1, vg.EMPTY, vg.EMPTY];
     let t: bigint = 0n;
     for (let i: number = 0; (i < 5); i = vg.chk(i + 1)) {
         t = BigInt.asIntN(64, BigInt.asIntN(64, t * 10n) + a[vg.ix(i, 5)]);

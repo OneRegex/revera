@@ -48,13 +48,13 @@ What the theorems say:
    The figures of the extreme cases still compare against the Go reference.
    `Vego.Corpus` records the measurements behind that choice, and the proposition re-checks its own coverage.
 
-6. `phaseA_link_agrees`, with `PhaseA.run_steps_le` and `PhaseA.run_heap_le` of `Vego/PhaseAProofs.lean`.
+5. `phaseA_link_agrees`, with `PhaseA.run_steps_le` and `PhaseA.run_heap_le` of `Vego/PhaseAProofs.lean`.
    The model of the phase A matcher in `Vego/PhaseA.lean` is bounded for every program and subject by the heap and step figures the contract reports, by ordinary induction and a potential argument on the closure.
    The link theorem checks the model against the interpreted engine on the corpus, result, bytes and loop meter, and checks the engine's contract figures against the proven ones.
    `phaseA_run_steps_anchored`, from `PhaseA.run_steps_le_anchored` of `Vego/PhaseAAnchored.lean`, is the tighter step figure of a start-anchored program of bounded depth, which pays for `depth + 3` boundaries instead of one per byte.
    Its certificate is decidable, and the link theorem checks that every contract the engine reports with that figure carries one.
 
-5. `spec_agrees_with_corpus`, `engine_meets_spec_on_corpus` and `engine_meets_spec_exhaustively`.
+6. `spec_agrees_with_corpus`, `engine_meets_spec_on_corpus` and `engine_meets_spec_exhaustively`.
    The `Ere` library is a model of the ERE specification, written from its text.
    The first theorem says that the recorded output of every corpus command the specification constrains meets the specification's verdict, at a pinned coverage.
    The second composes it with the corpus theorem: on those commands, the interpreted engine meets the specification, with the Go engine out of the trust base.

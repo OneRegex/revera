@@ -1225,7 +1225,7 @@ theorem pushAhead_step (p : Prog) (st : St) (r : Int) (atom : Nat) (hinv : Globa
     omega
   · have hpot := grow_pot st.ahead.length st.aheadCap
     have halloc := hinv.alloc
-    simp only [St.pushAhead, St.allocBytes_charge, capSum, St.charge, St.slot] at halloc ⊢
+    simp only [St.pushAhead, capSum, St.charge, St.slot] at halloc ⊢
     omega
   · simp only [stepFigure, St.pushAhead, St.charge]
     omega
@@ -1752,7 +1752,7 @@ theorem copyQueue_step (p : Prog) (st : St) (active : List Nat) (hinv : GlobalIn
       omega
     · have hd := growCap_doubles st.queueCap active.length
       have halloc := hinv.alloc
-      simp only [St.allocBytes_charge, capSum, St.charge, St.slot] at halloc ⊢
+      simp only [capSum, St.charge, St.slot] at halloc ⊢
       omega
   · exact ⟨hinv.slotsSize, fun si hsi => by simpa [St.slot] using hinv.slots si hsi,
       fun pc hpc => hlt pc (List.mem_reverse.mp hpc),
@@ -1937,7 +1937,7 @@ theorem liveAt_lt (p : Prog) (st : St) (si g : Nat) (hsl : SlotInv p (st.slot si
   rw [List.mem_filter] at hpc
   exact (hsl.mem pc hpc.1).1
 
-theorem liveAt_len (p : Prog) (st : St) (si g : Nat) (hsl : SlotInv p (st.slot si)) :
+theorem liveAt_len (p : Prog) (st : St) (si g : Nat) (_hsl : SlotInv p (st.slot si)) :
     (liveAt st si g).length ≤ (st.slot si).active.length :=
   List.length_filter_le _ _
 
@@ -1947,11 +1947,11 @@ theorem filterSlot_step (p : Prog) (st : St) (si g : Nat) (atom : Nat) (hinv : G
   have hsl := hinv.slots si hsi
   have hslot' : (st.filterSlot si g).slot si = { st.slot si with gen := g, active := liveAt st si g } := by
     simp only [St.filterSlot, St.slot, St.setSlot]
-    simp [Array.getElem?_setIfInBounds, hinv.slot_lt hsi]
+    simp [hinv.slot_lt hsi]
   have hother : ∀ sj, si ≠ sj → (st.filterSlot si g).slot sj = st.slot sj := by
     intro sj hne
     simp only [St.filterSlot, St.slot, St.setSlot]
-    simp [Array.getElem?_setIfInBounds, hne]
+    simp [hne]
   have hnew : SlotInv p { st.slot si with gen := g, active := liveAt st si g } :=
     ⟨hsl.size, List.Pairwise.filter _ hsl.nodup, fun pc hpc => by
       unfold liveAt at hpc

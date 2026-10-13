@@ -13,7 +13,7 @@ namespace Vego
 /--
 Replay every command of `pairs` in one session and return the output line of each, in order.
 Any fault, any run out of fuel, and any Exec past its resource contract is an error.
-The session enforces the resource contracts, so a command whose Exec passes its contract fails the replay.
+The session enforces the resource contracts, so a command whose Exec exceeds its contract fails the replay.
 -/
 def replayLines (tp : TProgram) (pairs : List (String × String)) : Except String (List String) := do
   let render : DriverErr → String := fun e =>

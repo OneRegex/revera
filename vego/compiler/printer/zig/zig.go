@@ -586,10 +586,7 @@ func (g *gen) opAssignPlace(s *compiler.Stmt, lhs string) string {
 	case "|=", "&=", "^=":
 		return fmt.Sprintf("%s %s %s", lhs, s.Op, val)
 	case "<<=", ">>=":
-		if s.Value.IsConst {
-			return fmt.Sprintf("%s %s %s", lhs, s.Op, val)
-		}
-		return fmt.Sprintf("%s %s @intCast(%s)", lhs, s.Op, val)
+		return fmt.Sprintf("%s %s %s", lhs, s.Op, g.shiftCount(s.Lhs[0].Typ, s.Value, val))
 	case "&^=":
 		return fmt.Sprintf("%s &= ~(%s)", lhs, g.typed(s.Value))
 	}
@@ -635,7 +632,7 @@ func (g *gen) expr(e *compiler.Expr) string {
 			if e.Index.IsConst {
 				return g.operand(e.X) + "[" + g.expr(e.Index) + "]"
 			}
-			return g.operand(e.X) + "[@intCast(" + g.expr(e.Index) + ")]"
+			return fmt.Sprintf("%s[vg.arrayIndex(%d, %s)]", g.operand(e.X), e.X.Typ.ALenVal, g.expr(e.Index))
 		}
 		fatal("index of", e.X.Typ)
 	case "slice_expr":
@@ -852,13 +849,17 @@ func (g *gen) binary(e *compiler.Expr) string {
 	case "&", "|", "^", "==", "!=", "<", "<=", ">", ">=":
 		return fmt.Sprintf("(%s %s %s)", x, e.Op, y)
 	case "<<", ">>":
-		if e.Y.IsConst {
-			return fmt.Sprintf("(%s %s %s)", x, e.Op, y)
-		}
-		return fmt.Sprintf("(%s %s @intCast(%s))", x, e.Op, y)
+		return fmt.Sprintf("(%s %s %s)", x, e.Op, g.shiftCount(e.Typ, e.Y, y))
 	}
 	fatal("unknown binary op", e.Op)
 	return ""
+}
+
+func (g *gen) shiftCount(t *compiler.Type, e *compiler.Expr, value string) string {
+	if compiler.ConstBelow(g.p, e, t.Width()) {
+		return value
+	}
+	return fmt.Sprintf("vg.shiftCount(%s, %s)", g.typ(t), value)
 }
 
 func (g *gen) composite(e *compiler.Expr) string {

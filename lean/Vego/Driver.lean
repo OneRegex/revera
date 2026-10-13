@@ -40,7 +40,7 @@ def hexEncode (b : ByteArray) : String := Id.run do
 
 /-- The embedded locale table, the same bytes as data.bin. -/
 def localeData : ByteArray :=
-  (hexDecode (include_str "../data/localedata.hex").trim).getD
+  (hexDecode (include_str "../data/localedata.hex").trimAscii.copy).getD
     ByteArray.empty
 
 /-- Protocol token codecs: "-" stands for the empty string. -/
@@ -368,7 +368,7 @@ The step comparison uses the loop counter, which ticks once per loop iteration a
 That is the granularity the abstract operations of the contract describe.
 The program text bounds the straight-line code between two of those units.
 The loop counter therefore bounds the whole work, up to a constant of the artifact.
-Exceeding any bound is a hard fault, so the corpus theorem fails if one real execution ever passes its contract.
+Exceeding any bound is a hard fault, so the corpus theorem fails if one real execution ever exceeds its contract.
 -/
 private def meterCheck (s : Session) (heapB stackB stepsB : Int) :
     SR Session := do

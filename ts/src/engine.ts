@@ -2,50 +2,50 @@
 
 import * as vg from "./vg.ts";
 
-const _s1: vg.Str = vg.lit("alnum");
-const _s2: vg.Str = vg.lit("alpha");
-const _s3: vg.Str = vg.lit("blank");
-const _s4: vg.Str = vg.lit("cntrl");
-const _s5: vg.Str = vg.lit("digit");
-const _s6: vg.Str = vg.lit("graph");
-const _s7: vg.Str = vg.lit("lower");
-const _s8: vg.Str = vg.lit("print");
-const _s9: vg.Str = vg.lit("punct");
-const _s10: vg.Str = vg.lit("space");
-const _s11: vg.Str = vg.lit("upper");
-const _s12: vg.Str = vg.lit("xdigit");
-const _s13: vg.Str = vg.lit(".]");
-const _s14: vg.Str = vg.lit("=]");
-const _s15: vg.Str = vg.lit(":]");
-const _s16: vg.Str = vg.lit("success");
-const _s17: vg.Str = vg.lit("no match");
-const _s18: vg.Str = vg.lit("invalid regular expression");
-const _s19: vg.Str = vg.lit("invalid collating element");
-const _s20: vg.Str = vg.lit("invalid character class");
-const _s21: vg.Str = vg.lit("invalid or trailing backslash");
-const _s22: vg.Str = vg.lit("invalid backreference");
-const _s23: vg.Str = vg.lit("unbalanced bracket");
-const _s24: vg.Str = vg.lit("unbalanced parenthesis");
-const _s25: vg.Str = vg.lit("unbalanced brace");
-const _s26: vg.Str = vg.lit("invalid interval");
-const _s27: vg.Str = vg.lit("invalid range endpoint");
-const _s28: vg.Str = vg.lit("capacity limit reached");
-const _s29: vg.Str = vg.lit("repetition without an operand");
-const _s30: vg.Str = vg.lit("offsets requested from a NoSub expression");
-const _s31: vg.Str = vg.lit("unknown error");
-const _s32: vg.Str = vg.lit("RVLOC001");
-const _s33: vg.Str = vg.lit("utf8");
-const _s34: vg.Str = vg.lit("utf-8");
-const _s35: vg.Str = vg.lit("collation=");
-const _s36: vg.Str = vg.lit("dict");
-const _s37: vg.Str = vg.lit("dictionary");
-const _s38: vg.Str = vg.lit("phonebk");
-const _s39: vg.Str = vg.lit("phonebook");
-const _s40: vg.Str = vg.lit("trad");
-const _s41: vg.Str = vg.lit("traditional");
-const _s42: vg.Str = vg.lit("c");
-const _s43: vg.Str = vg.lit("posix");
-const _s44: vg.Str = vg.lit("standard");
+const $s1: vg.Str = vg.lit("alnum");
+const $s2: vg.Str = vg.lit("alpha");
+const $s3: vg.Str = vg.lit("blank");
+const $s4: vg.Str = vg.lit("cntrl");
+const $s5: vg.Str = vg.lit("digit");
+const $s6: vg.Str = vg.lit("graph");
+const $s7: vg.Str = vg.lit("lower");
+const $s8: vg.Str = vg.lit("print");
+const $s9: vg.Str = vg.lit("punct");
+const $s10: vg.Str = vg.lit("space");
+const $s11: vg.Str = vg.lit("upper");
+const $s12: vg.Str = vg.lit("xdigit");
+const $s13: vg.Str = vg.lit(".]");
+const $s14: vg.Str = vg.lit("=]");
+const $s15: vg.Str = vg.lit(":]");
+const $s16: vg.Str = vg.lit("success");
+const $s17: vg.Str = vg.lit("no match");
+const $s18: vg.Str = vg.lit("invalid regular expression");
+const $s19: vg.Str = vg.lit("invalid collating element");
+const $s20: vg.Str = vg.lit("invalid character class");
+const $s21: vg.Str = vg.lit("invalid or trailing backslash");
+const $s22: vg.Str = vg.lit("invalid backreference");
+const $s23: vg.Str = vg.lit("unbalanced bracket");
+const $s24: vg.Str = vg.lit("unbalanced parenthesis");
+const $s25: vg.Str = vg.lit("unbalanced brace");
+const $s26: vg.Str = vg.lit("invalid interval");
+const $s27: vg.Str = vg.lit("invalid range endpoint");
+const $s28: vg.Str = vg.lit("capacity limit reached");
+const $s29: vg.Str = vg.lit("repetition without an operand");
+const $s30: vg.Str = vg.lit("offsets requested from a NoSub expression");
+const $s31: vg.Str = vg.lit("unknown error");
+const $s32: vg.Str = vg.lit("RVLOC001");
+const $s33: vg.Str = vg.lit("utf8");
+const $s34: vg.Str = vg.lit("utf-8");
+const $s35: vg.Str = vg.lit("collation=");
+const $s36: vg.Str = vg.lit("dict");
+const $s37: vg.Str = vg.lit("dictionary");
+const $s38: vg.Str = vg.lit("phonebk");
+const $s39: vg.Str = vg.lit("phonebook");
+const $s40: vg.Str = vg.lit("trad");
+const $s41: vg.Str = vg.lit("traditional");
+const $s42: vg.Str = vg.lit("c");
+const $s43: vg.Str = vg.lit("posix");
+const $s44: vg.Str = vg.lit("standard");
 
 export const itemChar: number = 0;
 export const itemElem: number = 1;
@@ -1485,7 +1485,7 @@ export class interval {
     static readonly elem: vg.Elem<interval> = vg.structElem(() => new interval(), 16);
 }
 
-export const classNames: vg.Str[] = [_s1, _s2, _s3, _s4, _s5, _s6, _s7, _s8, _s9, _s10, _s11, _s12];
+export const classNames: vg.Str[] = [$s1, $s2, $s3, $s4, $s5, $s6, $s7, $s8, $s9, $s10, $s11, $s12];
 
 export function parseBracket(p: parser, loc: Locale): number {
     let _t2!: vg.Slice<node>;
@@ -1582,7 +1582,7 @@ export function parseBracketItem(p: parser, loc: Locale, bracketStart: number): 
     if ((c === 91)) {
         const inner: number = peekByteAt(p, 1);
         if ((inner === 46)) {
-            const _t1 = scanInner(p, _s13, ErrECollate);
+            const _t1 = scanInner(p, $s13, ErrECollate);
             const seq: vg.Slice<number> = _t1[0];
             const ok: boolean = _t1[1];
             if ((!ok)) {
@@ -1602,7 +1602,7 @@ export function parseBracketItem(p: parser, loc: Locale, bracketStart: number): 
             return [item, true];
         }
         if ((inner === 61)) {
-            const _t2 = scanInner(p, _s14, ErrECollate);
+            const _t2 = scanInner(p, $s14, ErrECollate);
             const seq_2: vg.Slice<number> = _t2[0];
             const ok_2: boolean = _t2[1];
             if ((!ok_2)) {
@@ -1617,7 +1617,7 @@ export function parseBracketItem(p: parser, loc: Locale, bracketStart: number): 
             return [item, true];
         }
         if ((inner === 58)) {
-            const _t3 = scanInner(p, _s15, ErrECType);
+            const _t3 = scanInner(p, $s15, ErrECType);
             const seq_3: vg.Slice<number> = _t3[0];
             const ok_3: boolean = _t3[1];
             if ((!ok_3)) {
@@ -3595,82 +3595,82 @@ export function ErrorText(code: number): vg.Str {
     switch (code) {
         case ErrNone:
         {
-            return _s16;
+            return $s16;
             break;
         }
         case ErrNoMatch:
         {
-            return _s17;
+            return $s17;
             break;
         }
         case ErrBadPat:
         {
-            return _s18;
+            return $s18;
             break;
         }
         case ErrECollate:
         {
-            return _s19;
+            return $s19;
             break;
         }
         case ErrECType:
         {
-            return _s20;
+            return $s20;
             break;
         }
         case ErrEEscape:
         {
-            return _s21;
+            return $s21;
             break;
         }
         case ErrESubReg:
         {
-            return _s22;
+            return $s22;
             break;
         }
         case ErrEBrack:
         {
-            return _s23;
+            return $s23;
             break;
         }
         case ErrEParen:
         {
-            return _s24;
+            return $s24;
             break;
         }
         case ErrEBrace:
         {
-            return _s25;
+            return $s25;
             break;
         }
         case ErrBadBR:
         {
-            return _s26;
+            return $s26;
             break;
         }
         case ErrERange:
         {
-            return _s27;
+            return $s27;
             break;
         }
         case ErrESpace:
         {
-            return _s28;
+            return $s28;
             break;
         }
         case ErrBadRpt:
         {
-            return _s29;
+            return $s29;
             break;
         }
         case ErrENoSub:
         {
-            return _s30;
+            return $s30;
             break;
         }
         default:
         {
-            return _s31;
+            return $s31;
             break;
         }
     }
@@ -3801,7 +3801,7 @@ export function byteString(l: Locale, sec: number, off: number): vg.Str {
 }
 
 export function localeLoad(l: Locale, blob: vg.Str): boolean {
-    const magic: vg.Str = _s32;
+    const magic: vg.Str = $s32;
     if (((blob.length < magic.length) || (!vg.streq(vg.strSub(blob, 0, magic.length), magic)))) {
         return false;
     }
@@ -4002,7 +4002,7 @@ export function normalizeName(input: vg.Str): [vg.Str, boolean] {
             }
             codeset = vg.append(vg.U8, codeset, c_2);
         }
-        if (((!vg.streq(vg.strFromBytes(codeset), _s33)) && (!vg.streq(vg.strFromBytes(codeset), _s34)))) {
+        if (((!vg.streq(vg.strFromBytes(codeset), $s33)) && (!vg.streq(vg.strFromBytes(codeset), $s34)))) {
             return [vg.EMPTY, false];
         }
     }
@@ -4015,7 +4015,7 @@ export function embeddedModifier(name: vg.Str): [vg.Str, boolean] {
         return [vg.EMPTY, false];
     }
     const modifier: vg.Str = vg.strTail(name, vg.chk(at + 1));
-    const keyword: vg.Str = _s35;
+    const keyword: vg.Str = $s35;
     if ((modifier.length <= keyword.length)) {
         return [vg.EMPTY, false];
     }
@@ -4028,14 +4028,14 @@ export function embeddedModifier(name: vg.Str): [vg.Str, boolean] {
 }
 
 export function longTypeAlias(name: vg.Str): vg.Str {
-    if (vg.streq(name, _s36)) {
-        return _s37;
+    if (vg.streq(name, $s36)) {
+        return $s37;
     }
-    if (vg.streq(name, _s38)) {
-        return _s39;
+    if (vg.streq(name, $s38)) {
+        return $s39;
     }
-    if (vg.streq(name, _s40)) {
-        return _s41;
+    if (vg.streq(name, $s40)) {
+        return $s41;
     }
     return name;
 }
@@ -4116,12 +4116,12 @@ export function normalizeRequest(name: vg.Str, collationType: vg.Str): [localeRe
     }
     req.name = normalized;
     req.ctype = normalizedType;
-    req.posix = (vg.streq(normalized, _s42) || vg.streq(normalized, _s43));
+    req.posix = (vg.streq(normalized, $s42) || vg.streq(normalized, $s43));
     return [req, true];
 }
 
 export function posixSelect(ctype: vg.Str): [Locale, boolean] {
-    if (((ctype.length !== 0) && (!vg.streq(ctype, _s44)))) {
+    if (((ctype.length !== 0) && (!vg.streq(ctype, $s44)))) {
         const invalid: Locale = new Locale();
         return [invalid, false];
     }

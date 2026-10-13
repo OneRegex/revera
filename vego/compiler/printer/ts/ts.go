@@ -1211,7 +1211,8 @@ func (g *gen) strLit(s string) string {
 	if name, ok := g.lits[s]; ok {
 		return name
 	}
-	name := fmt.Sprintf("_s%d", len(g.litOrder)+1)
+	// Go names cannot contain $, so this never clashes with a program name.
+	name := fmt.Sprintf("$s%d", len(g.litOrder)+1)
 	g.lits[s] = name
 	g.litOrder = append(g.litOrder, name)
 	return name

@@ -4,9 +4,36 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"strings"
 	"testing"
 )
+
+func TestCharacterLiterals(t *testing.T) {
+	const input = `{"vego":1,"package":"p","consts":[],
+		"vars":[{"k":"var","name":"global","type":null,"value":{"k":"char","value":"66"}}],
+		"types":[],"funcs":[{"k":"func","name":"local","params":[],
+		"results":[{"k":"named","name":"int32"}],"body":[
+			{"k":"define","names":["x"],"value":{"k":"char","value":"VALUE"}},
+			{"k":"return","values":[{"k":"ident","name":"x"}]}]}]}`
+	// The literal must keep its rune type, or returning x as an int32 fails to compile.
+	src, err := Emit([]byte(strings.ReplaceAll(input, "VALUE", "65")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "generated.go", src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := new(types.Config).Check("p", fset, []*ast.File{file}, nil); err != nil {
+		t.Fatalf("type-check generated Go: %v\n%s", err, src)
+	}
+	// A surrogate is not a character, and quoting it would silently turn it into U+FFFD.
+	if _, err := Emit([]byte(strings.ReplaceAll(input, "VALUE", "55296"))); err == nil || !strings.Contains(err.Error(), "invalid character value") {
+		t.Fatalf("surrogate character value: error = %v, want invalid character value", err)
+	}
+}
 
 func TestRenderValidatesDocumentHeader(t *testing.T) {
 	cases := []struct {

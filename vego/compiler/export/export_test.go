@@ -238,6 +238,15 @@ func TestRejections(t *testing.T) {
 			"range over an indexed array"},
 		{"short declaration reuse", "package p\n\nfunc g() (int, int) { return 1, 2 }\n\nfunc f() int {\n\ta := 0\n\ta, b := g()\n\treturn a + b\n}\n",
 			"reuses a"},
+		{"two-name loop init", "package p\n\nfunc pair() (int, int) { return 1, 2 }\n\nfunc f() {\n\tfor i, j := pair(); i < j; i++ {\n\t}\n}\n",
+			"loop init must declare one variable"},
+		{"two-target loop post", "package p\n\nfunc pair() (int, int) { return 1, 2 }\n\nfunc f() int {\n\tvar i, j int\n\tfor ; false; i, j = pair() {\n\t}\n\treturn i + j\n}\n",
+			"loop post must assign one value"},
+		{"blank-target loop post", "package p\n\nfunc bump() int { return 1 }\n\nfunc f() {\n\tfor ; false; _ = bump() {\n\t}\n}\n",
+			"blank identifier cannot be a loop post target"},
+		{"reserved package clause", "package vg\n\nfunc f() {}\n", "reserved for generated code"},
+		{"non-ASCII package clause", "package caf\u00e9\n\nfunc f() {}\n", "not ASCII"},
+		{"octal integer literal", "package p\n\nconst n = 010\n", "decimal and hexadecimal"},
 	}
 	for _, tc := range cases {
 		_, violations := check(t, tc.src)
@@ -258,6 +267,14 @@ func TestRejections(t *testing.T) {
 	}
 }
 
+func TestBlankIdentifierCannotDeclareNames(t *testing.T) {
+	src := "package p\n\nconst _ = 1\n\nvar _ = 1\n\ntype _ struct{}\n\ntype S struct{ _ int }\n\nfunc _() {}\n\nfunc f(_ int) { var _ int }\n"
+	_, violations := check(t, src)
+	if got := strings.Count(strings.Join(violations, "\n"), "blank identifier"); got != 7 {
+		t.Fatalf("got %d blank identifier violations, want 7: %v", got, violations)
+	}
+}
+
 // checkAll runs the translator and then the checks of the emitters, which vegoc check also runs.
 func checkAll(t *testing.T, src string) error {
 	t.Helper()
@@ -274,7 +291,9 @@ func checkAll(t *testing.T, src string) error {
 
 func TestNamesThatStayAvailable(t *testing.T) {
 	// Fields may reuse predeclared names, and locals may hide builtin functions, which the JSON form never calls by a local name.
-	src := "package p\n\ntype T struct{ min, max, nil int }\n\nfunc f(t T) int {\n\tany := t.min\n\tprint := t.max + t.nil\n\treturn any + print\n}\n"
+	// The blank identifier still discards a result.
+	src := "package p\n\ntype T struct{ min, max, nil int }\n\nfunc f(t T) int {\n\tany := t.min\n\tprint := t.max + t.nil\n\treturn any + print\n}\n" +
+		"\nfunc pair() (int, int) { return 1, 2 }\n\nfunc g() int {\n\ta, _ := pair()\n\t_, a = pair()\n\t_, b := pair()\n\treturn a + b\n}\n"
 	if err := checkAll(t, src); err != nil {
 		t.Fatal(err)
 	}
@@ -412,6 +431,9 @@ func TestViewLifetimes(t *testing.T) {
 		{"int from two value", "package p\n\nfunc two(b []int) ([]int, int) { return b, len(b) }\n\nfunc F() int {\n\tvar a [4]int\n\tv, n := two(a[:])\n\treturn n + v[0]\n}\n", false},
 		{"self view through call", "package p\n\ntype S struct {\n\tarr [4]int\n\ts   []int\n}\n\nfunc view(p *S) []int { return p.arr[:] }\n\nfunc f(p *S) { p.s = view(p) }\n", true},
 		{"param wrapped in struct", "package p\n\ntype S struct{ s []int }\n\nfunc wrap(v []int) S { return S{s: v} }\n", true},
+		{"parenthesized self truncation", "package p\n\ntype S struct{ values []int }\n\nfunc reset(s *S) {\n\t(s.values) = ((s).values)[:0]\n}\n", false},
+		{"parenthesized other owner", "package p\n\ntype S struct{ values []int }\n\nfunc alias(dst, src *S) {\n\t(dst.values) = src.values[:]\n}\n", true},
+		{"owner chosen by a call", "package p\n\ntype Row struct{ values []int }\n\nfunc next() int { return 0 }\n\nfunc reset(rows []Row) {\n\trows[next()].values = rows[next()].values[:0]\n}\n", true},
 	}
 	for _, tc := range cases {
 		err := checkAll(t, tc.src)

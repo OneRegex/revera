@@ -9,32 +9,249 @@ import (
 	"testing"
 
 	"github.com/oneregex/revera/vego/compiler"
+	"github.com/oneregex/revera/vego/compiler/export"
 )
 
-func TestReservedIdentifierMappingIsInjective(t *testing.T) {
-	got := []string{ident("int"), ident("int_"), ident("vego_int")}
-	want := []string{"vego_int", "int_", "vego_vego_int"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("mapped identifiers = %q, want %q", got, want)
+// Every case builds a program whose names would collide with C, libc, or the printer's own names if they were printed as written.
+func TestGeneratedCNamesAreDisjoint(t *testing.T) {
+	tests := []struct {
+		name   string
+		opts   Options
+		source string
+		main   string
+	}{
+		{
+			name: "generated helpers",
+			source: `package vego
+
+type Item struct{ value int }
+type i64 struct{ value int64 }
+type i64_eq struct{ value int }
+
+func slice_i64() int      { return 7 }
+func vego_slice_i64() int { return 8 }
+func slice_i64_make() int { return 1 }
+func bytes_from_str() int { return 5 }
+func Item_eq() int        { return 4 }
+
+func Helpers() int {
+	vego_slice_i64 := 9
+	values := make([]int, 1)
+	var items []i64_eq
+	structs := []i64{i64{value: 5}}
+	var a Item
+	var b Item
+	equal := 0
+	if a == b {
+		equal = Item_eq()
+	}
+	bytes := []uint8("x")
+	return slice_i64() + vego_slice_i64 + slice_i64_make() + len(values) + len(items) + int(structs[0].value) + equal + bytes_from_str() + len(bytes)
+}
+
+func index() int { return 0 }
+
+func ContinuePost() int {
+	var values [1]int
+	i := 0
+	saved := 0
+	for ; i < 3; values[index()] = i {
+		i++
+		if i < 3 {
+			continue
 		}
+		saved = values[0]
+	}
+	return saved*10 + values[0]
+}
+`,
+			main: `#include "engine.h"
+int main(void) {
+    vg_arena mem = {0};
+    int ok = {{Helpers}}(&mem) == 33 && {{vego_slice_i64}}() == 8 && {{ContinuePost}}() == 23;
+    vg_arena_free(&mem);
+    return ok ? 0 : 1;
+}
+`,
+		},
+		{
+			name: "C and libc names",
+			source: `package vego
+
+var local_vego_char = 5
+var x = 5
+var vego_tmp_1 = 5
+
+type S struct {
+	errno  int
+	stdin  int
+	size_t int
+	EOF    int
+}
+
+func touch(s *S) int {
+	s.errno++
+	return 0
+}
+
+func F() int {
+	char := 2
+	vego_x := 2
+	int64_t := 1
+	INT64_MAX := 1
+	L_tmpnam := 6
+	s := S{errno: 1, stdin: 2, size_t: 3, EOF: 4}
+	values := [1]int{38}
+	values[touch(&s)] += vego_tmp_1
+	return char + local_vego_char + vego_x + x + int64_t + INT64_MAX + L_tmpnam + values[0] + s.errno + s.stdin + s.size_t + s.EOF
+}
+`,
+			main: `#include "engine.h"
+int main(void) { return {{F}}() == 76 ? 0 : 1; }
+`,
+		},
+		{
+			name: "package and function spelling a libc macro",
+			source: `package INT64
+
+func MAX() int { return 7 }
+`,
+			main: `#include "engine.h"
+int main(void) { return {{MAX}}() == 7 ? 0 : 1; }
+`,
+		},
+		{
+			name: "names spelling the old header guard",
+			source: `package P
+
+const ENGINE_H = 7
+
+type S struct{ P_ENGINE_H int }
+
+func F() int {
+	a := S{P_ENGINE_H: ENGINE_H}
+	b := a
+	if a == b {
+		return b.P_ENGINE_H
+	}
+	return 0
+}
+`,
+			main: `#include "engine.h"
+int main(void) { return {{F}}() == 7 ? 0 : 1; }
+`,
+		},
+		{
+			name: "namespace matching the runtime prefix",
+			opts: Options{Prefix: "vg"},
+			source: `package p
+
+func check() int { return 7 }
+`,
+			main: `#include "engine.h"
+int main(void) { return {{check}}() == 7 ? 0 : 1; }
+`,
+		},
+		{
+			name: "header name with punctuation",
+			opts: Options{HeaderName: "engine+v2.h"},
+			source: `package p
+
+func F() int { return 7 }
+`,
+			main: `#include "engine+v2.h"
+int main(void) { return {{F}}() == 7 ? 0 : 1; }
+`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			compileAndRun(t, test.source, test.main, test.opts)
+		})
 	}
 }
 
-func TestRuntimeAndContextNamesAreEscaped(t *testing.T) {
-	for _, name := range []string{"mem", "restrict", "errno", "vg_str", "bool"} {
-		if got, want := ident(name), "vego_"+name; got != want {
-			t.Fatalf("ident(%q) = %q, want %q", name, got, want)
+func compileAndRun(t *testing.T, source, main string, opts Options) {
+	t.Helper()
+	cc, err := exec.LookPath("clang")
+	if err != nil {
+		t.Skip("clang is not installed")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "sample.go"), []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	blob, violations, err := export.Package(dir)
+	if err != nil || len(violations) != 0 {
+		t.Fatalf("export: %v %v", err, violations)
+	}
+	p, err := compiler.Load(blob)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := compiler.Check(p); err != nil {
+		t.Fatal(err)
+	}
+	main = replaceGlobalRefs(main, p, opts)
+	header, generated, err := Emit(p, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vgh, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "native", "c", "vg.h"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	headerName := opts.HeaderName
+	if headerName == "" {
+		headerName = "engine.h"
+	}
+	for name, content := range map[string]string{
+		headerName: header, "engine.c": generated, "vg.h": string(vgh), "main.c": main,
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
 		}
+	}
+	cmd := exec.Command(cc, "-std=c11", "-fwrapv", "-Wall", "-Wextra", "-Werror", "engine.c", "main.c", "-o", "test")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("compile generated C: %v\n%s\n%s\n%s", err, out, header, generated)
+	}
+	if out, err := exec.Command(filepath.Join(dir, "test")).CombinedOutput(); err != nil {
+		t.Fatalf("run generated C: %v\n%s", err, out)
+	}
+}
+
+func replaceGlobalRefs(source string, p *compiler.Program, opts Options) string {
+	prefix := p.Package
+	if opts.Prefix != "" {
+		prefix = opts.Prefix
+	}
+	for _, f := range p.Funcs {
+		source = strings.ReplaceAll(source, "{{"+f.Name+"}}", GlobalName(prefix, f.Name))
+	}
+	return source
+}
+
+func TestTokensAreInjective(t *testing.T) {
+	seen := map[string]bool{}
+	for _, name := range []string{token("g", "a_b", "c"), token("g", "a", "b_c"), token("t", "a_b", "c"), token("l", "a_b_c")} {
+		if seen[name] {
+			t.Fatalf("duplicate token %q", name)
+		}
+		seen[name] = true
+	}
+	if got, want := token("g", "revera_eng", "Compile"), "vego_g_7265766572615f656e67x_Compile"; got != want {
+		t.Fatalf("token = %q, want %q", got, want)
 	}
 }
 
 func TestSyntheticTempsAvoidProgramNames(t *testing.T) {
-	f := &compiler.FuncDecl{Info: map[string]*compiler.LocalInfo{"_t1": {}}}
-	g := &gen{p: &compiler.Program{Funcs: []*compiler.FuncDecl{f}}}
-	g.resetNames(f)
-	if got := g.newTmp(); got != "_t2" {
-		t.Fatalf("first synthetic temporary = %q, want %q", got, "_t2")
+	f := &compiler.FuncDecl{Info: map[string]*compiler.LocalInfo{"vego_tmp_2": {}}}
+	p := &compiler.Program{Package: "vego", ConstMap: map[string]*compiler.ValueDecl{"vego_tmp_1": {Name: "vego_tmp_1"}}}
+	g := &gen{p: p, prefix: p.Package, fn: f}
+	if got := g.newTmp(); got != "vego_tmp_3" {
+		t.Fatalf("first synthetic temporary = %q, want %q", got, "vego_tmp_3")
 	}
 }
 
@@ -43,7 +260,6 @@ func TestLogicalRightOperandStaysConditional(t *testing.T) {
 	sliceInt := &compiler.Type{K: compiler.KSlice, Elem: compiler.TInt}
 	f := &compiler.FuncDecl{Info: map[string]*compiler.LocalInfo{}}
 	g := &gen{p: &compiler.Program{}, fn: f}
-	g.resetNames(f)
 	g.depth = 1
 	e := &compiler.Expr{K: "binary", Op: "&&", Typ: compiler.TBool,
 		X: &compiler.Expr{K: "ident", Name: "ok", Typ: compiler.TBool},
@@ -53,11 +269,11 @@ func TestLogicalRightOperandStaysConditional(t *testing.T) {
 					Args: []*compiler.Expr{{K: "call", Name: "n", Typ: compiler.TInt}}}}},
 			Y: &compiler.Expr{K: "call", Name: "n", Typ: compiler.TInt}}}
 	got := g.expr(e)
-	if got != "_t1" {
+	if got != "vego_tmp_1" {
 		t.Fatalf("logical expression = %q, want a temporary", got)
 	}
 	joined := strings.Join(g.pre, "\n")
-	if !strings.Contains(joined, "bool _t1 = ok;") || !strings.Contains(joined, "if (_t1) {") {
+	if !strings.Contains(joined, "bool vego_tmp_1 = ok;") || !strings.Contains(joined, "if (vego_tmp_1) {") {
 		t.Fatalf("prelude does not guard the right operand:\n%s", joined)
 	}
 }
@@ -65,7 +281,6 @@ func TestLogicalRightOperandStaysConditional(t *testing.T) {
 func TestShiftCountIsCheckedAgainstTheWidth(t *testing.T) {
 	f := &compiler.FuncDecl{Info: map[string]*compiler.LocalInfo{}}
 	g := &gen{p: &compiler.Program{}, fn: f}
-	g.resetNames(f)
 	a := &compiler.Expr{K: "ident", Name: "a", Typ: compiler.TU64}
 	for _, test := range []struct {
 		op    string
@@ -114,15 +329,15 @@ func TestNegativeShiftCountAborts(t *testing.T) {
 	}
 	p := shiftProgram(t)
 	header, source := (&gen{p: p, hdrName: "engine.h", prefix: p.Package}).files()
-	main := `#include <stdio.h>
+	main := fmt.Sprintf(`#include <stdio.h>
 #include "engine.h"
 int main(void) {
-    printf("%lld\n", (long long)shifts_shl_int64_int(5, 3));
+    printf("%%lld\n", (long long)%s(5, 3));
     fflush(stdout);
-    printf("%lld\n", (long long)shifts_shl_int64_int(5, -1));
+    printf("%%lld\n", (long long)%s(5, -1));
     return 0;
 }
-`
+`, token("g", p.Package, "shl_int64_int"), token("g", p.Package, "shl_int64_int"))
 	dir := t.TempDir()
 	for name, content := range map[string]string{
 		"engine.h": header, "engine.c": source, "vg.h": string(vgh), "main.c": main,

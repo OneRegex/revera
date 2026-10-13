@@ -1,6 +1,7 @@
 package printer_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,7 @@ func bump(s *State) [2]int {
 	s.N++
 	return [2]int{1, 2}
 }
+
 func Effect() int {
 	var s State
 	n := len(bump(&s))
@@ -102,7 +104,15 @@ func ConstantConversion(a [1]uint8) int {
 				write(dir, "engine.h", header)
 				write(dir, "engine.c", body)
 				copyRuntime("native/c/vg.h", "vg.h")
-				write(dir, "main.c", "#include \"engine.h\"\nint main(void) { if (sample_Effect() != 12 || sample_BuiltinEffect() != 17) return 1; return sample_Constant((sample_slice_arr_i64_2){0}) != 2 || sample_NestedConstant((sample_slice_arr_i64_2){0}) != 2 || sample_ConstantConversion((sample_arr_u8_1){{7}}) != 8; }\n")
+				ns := p.Package
+				sliceArray := &compiler.Type{K: compiler.KSlice, Elem: &compiler.Type{K: compiler.KArray, Elem: compiler.TInt, ALenSet: true, ALenVal: 2}}
+				arrayByte := &compiler.Type{K: compiler.KArray, Elem: compiler.TU8, ALenSet: true, ALenVal: 1}
+				main := fmt.Sprintf("#include \"engine.h\"\nint main(void) { if (%s() != 12 || %s() != 17) return 1; return %s((%s){0}) != 2 || %s((%s){0}) != 2 || %s((%s){{7}}) != 8; }\n",
+					c.GlobalName(ns, "Effect"), c.GlobalName(ns, "BuiltinEffect"),
+					c.GlobalName(ns, "Constant"), c.TypeName(ns, sliceArray),
+					c.GlobalName(ns, "NestedConstant"), c.TypeName(ns, sliceArray),
+					c.GlobalName(ns, "ConstantConversion"), c.TypeName(ns, arrayByte))
+				write(dir, "main.c", main)
 				commands = [][]string{{"cc", "-std=c11", "-fwrapv", "engine.c", "main.c", "-o", "run"}, {"./run"}}
 			case "cpp":
 				header, body, err := cpp.Emit(p, cpp.Options{HeaderName: "engine.hpp", Namespace: "sample"})
@@ -142,6 +152,96 @@ func ConstantConversion(a [1]uint8) int {
 				write(dir, "package.json", "{\"type\":\"module\"}\n")
 				write(dir, "main.ts", "import * as e from './engine.ts'; import * as vg from './vg.ts'; if (e.Effect() !== 12 || e.BuiltinEffect() !== 17) throw new Error('effect'); if (e.Constant(vg.NIL) !== 2 || e.NestedConstant(vg.NIL) !== 2 || e.ConstantConversion(new Uint8Array([7])) !== 8) throw new Error('constant');\n")
 				commands = [][]string{{"node", "main.ts"}}
+			}
+			for _, args := range commands {
+				cmd := exec.Command(args[0], args[1:]...)
+				cmd.Dir = dir
+				if out, err := cmd.CombinedOutput(); err != nil {
+					t.Fatalf("%v: %v\n%s", args, err, out)
+				}
+			}
+		})
+	}
+}
+
+func TestBooleanSwitchUsesFirstMatchingCase(t *testing.T) {
+	const source = `package sample
+
+const on = true
+
+func Pick(b bool) int {
+	switch b {
+	case true:
+		return 100
+	case on:
+		return 200
+	}
+	return 300
+}
+`
+	srcDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(srcDir, "sample.go"), []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	blob, violations, err := export.Package(srcDir)
+	if err != nil || len(violations) != 0 {
+		t.Fatalf("export: %v, %v", err, violations)
+	}
+	repo, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{"c", "cpp"} {
+		t.Run(target, func(t *testing.T) {
+			tool := map[string]string{"c": "cc", "cpp": "c++"}[target]
+			if _, err := exec.LookPath(tool); err != nil {
+				t.Skipf("%s is not installed", tool)
+			}
+			p, err := compiler.Load(blob)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := compiler.Check(p); err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			write := func(name, content string) {
+				t.Helper()
+				if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var commands [][]string
+			switch target {
+			case "c":
+				header, body, err := c.Emit(p, c.Options{HeaderName: "engine.h"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				write("engine.h", header)
+				write("engine.c", body)
+				runtime, err := os.ReadFile(filepath.Join(repo, "native/c/vg.h"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				write("vg.h", string(runtime))
+				name := c.GlobalName(p.Package, "Pick")
+				write("main.c", fmt.Sprintf("#include \"engine.h\"\nint main(void) { return %s(true) == 100 && %s(false) == 300 ? 0 : 1; }\n", name, name))
+				commands = [][]string{{"cc", "-std=c11", "-fwrapv", "-Wall", "-Wextra", "-Werror", "engine.c", "main.c", "-o", "run"}, {"./run"}}
+			case "cpp":
+				header, body, err := cpp.Emit(p, cpp.Options{HeaderName: "engine.hpp", Namespace: "sample"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				write("engine.hpp", header)
+				write("engine.cpp", body)
+				runtime, err := os.ReadFile(filepath.Join(repo, "native/cpp/vg.hpp"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				write("vg.hpp", string(runtime))
+				write("main.cpp", "#include \"engine.hpp\"\nint main() { return sample::Pick(true) == 100 && sample::Pick(false) == 300 ? 0 : 1; }\n")
+				commands = [][]string{{"c++", "-std=c++20", "-fwrapv", "-Wall", "-Wextra", "-Werror", "engine.cpp", "main.cpp", "-o", "run"}, {"./run"}}
 			}
 			for _, args := range commands {
 				cmd := exec.Command(args[0], args[1:]...)

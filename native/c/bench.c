@@ -27,11 +27,11 @@ typedef enum { KIND_COMPILE, KIND_MATCH, KIND_REPLACE } bench_kind;
 typedef struct {
     bench_kind kind;
     vg_str pat;
-    revera_eng_Locale loc;
+    ENG(Locale) loc;
     uint32_t cflags;
     vg_str subject;
     vg_str repl;
-    revera_eng_Regexp re;
+    ENG(Regexp) re;
 } bench_case;
 
 // A B command has a fixed shape, so a missing token is a protocol error.
@@ -58,22 +58,22 @@ static void run_pass(bench_case *c, int64_t iters, vg_arena *pattern, vg_arena *
     case KIND_COMPILE:
         for (int64_t i = 0; i < iters; i++) {
             vg_arena_reset(pattern);
-            revera_eng_Compile(pattern, c->pat, c->loc, c->cflags);
+            ENG(Compile)(pattern, c->pat, c->loc, c->cflags);
         }
         break;
     case KIND_MATCH: {
-        int64_t nmatch = revera_eng_NumSub(&c->re) + 1;
+        int64_t nmatch = ENG(NumSub)(&c->re) + 1;
         for (int64_t i = 0; i < iters; i++) {
             vg_arena_reset(scratch);
-            revera_eng_slice_Match pmatch = revera_eng_slice_Match_make(scratch, nmatch);
-            revera_eng_Exec(scratch, &c->re, c->subject, pmatch, 0);
+            ENG_TYPE(st4d61746368x) pmatch = ENG_TYPE(st4d61746368x_make)(scratch, nmatch);
+            ENG(Exec)(scratch, &c->re, c->subject, pmatch, 0);
         }
         break;
     }
     case KIND_REPLACE:
         for (int64_t i = 0; i < iters; i++) {
             vg_arena_reset(scratch);
-            revera_eng_ReplaceAll(scratch, &c->re, c->subject, c->repl, -1, 0);
+            ENG(ReplaceAll)(scratch, &c->re, c->subject, c->repl, -1, 0);
         }
         break;
     }
@@ -85,8 +85,8 @@ int main(void) {
     vg_arena pattern = {0};
     vg_arena scratch = {0};
 
-    revera_eng_Locale base_loc = base_locale();
-    revera_eng_Locale cur_loc = revera_eng_LocalePOSIX();
+    ENG(Locale) base_loc = base_locale();
+    ENG(Locale) cur_loc = ENG(LocalePOSIX)();
 
     size_t line_cap = 0;
     char *line = NULL;
@@ -98,14 +98,14 @@ int main(void) {
         }
         switch (cmd[0]) {
         case 'P': {
-            cur_loc = revera_eng_LocalePOSIX();
+            cur_loc = ENG(LocalePOSIX)();
             puts("P 1");
             break;
         }
         case 'L': {
             vg_str name = decode(&persistent, tok_need(&cursor));
             vg_str coll = decode(&persistent, tok_need(&cursor));
-            revera_eng_Tup_t4c6f63616c65x_bool res = revera_eng_LocaleSelect(&persistent, &base_loc, name, coll);
+            ENG_TUPLE(Tup_t4c6f63616c65x_bool) res = ENG(LocaleSelect)(&persistent, &base_loc, name, coll);
             if (res.r1) {
                 cur_loc = res.r0;
             }
@@ -140,9 +140,9 @@ int main(void) {
             }
             vg_arena_reset(&pattern);
             vg_arena_reset(&scratch);
-            revera_eng_Tup_t526567657870x_t4572726f72x res = revera_eng_Compile(&pattern, c.pat, c.loc, c.cflags);
-            if (res.r1.Code != 0) {
-                printf("B %s %" PRId32 " 0 0\n", name, res.r1.Code);
+            ENG_TUPLE(Tup_t526567657870x_t4572726f72x) res = ENG(Compile)(&pattern, c.pat, c.loc, c.cflags);
+            if (res.r1.vego_f_Code != 0) {
+                printf("B %s %" PRId32 " 0 0\n", name, res.r1.vego_f_Code);
                 break;
             }
             c.re = res.r0;

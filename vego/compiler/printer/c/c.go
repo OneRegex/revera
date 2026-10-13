@@ -9,10 +9,13 @@
 // Where the Go evaluation order needs pinning, the printer therefore hoists operands into temporaries.
 // The temporaries become prelude statements in front of the statement that consumes the expression.
 //
-// Every global identifier carries the prefix, which defaults to the Vego package name.
+// Every generated name starts with vego_, or VEGO_ for the header guard, so it cannot clash with C keywords or libc macros.
+// Program names add a one-letter kind, which keeps them apart from each other and from the printer's own names.
+// Global names also include the namespace, which defaults to the Vego package name.
 package c
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sort"
@@ -45,7 +48,8 @@ func catch(err *error) {
 type Options struct {
 	// HeaderName is the file name the source includes; the default is engine.h.
 	HeaderName string
-	// Prefix is the global identifier prefix; the default is the Vego package name.
+	// Prefix is the namespace that global names include.
+	// It defaults to the Vego package name.
 	Prefix string
 }
 
@@ -68,7 +72,6 @@ type gen struct {
 	b       strings.Builder
 	fn      *compiler.FuncDecl
 	tmp     int
-	used    map[string]bool
 	pre     []string
 	depth   int
 	hdrName string
@@ -80,74 +83,76 @@ type gen struct {
 	arrayTypes map[string]*compiler.Type
 }
 
-// cReserved holds C11 keywords, standard macro names, and runtime names that a local or field identifier must not collide with.
-// Global identifiers carry the package prefix and need no renaming.
-var cReserved = map[string]bool{
-	"auto": true, "break": true, "case": true, "char": true,
-	"const": true, "continue": true, "default": true, "do": true,
-	"double": true, "else": true, "enum": true, "extern": true,
-	"float": true, "for": true, "goto": true, "if": true,
-	"inline": true, "int": true, "long": true, "register": true,
-	"restrict": true, "return": true, "short": true, "signed": true,
-	"sizeof": true, "static": true, "struct": true, "switch": true,
-	"typedef": true, "union": true, "unsigned": true, "void": true,
-	"volatile": true, "while": true, "bool": true, "true": true,
-	"false": true, "NULL": true, "EOF": true, "errno": true,
-	"stdin": true, "stdout": true, "stderr": true, "assert": true,
-	"minor": true, "major": true, "index": true, "mem": true,
-}
-
-func ident(name string) string {
-	if cReserved[name] || strings.HasPrefix(name, "vego_") || strings.HasPrefix(name, "vg_") {
-		return "vego_" + name
-	}
-	return name
-}
-
-// global names a top-level constant, variable, type or function.
-func (g *gen) global(name string) string {
-	return g.prefix + "_" + name
-}
-
-// mangle folds a type into the identifier fragment the monomorphized C names use.
-func (g *gen) mangle(t *compiler.Type) string {
-	switch t.K {
-	case compiler.KBool:
-		return "bool"
-	case compiler.KU8:
-		return "u8"
-	case compiler.KU16:
-		return "u16"
-	case compiler.KU32:
-		return "u32"
-	case compiler.KU64:
-		return "u64"
-	case compiler.KI32:
-		return "i32"
-	case compiler.KI64, compiler.KInt:
-		return "i64"
-	case compiler.KStr:
-		return "Str"
-	case compiler.KSlice:
-		return "slice_" + g.mangle(t.Elem)
-	case compiler.KArray:
-		if !t.ALenSet {
-			fatal("cannot mangle an unresolved array length")
+// token builds a generated name.
+// Every part but the last is hex-encoded and ends with x, so different parts never produce the same name.
+func token(kind string, parts ...string) string {
+	var b strings.Builder
+	b.WriteString("vego_")
+	b.WriteString(kind)
+	for i, part := range parts {
+		b.WriteByte('_')
+		if i+1 == len(parts) {
+			b.WriteString(part)
+		} else {
+			b.WriteString(hex.EncodeToString([]byte(part)))
+			b.WriteByte('x')
 		}
-		return "arr_" + g.mangle(t.Elem) + "_" + strconv.FormatInt(t.ALenVal, 10)
-	case compiler.KStruct:
-		return t.Name
 	}
-	fatal("cannot mangle type", t)
-	return ""
+	return b.String()
+}
+
+func guardToken(namespace, header string) string {
+	return "VEGO_HEADER_" + strings.ToUpper(hex.EncodeToString([]byte(namespace))) +
+		"X_" + strings.ToUpper(hex.EncodeToString([]byte(header))) + "X"
+}
+
+// GlobalName returns the C name of a top-level declaration in the namespace.
+func GlobalName(namespace, name string) string {
+	return token("g", namespace, name)
+}
+
+// TypeName returns the C name of the slice or array type t in the namespace.
+func TypeName(namespace string, t *compiler.Type) string {
+	return token("t", namespace, compiler.Mangle(t))
+}
+
+func (g *gen) global(name string) string {
+	return GlobalName(g.prefix, name)
+}
+
+func (g *gen) local(name string) string {
+	return token("l", name)
+}
+
+func (g *gen) field(name string) string {
+	return token("f", name)
 }
 
 func (g *gen) sliceName(t *compiler.Type) string {
-	return g.global(g.mangle(t))
+	return TypeName(g.prefix, t)
 }
 
 func (g *gen) arrName(t *compiler.Type) string {
-	return g.global(g.mangle(t))
+	return TypeName(g.prefix, t)
+}
+
+func (g *gen) tupleName(t [2]*compiler.Type) string {
+	return token("q", g.prefix, compiler.TupName(t))
+}
+
+func (g *gen) eqName(t *compiler.Type) string {
+	if t.K == compiler.KArray {
+		return g.arrName(t) + "_eq"
+	}
+	return token("e", g.prefix, compiler.Mangle(t))
+}
+
+func (g *gen) bytesFromStrName() string {
+	return token("b", g.prefix, "bytes_from_str")
+}
+
+func (g *gen) strFromBytesName() string {
+	return token("b", g.prefix, "str_from_bytes")
 }
 
 func (g *gen) typ(t *compiler.Type) string {
@@ -202,14 +207,14 @@ func (g *gen) collect() {
 		switch t.K {
 		case compiler.KSlice:
 			addType(t.Elem)
-			key := g.mangle(t)
+			key := compiler.Mangle(t)
 			if _, ok := g.sliceTypes[key]; !ok {
 				g.sliceTypes[key] = t
 				g.sliceOrder = append(g.sliceOrder, key)
 			}
 		case compiler.KArray:
 			addType(t.Elem)
-			key := g.mangle(t)
+			key := compiler.Mangle(t)
 			if _, ok := g.arrayTypes[key]; !ok {
 				g.arrayTypes[key] = t
 				g.arrayOrder = append(g.arrayOrder, key)
@@ -260,9 +265,9 @@ func (g *gen) files() (string, string) {
 			tups[compiler.TupName(pair)] = pair
 		}
 	}
+	guard := guardToken(g.prefix, g.hdrName)
 
 	var h strings.Builder
-	guard := strings.ToUpper(g.prefix) + "_" + strings.ToUpper(strings.NewReplacer(".", "_", "-", "_").Replace(g.hdrName))
 	h.WriteString("// Code generated by vegoc from the Vego JSON form. DO NOT EDIT.\n\n")
 	fmt.Fprintf(&h, "#ifndef %s\n#define %s\n\n#include \"vg.h\"\n\n", guard, guard)
 
@@ -296,7 +301,7 @@ func (g *gen) files() (string, string) {
 	for _, n := range names {
 		pair := tups[n]
 		fmt.Fprintf(&h, "typedef struct {\n    %s;\n    %s;\n} %s;\n\n",
-			g.decl(pair[0], "r0"), g.decl(pair[1], "r1"), g.global(n))
+			g.decl(pair[0], "r0"), g.decl(pair[1], "r1"), g.tupleName(pair))
 	}
 
 	for _, d := range g.p.Vars {
@@ -371,17 +376,17 @@ func (g *gen) emitTypeDefs(h *strings.Builder) {
 			h.WriteString("    char vego_empty;\n")
 		}
 		for _, f := range s.Fields {
-			fmt.Fprintf(h, "    %s;\n", g.decl(f.Type, ident(f.Name)))
+			fmt.Fprintf(h, "    %s;\n", g.decl(f.Type, g.field(f.Name)))
 		}
 		h.WriteString("};\n\n")
 	}
 	visitArray = func(t *compiler.Type) {
-		key := "array " + g.mangle(t)
+		key := "array " + compiler.Mangle(t)
 		switch state[key] {
 		case 2:
 			return
 		case 1:
-			fatal("array value cycle at", g.mangle(t))
+			fatal("array value cycle at", t)
 		}
 		state[key] = 1
 		visitType(t.Elem)
@@ -430,9 +435,9 @@ func (g *gen) eqCall(t *compiler.Type, a, b string) string {
 	case compiler.KStr:
 		return fmt.Sprintf("vg_streq(%s, %s)", a, b)
 	case compiler.KStruct:
-		return fmt.Sprintf("%s_eq(%s, %s)", g.global(t.Name), a, b)
+		return fmt.Sprintf("%s(%s, %s)", g.eqName(t), a, b)
 	case compiler.KArray:
-		return fmt.Sprintf("%s_eq(%s, %s)", g.arrName(t), a, b)
+		return fmt.Sprintf("%s(%s, %s)", g.eqName(t), a, b)
 	}
 	return fmt.Sprintf("%s == %s", a, b)
 }
@@ -448,24 +453,24 @@ func (g *gen) emitEqHelpers(h *strings.Builder) {
 	for _, s := range g.p.Types {
 		t := &compiler.Type{K: compiler.KStruct, Name: s.Name}
 		if g.comparable(t) {
-			decls = append(decls, eqDecl{g.global(s.Name), t})
+			decls = append(decls, eqDecl{g.eqName(t), t})
 		}
 	}
 	for _, key := range g.arrayOrder {
 		t := g.arrayTypes[key]
 		if g.comparable(t) {
-			decls = append(decls, eqDecl{g.arrName(t), t})
+			decls = append(decls, eqDecl{g.eqName(t), t})
 		}
 	}
 	if len(decls) == 0 {
 		return
 	}
 	for _, d := range decls {
-		fmt.Fprintf(h, "static inline bool %s_eq(%s a, %s b);\n", d.name, g.typ(d.t), g.typ(d.t))
+		fmt.Fprintf(h, "static inline bool %s(%s a, %s b);\n", d.name, g.typ(d.t), g.typ(d.t))
 	}
 	h.WriteString("\n")
 	for _, d := range decls {
-		fmt.Fprintf(h, "static inline bool %s_eq(%s a, %s b) {\n", d.name, g.typ(d.t), g.typ(d.t))
+		fmt.Fprintf(h, "static inline bool %s(%s a, %s b) {\n", d.name, g.typ(d.t), g.typ(d.t))
 		if d.t.K == compiler.KArray {
 			if d.t.ALenVal == 0 {
 				h.WriteString("    (void)a;\n    (void)b;\n    return true;\n}\n\n")
@@ -484,7 +489,7 @@ func (g *gen) emitEqHelpers(h *strings.Builder) {
 		}
 		var parts []string
 		for _, f := range fields {
-			parts = append(parts, g.eqCall(f.Type, "a."+ident(f.Name), "b."+ident(f.Name)))
+			parts = append(parts, g.eqCall(f.Type, "a."+g.field(f.Name), "b."+g.field(f.Name)))
 		}
 		fmt.Fprintf(h, "    return %s;\n}\n\n", strings.Join(parts, " && "))
 	}
@@ -541,10 +546,10 @@ func (g *gen) emitSliceHelpers(h *strings.Builder) {
 
 // emitByteBridges emits the conversions between vg_str and the byte slice.
 func (g *gen) emitByteBridges(h *strings.Builder, s string) {
-	fmt.Fprintf(h, "static inline %s %s_bytes_from_str(vg_arena *mem, vg_str v) {\n", s, g.prefix)
+	fmt.Fprintf(h, "static inline %s %s(vg_arena *mem, vg_str v) {\n", s, g.bytesFromStrName())
 	fmt.Fprintf(h, "    %s out = %s_make(mem, v.len);\n", s, s)
 	fmt.Fprintf(h, "    if (v.len > 0) {\n        memcpy(out.p, v.p, (size_t)v.len);\n    }\n    return out;\n}\n\n")
-	fmt.Fprintf(h, "static inline vg_str %s_str_from_bytes(vg_arena *mem, %s b) {\n", g.prefix, s)
+	fmt.Fprintf(h, "static inline vg_str %s(vg_arena *mem, %s b) {\n", g.strFromBytesName(), s)
 	fmt.Fprintf(h, "    char *p = (char *)vg_arena_alloc(mem, (size_t)(b.len < 1 ? 1 : b.len));\n")
 	fmt.Fprintf(h, "    if (b.len > 0) {\n        memcpy(p, b.p, (size_t)b.len);\n    }\n")
 	fmt.Fprintf(h, "    return (vg_str){p, b.len};\n}\n\n")
@@ -562,7 +567,7 @@ func (g *gen) emitArrayHelpers(h *strings.Builder) {
 	for _, key := range g.arrayOrder {
 		t := g.arrayTypes[key]
 		st := &compiler.Type{K: compiler.KSlice, Elem: t.Elem}
-		if _, ok := g.sliceTypes[g.mangle(st)]; !ok {
+		if _, ok := g.sliceTypes[compiler.Mangle(st)]; !ok {
 			continue
 		}
 		a := g.arrName(t)
@@ -585,7 +590,7 @@ func (g *gen) signature(f *compiler.FuncDecl) string {
 		params = append(params, "vg_arena *mem")
 	}
 	for _, pa := range f.Params {
-		params = append(params, g.decl(pa.Type, ident(pa.Name)))
+		params = append(params, g.decl(pa.Type, g.local(pa.Name)))
 	}
 	if len(params) == 0 {
 		params = append(params, "void")
@@ -595,7 +600,7 @@ func (g *gen) signature(f *compiler.FuncDecl) string {
 	case 1:
 		ret = g.typ(f.Results[0])
 	case 2:
-		ret = g.global(compiler.TupName([2]*compiler.Type{f.Results[0], f.Results[1]}))
+		ret = g.tupleName([2]*compiler.Type{f.Results[0], f.Results[1]})
 	}
 	sep := " "
 	if strings.HasSuffix(ret, "*") {
@@ -606,11 +611,11 @@ func (g *gen) signature(f *compiler.FuncDecl) string {
 
 func (g *gen) emitFunc(f *compiler.FuncDecl) {
 	g.fn = f
-	g.resetNames(f)
+	g.tmp = 0
 	g.wf("%s {\n", g.signature(f))
 	for _, pa := range f.Params {
 		if info := f.Info[pa.Name]; info != nil && !info.Used {
-			g.wf("    (void)%s;\n", ident(pa.Name))
+			g.wf("    (void)%s;\n", g.local(pa.Name))
 		}
 	}
 	g.body(f.Body, 1)
@@ -634,23 +639,13 @@ func (g *gen) body(body []*compiler.Stmt, depth int) {
 	}
 }
 
+// Temporaries are read back as identifiers, so skip any name the program already uses.
 func (g *gen) newTmp() string {
 	for {
 		g.tmp++
-		name := fmt.Sprintf("_t%d", g.tmp)
-		if !g.used[name] {
-			g.used[name] = true
+		name := fmt.Sprintf("vego_tmp_%d", g.tmp)
+		if !g.isLocal(name) && !g.isGlobal(name) {
 			return name
-		}
-	}
-}
-
-func (g *gen) resetNames(f *compiler.FuncDecl) {
-	g.tmp = 0
-	g.used = map[string]bool{}
-	if f != nil {
-		for name := range f.Info {
-			g.used[ident(name)] = true
 		}
 	}
 }
@@ -669,23 +664,17 @@ func (g *gen) flushPre() {
 }
 
 type checkpoint struct {
-	pre  int
-	tmp  int
-	used map[string]bool
+	pre int
+	tmp int
 }
 
 func (g *gen) save() checkpoint {
-	used := make(map[string]bool, len(g.used))
-	for k, v := range g.used {
-		used[k] = v
-	}
-	return checkpoint{pre: len(g.pre), tmp: g.tmp, used: used}
+	return checkpoint{pre: len(g.pre), tmp: g.tmp}
 }
 
 func (g *gen) rollback(c checkpoint) {
 	g.pre = g.pre[:c.pre]
 	g.tmp = c.tmp
-	g.used = c.used
 }
 
 // hoist pins a value into a fresh named temporary in the prelude and returns its name.
@@ -718,6 +707,10 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 	case "range":
 		g.emitRange(s, depth)
 	case "switch":
+		if s.Tag.Typ.K == compiler.KBool {
+			g.emitBoolSwitch(s, depth)
+			return
+		}
 		tag := g.expr(s.Tag)
 		g.flushPre()
 		g.indent(depth)
@@ -765,7 +758,7 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 		default:
 			values := g.renderInits(s.Values)
 			g.flushPre()
-			ret := g.global(compiler.TupName([2]*compiler.Type{g.fn.Results[0], g.fn.Results[1]}))
+			ret := g.tupleName([2]*compiler.Type{g.fn.Results[0], g.fn.Results[1]})
 			g.indent(depth)
 			g.wf("return (%s){%s, %s};\n", ret, values[0], values[1])
 		}
@@ -789,6 +782,44 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 	}
 }
 
+func (g *gen) emitBoolSwitch(s *compiler.Stmt, depth int) {
+	tag := g.hoist(compiler.TBool, g.expr(s.Tag))
+	g.flushPre()
+	g.indent(depth)
+	g.wf("{\n")
+	if len(s.Cases) == 0 {
+		g.indent(depth + 1)
+		g.wf("(void)%s;\n", tag)
+		if s.HasDef {
+			g.body(s.Default, depth+1)
+		}
+	} else {
+		for i, cs := range s.Cases {
+			var conds []string
+			for _, v := range cs.Values {
+				conds = append(conds, tag+" == "+g.expr(v))
+			}
+			g.indent(depth + 1)
+			if i != 0 {
+				g.wf("else ")
+			}
+			g.wf("if (%s) {\n", strings.Join(conds, " || "))
+			g.body(cs.Body, depth+2)
+			g.indent(depth + 1)
+			g.wf("} ")
+		}
+		if s.HasDef {
+			g.wf("else {\n")
+			g.body(s.Default, depth+2)
+			g.indent(depth + 1)
+			g.wf("}")
+		}
+		g.wf("\n")
+	}
+	g.indent(depth)
+	g.wf("}\n")
+}
+
 // simpleStmt emits a declaration or assignment as full lines at the given depth.
 func (g *gen) simpleStmt(s *compiler.Stmt, depth int) {
 	switch s.K {
@@ -797,18 +828,18 @@ func (g *gen) simpleStmt(s *compiler.Stmt, depth int) {
 			v := g.expr(s.Value)
 			g.flushPre()
 			g.indent(depth)
-			g.wf("%s = %s;\n", g.decl(s.TypeRef, ident(s.Name)), v)
+			g.wf("%s = %s;\n", g.decl(s.TypeRef, g.local(s.Name)), v)
 		} else {
 			g.flushPre()
 			g.indent(depth)
-			g.wf("%s = {0};\n", g.decl(s.TypeRef, ident(s.Name)))
+			g.wf("%s = {0};\n", g.decl(s.TypeRef, g.local(s.Name)))
 		}
 	case "define":
 		if len(s.Names) == 1 {
 			v := g.expr(s.Value)
 			g.flushPre()
 			g.indent(depth)
-			g.wf("%s = %s;\n", g.decl(s.DeclaredTypes[0], ident(s.Names[0])), v)
+			g.wf("%s = %s;\n", g.decl(s.DeclaredTypes[0], g.local(s.Names[0])), v)
 			return
 		}
 		v := g.expr(s.Value)
@@ -822,7 +853,7 @@ func (g *gen) simpleStmt(s *compiler.Stmt, depth int) {
 				continue
 			}
 			g.indent(depth)
-			g.wf("%s = %s.r%d;\n", g.decl(s.DeclaredTypes[i], ident(n)), tmp, i)
+			g.wf("%s = %s.r%d;\n", g.decl(s.DeclaredTypes[i], g.local(n)), tmp, i)
 		}
 	case "assign":
 		if len(s.Lhs) == 2 {
@@ -872,7 +903,7 @@ func (g *gen) tupleOf(e *compiler.Expr) string {
 	if e.Typ == nil || e.Typ.K != compiler.KTuple {
 		fatal("expression is not a two-result call")
 	}
-	return g.global(compiler.TupName(e.Typ.Tup))
+	return g.tupleName(e.Typ.Tup)
 }
 
 // pinPlace evaluates an assignment target once, into a pointer temporary, and returns the dereference.
@@ -929,12 +960,12 @@ func (g *gen) opAssign(s *compiler.Stmt, place, val string) string {
 		return fmt.Sprintf("%s &= ~(%s)", place, val)
 	case "/=":
 		if t.Signed() {
-			return fmt.Sprintf("%s = vg_sdiv_%s(%s, %s)", place, g.mangle(t), place, val)
+			return fmt.Sprintf("%s = vg_sdiv_%s(%s, %s)", place, compiler.Mangle(t), place, val)
 		}
 		return fmt.Sprintf("%s /= vg_udivisor(%s)", place, val)
 	case "%=":
 		if t.Signed() {
-			return fmt.Sprintf("%s = vg_srem_%s(%s, %s)", place, g.mangle(t), place, val)
+			return fmt.Sprintf("%s = vg_srem_%s(%s, %s)", place, compiler.Mangle(t), place, val)
 		}
 		return fmt.Sprintf("%s %%= vg_udivisor(%s)", place, val)
 	case "<<=":
@@ -971,7 +1002,8 @@ func (g *gen) shiftCount(t *compiler.Type, e *compiler.Expr, y string) string {
 // emitFor lowers a Go for statement.
 // An init statement gets its own wrapping block, so its prelude and scope stay local.
 // A condition that needs a prelude moves to the top of the body, in front of a break.
-// The post statement stays in the loop header, so continue keeps its meaning.
+// A post statement that needs a prelude moves to the top of the body too.
+// A flag skips it on the first pass, and continue still runs it.
 func (g *gen) emitFor(s *compiler.Stmt, depth int) {
 	if s.Init != nil {
 		g.indent(depth)
@@ -988,10 +1020,13 @@ func (g *gen) emitFor(s *compiler.Stmt, depth int) {
 	if s.Post != nil {
 		cp := g.save()
 		g.depth = depth
-		post = g.inlineStmt(s.Post)
-		if len(g.pre) > cp.pre {
-			fatal("loop post statement needs a temporary")
+		inline, ok := g.inlineStmt(s.Post)
+		if !ok || len(g.pre) > cp.pre {
+			g.rollback(cp)
+			g.emitForWithPostPrelude(s, depth)
+			return
 		}
+		post = inline
 	}
 	if s.Cond == nil {
 		g.indent(depth)
@@ -1026,40 +1061,66 @@ func (g *gen) emitFor(s *compiler.Stmt, depth int) {
 	} else {
 		g.wf("for (;; %s) {\n", post)
 	}
-	g.flushPre()
+	g.breakUnless(cond, depth+1)
+	g.body(s.Body, depth+1)
+	g.indent(depth)
+	g.wf("}\n")
+}
+
+func (g *gen) emitForWithPostPrelude(s *compiler.Stmt, depth int) {
+	first := g.newTmp()
+	g.indent(depth)
+	g.wf("for (bool %s = true;; %s = false) {\n", first, first)
 	g.indent(depth + 1)
-	g.wf("if (!(%s)) {\n", cond)
-	g.indent(depth + 2)
-	g.wf("break;\n")
+	g.wf("if (!%s) {\n", first)
+	g.stmt(s.Post, depth+2)
 	g.indent(depth + 1)
 	g.wf("}\n")
+	if s.Cond != nil {
+		g.depth = depth + 1
+		g.breakUnless(g.expr(s.Cond), depth+1)
+	}
 	g.body(s.Body, depth+1)
+	g.indent(depth)
+	g.wf("}\n")
+}
+
+// breakUnless exits the loop when cond is false.
+// Any temporaries cond needs are written first.
+func (g *gen) breakUnless(cond string, depth int) {
+	g.flushPre()
+	g.indent(depth)
+	g.wf("if (!(%s)) {\n", cond)
+	g.indent(depth + 1)
+	g.wf("break;\n")
 	g.indent(depth)
 	g.wf("}\n")
 }
 
 // inlineStmt renders a loop post statement, with no indentation and no terminator.
 // Assignments are expressions in C, so the rendered forms fit a loop header.
-func (g *gen) inlineStmt(s *compiler.Stmt) string {
+// It returns false when the assignment target has side effects.
+// Keeping Go's evaluation order then needs temporaries.
+func (g *gen) inlineStmt(s *compiler.Stmt) (string, bool) {
 	switch s.K {
 	case "assign":
 		if len(s.Lhs) != 1 {
 			fatal("two-value assign in loop header")
 		}
 		if compiler.Impure(s.Lhs[0]) {
-			fatal("impure loop header assignment needs a temporary")
+			return "", false
 		}
-		return fmt.Sprintf("%s = %s", g.expr(s.Lhs[0]), g.expr(s.Value))
+		return fmt.Sprintf("%s = %s", g.expr(s.Lhs[0]), g.expr(s.Value)), true
 	case "op_assign":
 		if compiler.Impure(s.Lhs[0]) {
-			fatal("impure loop header assignment needs a temporary")
+			return "", false
 		}
-		return g.opAssign(s, g.expr(s.Lhs[0]), g.expr(s.Value))
+		return g.opAssign(s, g.expr(s.Lhs[0]), g.expr(s.Value)), true
 	case "expr_stmt":
-		return g.expr(s.Value)
+		return g.expr(s.Value), true
 	}
 	fatal("unsupported loop header statement", s.K)
-	return ""
+	return "", false
 }
 
 // emitRange lowers a range statement to an index loop.
@@ -1085,7 +1146,7 @@ func (g *gen) emitRange(s *compiler.Stmt, depth int) {
 	g.wf("for (int64_t %s = 0; %s < %s; %s++) {\n", counter, counter, limit, counter)
 	if s.IdxName != "" && s.IdxName != "_" {
 		g.indent(depth + 2)
-		g.wf("int64_t %s = %s;\n", ident(s.IdxName), counter)
+		g.wf("int64_t %s = %s;\n", g.local(s.IdxName), counter)
 	}
 	if s.ValName != "" && s.ValName != "_" {
 		elem := s.Value.Typ.Elem
@@ -1099,7 +1160,7 @@ func (g *gen) emitRange(s *compiler.Stmt, depth int) {
 			fatal("range value over", s.Value.Typ)
 		}
 		g.indent(depth + 2)
-		g.wf("%s = %s;\n", g.decl(elem, ident(s.ValName)), access)
+		g.wf("%s = %s;\n", g.decl(elem, g.local(s.ValName)), access)
 	}
 	g.body(s.Body, depth+2)
 	g.indent(depth + 1)
@@ -1176,21 +1237,20 @@ func (g *gen) expr(e *compiler.Expr) string {
 		if e.Name == "nil" {
 			return "((" + g.typ(e.Typ) + "){0})"
 		}
-		if g.fn != nil {
-			if _, local := g.fn.Info[e.Name]; local {
-				return ident(e.Name)
-			}
+		if g.isLocal(e.Name) {
+			return g.local(e.Name)
 		}
 		if g.isGlobal(e.Name) {
 			return g.global(e.Name)
 		}
-		return ident(e.Name)
+		// Anything else is a temporary made by the printer.
+		return e.Name
 	case "field":
 		sep := "."
 		if e.X.Typ.K == compiler.KPtr {
 			sep = "->"
 		}
-		return g.expr(e.X) + sep + ident(e.Name)
+		return g.expr(e.X) + sep + g.field(e.Name)
 	case "index":
 		return g.index(e)
 	case "slice_expr":
@@ -1205,10 +1265,10 @@ func (g *gen) expr(e *compiler.Expr) string {
 		return g.builtin(e)
 	case "conv":
 		if e.TypeRef.K == compiler.KStr {
-			return g.prefix + "_str_from_bytes(mem, " + g.expr(e.X) + ")"
+			return g.strFromBytesName() + "(mem, " + g.expr(e.X) + ")"
 		}
 		if e.TypeRef.K == compiler.KSlice {
-			return g.prefix + "_bytes_from_str(mem, " + g.expr(e.X) + ")"
+			return g.bytesFromStrName() + "(mem, " + g.expr(e.X) + ")"
 		}
 		return "((" + g.typ(e.TypeRef) + ")(" + g.expr(e.X) + "))"
 	case "unary":
@@ -1237,6 +1297,14 @@ func (g *gen) expr(e *compiler.Expr) string {
 	}
 	fatal("unknown expression kind", e.K)
 	return ""
+}
+
+func (g *gen) isLocal(name string) bool {
+	if g.fn == nil {
+		return false
+	}
+	_, ok := g.fn.Info[name]
+	return ok
 }
 
 func (g *gen) isGlobal(name string) bool {
@@ -1427,7 +1495,7 @@ func (g *gen) builtin(e *compiler.Expr) string {
 		return fmt.Sprintf("%s_copy(%s, %s)", name, args[0], args[1])
 	case "min", "max":
 		args := g.renderArgs(e.Args)
-		return fmt.Sprintf("vg_%s_%s(%s, %s)", e.Name, g.mangle(e.Typ), args[0], args[1])
+		return fmt.Sprintf("vg_%s_%s(%s, %s)", e.Name, compiler.Mangle(e.Typ), args[0], args[1])
 	}
 	fatal("unknown builtin", e.Name)
 	return ""
@@ -1516,12 +1584,12 @@ func (g *gen) binary(e *compiler.Expr) string {
 	case "/":
 		if e.Typ.Signed() {
 			// Go defines MinInt / -1 as MinInt, which C leaves undefined even under -fwrapv.
-			return fmt.Sprintf("vg_sdiv_%s(%s, %s)", g.mangle(e.Typ), x, y)
+			return fmt.Sprintf("vg_sdiv_%s(%s, %s)", compiler.Mangle(e.Typ), x, y)
 		}
 		body = fmt.Sprintf("%s / vg_udivisor(%s)", x, y)
 	case "%":
 		if e.Typ.Signed() {
-			return fmt.Sprintf("vg_srem_%s(%s, %s)", g.mangle(e.Typ), x, y)
+			return fmt.Sprintf("vg_srem_%s(%s, %s)", compiler.Mangle(e.Typ), x, y)
 		}
 		body = fmt.Sprintf("%s %% vg_udivisor(%s)", x, y)
 	case "&^":
@@ -1586,7 +1654,7 @@ func (g *gen) composite(e *compiler.Expr) string {
 		rendered := g.renderInits(vals)
 		var parts []string
 		for i, f := range e.Fields {
-			parts = append(parts, fmt.Sprintf(".%s = %s", ident(f.Name), rendered[i]))
+			parts = append(parts, fmt.Sprintf(".%s = %s", g.field(f.Name), rendered[i]))
 		}
 		return fmt.Sprintf("((%s){%s})", g.typ(t), strings.Join(parts, ", "))
 	case compiler.KSlice:
@@ -1662,7 +1730,7 @@ func (g *gen) staticInit(e *compiler.Expr) string {
 			}
 			var parts []string
 			for _, f := range e.Fields {
-				parts = append(parts, fmt.Sprintf(".%s = %s", ident(f.Name), g.staticInit(f.Value)))
+				parts = append(parts, fmt.Sprintf(".%s = %s", g.field(f.Name), g.staticInit(f.Value)))
 			}
 			return "{" + strings.Join(parts, ", ") + "}"
 		case compiler.KArray:

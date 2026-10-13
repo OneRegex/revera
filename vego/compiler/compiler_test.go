@@ -45,8 +45,8 @@ func TestAllocates(t *testing.T) {
 		res  string
 		want bool
 	}{
-		{"make", `{"k": "builtin", "fn": "make", "args": [{"k": "int", "value": "1"}], "type": ` + su8 + `}`, su8, true},
-		{"append", `{"k": "builtin", "fn": "append", "args": [{"k": "ident", "name": "b"}, {"k": "int", "value": "1"}]}`, su8, true},
+		{"make", `{"k": "builtin", "fn": "make", "args": [{"k": "int", "value": "1"}], "spread": false, "type": ` + su8 + `}`, su8, true},
+		{"append", `{"k": "builtin", "fn": "append", "args": [{"k": "ident", "name": "b"}, {"k": "int", "value": "1"}], "spread": false}`, su8, true},
 		{"conv_to_str", `{"k": "conv", "type": ` + str + `, "x": {"k": "ident", "name": "b"}}`, str, true},
 		{"conv_to_bytes", `{"k": "conv", "type": ` + su8 + `, "x": {"k": "conv", "type": ` + str + `, "x": {"k": "ident", "name": "b"}}}`, su8, true},
 		{"slice_literal", `{"k": "composite", "type": ` + su8 + `, "elems": [{"k": "int", "value": "1"}]}`, su8, true},
@@ -84,6 +84,31 @@ func TestReservedPackageName(t *testing.T) {
 	if _, err := load(src); err == nil {
 		t.Fatal("package-level name mem was not rejected")
 	}
+	src = `{"vego": 1, "package": "vg", "consts": [], "vars": [], "types": [], "funcs": []}`
+	if _, err := load(src); err == nil || !strings.Contains(err.Error(), "reserved") {
+		t.Fatalf("reserved package name error = %v", err)
+	}
+}
+
+func TestBlankIdentifierCannotDeclareNames(t *testing.T) {
+	const src = `{"vego": 1, "package": "PackageName",
+		"consts": [{"k": "const", "name": "ConstName", "type": null, "value": {"k": "int", "value": "1"}}],
+		"vars": [{"k": "var", "name": "VarName", "type": null, "value": {"k": "int", "value": "1"}}],
+		"types": [{"k": "type", "name": "TypeName", "fields": [
+			{"name": "FieldName", "type": {"k": "named", "name": "int"}}]}],
+		"funcs": [{"k": "func", "name": "FuncName",
+			"params": [{"name": "ParamName", "type": {"k": "named", "name": "int"}}], "results": [],
+			"body": [
+				{"k": "var_decl", "name": "LocalVarName", "type": {"k": "named", "name": "int"}, "value": null},
+				{"k": "define", "names": ["LocalDefineName"], "value": {"k": "int", "value": "1"}}
+			]}]}`
+	for _, name := range []string{
+		"PackageName", "ConstName", "VarName", "TypeName", "FieldName", "FuncName", "ParamName", "LocalVarName", "LocalDefineName",
+	} {
+		if _, err := load(strings.Replace(src, name, "_", 1)); err == nil || !strings.Contains(err.Error(), "blank identifier") {
+			t.Errorf("%s: error = %v, want a blank identifier error", name, err)
+		}
+	}
 }
 
 func TestReservedTupleNamespace(t *testing.T) {
@@ -117,6 +142,18 @@ func TestLoadRejectsInvalidDocuments(t *testing.T) {
 		{"unsupported version", `{"vego": 2, "package": "t", "consts": [], "vars": [], "types": [], "funcs": []}`, "unsupported"},
 		{"malformed list", `{"vego": 1, "package": "t", "consts": {}, "vars": [], "types": [], "funcs": []}`, "consts"},
 		{"malformed declaration", `{"vego": 1, "package": "t", "consts": [null], "vars": [], "types": [], "funcs": []}`, "invalid Vego JSON"},
+		{"noncanonical integer", `{"vego": 1, "package": "t", "consts": [{"name": "n", "type": null, "value": {"k": "int", "value": "01"}}], "vars": [], "types": [], "funcs": []}`, "invalid integer value"},
+		{"negative integer literal", `{"vego": 1, "package": "t", "consts": [{"name": "n", "type": null, "value": {"k": "int", "value": "-1"}}], "vars": [], "types": [], "funcs": []}`, "invalid integer value"},
+		{"integer beyond uint64", `{"vego": 1, "package": "t", "consts": [{"name": "n", "type": null, "value": {"k": "int", "value": "18446744073709551616"}}], "vars": [], "types": [], "funcs": []}`, "outside uint64"},
+		{"null function body", `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [{"name": "f", "params": [], "results": [], "body": null}]}`, "function body is null"},
+		{"range value without index", `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [{"name": "f", "params": [], "results": [], "body": [{"k": "range", "idx": null, "val": "v", "over": {"k": "int", "value": "1"}, "body": []}]}]}`, "requires an index"},
+		{"empty range index", `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [{"name": "f", "params": [], "results": [], "body": [{"k": "range", "idx": "", "val": null, "over": {"k": "int", "value": "1"}, "body": []}]}]}`, "index variable is empty"},
+		{"empty range value", `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [{"name": "f", "params": [], "results": [], "body": [{"k": "range", "idx": "i", "val": "", "over": {"k": "int", "value": "1"}, "body": []}]}]}`, "value variable is empty"},
+		{"blank range index", `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [{"name": "f", "params": [], "results": [], "body": [{"k": "range", "idx": "_", "val": null, "over": {"k": "int", "value": "1"}, "body": []}]}]}`, "has no variables"},
+		{"two blank range variables", `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [{"name": "f", "params": [{"name": "s", "type": {"k": "slice", "elem": {"k": "named", "name": "int"}}}], "results": [], "body": [{"k": "range", "idx": "_", "val": "_", "over": {"k": "ident", "name": "s"}, "body": []}]}]}`, "has no variables"},
+		{"empty switch case", `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [{"name": "f", "params": [], "results": [], "body": [{"k": "switch", "tag": {"k": "bool", "value": true}, "cases": [{"values": [], "body": []}], "default": null}]}]}`, "case has no values"},
+		{"missing builtin spread", `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [{"name": "f", "params": [], "results": [], "body": [{"k": "expr_stmt", "value": {"k": "builtin", "fn": "copy", "args": []}}]}]}`, "spread must be a bool"},
+		{"non-boolean builtin spread", `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [{"name": "f", "params": [], "results": [], "body": [{"k": "expr_stmt", "value": {"k": "builtin", "fn": "copy", "args": [], "spread": 0}}]}]}`, "spread must be a bool"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -124,6 +161,30 @@ func TestLoadRejectsInvalidDocuments(t *testing.T) {
 				t.Fatalf("Load error = %v, want an error containing %q", err, tc.want)
 			}
 		})
+	}
+	if _, err := Load([]byte("{\xff}")); err == nil || !strings.Contains(err.Error(), "valid UTF-8") {
+		t.Fatalf("invalid UTF-8 error = %v", err)
+	}
+}
+
+func TestLoadNormalizesIncDecOperators(t *testing.T) {
+	program := func(op string) string {
+		return `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
+			{"k": "func", "name": "f", "params": [{"name": "n", "type": {"k": "named", "name": "int"}}],
+			 "results": [], "body": [{"k": "incdec", "op": "` + op + `", "lhs": {"k": "ident", "name": "n"}}]}]}`
+	}
+	for op, want := range map[string]string{"++": "+=", "--": "-="} {
+		p, err := Load([]byte(program(op)))
+		if err != nil {
+			t.Errorf("%s: %v", op, err)
+			continue
+		}
+		if got := p.Funcs[0].Body[0].Op; got != want {
+			t.Errorf("%s normalized to %q, want %q", op, got, want)
+		}
+	}
+	if _, err := Load([]byte(program("wat"))); err == nil || !strings.Contains(err.Error(), "unknown increment") {
+		t.Fatalf("unknown operator error = %v", err)
 	}
 }
 
@@ -169,6 +230,41 @@ func TestRejectsUnsupportedSourceSemantics(t *testing.T) {
 			    "body": [{"k": "range", "idx": null, "val": null, "over": {"k": "ident", "name": "n"}, "body": []}]}]}`,
 			"range over unsupported type",
 		},
+		{
+			"blank loop post target",
+			`{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
+			  {"k": "func", "name": "bump", "params": [], "results": [{"k": "named", "name": "int"}],
+			   "body": [{"k": "return", "values": [{"k": "int", "value": "1"}]}]},
+			  {"k": "func", "name": "f", "params": [], "results": [], "body": [
+			   {"k": "for", "init": null, "cond": {"k": "bool", "value": false},
+			    "post": {"k": "assign", "lhs": [{"k": "ident", "name": "_"}],
+			             "value": {"k": "call", "fn": "bump", "args": []}}, "body": []}]}]}`,
+			"blank identifier cannot be a loop post target",
+		},
+		{
+			"loop init assignment",
+			`{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
+			  {"k": "func", "name": "f", "params": [{"name": "n", "type": {"k": "named", "name": "int"}}],
+			   "results": [], "body": [{"k": "for",
+			    "init": {"k": "assign", "lhs": [{"k": "ident", "name": "n"}], "value": {"k": "int", "value": "0"}},
+			    "cond": {"k": "bool", "value": false}, "post": null, "body": []}]}]}`,
+			"loop init must declare one variable",
+		},
+		{
+			"loop post declaration",
+			`{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
+			  {"k": "func", "name": "f", "params": [], "results": [], "body": [{"k": "for",
+			    "init": null, "cond": {"k": "bool", "value": false},
+			    "post": {"k": "define", "names": ["n"], "value": {"k": "int", "value": "1"}}, "body": []}]}]}`,
+			"loop post statement is not in the subset",
+		},
+		{
+			"non-call expression statement",
+			`{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
+			  {"k": "func", "name": "f", "params": [], "results": [],
+			   "body": [{"k": "expr_stmt", "value": {"k": "int", "value": "1"}}]}]}`,
+			"expression statements must be calls",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -179,13 +275,263 @@ func TestRejectsUnsupportedSourceSemantics(t *testing.T) {
 	}
 }
 
-func TestAcceptsIntRangeCount(t *testing.T) {
-	src := `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [],
-		"funcs": [{"k": "func", "name": "f",
-		  "params": [{"name": "n", "type": {"k": "named", "name": "int"}}], "results": [],
-		  "body": [{"k": "range", "idx": null, "val": null, "over": {"k": "ident", "name": "n"}, "body": []}]}]}`
+func TestRejectsInvalidCheckedIR(t *testing.T) {
+	program := func(consts, vars, types, funcs string) string {
+		return `{"vego":1,"package":"t","consts":` + consts + `,"vars":` + vars + `,"types":` + types + `,"funcs":` + funcs + `}`
+	}
+	intType := `{"k":"named","name":"int"}`
+	boolType := `{"k":"named","name":"bool"}`
+	u8Type := `{"k":"named","name":"uint8"}`
+	i32Type := `{"k":"named","name":"int32"}`
+	intLit := func(n string) string { return `{"k":"int","value":"` + n + `"}` }
+	conv := func(typ, value string) string { return `{"k":"conv","type":` + typ + `,"x":` + value + `}` }
+	fn := func(params, results, body string) string {
+		return `[{"name":"f","params":` + params + `,"results":` + results + `,"body":` + body + `}]`
+	}
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			"duplicate package declaration",
+			program(`[{"name":"n","type":null,"value":`+intLit("1")+`}]`, `[{"name":"n","type":null,"value":`+intLit("2")+`}]`, `[]`, `[]`),
+			"redeclares",
+		},
+		{
+			"recursive value type",
+			program(`[]`, `[]`, `[{"name":"S","fields":[{"name":"next","type":{"k":"struct_ref","name":"S"}}]}]`, `[]`),
+			"recursive value type",
+		},
+		{
+			"constant cycle",
+			program(`[{"name":"a","type":null,"value":{"k":"ident","name":"b"}},{"name":"b","type":null,"value":{"k":"ident","name":"a"}}]`, `[]`, `[]`, `[]`),
+			"initialization cycle",
+		},
+		{
+			"nonconstant global",
+			program(`[]`, `[{"name":"a","type":null,"value":`+intLit("1")+`},{"name":"b","type":null,"value":{"k":"ident","name":"a"}}]`, `[]`, `[]`),
+			"non-constant initializer",
+		},
+		{
+			"invalid scalar conversion",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[`+intType+`]`, `[{"k":"return","values":[{"k":"conv","type":`+intType+`,"x":{"k":"bool","value":true}}]}]`)),
+			"conversion outside the subset",
+		},
+		{
+			"ordered booleans",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[`+boolType+`]`, `[{"k":"return","values":[{"k":"binary","op":"<","x":{"k":"bool","value":false},"y":{"k":"bool","value":true}}]}]`)),
+			"ordered comparison",
+		},
+		{
+			"slice equality",
+			program(`[]`, `[]`, `[]`, fn(`[{"name":"a","type":{"k":"slice","elem":`+intType+`}},{"name":"b","type":{"k":"slice","elem":`+intType+`}}]`, `[`+boolType+`]`, `[{"k":"return","values":[{"k":"binary","op":"==","x":{"k":"ident","name":"a"},"y":{"k":"ident","name":"b"}}]}]`)),
+			"slices can only be compared with nil",
+		},
+		{
+			"missing return",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[`+intType+`]`, `[]`)),
+			"without returning",
+		},
+		{
+			"parameter redeclaration",
+			program(`[]`, `[]`, `[]`, fn(`[{"name":"x","type":`+intType+`}]`, `[]`, `[{"k":"var_decl","name":"x","type":`+intType+`,"value":null}]`)),
+			"redeclared in the same scope",
+		},
+		{
+			"break in switch",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[]`, `[{"k":"switch","tag":{"k":"bool","value":true},"cases":[{"values":[{"k":"bool","value":true}],"body":[{"k":"break"}]}],"default":null}]`)),
+			"break must target a loop",
+		},
+		{
+			"nonconstant switch case",
+			program(`[]`, `[]`, `[]`, fn(`[{"name":"n","type":`+intType+`}]`, `[]`, `[{"k":"switch","tag":{"k":"ident","name":"n"},"cases":[{"values":[{"k":"ident","name":"n"}],"body":[]}],"default":null}]`)),
+			"case is not constant",
+		},
+		{
+			"range value containing a slice",
+			program(`[]`, `[]`, `[]`, fn(`[{"name":"rows","type":{"k":"slice","elem":{"k":"slice","elem":`+intType+`}}}]`, `[]`, `[{"k":"range","idx":"i","val":"row","over":{"k":"ident","name":"rows"},"body":[]}]`)),
+			"containing a slice",
+		},
+		{
+			"slice of global array",
+			program(`[]`, `[{"name":"a","type":{"k":"array","len":`+intLit("1")+`,"elem":`+intType+`},"value":{"k":"composite","type":{"k":"array","len":`+intLit("1")+`,"elem":`+intType+`},"elems":[]}}]`, `[]`, fn(`[]`, `[]`, `[{"k":"assign","lhs":[{"k":"ident","name":"_"}],"value":{"k":"slice_expr","x":{"k":"ident","name":"a"},"lo":null,"hi":null}}]`)),
+			"cannot be sliced",
+		},
+		{
+			"too many array elements",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[]`, `[{"k":"define","names":["a"],"value":{"k":"composite","type":{"k":"array","len":`+intLit("1")+`,"elem":`+intType+`},"elems":[`+intLit("1")+`,`+intLit("2")+`]}}]`)),
+			"too many values",
+		},
+		{
+			"negative make size",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[]`, `[{"k":"define","names":["s"],"value":{"k":"builtin","fn":"make","spread":false,"type":{"k":"slice","elem":`+intType+`},"args":[{"k":"unary","op":"-","x":`+intLit("1")+`}]}}]`)),
+			"make size is negative",
+		},
+		{
+			"constant array index",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[`+intType+`]`, `[{"k":"return","values":[{"k":"index","x":{"k":"composite","type":{"k":"array","len":`+intLit("1")+`,"elem":`+intType+`},"elems":[]},"index":`+intLit("1")+`}]}]`)),
+			"out of bounds",
+		},
+		{
+			"unaddressable array slice",
+			program(`[]`, `[]`, `[]`, `[{"name":"array","params":[],"results":[{"k":"array","len":`+intLit("1")+`,"elem":`+intType+`}],"body":[{"k":"return","values":[{"k":"composite","type":{"k":"array","len":`+intLit("1")+`,"elem":`+intType+`},"elems":[]}]}]},{"name":"f","params":[],"results":[],"body":[{"k":"assign","lhs":[{"k":"ident","name":"_"}],"value":{"k":"slice_expr","x":{"k":"call","fn":"array","args":[]},"lo":null,"hi":null}}]}]`),
+			"unaddressable array",
+		},
+		{
+			"constant zero divisor",
+			program(`[]`, `[]`, `[]`, fn(`[{"name":"n","type":`+intType+`}]`, `[`+intType+`]`, `[{"k":"return","values":[{"k":"binary","op":"/","x":{"k":"ident","name":"n"},"y":`+intLit("0")+`}]}]`)),
+			"division by zero",
+		},
+		{
+			"typed addition overflow",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[`+u8Type+`]`, `[{"k":"return","values":[{"k":"binary","op":"+","x":`+conv(u8Type, intLit("255"))+`,"y":`+conv(u8Type, intLit("1"))+`}]}]`)),
+			"does not fit uint8",
+		},
+		{
+			"typed shift overflow",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[`+u8Type+`]`, `[{"k":"return","values":[{"k":"binary","op":"<<","x":`+conv(u8Type, intLit("1"))+`,"y":`+intLit("8")+`}]}]`)),
+			"does not fit uint8",
+		},
+		{
+			"typed unsigned negation",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[`+u8Type+`]`, `[{"k":"return","values":[{"k":"unary","op":"-","x":`+conv(u8Type, intLit("1"))+`}]}]`)),
+			"does not fit uint8",
+		},
+		{
+			"typed signed division overflow",
+			program(`[]`, `[]`, `[]`, fn(`[]`, `[`+i32Type+`]`, `[{"k":"return","values":[{"k":"binary","op":"/","x":`+conv(i32Type, `{"k":"unary","op":"-","x":`+intLit("2147483648")+`}`)+`,"y":`+conv(i32Type, `{"k":"unary","op":"-","x":`+intLit("1")+`}`)+`}]}]`)),
+			"does not fit int32",
+		},
+		{
+			"address outside call",
+			program(`[]`, `[]`, `[{"name":"S","fields":[]}]`, fn(`[]`, `[]`, `[{"k":"var_decl","name":"s","type":{"k":"struct_ref","name":"S"},"value":null},{"k":"define","names":["p"],"value":{"k":"unary","op":"&","x":{"k":"ident","name":"s"}}}]`)),
+			"direct call arguments",
+		},
+		{
+			"unused builtin value",
+			program(`[]`, `[]`, `[]`, fn(`[{"name":"s","type":{"k":"slice","elem":`+intType+`}}]`, `[]`, `[{"k":"expr_stmt","value":{"k":"builtin","fn":"len","spread":false,"type":null,"args":[{"k":"ident","name":"s"}]}}]`)),
+			"only copy",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := load(tc.src); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("load error = %v, want an error containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestAcceptsRangeCountAndBlankAssignment(t *testing.T) {
+	for name, stmt := range map[string]string{
+		"int range count":  `{"k": "range", "idx": null, "val": null, "over": {"k": "ident", "name": "n"}, "body": []}`,
+		"blank assignment": `{"k": "assign", "lhs": [{"k": "ident", "name": "_"}], "value": {"k": "ident", "name": "n"}}`,
+	} {
+		src := `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [],
+			"funcs": [{"k": "func", "name": "f",
+			  "params": [{"name": "n", "type": {"k": "named", "name": "int"}}], "results": [],
+			  "body": [` + stmt + `]}]}`
+		if _, err := load(src); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	const twoResultDiscard = `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
+		{"k": "func", "name": "pair", "params": [],
+		 "results": [{"k": "named", "name": "int"}, {"k": "named", "name": "int"}],
+		 "body": [{"k": "return", "values": [{"k": "int", "value": "1"}, {"k": "int", "value": "2"}]}]},
+		{"k": "func", "name": "f", "params": [], "results": [],
+		 "body": [{"k": "define", "names": ["_", "n"], "value": {"k": "call", "fn": "pair", "args": []}}]}
+	]}`
+	if _, err := load(twoResultDiscard); err != nil {
+		t.Errorf("two-result blank discard: %v", err)
+	}
+	const oneRangeVariable = `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
+		{"name": "f", "params": [{"name": "s", "type": {"k": "slice", "elem": {"k": "named", "name": "int"}}}],
+		 "results": [], "body": [
+			{"k": "range", "idx": "_", "val": "v", "over": {"k": "ident", "name": "s"}, "body": []},
+			{"k": "range", "idx": "i", "val": "_", "over": {"k": "ident", "name": "s"}, "body": []}
+		]}
+	]}`
+	if _, err := load(oneRangeVariable); err != nil {
+		t.Errorf("one nonblank range variable: %v", err)
+	}
+}
+
+func TestAcceptsTypedConstantBoundaries(t *testing.T) {
+	const src = `{"vego":1,"package":"t","vars":[],"types":[],"funcs":[],"consts":[
+		{"name":"add","type":null,"value":{"k":"binary","op":"+","x":{"k":"conv","type":{"k":"named","name":"uint8"},"x":{"k":"int","value":"254"}},"y":{"k":"conv","type":{"k":"named","name":"uint8"},"x":{"k":"int","value":"1"}}}},
+		{"name":"neg","type":null,"value":{"k":"unary","op":"-","x":{"k":"conv","type":{"k":"named","name":"int32"},"x":{"k":"int","value":"2147483647"}}}},
+		{"name":"shift","type":null,"value":{"k":"binary","op":"<<","x":{"k":"conv","type":{"k":"named","name":"uint8"},"x":{"k":"int","value":"1"}},"y":{"k":"int","value":"7"}}},
+		{"name":"complement","type":null,"value":{"k":"unary","op":"^","x":{"k":"conv","type":{"k":"named","name":"uint8"},"x":{"k":"int","value":"0"}}}}
+	]}`
 	if _, err := load(src); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCharacterValuesAreUnicodeScalars(t *testing.T) {
+	program := func(value string) string {
+		return `{"vego": 1, "package": "t", "consts": [], "vars": [], "types": [], "funcs": [
+			{"k": "func", "name": "f", "params": [], "results": [{"k": "named", "name": "int32"}],
+			 "body": [{"k": "return", "values": [{"k": "char", "value": "` + value + `"}]}]}]}`
+	}
+	// 4294967296 would turn into 0 if it were cut down to 32 bits.
+	for _, value := range []string{"-1", "55296", "57343", "1114112", "4294967296"} {
+		if _, err := load(program(value)); err == nil || !strings.Contains(err.Error(), "invalid character value") {
+			t.Errorf("character value %s: error = %v, want invalid character value", value, err)
+		}
+	}
+	for _, value := range []string{"0", "55295", "57344", "1114111"} {
+		if _, err := load(program(value)); err != nil {
+			t.Errorf("character value %s: %v", value, err)
+		}
+	}
+}
+
+func TestArrayLengthsAreResolved(t *testing.T) {
+	const prefix = `{"vego": 1, "package": "t", "consts": CONSTS, "vars": [], "types": [], "funcs": [
+		{"k": "func", "name": "f", "params": [{"name": "a", "type":
+		 {"k": "array", "len": LENGTH, "elem": {"k": "named", "name": "int"}}}],
+		 "results": [], "body": []}]}`
+	makeProgram := func(consts, length string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(prefix, "CONSTS", consts), "LENGTH", length)
+	}
+	for _, tc := range []struct {
+		name   string
+		length string
+	}{
+		{"unknown identifier", `{"k": "ident", "name": "missing"}`},
+		{"negative", `{"k": "unary", "op": "-", "x": {"k": "int", "value": "1"}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := load(makeProgram("[]", tc.length)); err == nil || !strings.Contains(err.Error(), "array length") {
+				t.Fatalf("load error = %v, want an array length error", err)
+			}
+		})
+	}
+
+	constants := `[{"k": "const", "name": "n", "type": null, "value":
+		{"k": "binary", "op": "+", "x": {"k": "int", "value": "1"}, "y": {"k": "int", "value": "1"}}}]`
+	for _, tc := range []struct {
+		name   string
+		consts string
+		length string
+		want   int64
+	}{
+		{"zero", "[]", `{"k": "int", "value": "0"}`, 0},
+		{"named computed constant", constants, `{"k": "ident", "name": "n"}`, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, err := load(makeProgram(tc.consts, tc.length))
+			if err != nil {
+				t.Fatal(err)
+			}
+			typ := p.FuncMap["f"].Params[0].Type
+			if !typ.ALenSet || typ.ALenVal != tc.want {
+				t.Fatalf("resolved length = (%d, %v), want (%d, true)", typ.ALenVal, typ.ALenSet, tc.want)
+			}
+		})
 	}
 }
 

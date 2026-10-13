@@ -1105,7 +1105,7 @@ theorem MOK_runFn (fuel : Nat) (c : Ctx) (fn : TFunc)
   cases fuel with
   | zero => simp only [runFn] at e; cases e
   | succ fuel =>
-    simp only [runFn, M.bind_def, M.pure_def] at e
+    simp only [runFn, M.bind_def] at e
     split at e
     next u1 h1 hent =>
       split at e

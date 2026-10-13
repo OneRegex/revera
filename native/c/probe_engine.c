@@ -2,277 +2,277 @@
 
 #include "probe_engine.h"
 
-int64_t probe_bump(vg_arena *mem, probe_Counter *c, int32_t tag) {
-    c->n += 1LL;
-    c->log = probe_slice_i32_append(mem, c->log, tag);
-    return ((int64_t)(tag));
+int64_t vego_g_70726f6265x_bump(vg_arena *mem, vego_g_70726f6265x_Counter *vego_l_c, int32_t vego_l_tag) {
+    vego_l_c->vego_f_n += 1LL;
+    vego_l_c->vego_f_log = vego_t_70726f6265x_si32_append(mem, vego_l_c->vego_f_log, vego_l_tag);
+    return ((int64_t)(vego_l_tag));
 }
 
-int64_t probe_logCode(probe_Counter *c) {
-    int64_t v = 0LL;
+int64_t vego_g_70726f6265x_logCode(vego_g_70726f6265x_Counter *vego_l_c) {
+    int64_t vego_l_v = 0LL;
     {
-        int64_t i = 0LL;
-        for (; (i < (c->log).len); i += 1LL) {
-            v = ((v * 10LL) + ((int64_t)((*probe_slice_i32_at(c->log, i)))));
+        int64_t vego_l_i = 0LL;
+        for (; (vego_l_i < (vego_l_c->vego_f_log).len); vego_l_i += 1LL) {
+            vego_l_v = ((vego_l_v * 10LL) + ((int64_t)((*vego_t_70726f6265x_si32_at(vego_l_c->vego_f_log, vego_l_i)))));
         }
     }
-    return ((v * 100LL) + ((int64_t)(c->n)));
+    return ((vego_l_v * 100LL) + ((int64_t)(vego_l_c->vego_f_n)));
 }
 
-probe_Tup_i64_i64 probe_DivMod(int64_t a, int64_t b) {
-    return (probe_Tup_i64_i64){vg_sdiv_i64(a, b), vg_srem_i64(a, b)};
+vego_q_70726f6265x_Tup_i64_i64 vego_g_70726f6265x_DivMod(int64_t vego_l_a, int64_t vego_l_b) {
+    return (vego_q_70726f6265x_Tup_i64_i64){vg_sdiv_i64(vego_l_a, vego_l_b), vg_srem_i64(vego_l_a, vego_l_b)};
 }
 
-probe_Tup_i32_i32 probe_DivMod32(int32_t a, int32_t b) {
-    return (probe_Tup_i32_i32){vg_sdiv_i32(a, b), vg_srem_i32(a, b)};
+vego_q_70726f6265x_Tup_i32_i32 vego_g_70726f6265x_DivMod32(int32_t vego_l_a, int32_t vego_l_b) {
+    return (vego_q_70726f6265x_Tup_i32_i32){vg_sdiv_i32(vego_l_a, vego_l_b), vg_srem_i32(vego_l_a, vego_l_b)};
 }
 
-int64_t probe_BytesProbe(vg_arena *mem, vg_str s) {
-    probe_slice_u8 b = probe_bytes_from_str(mem, s);
-    if (((b).len > 0LL)) {
-        (*probe_slice_u8_at(b, 0LL)) = 88;
+int64_t vego_g_70726f6265x_BytesProbe(vg_arena *mem, vg_str vego_l_s) {
+    vego_t_70726f6265x_su8 vego_l_b = vego_b_70726f6265x_bytes_from_str(mem, vego_l_s);
+    if (((vego_l_b).len > 0LL)) {
+        (*vego_t_70726f6265x_su8_at(vego_l_b, 0LL)) = 88;
     }
-    int64_t t = 0LL;
+    int64_t vego_l_t = 0LL;
     {
-        int64_t i = 0LL;
-        for (; (i < (b).len); i += 1LL) {
-            t = ((t * 31LL) + ((int64_t)((*probe_slice_u8_at(b, i)))));
+        int64_t vego_l_i = 0LL;
+        for (; (vego_l_i < (vego_l_b).len); vego_l_i += 1LL) {
+            vego_l_t = ((vego_l_t * 31LL) + ((int64_t)((*vego_t_70726f6265x_su8_at(vego_l_b, vego_l_i)))));
         }
     }
-    return t;
+    return vego_l_t;
 }
 
-probe_slice_i32 probe_sliceFrom(vg_arena *mem, probe_Counter *c, int64_t n) {
-    c->n += 1LL;
-    probe_slice_i32 out = probe_slice_i32_make(mem, n);
+vego_t_70726f6265x_si32 vego_g_70726f6265x_sliceFrom(vg_arena *mem, vego_g_70726f6265x_Counter *vego_l_c, int64_t vego_l_n) {
+    vego_l_c->vego_f_n += 1LL;
+    vego_t_70726f6265x_si32 vego_l_out = vego_t_70726f6265x_si32_make(mem, vego_l_n);
     {
-        int64_t i = 0LL;
-        for (; (i < n); i += 1LL) {
-            (*probe_slice_i32_at(out, i)) = ((int32_t)((i + 1LL)));
+        int64_t vego_l_i = 0LL;
+        for (; (vego_l_i < vego_l_n); vego_l_i += 1LL) {
+            (*vego_t_70726f6265x_si32_at(vego_l_out, vego_l_i)) = ((int32_t)((vego_l_i + 1LL)));
         }
     }
-    return out;
+    return vego_l_out;
 }
 
-int64_t probe_RangeProbe(vg_arena *mem, probe_Counter *c) {
-    int64_t t = 0LL;
+int64_t vego_g_70726f6265x_RangeProbe(vg_arena *mem, vego_g_70726f6265x_Counter *vego_l_c) {
+    int64_t vego_l_t = 0LL;
     {
-        probe_slice_i32 _t1 = probe_sliceFrom(mem, c, 4LL);
-        for (int64_t _t2 = 0; _t2 < _t1.len; _t2++) {
-            int64_t i = _t2;
-            int32_t v = (*probe_slice_i32_at(_t1, _t2));
-            t += (((int64_t)(i)) * ((int64_t)(v)));
-            i = 100LL;
+        vego_t_70726f6265x_si32 vego_tmp_1 = vego_g_70726f6265x_sliceFrom(mem, vego_l_c, 4LL);
+        for (int64_t vego_tmp_2 = 0; vego_tmp_2 < vego_tmp_1.len; vego_tmp_2++) {
+            int64_t vego_l_i = vego_tmp_2;
+            int32_t vego_l_v = (*vego_t_70726f6265x_si32_at(vego_tmp_1, vego_tmp_2));
+            vego_l_t += (((int64_t)(vego_l_i)) * ((int64_t)(vego_l_v)));
+            vego_l_i = 100LL;
         }
     }
-    return ((t * 10LL) + ((int64_t)(c->n)));
+    return ((vego_l_t * 10LL) + ((int64_t)(vego_l_c->vego_f_n)));
 }
 
-int64_t probe_RangeValProbe(probe_slice_i32 xs) {
-    int64_t t = 0LL;
+int64_t vego_g_70726f6265x_RangeValProbe(vego_t_70726f6265x_si32 vego_l_xs) {
+    int64_t vego_l_t = 0LL;
     {
-        probe_slice_i32 _t1 = xs;
-        for (int64_t _t2 = 0; _t2 < _t1.len; _t2++) {
-            int32_t v = (*probe_slice_i32_at(_t1, _t2));
-            v = ((int32_t)(v + 1));
-            t += ((int64_t)(v));
+        vego_t_70726f6265x_si32 vego_tmp_1 = vego_l_xs;
+        for (int64_t vego_tmp_2 = 0; vego_tmp_2 < vego_tmp_1.len; vego_tmp_2++) {
+            int32_t vego_l_v = (*vego_t_70726f6265x_si32_at(vego_tmp_1, vego_tmp_2));
+            vego_l_v = ((int32_t)(vego_l_v + 1));
+            vego_l_t += ((int64_t)(vego_l_v));
         }
     }
     {
-        int64_t i = 0LL;
-        for (; (i < (xs).len); i += 1LL) {
-            t += (((int64_t)((*probe_slice_i32_at(xs, i)))) * 100LL);
+        int64_t vego_l_i = 0LL;
+        for (; (vego_l_i < (vego_l_xs).len); vego_l_i += 1LL) {
+            vego_l_t += (((int64_t)((*vego_t_70726f6265x_si32_at(vego_l_xs, vego_l_i)))) * 100LL);
         }
     }
-    return t;
+    return vego_l_t;
 }
 
-int64_t probe_RangeIntProbe(int64_t n) {
-    int64_t t = 0LL;
+int64_t vego_g_70726f6265x_RangeIntProbe(int64_t vego_l_n) {
+    int64_t vego_l_t = 0LL;
     {
-        int64_t _t1 = n;
-        for (int64_t _t2 = 0; _t2 < _t1; _t2++) {
-            int64_t i = _t2;
-            t = ((t * 2LL) + ((int64_t)(i)));
+        int64_t vego_tmp_1 = vego_l_n;
+        for (int64_t vego_tmp_2 = 0; vego_tmp_2 < vego_tmp_1; vego_tmp_2++) {
+            int64_t vego_l_i = vego_tmp_2;
+            vego_l_t = ((vego_l_t * 2LL) + ((int64_t)(vego_l_i)));
         }
     }
-    return t;
+    return vego_l_t;
 }
 
-int64_t probe_PartialArray(void) {
-    probe_arr_i64_5 a = ((probe_arr_i64_5){.v = {7LL, 9LL}});
-    probe_arr_Str_3 names = ((probe_arr_Str_3){.v = {vg_lit("a")}});
-    int64_t t = 0LL;
+int64_t vego_g_70726f6265x_PartialArray(void) {
+    vego_t_70726f6265x_a5xi64 vego_l_a = ((vego_t_70726f6265x_a5xi64){.v = {7LL, 9LL}});
+    vego_t_70726f6265x_a3xStr vego_l_names = ((vego_t_70726f6265x_a3xStr){.v = {vg_lit("a")}});
+    int64_t vego_l_t = 0LL;
     {
-        int64_t i = 0LL;
-        for (; (i < 5LL); i += 1LL) {
-            t = ((t * 10LL) + a.v[vg_index(i, 5)]);
+        int64_t vego_l_i = 0LL;
+        for (; (vego_l_i < 5LL); vego_l_i += 1LL) {
+            vego_l_t = ((vego_l_t * 10LL) + vego_l_a.v[vg_index(vego_l_i, 5)]);
         }
     }
-    return (((t * 10LL) + ((int64_t)((names.v[vg_index(1LL, 3)]).len))) + ((int64_t)((names.v[vg_index(0LL, 3)]).len)));
+    return (((vego_l_t * 10LL) + ((int64_t)((vego_l_names.v[vg_index(1LL, 3)]).len))) + ((int64_t)((vego_l_names.v[vg_index(0LL, 3)]).len)));
 }
 
-bool probe_TaggedEq(probe_Tagged a, probe_Tagged b) {
-    return (probe_Tagged_eq(a, b));
+bool vego_g_70726f6265x_TaggedEq(vego_g_70726f6265x_Tagged vego_l_a, vego_g_70726f6265x_Tagged vego_l_b) {
+    return (vego_e_70726f6265x_t546167676564x(vego_l_a, vego_l_b));
 }
 
-int64_t probe_three(int64_t a, int64_t b, int64_t x) {
-    return (((a * 100LL) + (b * 10LL)) + x);
+int64_t vego_g_70726f6265x_three(int64_t vego_l_a, int64_t vego_l_b, int64_t vego_l_x) {
+    return (((vego_l_a * 100LL) + (vego_l_b * 10LL)) + vego_l_x);
 }
 
-int64_t probe_OrderArgs(vg_arena *mem, probe_Counter *c) {
-    int64_t _t1 = probe_bump(mem, c, 1);
-    int64_t _t2 = probe_bump(mem, c, 2);
-    int64_t _t3 = probe_bump(mem, c, 3);
-    int64_t _t4 = probe_three(_t1, _t2, _t3);
-    int64_t _t5 = probe_logCode(c);
-    return (_t4 + _t5);
+int64_t vego_g_70726f6265x_OrderArgs(vg_arena *mem, vego_g_70726f6265x_Counter *vego_l_c) {
+    int64_t vego_tmp_1 = vego_g_70726f6265x_bump(mem, vego_l_c, 1);
+    int64_t vego_tmp_2 = vego_g_70726f6265x_bump(mem, vego_l_c, 2);
+    int64_t vego_tmp_3 = vego_g_70726f6265x_bump(mem, vego_l_c, 3);
+    int64_t vego_tmp_4 = vego_g_70726f6265x_three(vego_tmp_1, vego_tmp_2, vego_tmp_3);
+    int64_t vego_tmp_5 = vego_g_70726f6265x_logCode(vego_l_c);
+    return (vego_tmp_4 + vego_tmp_5);
 }
 
-int64_t probe_OrderBinary(vg_arena *mem, probe_Counter *c) {
-    int64_t _t1 = probe_bump(mem, c, 4);
-    int64_t _t2 = (2LL * probe_bump(mem, c, 5));
-    int64_t v = (_t1 - _t2);
-    int64_t _t3 = (v * 10000LL);
-    int64_t _t4 = probe_logCode(c);
-    return (_t3 + _t4);
+int64_t vego_g_70726f6265x_OrderBinary(vg_arena *mem, vego_g_70726f6265x_Counter *vego_l_c) {
+    int64_t vego_tmp_1 = vego_g_70726f6265x_bump(mem, vego_l_c, 4);
+    int64_t vego_tmp_2 = (2LL * vego_g_70726f6265x_bump(mem, vego_l_c, 5));
+    int64_t vego_l_v = (vego_tmp_1 - vego_tmp_2);
+    int64_t vego_tmp_3 = (vego_l_v * 10000LL);
+    int64_t vego_tmp_4 = vego_g_70726f6265x_logCode(vego_l_c);
+    return (vego_tmp_3 + vego_tmp_4);
 }
 
-int64_t probe_OrderIndex(vg_arena *mem, probe_Counter *c) {
-    probe_slice_i32 s = probe_sliceFrom(mem, c, 6LL);
-    probe_slice_i32 _t1 = s;
-    int64_t _t2 = probe_bump(mem, c, 2);
-    int64_t v = ((int64_t)((*probe_slice_i32_at(_t1, _t2))));
-    int64_t _t3 = (v * 10000LL);
-    int64_t _t4 = probe_logCode(c);
-    return (_t3 + _t4);
+int64_t vego_g_70726f6265x_OrderIndex(vg_arena *mem, vego_g_70726f6265x_Counter *vego_l_c) {
+    vego_t_70726f6265x_si32 vego_l_s = vego_g_70726f6265x_sliceFrom(mem, vego_l_c, 6LL);
+    vego_t_70726f6265x_si32 vego_tmp_1 = vego_l_s;
+    int64_t vego_tmp_2 = vego_g_70726f6265x_bump(mem, vego_l_c, 2);
+    int64_t vego_l_v = ((int64_t)((*vego_t_70726f6265x_si32_at(vego_tmp_1, vego_tmp_2))));
+    int64_t vego_tmp_3 = (vego_l_v * 10000LL);
+    int64_t vego_tmp_4 = vego_g_70726f6265x_logCode(vego_l_c);
+    return (vego_tmp_3 + vego_tmp_4);
 }
 
-int64_t probe_SpareProbe(vg_arena *mem) {
-    probe_slice_i64 s = probe_slice_i64_make_cap(mem, 0LL, 4LL);
-    s = probe_slice_i64_append(mem, s, 5LL);
-    s = probe_slice_i64_head(s, 4LL);
-    int64_t t = 0LL;
+int64_t vego_g_70726f6265x_SpareProbe(vg_arena *mem) {
+    vego_t_70726f6265x_si64 vego_l_s = vego_t_70726f6265x_si64_make_cap(mem, 0LL, 4LL);
+    vego_l_s = vego_t_70726f6265x_si64_append(mem, vego_l_s, 5LL);
+    vego_l_s = vego_t_70726f6265x_si64_head(vego_l_s, 4LL);
+    int64_t vego_l_t = 0LL;
     {
-        int64_t i = 0LL;
-        for (; (i < (s).len); i += 1LL) {
-            t = (((t * 10LL) + (*probe_slice_i64_at(s, i))) + 1LL);
+        int64_t vego_l_i = 0LL;
+        for (; (vego_l_i < (vego_l_s).len); vego_l_i += 1LL) {
+            vego_l_t = (((vego_l_t * 10LL) + (*vego_t_70726f6265x_si64_at(vego_l_s, vego_l_i))) + 1LL);
         }
     }
-    probe_slice_i64 g = probe_slice_i64_make_cap(mem, 0LL, 2LL);
-    g = probe_slice_i64_append(mem, g, 1LL);
-    g = probe_slice_i64_append(mem, g, 2LL);
-    g = probe_slice_i64_append(mem, g, 3LL);
-    if (((g).cap >= 4LL)) {
-        g = probe_slice_i64_head(g, 4LL);
+    vego_t_70726f6265x_si64 vego_l_g = vego_t_70726f6265x_si64_make_cap(mem, 0LL, 2LL);
+    vego_l_g = vego_t_70726f6265x_si64_append(mem, vego_l_g, 1LL);
+    vego_l_g = vego_t_70726f6265x_si64_append(mem, vego_l_g, 2LL);
+    vego_l_g = vego_t_70726f6265x_si64_append(mem, vego_l_g, 3LL);
+    if (((vego_l_g).cap >= 4LL)) {
+        vego_l_g = vego_t_70726f6265x_si64_head(vego_l_g, 4LL);
     }
     {
-        int64_t i_2 = 0LL;
-        for (; (i_2 < 4LL); i_2 += 1LL) {
-            t = (((t * 10LL) + (*probe_slice_i64_at(g, i_2))) + 1LL);
+        int64_t vego_l_i_2 = 0LL;
+        for (; (vego_l_i_2 < 4LL); vego_l_i_2 += 1LL) {
+            vego_l_t = (((vego_l_t * 10LL) + (*vego_t_70726f6265x_si64_at(vego_l_g, vego_l_i_2))) + 1LL);
         }
     }
-    return t;
+    return vego_l_t;
 }
 
-int64_t probe_NilProbe(vg_arena *mem) {
-    probe_slice_i32 s = {0};
-    int64_t t = 0LL;
-    if (((s).p == NULL)) {
-        t += 1LL;
+int64_t vego_g_70726f6265x_NilProbe(vg_arena *mem) {
+    vego_t_70726f6265x_si32 vego_l_s = {0};
+    int64_t vego_l_t = 0LL;
+    if (((vego_l_s).p == NULL)) {
+        vego_l_t += 1LL;
     }
-    probe_slice_i32 s2 = probe_slice_i32_make(mem, 0LL);
-    if (((s2).p != NULL)) {
-        t += 2LL;
+    vego_t_70726f6265x_si32 vego_l_s2 = vego_t_70726f6265x_si32_make(mem, 0LL);
+    if (((vego_l_s2).p != NULL)) {
+        vego_l_t += 2LL;
     }
-    s = probe_slice_i32_append(mem, s, 5);
-    if (((s).p != NULL)) {
-        t += 4LL;
+    vego_l_s = vego_t_70726f6265x_si32_append(mem, vego_l_s, 5);
+    if (((vego_l_s).p != NULL)) {
+        vego_l_t += 4LL;
     }
-    return t;
+    return vego_l_t;
 }
 
-int64_t probe_WrapProbe(int64_t a, int64_t b) {
-    return (((a * b) + a) - b);
+int64_t vego_g_70726f6265x_WrapProbe(int64_t vego_l_a, int64_t vego_l_b) {
+    return (((vego_l_a * vego_l_b) + vego_l_a) - vego_l_b);
 }
 
-int32_t probe_Narrow32(int32_t a, int32_t b) {
-    return ((int32_t)(((int32_t)(((int32_t)(a * b)) - vg_sdiv_i32(a, b))) + vg_srem_i32(a, b)));
+int32_t vego_g_70726f6265x_Narrow32(int32_t vego_l_a, int32_t vego_l_b) {
+    return ((int32_t)(((int32_t)(((int32_t)(vego_l_a * vego_l_b)) - vg_sdiv_i32(vego_l_a, vego_l_b))) + vg_srem_i32(vego_l_a, vego_l_b)));
 }
 
-uint8_t probe_WrapU8(uint8_t a, uint8_t b) {
-    return ((uint8_t)(((uint8_t)(a - b)) * 3));
+uint8_t vego_g_70726f6265x_WrapU8(uint8_t vego_l_a, uint8_t vego_l_b) {
+    return ((uint8_t)(((uint8_t)(vego_l_a - vego_l_b)) * 3));
 }
 
-uint32_t probe_AndNotProbe(uint32_t a, uint32_t b) {
-    uint32_t a_v = a;
-    a_v &= ~(b);
-    return ((uint32_t)(a_v & ~(((uint32_t)(b >> 1LL)))));
+uint32_t vego_g_70726f6265x_AndNotProbe(uint32_t vego_l_a, uint32_t vego_l_b) {
+    uint32_t vego_l_a_v = vego_l_a;
+    vego_l_a_v &= ~(vego_l_b);
+    return ((uint32_t)(vego_l_a_v & ~(((uint32_t)(vego_l_b >> 1LL)))));
 }
 
-uint64_t probe_ShiftProbe(uint64_t x, int64_t n) {
-    return ((x << vg_shift_count(n, 64)) >> vg_shift_count(vg_sdiv_i64(n, 2LL), 64));
+uint64_t vego_g_70726f6265x_ShiftProbe(uint64_t vego_l_x, int64_t vego_l_n) {
+    return ((vego_l_x << vg_shift_count(vego_l_n, 64)) >> vg_shift_count(vg_sdiv_i64(vego_l_n, 2LL), 64));
 }
 
-uint64_t probe_ConvProbe(int64_t x) {
-    return (((uint64_t)(((uint8_t)(x)))) + (((uint64_t)(((uint32_t)(((int32_t)(x)))))) * 1000ULL));
+uint64_t vego_g_70726f6265x_ConvProbe(int64_t vego_l_x) {
+    return (((uint64_t)(((uint8_t)(vego_l_x)))) + (((uint64_t)(((uint32_t)(((int32_t)(vego_l_x)))))) * 1000ULL));
 }
 
-int64_t probe_SubWrite(vg_arena *mem, int64_t n) {
-    probe_slice_i64 s = probe_slice_i64_make(mem, n);
-    (*probe_slice_i64_at(probe_slice_i64_tail(s, 1LL), 0LL)) = 7LL;
-    (*probe_slice_i64_at(probe_slice_i64_tail(probe_slice_i64_tail(s, 1LL), 1LL), 0LL)) = 9LL;
-    int64_t t = 0LL;
+int64_t vego_g_70726f6265x_SubWrite(vg_arena *mem, int64_t vego_l_n) {
+    vego_t_70726f6265x_si64 vego_l_s = vego_t_70726f6265x_si64_make(mem, vego_l_n);
+    (*vego_t_70726f6265x_si64_at(vego_t_70726f6265x_si64_tail(vego_l_s, 1LL), 0LL)) = 7LL;
+    (*vego_t_70726f6265x_si64_at(vego_t_70726f6265x_si64_tail(vego_t_70726f6265x_si64_tail(vego_l_s, 1LL), 1LL), 0LL)) = 9LL;
+    int64_t vego_l_t = 0LL;
     {
-        int64_t i = 0LL;
-        for (; (i < (s).len); i += 1LL) {
-            t = ((t * 10LL) + (*probe_slice_i64_at(s, i)));
+        int64_t vego_l_i = 0LL;
+        for (; (vego_l_i < (vego_l_s).len); vego_l_i += 1LL) {
+            vego_l_t = ((vego_l_t * 10LL) + (*vego_t_70726f6265x_si64_at(vego_l_s, vego_l_i)));
         }
     }
-    return t;
+    return vego_l_t;
 }
 
-int64_t probe_AndNotOrder(vg_arena *mem, probe_Counter *c) {
-    probe_slice_u64 s = probe_slice_u64_make(mem, 8LL);
-    (*probe_slice_u64_at(s, 3LL)) = 255ULL;
-    probe_slice_u64 _t1 = s;
-    int64_t _t2 = (probe_bump(mem, c, 1) + 2LL);
-    uint64_t *_t3 = &((*probe_slice_u64_at(_t1, _t2)));
-    (*_t3) &= ~((((uint64_t)(probe_bump(mem, c, 2))) + 15ULL));
-    int64_t _t4 = (((int64_t)((*probe_slice_u64_at(s, 3LL)))) * 100000LL);
-    int64_t _t5 = probe_logCode(c);
-    return (_t4 + _t5);
+int64_t vego_g_70726f6265x_AndNotOrder(vg_arena *mem, vego_g_70726f6265x_Counter *vego_l_c) {
+    vego_t_70726f6265x_su64 vego_l_s = vego_t_70726f6265x_su64_make(mem, 8LL);
+    (*vego_t_70726f6265x_su64_at(vego_l_s, 3LL)) = 255ULL;
+    vego_t_70726f6265x_su64 vego_tmp_1 = vego_l_s;
+    int64_t vego_tmp_2 = (vego_g_70726f6265x_bump(mem, vego_l_c, 1) + 2LL);
+    uint64_t *vego_tmp_3 = &((*vego_t_70726f6265x_su64_at(vego_tmp_1, vego_tmp_2)));
+    (*vego_tmp_3) &= ~((((uint64_t)(vego_g_70726f6265x_bump(mem, vego_l_c, 2))) + 15ULL));
+    int64_t vego_tmp_4 = (((int64_t)((*vego_t_70726f6265x_su64_at(vego_l_s, 3LL)))) * 100000LL);
+    int64_t vego_tmp_5 = vego_g_70726f6265x_logCode(vego_l_c);
+    return (vego_tmp_4 + vego_tmp_5);
 }
 
-int64_t probe_ZeroArray(void) {
-    probe_arr_i32_0 a = {0};
-    int64_t t = 0LL;
-    if (((probe_arr_i32_0_slice(&(a), 0, 0)).p != NULL)) {
-        t += 1LL;
+int64_t vego_g_70726f6265x_ZeroArray(void) {
+    vego_t_70726f6265x_a0xi32 vego_l_a = {0};
+    int64_t vego_l_t = 0LL;
+    if (((vego_t_70726f6265x_a0xi32_slice(&(vego_l_a), 0, 0)).p != NULL)) {
+        vego_l_t += 1LL;
     }
-    t = ((t * 10LL) + ((int64_t)((probe_arr_i32_0_slice(&(a), 0, 0)).len)));
-    return t;
+    vego_l_t = ((vego_l_t * 10LL) + ((int64_t)((vego_t_70726f6265x_a0xi32_slice(&(vego_l_a), 0, 0)).len)));
+    return vego_l_t;
 }
 
-int64_t probe_MakeU64(vg_arena *mem, uint64_t n) {
-    probe_slice_i32 s = probe_slice_i32_make(mem, n);
-    return ((int64_t)((s).len));
+int64_t vego_g_70726f6265x_MakeU64(vg_arena *mem, uint64_t vego_l_n) {
+    vego_t_70726f6265x_si32 vego_l_s = vego_t_70726f6265x_si32_make(mem, vego_l_n);
+    return ((int64_t)((vego_l_s).len));
 }
 
-probe_arr_i64_3 probe_mkTriple(int64_t x) {
-    probe_arr_i64_3 a = {0};
-    a.v[vg_index(0LL, 3)] = x;
-    a.v[vg_index(1LL, 3)] = (x + 1LL);
-    a.v[vg_index(2LL, 3)] = (x + 2LL);
-    return a;
+vego_t_70726f6265x_a3xi64 vego_g_70726f6265x_mkTriple(int64_t vego_l_x) {
+    vego_t_70726f6265x_a3xi64 vego_l_a = {0};
+    vego_l_a.v[vg_index(0LL, 3)] = vego_l_x;
+    vego_l_a.v[vg_index(1LL, 3)] = (vego_l_x + 1LL);
+    vego_l_a.v[vg_index(2LL, 3)] = (vego_l_x + 2LL);
+    return vego_l_a;
 }
 
-int64_t probe_PickArray(vg_arena *mem, probe_Counter *c) {
-    probe_arr_i64_3 _t1 = probe_mkTriple(40LL);
-    int64_t _t2 = probe_bump(mem, c, 2);
-    int64_t v = _t1.v[vg_index(_t2, 3)];
-    int64_t _t3 = (v * 10000LL);
-    int64_t _t4 = probe_logCode(c);
-    return (_t3 + _t4);
+int64_t vego_g_70726f6265x_PickArray(vg_arena *mem, vego_g_70726f6265x_Counter *vego_l_c) {
+    vego_t_70726f6265x_a3xi64 vego_tmp_1 = vego_g_70726f6265x_mkTriple(40LL);
+    int64_t vego_tmp_2 = vego_g_70726f6265x_bump(mem, vego_l_c, 2);
+    int64_t vego_l_v = vego_tmp_1.v[vg_index(vego_tmp_2, 3)];
+    int64_t vego_tmp_3 = (vego_l_v * 10000LL);
+    int64_t vego_tmp_4 = vego_g_70726f6265x_logCode(vego_l_c);
+    return (vego_tmp_3 + vego_tmp_4);
 }
 

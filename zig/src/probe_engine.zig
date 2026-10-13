@@ -125,7 +125,7 @@ pub fn PartialArray() i64 {
     {
         var i: i64 = 0;
         while ((i < 5)) : (i +%= 1) {
-            t = ((t *% 10) +% a[@intCast(i)]);
+            t = ((t *% 10) +% a[vg.arrayIndex(5, i)]);
         }
     }
     return (((t *% 10) +% vg.cv(i64, names[1].len)) +% vg.cv(i64, names[0].len));
@@ -217,7 +217,7 @@ pub fn AndNotProbe(a: u32, b: u32) u32 {
 }
 
 pub fn ShiftProbe(x: u64, n: i64) u64 {
-    return ((x << @intCast(n)) >> @intCast(vg.divT(n, 2)));
+    return ((x << vg.shiftCount(u64, n)) >> vg.shiftCount(u64, vg.divT(n, 2)));
 }
 
 pub fn ConvProbe(x: i64) u64 {
@@ -269,7 +269,7 @@ pub fn mkTriple(x: i64) [3]i64 {
 }
 
 pub fn PickArray(mem: vg.Allocator, c: *Counter) vg.Allocator.Error!i64 {
-    const v: i64 = mkTriple(40)[@intCast(try bump(mem, c, 2))];
+    const v: i64 = mkTriple(40)[vg.arrayIndex(3, try bump(mem, c, 2))];
     return ((v *% 10000) +% logCode(c));
 }
 

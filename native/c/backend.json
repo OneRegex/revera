@@ -1,7 +1,7 @@
 {
   "name": "c",
   "generated": ["engine.h", "engine.c", "probe_engine.h", "probe_engine.c"],
-  "engine_symbols": "revera_eng_",
+  "engine_symbols": "^_?vego_[gtqeb]_7265766572615f656e67x_",
   "toolchain": ["clang", "--version"],
   "release": {
     "build": [["make", "all"]],

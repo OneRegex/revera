@@ -207,12 +207,12 @@ theorem ctrLess_bumpFrom (slots : List Nat) (delta : Nat) (a b : List Nat) (n : 
       simp only [ctrLess, bumpFrom, bne_iff_ne, ne_eq, ite_not] at h ⊢
       split at h
       · rename_i hxy; subst hxy; simp; exact ih ys (n + 1) h
-      · rename_i hxy
+      · rename_i _hxy
         simp only [decide_eq_true_eq] at h
         split
         · have : ¬ (x + delta = y + delta) := by omega
           rw [if_neg this]; simp; omega
-        · simp [hxy]; omega
+        · simp; omega
 
 /-- A strictly smaller vector stays strictly smaller than the other side after increments on that side alone. -/
 theorem ctrLess_bumpFrom_right (slots : List Nat) (delta : Nat) (a b : List Nat) (n : Nat) (h : ctrLess a b = true) :
@@ -232,12 +232,12 @@ theorem ctrLess_bumpFrom_right (slots : List Nat) (delta : Nat) (a b : List Nat)
           · have : ¬ (x = x + delta) := by omega
             rw [if_neg this]; simp; omega
         · simp; exact ih ys (n + 1) h
-      · rename_i hxy
+      · rename_i _hxy
         simp only [decide_eq_true_eq] at h
         split
         · have : ¬ (x = y + delta) := by omega
           rw [if_neg this]; simp; omega
-        · simp [hxy]; omega
+        · simp; omega
 
 theorem ctrLess_bumpCtr (slots : List Nat) (delta : Nat) (a b : List Nat) (h : ctrLess a b = true) :
     ctrLess (bumpCtr a slots delta) (bumpCtr b slots delta) = true := by
@@ -396,7 +396,7 @@ theorem Dom_iff (k : Nat) (st : St) (v : Payload) :
       · have hs : v.1 = st.so := by omega
         by_cases hk : k = 0
         · simp [h1, h2, hk]
-        · simp [h1, h2, hk, hs]
+        · simp [hk, hs]
 
 /-- Domination is upward closed in the payload order. -/
 theorem Dom_of_ple (k : Nat) (st : St) (v w : Payload) (hd : Dom k st v) (hle : ple k v w) : Dom k st w := by
@@ -539,19 +539,18 @@ theorem paConsider_spec (k : Nat) (st : St) (start : Nat) (ctr : List Nat) (e : 
           have hc0 : ctr = [] := List.eq_nil_of_length_eq_zero hc
           have hb0 : st.bestCtr = [] := List.eq_nil_of_length_eq_zero hb
           by_cases he : st.eo < e
-          · simp [st', paConsider, considerCore, bestOf, hm, h1, h2, he, hc0, hb0, selLE, ctrLess]; omega
-          · simp [st', paConsider, considerCore, bestOf, hm, h1, h2, he, hc0, hb0, selLE, ctrLess]; omega
+          · simp [st', paConsider, considerCore, bestOf, hm, h1, he, hc0, hb0, selLE, ctrLess]; omega
+          · simp [st', paConsider, considerCore, bestOf, hm, h1, he, hc0, hb0, selLE, ctrLess]; omega
         · have hk' : 0 < k := by omega
           rcases ctrLess_total ctr st.bestCtr (hc.trans hb.symm) with h3 | h3 | h3
+          · simp [st', paConsider, considerCore, bestOf, hm, h1, hk', h3, selLE]
           · have h4 := ctrLess_asymm _ _ h3
-            simp [st', paConsider, considerCore, bestOf, hm, h1, h2, hk', h3, h4, selLE]
-          · have h4 := ctrLess_asymm _ _ h3
-            simp [st', paConsider, considerCore, bestOf, hm, h1, h2, hk', h3, h4, selLE]
+            simp [st', paConsider, considerCore, bestOf, hm, h1, hk', h3, h4, selLE]
           · subst h3
             have h4 := ctrLess_irrefl st.bestCtr
             by_cases he : st.eo < e
-            · simp [st', paConsider, considerCore, bestOf, hm, h1, h2, hk', h4, he, selLE]; omega
-            · simp [st', paConsider, considerCore, bestOf, hm, h1, h2, hk', h4, he, selLE]; omega
+            · simp [st', paConsider, considerCore, bestOf, hm, h1, hk', h4, he, selLE]; omega
+            · simp [st', paConsider, considerCore, bestOf, hm, h1, hk', h4, he, selLE]; omega
   · simp [st', paConsider, considerCore, bestOf, hm, selLE]
 
 /-- The best only improves, so every domination survives a candidate update. -/
@@ -750,7 +749,7 @@ theorem paStore_entries (k : Nat) (st : St) (si pc start : Nat) (ctr : List Nat)
       rw [hslot]
       simp only [Slot.entry_eq]
       unfold storeInto
-      split <;> simp [Array.getElem?_setIfInBounds, hpc]
+      split <;> simp [hpc]
 
 /-- A relaxation changes at most the entry it stores at, and then it queues that instruction. -/
 theorem paRelax_entries (k : Nat) (st : St) (si pc start : Nat) (ctr : List Nat) (hsi : si < st.slots.size) :
@@ -765,7 +764,7 @@ theorem paRelax_entries (k : Nat) (st : St) (si pc start : Nat) (ctr : List Nat)
   have st0 : St := { st with m := { st.m with relaxes := st.m.relaxes + 1 } }
   obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := paStore_entries k { st with m := { st.m with relaxes := st.m.relaxes + 1 } }
     si pc start ctr (by simpa using hsi)
-  simp only [St.slot_mk_m, St.slots_mk_m] at h1 h2 h3 h4 h5 h6
+  simp only [St.slot_mk_m] at h1 h2 h3 h4 h5 h6
   have hq0 : ({ st with m := { st.m with relaxes := st.m.relaxes + 1 } } : St).queue = st.queue := rfl
   rw [hq0] at h7
   simp only [st', paRelax]
@@ -1577,7 +1576,7 @@ theorem decodeOne_small (bs : ByteArray) (i c size : Nat) (h : Ere.decodeOne bs 
                     by_cases he : bs[i].toNat = 0xe0
                     · have hb : bs[i] = 0xe0 := by
                         apply UInt8.toNat.inj; simpa using he
-                      simp only [hb, beq_self_eq_true, Bool.true_and, Bool.not_eq_true'] at hnot1
+                      simp only [hb, beq_self_eq_true, Bool.true_and] at hnot1
                       have hc1 := UInt8.toNat_le_of_not_lt (by simpa using hnot1 : ¬ c1 < 0xa0)
                       simp at hc1
                       have hcont1 : Ere.cont c1 = true := by
@@ -1625,7 +1624,7 @@ theorem decodeOne_small (bs : ByteArray) (i c size : Nat) (h : Ere.decodeOne bs 
                       by_cases he : bs[i].toNat = 0xf0
                       · have hb : bs[i] = 0xf0 := by
                           apply UInt8.toNat.inj; simpa using he
-                        simp only [hb, beq_self_eq_true, Bool.true_and, Bool.not_eq_true'] at hnot1
+                        simp only [hb, beq_self_eq_true, Bool.true_and] at hnot1
                         have hc1 := UInt8.toNat_le_of_not_lt (by simpa using hnot1 : ¬ c1 < 0x90)
                         simp at hc1
                         have hcont1 : Ere.cont c1 = true := by
@@ -1879,11 +1878,11 @@ theorem selLE_of_Dom (k : Nat) (st : St) (s : Nat) (c : List Nat) (e : Nat) (h :
 theorem filterSlot_current (st : St) (si g : Nat) (hsi : si < st.slots.size) :
     (st.filterSlot si g).slot si = { st.slot si with gen := g, active := liveAt st si g } := by
   simp only [St.filterSlot, St.slot, St.setSlot]
-  simp [Array.getElem?_setIfInBounds, hsi]
+  simp [hsi]
 
 theorem filterSlot_other (st : St) (si g sj : Nat) (h : si ≠ sj) : (st.filterSlot si g).slot sj = st.slot sj := by
   simp only [St.filterSlot, St.slot, St.setSlot]
-  simp [Array.getElem?_setIfInBounds, h]
+  simp [h]
 
 theorem liveAt_iff (st : St) (si g pc : Nat) : pc ∈ liveAt st si g ↔ pc ∈ (st.slot si).active ∧ ((st.slot si).entry pc).stamp = g := by
   unfold liveAt
@@ -2010,7 +2009,7 @@ theorem Dom_of_bestOf (k : Nat) (st st' : St) (hb : bestOf st' = bestOf st) (hm 
   rw [hm, hb.1, hb.2.1]; exact h
 
 /-- The state at the start of the closure: the invariant holds and every entry thread is covered. -/
-theorem body_start (p : Prog) (atoms : Atoms) (input : Input) (hwf : p.wf) (hring : 2 ≤ p.ring) (st1 : St)
+theorem body_start (p : Prog) (atoms : Atoms) (input : Input) (hwf : p.wf) (_hring : 2 ≤ p.ring) (st1 : St)
     (prev : Int) (idx si : Nat) (active : List Nat)
     (hsize : st1.slots.size = p.ring) (hsi : si < p.ring) (hrs : RSlot p (st1.slot si))
     (hact : (st1.slot si).active = active) (hpos : st1.pos = chainPos input idx) (hvalid : ValidIdx input idx)
@@ -2390,8 +2389,8 @@ theorem RSlot_reset (p : Prog) (sl : Slot) (g : Nat) (h : RSlotQ p sl g) (hg : s
      omega⟩
 
 /-- The effect of one arrival on its target slot, and on nothing else. -/
-theorem paArrive_effect (p : Prog) (atoms : Atoms) (input : Input) (hwf : p.wf) (st : St) (pc delta start : Nat)
-    (ctr : List Nat) (hring : 2 ≤ p.ring) (hsize : st.slots.size = p.ring) (hd : 1 ≤ delta) (hd2 : delta < p.ring)
+theorem paArrive_effect (p : Prog) (_atoms : Atoms) (_input : Input) (hwf : p.wf) (st : St) (pc delta start : Nat)
+    (ctr : List Nat) (hring : 2 ≤ p.ring) (hsize : st.slots.size = p.ring) (_hd : 1 ≤ delta) (_hd2 : delta < p.ring)
     (hpc : pc < p.n) (hl : ctr.length = p.k)
     (hrs : RSlotQ p (st.slot ((st.ci + delta) % p.ring)) (paGen (st.ci + delta))) :
     let st' := paArrive p st pc delta start ctr

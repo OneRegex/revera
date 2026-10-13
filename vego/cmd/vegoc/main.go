@@ -201,7 +201,7 @@ func runEmit(args []string, stdout, stderr io.Writer) int {
 			"usage: vegoc emit c [-header engine.h] [-source engine.c] [-prefix name] input.json")
 		header := flags.String("header", "", "output header (default stdout)")
 		source := flags.String("source", "", "output source (default stdout)")
-		prefix := flags.String("prefix", "", "global identifier prefix (default the package name)")
+		prefix := flags.String("prefix", "", "generated C namespace (default the package name)")
 		if ok, status := parse(flags, rest, 1, stderr); !ok {
 			return status
 		}

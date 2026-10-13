@@ -12,44 +12,50 @@ import (
 	"github.com/oneregex/revera/vego/compiler/export"
 )
 
-// runSample exports a Go package, prints it as Zig, and runs it against the real runtime.
-// Every function whose name starts with T takes no argument and returns an integer.
-// The result holds one "Name = value" line per such function, in declaration order.
-func runSample(t *testing.T, source string) string {
+// emitSample exports a Go package, prints it as Zig, and writes it next to the real runtime.
+func emitSample(t *testing.T, source string) (zig, dir string, p *compiler.Program, engine string) {
 	t.Helper()
 	zig, err := exec.LookPath("zig")
 	if err != nil {
 		t.Skip("Zig is not installed")
 	}
-	dir := t.TempDir()
-	write := func(name, content string) {
-		t.Helper()
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
+	dir = t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "sample.go"), []byte(source), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	write("sample.go", source)
 	blob, violations, err := export.Package(dir)
 	if err != nil || len(violations) != 0 {
 		t.Fatalf("export: %v %v", err, violations)
 	}
-	p, err := compiler.Load(blob)
+	p, err = compiler.Load(blob)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := compiler.Check(p); err != nil {
 		t.Fatal(err)
 	}
-	engine, err := Emit(p)
+	engine, err = Emit(p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	write("engine.zig", engine)
 	runtime, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "zig", "src", "vg.zig"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	write("vg.zig", string(runtime))
+	for name, content := range map[string]string{"engine.zig": engine, "vg.zig": string(runtime)} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return zig, dir, p, engine
+}
+
+// runSample runs every function of the sample whose name starts with T.
+// Those take no argument and return an integer.
+// The result holds one "Name = value" line per function, in declaration order.
+func runSample(t *testing.T, source string) string {
+	t.Helper()
+	zig, dir, p, engine := emitSample(t, source)
 	var main strings.Builder
 	main.WriteString("const std = @import(\"std\");\nconst e = @import(\"engine.zig\");\n")
 	main.WriteString("pub fn main() !void {\n    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);\n    defer arena.deinit();\n    const mem = arena.allocator();\n    _ = &mem;\n")
@@ -64,7 +70,9 @@ func runSample(t *testing.T, source string) string {
 		fmt.Fprintf(&main, "    std.debug.print(\"%s = {d}\\n\", .{%s});\n", f.Name, call)
 	}
 	main.WriteString("}\n")
-	write("main.zig", main.String())
+	if err := os.WriteFile(filepath.Join(dir, "main.zig"), []byte(main.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	cmd := exec.Command(zig, "run", "main.zig")
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
@@ -425,7 +433,7 @@ func TestAllocatingFunctionsPropagateOutOfMemory(t *testing.T) {
 		{"k": "func", "name": "f", "params": [],
 		 "results": [{"k": "slice", "elem": {"k": "named", "name": "uint8"}}],
 		 "body": [{"k": "return", "values": [
-			{"k": "builtin", "fn": "make", "args": [{"k": "int", "value": "1"}],
+			{"k": "builtin", "fn": "make", "args": [{"k": "int", "value": "1"}], "spread": false,
 			 "type": {"k": "slice", "elem": {"k": "named", "name": "uint8"}}}
 		 ]}]},
 		{"k": "func", "name": "g", "params": [],
@@ -448,6 +456,70 @@ func TestAllocatingFunctionsPropagateOutOfMemory(t *testing.T) {
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("generated output does not contain %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestReleaseFastAbortsOnInvalidArithmeticAndArrayIndex(t *testing.T) {
+	const source = `package sample
+
+func Index(values [2]int64, i int) int64 { return values[i] }
+func Div(x, y int64) int64 { return x / y }
+func Rem(x, y int64) int64 { return x % y }
+func Shift(n int64) int64 { return int64(5) << n }
+func ShiftAssign(n int64) int64 { x := int64(5); x <<= n; return x }
+`
+	zig, dir, _, engine := emitSample(t, source)
+	const main = `const std = @import("std");
+const engine = @import("engine.zig");
+
+pub fn main(init: std.process.Init.Minimal) void {
+    var args = std.process.Args.Iterator.init(init.args);
+    _ = args.next();
+    const mode = args.next().?;
+    const value = std.fmt.parseInt(i64, args.next().?, 10) catch unreachable;
+    const result = switch (mode[0]) {
+        'i' => engine.Index(.{ 11, 22 }, value),
+        'd' => engine.Div(7, value),
+        'r' => engine.Rem(7, value),
+        's' => engine.Shift(value),
+        'a' => engine.ShiftAssign(value),
+        else => unreachable,
+    };
+    std.debug.print("{}\n", .{result});
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "main.zig"), []byte(main), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(dir, "invalid-ops")
+	cmd := exec.Command(zig, "build-exe", "-OReleaseFast", "main.zig", "-femit-bin="+binary)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build generated Zig: %v\n%s\n%s", err, out, engine)
+	}
+	// An empty want means the call must abort.
+	// The first case shows that the binary works at all.
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"i", "1"}, "22"},
+		{[]string{"i", "2"}, ""},
+		{[]string{"i", "-1"}, ""},
+		{[]string{"d", "0"}, ""},
+		{[]string{"r", "0"}, ""},
+		{[]string{"s", "3"}, "40"},
+		{[]string{"s", "64"}, ""},
+		{[]string{"s", "-1"}, ""},
+		{[]string{"a", "64"}, ""},
+	} {
+		out, err := exec.Command(binary, tc.args...).CombinedOutput()
+		if tc.want == "" && err == nil {
+			t.Errorf("%v succeeded, want an abort", tc.args)
+		}
+		if tc.want != "" && (err != nil || strings.TrimSpace(string(out)) != tc.want) {
+			t.Errorf("%v = %q, %v; want %q", tc.args, out, err, tc.want)
 		}
 	}
 }
@@ -480,7 +552,7 @@ func TestImpureDivisionAssignmentPinsPlace(t *testing.T) {
 	mark := &compiler.FuncDecl{Name: "mark"}
 	p := &compiler.Program{Funcs: []*compiler.FuncDecl{mark}, FuncMap: map[string]*compiler.FuncDecl{"mark": mark}}
 	array := &compiler.Type{K: compiler.KArray, Elem: compiler.TInt,
-		ALen: &compiler.Expr{K: "int", Value: "1", Typ: compiler.TInt}}
+		ALen: &compiler.Expr{K: "int", Value: "1", Typ: compiler.TInt}, ALenVal: 1, ALenSet: true}
 	call := func(value string) *compiler.Expr {
 		return &compiler.Expr{K: "call", Name: "mark", Typ: compiler.TInt,
 			Args: []*compiler.Expr{{K: "int", Value: value, Typ: compiler.TInt}}}
@@ -496,6 +568,10 @@ func TestImpureDivisionAssignmentPinsPlace(t *testing.T) {
 	post := g.inlineStmt(assign)
 	source := `const vg = struct {
     fn divT(x: i64, y: i64) i64 { return @divTrunc(x, y); }
+    fn arrayIndex(comptime n: usize, i: i64) usize {
+        if (i < 0 or i >= n) unreachable;
+        return @intCast(i);
+    }
 };
 var trace: i64 = 0;
 fn mark(value: i64) i64 { trace = trace * 10 + value; return value - 1; }

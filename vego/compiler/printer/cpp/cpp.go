@@ -420,6 +420,10 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 	case "range":
 		g.emitRange(s, depth)
 	case "switch":
+		if s.Tag.Typ.K == compiler.KBool {
+			g.emitBoolSwitch(s, depth)
+			return
+		}
 		g.indent(depth)
 		g.wf("switch (%s) {\n", g.expr(s.Tag))
 		for _, cs := range s.Cases {
@@ -479,6 +483,45 @@ func (g *gen) stmt(s *compiler.Stmt, depth int) {
 	default:
 		fatal("unknown statement kind", s.K)
 	}
+}
+
+func (g *gen) emitBoolSwitch(s *compiler.Stmt, depth int) {
+	tag := g.newTmp()
+	g.indent(depth)
+	g.wf("{\n")
+	g.indent(depth + 1)
+	g.wf("bool %s = %s;\n", tag, g.expr(s.Tag))
+	if len(s.Cases) == 0 {
+		g.indent(depth + 1)
+		g.wf("(void)%s;\n", tag)
+		if s.HasDef {
+			g.body(s.Default, depth+1)
+		}
+	} else {
+		for i, cs := range s.Cases {
+			var conds []string
+			for _, v := range cs.Values {
+				conds = append(conds, tag+" == "+g.expr(v))
+			}
+			g.indent(depth + 1)
+			if i != 0 {
+				g.wf("else ")
+			}
+			g.wf("if (%s) {\n", strings.Join(conds, " || "))
+			g.body(cs.Body, depth+2)
+			g.indent(depth + 1)
+			g.wf("} ")
+		}
+		if s.HasDef {
+			g.wf("else {\n")
+			g.body(s.Default, depth+2)
+			g.indent(depth + 1)
+			g.wf("}")
+		}
+		g.wf("\n")
+	}
+	g.indent(depth)
+	g.wf("}\n")
 }
 
 // simpleStmt emits a declaration or assignment, indented, with its own newline.
