@@ -97,11 +97,13 @@ inline constexpr uint8_t iSplit = 6;
 inline constexpr uint8_t iJmp = 7;
 inline constexpr uint8_t iMatch = 8;
 inline constexpr uint8_t iFail = 9;
-inline constexpr int64_t failMinNone = 4611686018427387904LL;
+inline constexpr int64_t lenInf = 1073741824LL;
+inline constexpr int64_t failMinNone = 1073741825LL;
 inline constexpr int64_t maxProgram = 1048576LL;
 inline constexpr int64_t maskWidth = 64LL;
 inline constexpr int64_t subjectLimit = 2147483647LL;
 inline constexpr int64_t lengthCap = 1099511627776LL;
+inline constexpr int64_t maxCounterCells = 2147483647LL;
 inline constexpr uint8_t opChar = 0;
 inline constexpr uint8_t opAny = 1;
 inline constexpr uint8_t opBracket = 2;
@@ -112,7 +114,6 @@ inline constexpr uint8_t opAlt = 6;
 inline constexpr uint8_t opRepeat = 7;
 inline constexpr uint8_t opGroup = 8;
 inline constexpr int64_t infinite = int64_t(0ULL - uint64_t(1LL));
-inline constexpr int64_t lenInf = 1073741824LL;
 inline constexpr int64_t maxNesting = 256LL;
 inline constexpr int32_t invalidRune = int32_t(0ULL - uint64_t(1));
 
@@ -344,8 +345,8 @@ struct Locale {
 };
 
 struct LocaleRow {
-    int64_t TypeFirst = {};
-    int64_t TypeCount = {};
+    uint32_t TypeFirst = {};
+    uint32_t TypeCount = {};
     uint32_t CaseProfile = {};
     uint32_t DefaultCollation = {};
     bool operator==(const LocaleRow&) const = default;
@@ -371,12 +372,12 @@ struct preimageBuf {
 };
 
 struct CollProfile {
-    int64_t OverrideFirst = {};
-    int64_t OverrideCount = {};
-    int64_t AddFirst = {};
-    int64_t AddCount = {};
-    int64_t RemoveFirst = {};
-    int64_t RemoveCount = {};
+    uint32_t OverrideFirst = {};
+    uint32_t OverrideCount = {};
+    uint32_t AddFirst = {};
+    uint32_t AddCount = {};
+    uint32_t RemoveFirst = {};
+    uint32_t RemoveCount = {};
     bool operator==(const CollProfile&) const = default;
 };
 
@@ -637,6 +638,8 @@ bool localeLoad(Locale& l, vg::Str blob);
 bool localeValidate(Locale& l);
 bool scalarSectionValid(Locale& l, int64_t sec);
 bool contractionIDsValid(Locale& l, int64_t sec, int64_t seqCount);
+bool u32Below(uint32_t v, int64_t limit);
+bool u32SpanWithin(uint32_t first, uint32_t count, int64_t limit);
 int64_t localeMaxElementLength(Locale& l);
 bool validScalar(int32_t r);
 uint8_t asciiLower(uint8_t c);
@@ -722,6 +725,7 @@ Tup_bool_t4572726f72x Exec(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Slic
 Tup_t4d6174636849746572x_t4572726f72x MatchIterInit(Regexp& re, int64_t limit);
 Tup_bool_t4572726f72x MatchIterNext(vg::Arena& mem, Regexp& re, MatchIter& it, vg::Str subject, uint32_t eflags, vg::Slice<Match> pmatch);
 Tup_st7265706c50617274x_t4572726f72x parseReplacement(vg::Arena& mem, vg::Str replacement, int64_t nsub);
+int64_t replaceCapacity(int64_t n);
 Tup_Str_t4572726f72x ReplaceAll(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Str replacement, int64_t limit, uint32_t eflags);
 int32_t fail(parser& p, int32_t code, int64_t pos);
 int32_t addNode(vg::Arena& mem, parser& p, uint8_t op);

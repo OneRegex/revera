@@ -61,7 +61,8 @@ impl Drop for Arena {
 }
 
 fn alloc_elems<T>(mem: &Arena, n: i64) -> *mut T {
-    let count = if n < 1 { 1 } else { n as usize };
+    // A plain cast would wrap on 32-bit targets and allocate too little.
+    let count = usize::try_from(n.max(1)).expect("allocation size out of range");
     let layout = Layout::array::<T>(count).unwrap();
     mem.alloc(layout) as *mut T
 }
@@ -242,6 +243,13 @@ impl<T: Copy> Slot<T> {
     }
 }
 
+// array_len gives array types their length at compile time.
+// A length that does not fit usize fails the build instead of wrapping.
+pub const fn array_len(n: i64) -> usize {
+    assert!(n >= 0 && n as u64 <= usize::MAX as u64, "array length out of range");
+    n as usize
+}
+
 #[inline(always)]
 pub fn array_index(i: i64, len: usize) -> usize {
     assert!((i as u64) < len as u64, "array index out of bounds");
@@ -253,7 +261,10 @@ pub fn array_index(i: i64, len: usize) -> usize {
 // The count keeps its type, so an in-range shift works exactly as before.
 #[inline(always)]
 pub fn shift_count<T: Copy + PartialOrd + From<u8>>(n: T, width: u8) -> T {
-    assert!(n >= T::from(0u8) && n < T::from(width), "shift count out of range");
+    assert!(
+        n >= T::from(0u8) && n < T::from(width),
+        "shift count out of range"
+    );
     n
 }
 
@@ -423,6 +434,14 @@ mod tests {
                 second: 9,
             }
         );
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "32")]
+    fn allocation_count_never_wraps_on_a_narrow_usize() {
+        let mem = Arena::new();
+        let make_huge = || make::<u8>(&mem, (1i64 << 32) + 16);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(make_huge)).is_err());
     }
 
     #[test]

@@ -9,6 +9,23 @@ The Vego toolchain has its own version, which `vegoc version` prints.
 
 ### Fixed
 
+- The Go module no longer fails to build on 32-bit platforms such as `linux/386` and `linux/arm`.
+  Two constants did not fit a 32-bit `int`, and some length math overflowed as well.
+  For example, on 386 the captures of `(a*)(b*)` on `ab` failed with a capacity error.
+  The locale loader also checks its 32-bit fields before converting them, so a broken locale file can no longer slip through and crash a later lookup.
+  CI now runs the Go tests on `linux/386`.
+- Patterns whose phase A counter table would need more than 2^31-1 entries now use the minimum-length fallback, like patterns past the size cap.
+  Such a table needs at least 8 GiB, and its size overflowed on 32-bit platforms.
+- On 32-bit targets, the Rust runtime no longer truncates allocation sizes that do not fit `usize`.
+  A slice growing past 2^32 elements could get a buffer that was too small, and later writes went past its end.
+  It now panics instead, like the Zig, C and C++ runtimes.
+- Generated Rust now checks every array index instead of casting it with `as usize`.
+  On 32-bit targets the cast could wrap a bad index back into range and touch the wrong element.
+  An array length that does not fit `usize` now fails to compile instead of producing a shorter array.
+- The locale loader rejects data with more than 65,536 collation profiles.
+  Profile numbers are stored in 16 bits, so profile 65,536 used to silently become profile 0.
+- Captures of simple patterns such as `(a)*` no longer fail with a capacity error when the match is longer than 2^30 characters.
+
 - One-pass expressions no longer report the general capture solver or include its unreachable worst-case figures in their totals.
   The compile-time backend choice is now exclusive in both the contract and execution.
   If the one-pass walk ever detects an internal inconsistency, execution fails closed with the existing capacity error instead of entering an unreported solver path.

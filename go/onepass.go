@@ -174,8 +174,10 @@ func disjointFirsts(nodes []node, ni int32) bool {
 // onePassCaps fills the group spans from the unique parse of node ni over [i, j).
 // It returns false when the walk hits an inconsistency.
 func onePassCaps(re *Regexp, d *decoded, ni int32, i int, j int, eflags uint32, caps []Match) bool {
+	// A saturated maxL means unbounded, never an actual limit.
 	span := j - i
-	if span < re.nodes[ni].minL || span > re.nodes[ni].maxL {
+	if span < re.nodes[ni].minL ||
+		(re.nodes[ni].maxL < lenInf && span > re.nodes[ni].maxL) {
 		return false
 	}
 	switch re.nodes[ni].op {
@@ -242,7 +244,8 @@ func onePassCaps(re *Regexp, d *decoded, ni int32, i int, j int, eflags uint32, 
 		chosen := -1
 		for idx := 0; idx < len(re.nodes[ni].ch); idx++ {
 			branch := re.nodes[ni].ch[idx]
-			if span < re.nodes[branch].minL || span > re.nodes[branch].maxL {
+			if span < re.nodes[branch].minL ||
+				(re.nodes[branch].maxL < lenInf && span > re.nodes[branch].maxL) {
 				continue
 			}
 			if chosen >= 0 {

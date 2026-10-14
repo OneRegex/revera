@@ -61,20 +61,8 @@ func TestStructEqualityHelperAvoidsProgramName(t *testing.T) {
 		}
 	}
 
-	rustc, err := exec.LookPath("rustc")
-	if err != nil {
-		t.Skip("rustc is not installed")
-	}
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "engine.rs"), []byte(out), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "lib.rs"), []byte("mod vg {}\nmod engine;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command(rustc, "--edition=2021", "--crate-type=lib", "lib.rs")
-	cmd.Dir = dir
-	if output, err := cmd.CombinedOutput(); err != nil {
+	files := map[string]string{"engine.rs": out, "lib.rs": "mod vg {}\nmod engine;\n"}
+	if _, output, err := compileRust(t, files, "--crate-type=lib", "lib.rs"); err != nil {
 		t.Fatalf("rustc failed: %v\n%s", err, output)
 	}
 }
@@ -213,14 +201,6 @@ func TestShiftCountIsCheckedAgainstTheWidth(t *testing.T) {
 // TestShiftsCompileForEveryCountType compiles a shift of every integer type by a count of every integer type.
 // It then runs a negative count without overflow checks, as the release profile does, and expects a panic.
 func TestShiftsCompileForEveryCountType(t *testing.T) {
-	rustc, err := exec.LookPath("rustc")
-	if err != nil {
-		t.Skip("rustc is not installed")
-	}
-	vgrs, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "rust", "src", "vg.rs"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	out := (&gen{p: shiftProgram(t)}).file()
 	main := `mod vg;
 mod engine;
@@ -229,18 +209,12 @@ fn main() {
     println!("{}", engine::shl_int64_int(5, -1));
 }
 `
-	dir := t.TempDir()
-	for name, content := range map[string]string{"engine.rs": out, "vg.rs": string(vgrs), "main.rs": main} {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	cmd := exec.Command(rustc, "--edition=2021", "-O", "-C", "overflow-checks=off", "-A", "warnings", "main.rs", "-o", "shifts")
-	cmd.Dir = dir
-	if output, err := cmd.CombinedOutput(); err != nil {
+	files := map[string]string{"engine.rs": out, "vg.rs": vgRuntime(t), "main.rs": main}
+	dir, output, err := compileRust(t, files, "-O", "-C", "overflow-checks=off", "-A", "warnings", "main.rs", "-o", "shifts")
+	if err != nil {
 		t.Fatalf("rustc failed: %v\n%s", err, output)
 	}
-	output, err := exec.Command(filepath.Join(dir, "shifts")).CombinedOutput()
+	output, err = exec.Command(filepath.Join(dir, "shifts")).CombinedOutput()
 	if err == nil || !strings.HasPrefix(string(output), "5\n") || !strings.Contains(string(output), "shift count out of range") {
 		t.Fatalf("a negative shift count did not panic after a valid shift: %v\n%s", err, output)
 	}
@@ -329,6 +303,77 @@ func TestArrayProjectionIsResolvedBeforeSlotUpdate(t *testing.T) {
 		"let _t2 = vg::array_index(j, ((4) as usize));",
 		"let _t3 = mark(3i64);",
 		"_t1.update(_t3, |mut _t4, _t3| { _t4.items[_t2] = _t3; _t4 });")
+}
+
+func TestArraySubscriptsAreChecked(t *testing.T) {
+	length := &compiler.Expr{K: "int", Value: "4", Typ: compiler.TInt}
+	array := &compiler.Type{K: compiler.KArray, Elem: compiler.TInt, ALen: length}
+	values := &compiler.Expr{K: "ident", Name: "values", Typ: array}
+	read := &compiler.Expr{K: "index", Typ: compiler.TInt, X: values,
+		Index: &compiler.Expr{K: "ident", Name: "k", Typ: compiler.TU8}}
+	lhs := &compiler.Expr{K: "index", Typ: compiler.TInt, X: values,
+		Index: &compiler.Expr{K: "ident", Name: "j", Typ: compiler.TInt}}
+
+	g := &gen{p: &compiler.Program{}, fn: &compiler.FuncDecl{Info: map[string]*compiler.LocalInfo{}}}
+	g.resetNames(g.fn)
+	if got, want := g.expr(read), "values[vg::array_index(((k) as i64), ((4) as usize))]"; got != want {
+		t.Errorf("read: got %s, want %s", got, want)
+	}
+	g.assignLine(0, lhs, "7i64")
+	if got, want := g.b.String(), "values[vg::array_index(j, ((4) as usize))] = 7i64;\n"; got != want {
+		t.Errorf("assignment: got %q, want %q", got, want)
+	}
+}
+
+// An array type of 2^32 elements must not compile for a 32-bit target.
+func TestArrayLengthPastUsizeFailsToCompile(t *testing.T) {
+	const target = "i686-unknown-linux-musl"
+	sysroot, err := exec.Command("rustc", "--print", "sysroot").Output()
+	if err != nil {
+		t.Skip("rustc is not installed")
+	}
+	if _, err := os.Stat(filepath.Join(strings.TrimSpace(string(sysroot)), "lib", "rustlib", target)); err != nil {
+		t.Skip("the " + target + " standard library is not installed")
+	}
+	length := &compiler.Expr{K: "ident", Name: "N", Typ: compiler.TI64}
+	typ := (&gen{p: &compiler.Program{}}).typ(&compiler.Type{K: compiler.KArray, Elem: compiler.TU8, ALen: length})
+	for n, ok := range map[string]bool{"4": true, "4294967296": false} {
+		lib := "mod vg;\nconst N: i64 = " + n + ";\npub fn f(_a: " + typ + ") {}\n"
+		files := map[string]string{"lib.rs": lib, "vg.rs": vgRuntime(t)}
+		_, output, err := compileRust(t, files, "--crate-type=lib", "--target", target, "-A", "warnings", "lib.rs")
+		if ok != (err == nil) || !ok && !strings.Contains(string(output), "array length out of range") {
+			t.Fatalf("length %s: %v\n%s", n, err, output)
+		}
+	}
+}
+
+// compileRust writes files to a fresh directory and runs rustc on them there.
+// It skips the test when rustc is not installed.
+func compileRust(t *testing.T, files map[string]string, args ...string) (string, []byte, error) {
+	t.Helper()
+	rustc, err := exec.LookPath("rustc")
+	if err != nil {
+		t.Skip("rustc is not installed")
+	}
+	dir := t.TempDir()
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cmd := exec.Command(rustc, append([]string{"--edition=2021"}, args...)...)
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	return dir, output, err
+}
+
+func vgRuntime(t *testing.T) string {
+	t.Helper()
+	vgrs, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "rust", "src", "vg.rs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(vgrs)
 }
 
 func assertInOrder(t *testing.T, text string, parts ...string) {

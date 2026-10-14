@@ -143,7 +143,7 @@ func (g *gen) typ(t *compiler.Type) string {
 	case compiler.KSlice:
 		return "vg::Slice<" + g.typ(t.Elem) + ">"
 	case compiler.KArray:
-		return "[" + g.typ(t.Elem) + "; (" + g.constPlain(t.ALen) + ") as usize]"
+		return "[" + g.typ(t.Elem) + "; " + g.arrayLen(t.ALen) + "]"
 	case compiler.KStruct:
 		return ident(t.Name)
 	case compiler.KPtr:
@@ -381,7 +381,7 @@ func (g *gen) place(e *compiler.Expr) string {
 		return g.place(e.X) + "." + ident(e.Name)
 	case "index":
 		if e.X.Typ.K == compiler.KArray {
-			return g.place(e.X) + "[(" + g.expr(e.Index) + ") as usize]"
+			return g.place(e.X) + "[" + g.arrayIndex(e.Index, e.X.Typ.ALen) + "]"
 		}
 	}
 	fatal("unsupported assignment target", e.K)
@@ -425,6 +425,18 @@ func (g *gen) assignmentPlace(e *compiler.Expr) assignmentPlace {
 	return assignmentPlace{}
 }
 
+// arrayIndex renders a checked array subscript.
+// A plain `as usize` would wrap large indexes on 32-bit targets.
+// The length cast is safe, because the array type already checked it with arrayLen.
+func (g *gen) arrayIndex(index *compiler.Expr, length *compiler.Expr) string {
+	return "vg::array_index(" + g.idx(index) + ", ((" + g.constPlain(length) + ") as usize))"
+}
+
+// arrayLen renders the length of an array type, which fails to compile if it does not fit usize.
+func (g *gen) arrayLen(length *compiler.Expr) string {
+	return "vg::array_len((" + g.constPlain(length) + ") as i64)"
+}
+
 // idx renders an index or bound expression as i64.
 func (g *gen) idx(e *compiler.Expr) string {
 	if e.Typ.K == compiler.KI64 || e.Typ.K == compiler.KInt {
@@ -450,7 +462,7 @@ func (g *gen) assignOperation(depth int, lhs *compiler.Expr, rhs, op string) {
 			g.wf("%s.set(%s, %s);\n", g.expr(p.slice), g.idx(p.sliceIndex), rhs)
 		} else {
 			value, elem := g.newTmp(), g.newTmp()
-			place := renderDirectPlace(g, elem, p.steps)
+			place := renderPlace(elem, p.steps, nil)
 			g.wf("%s.update(%s, %s, |mut %s, %s| { %s; %s });\n",
 				g.expr(p.slice), g.idx(p.sliceIndex), rhs, elem, value,
 				assignmentExpr(place, value, op, lhs.Typ), elem)
@@ -479,8 +491,7 @@ func (g *gen) assignOperation(depth int, lhs *compiler.Expr, rhs, op string) {
 		}
 		indexes[i] = g.newTmp()
 		g.indent(inner)
-		g.wf("let %s = vg::array_index(%s, ((%s) as usize));\n",
-			indexes[i], g.idx(step.index), g.constPlain(step.length))
+		g.wf("let %s = %s;\n", indexes[i], g.arrayIndex(step.index, step.length))
 	}
 	value := g.newTmp()
 	g.indent(inner)
@@ -548,20 +559,6 @@ func renderPlace(root string, steps []placeStep, indexes []string) string {
 			b.WriteString(step.field)
 		} else {
 			fmt.Fprintf(&b, "[%s]", indexes[i])
-		}
-	}
-	return b.String()
-}
-
-func renderDirectPlace(g *gen, root string, steps []placeStep) string {
-	var b strings.Builder
-	b.WriteString(root)
-	for _, step := range steps {
-		if step.field != "" {
-			b.WriteByte('.')
-			b.WriteString(step.field)
-		} else {
-			fmt.Fprintf(&b, "[(%s) as usize]", g.expr(step.index))
 		}
 	}
 	return b.String()
@@ -865,7 +862,7 @@ func (g *gen) expr(e *compiler.Expr) string {
 		case compiler.KStr:
 			return g.expr(e.X) + ".byte(" + g.idx(e.Index) + ")"
 		case compiler.KArray:
-			return g.expr(e.X) + "[(" + g.expr(e.Index) + ") as usize]"
+			return g.expr(e.X) + "[" + g.arrayIndex(e.Index, e.X.Typ.ALen) + "]"
 		}
 		fatal("index of", e.X.Typ)
 	case "slice_expr":

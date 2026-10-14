@@ -997,21 +997,14 @@
    "type": null,
    "value": {
     "k": "binary",
-    "op": "\u003c\u003c",
+    "op": "+",
     "x": {
-     "k": "conv",
-     "type": {
-      "k": "named",
-      "name": "int"
-     },
-     "x": {
-      "k": "int",
-      "value": "1"
-     }
+     "k": "ident",
+     "name": "lenInf"
     },
     "y": {
      "k": "int",
-     "value": "62"
+     "value": "1"
     }
    }
   },
@@ -1077,7 +1070,7 @@
      "k": "conv",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "int64"
      },
      "x": {
       "k": "int",
@@ -1087,6 +1080,31 @@
     "y": {
      "k": "int",
      "value": "40"
+    }
+   }
+  },
+  {
+   "k": "const",
+   "name": "maxCounterCells",
+   "type": null,
+   "value": {
+    "k": "binary",
+    "op": "-",
+    "x": {
+     "k": "binary",
+     "op": "\u003c\u003c",
+     "x": {
+      "k": "int",
+      "value": "1"
+     },
+     "y": {
+      "k": "int",
+      "value": "31"
+     }
+    },
+    "y": {
+     "k": "int",
+     "value": "1"
     }
    }
   },
@@ -23535,11 +23553,18 @@
          "y": {
           "args": [
            {
-            "k": "field",
-            "name": "AddCount",
+            "k": "conv",
+            "type": {
+             "k": "named",
+             "name": "int"
+            },
             "x": {
-             "k": "ident",
-             "name": "row"
+             "k": "field",
+             "name": "AddCount",
+             "x": {
+              "k": "ident",
+              "name": "row"
+             }
             }
            }
           ],
@@ -23584,11 +23609,18 @@
       "y": {
        "args": [
         {
-         "k": "field",
-         "name": "RemoveCount",
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int"
+         },
          "x": {
-          "k": "ident",
-          "name": "row"
+          "k": "field",
+          "name": "RemoveCount",
+          "x": {
+           "k": "ident",
+           "name": "row"
+          }
          }
         }
        ],
@@ -23633,11 +23665,18 @@
         "y": {
          "args": [
           {
-           "k": "field",
-           "name": "OverrideCount",
+           "k": "conv",
+           "type": {
+            "k": "named",
+            "name": "int"
+           },
            "x": {
-            "k": "ident",
-            "name": "row"
+            "k": "field",
+            "name": "OverrideCount",
+            "x": {
+             "k": "ident",
+             "name": "row"
+            }
            }
           }
          ],
@@ -35406,12 +35445,8 @@
              "k": "binary",
              "op": "+",
              "x": {
-              "k": "field",
-              "name": "ci",
-              "x": {
-               "k": "ident",
-               "name": "e"
-              }
+              "k": "ident",
+              "name": "si"
              },
              "y": {
               "k": "ident",
@@ -35455,26 +35490,23 @@
               }
              },
              "y": {
-              "args": [
-               {
-                "k": "binary",
-                "op": "+",
-                "x": {
-                 "k": "field",
-                 "name": "ci",
-                 "x": {
-                  "k": "ident",
-                  "name": "e"
-                 }
-                },
-                "y": {
-                 "k": "ident",
-                 "name": "delta"
-                }
+              "k": "binary",
+              "op": "+",
+              "x": {
+               "k": "ident",
+               "name": "g"
+              },
+              "y": {
+               "k": "conv",
+               "type": {
+                "k": "named",
+                "name": "uint32"
+               },
+               "x": {
+                "k": "ident",
+                "name": "delta"
                }
-              ],
-              "fn": "paGen",
-              "k": "call"
+              }
              }
             },
             "y": {
@@ -38304,30 +38336,119 @@
       {
        "cond": {
         "k": "binary",
-        "op": "\u003e",
+        "op": "\u003c",
         "x": {
          "k": "binary",
-         "op": "+",
+         "op": "-",
          "x": {
-          "k": "ident",
-          "name": "cursor"
+          "args": [
+           {
+            "k": "ident",
+            "name": "blob"
+           }
+          ],
+          "fn": "len",
+          "k": "builtin",
+          "spread": false,
+          "type": null
          },
          "y": {
-          "k": "int",
-          "value": "4"
+          "k": "ident",
+          "name": "cursor"
          }
         },
         "y": {
-         "args": [
+         "k": "int",
+         "value": "4"
+        }
+       },
+       "else": null,
+       "k": "if",
+       "then": [
+        {
+         "k": "return",
+         "values": [
           {
-           "k": "ident",
-           "name": "blob"
+           "k": "bool",
+           "value": false
           }
-         ],
-         "fn": "len",
-         "k": "builtin",
-         "spread": false,
-         "type": null
+         ]
+        }
+       ]
+      },
+      {
+       "k": "define",
+       "names": [
+        "raw"
+       ],
+       "value": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "blob"
+         },
+         {
+          "k": "ident",
+          "name": "cursor"
+         }
+        ],
+        "fn": "u32Raw",
+        "k": "call"
+       }
+      },
+      {
+       "k": "op_assign",
+       "lhs": {
+        "k": "ident",
+        "name": "cursor"
+       },
+       "op": "+=",
+       "value": {
+        "k": "int",
+        "value": "4"
+       }
+      },
+      {
+       "cond": {
+        "k": "binary",
+        "op": "\u003e",
+        "x": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "uint64"
+         },
+         "x": {
+          "k": "ident",
+          "name": "raw"
+         }
+        },
+        "y": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "uint64"
+         },
+         "x": {
+          "k": "binary",
+          "op": "-",
+          "x": {
+           "args": [
+            {
+             "k": "ident",
+             "name": "blob"
+            }
+           ],
+           "fn": "len",
+           "k": "builtin",
+           "spread": false,
+           "type": null
+          },
+          "y": {
+           "k": "ident",
+           "name": "cursor"
+          }
+         }
         }
        },
        "else": null,
@@ -38356,75 +38477,10 @@
          "name": "int"
         },
         "x": {
-         "args": [
-          {
-           "k": "ident",
-           "name": "blob"
-          },
-          {
-           "k": "ident",
-           "name": "cursor"
-          }
-         ],
-         "fn": "u32Raw",
-         "k": "call"
+         "k": "ident",
+         "name": "raw"
         }
        }
-      },
-      {
-       "k": "op_assign",
-       "lhs": {
-        "k": "ident",
-        "name": "cursor"
-       },
-       "op": "+=",
-       "value": {
-        "k": "int",
-        "value": "4"
-       }
-      },
-      {
-       "cond": {
-        "k": "binary",
-        "op": "\u003e",
-        "x": {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "cursor"
-         },
-         "y": {
-          "k": "ident",
-          "name": "length"
-         }
-        },
-        "y": {
-         "args": [
-          {
-           "k": "ident",
-           "name": "blob"
-          }
-         ],
-         "fn": "len",
-         "k": "builtin",
-         "spread": false,
-         "type": null
-        }
-       },
-       "else": null,
-       "k": "if",
-       "then": [
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "bool",
-           "value": false
-          }
-         ]
-        }
-       ]
       },
       {
        "k": "assign",
@@ -39641,22 +39697,51 @@
         "off"
        ],
        "value": {
-        "k": "conv",
-        "type": {
-         "k": "named",
-         "name": "int"
-        },
-        "x": {
-         "args": [
-          {
-           "k": "ident",
-           "name": "l"
+        "args": [
+         {
+          "k": "ident",
+          "name": "l"
+         },
+         {
+          "k": "ident",
+          "name": "secSequences"
+         },
+         {
+          "k": "binary",
+          "op": "*",
+          "x": {
+           "k": "int",
+           "value": "2"
           },
-          {
+          "y": {
            "k": "ident",
-           "name": "secSequences"
-          },
-          {
+           "name": "i"
+          }
+         }
+        ],
+        "fn": "u32At",
+        "k": "call"
+       }
+      },
+      {
+       "k": "define",
+       "names": [
+        "length"
+       ],
+       "value": {
+        "args": [
+         {
+          "k": "ident",
+          "name": "l"
+         },
+         {
+          "k": "ident",
+          "name": "secSequences"
+         },
+         {
+          "k": "binary",
+          "op": "+",
+          "x": {
            "k": "binary",
            "op": "*",
            "x": {
@@ -39667,58 +39752,15 @@
             "k": "ident",
             "name": "i"
            }
-          }
-         ],
-         "fn": "u32At",
-         "k": "call"
-        }
-       }
-      },
-      {
-       "k": "define",
-       "names": [
-        "length"
-       ],
-       "value": {
-        "k": "conv",
-        "type": {
-         "k": "named",
-         "name": "int"
-        },
-        "x": {
-         "args": [
-          {
-           "k": "ident",
-           "name": "l"
           },
-          {
-           "k": "ident",
-           "name": "secSequences"
-          },
-          {
-           "k": "binary",
-           "op": "+",
-           "x": {
-            "k": "binary",
-            "op": "*",
-            "x": {
-             "k": "int",
-             "value": "2"
-            },
-            "y": {
-             "k": "ident",
-             "name": "i"
-            }
-           },
-           "y": {
-            "k": "int",
-            "value": "1"
-           }
+          "y": {
+           "k": "int",
+           "value": "1"
           }
-         ],
-         "fn": "u32At",
-         "k": "call"
-        }
+         }
+        ],
+        "fn": "u32At",
+        "k": "call"
        }
       },
       {
@@ -39748,33 +39790,42 @@
            "name": "length"
           },
           "y": {
-           "k": "field",
-           "name": "maxSeq",
+           "k": "conv",
+           "type": {
+            "k": "named",
+            "name": "uint32"
+           },
            "x": {
-            "k": "ident",
-            "name": "l"
+            "k": "field",
+            "name": "maxSeq",
+            "x": {
+             "k": "ident",
+             "name": "l"
+            }
            }
           }
          }
         },
         "y": {
-         "k": "binary",
-         "op": "\u003e",
+         "k": "unary",
+         "op": "!",
          "x": {
-          "k": "binary",
-          "op": "+",
-          "x": {
-           "k": "ident",
-           "name": "off"
-          },
-          "y": {
-           "k": "ident",
-           "name": "length"
-          }
-         },
-         "y": {
-          "k": "ident",
-          "name": "codepointCount"
+          "args": [
+           {
+            "k": "ident",
+            "name": "off"
+           },
+           {
+            "k": "ident",
+            "name": "length"
+           },
+           {
+            "k": "ident",
+            "name": "codepointCount"
+           }
+          ],
+          "fn": "u32SpanWithin",
+          "k": "call"
          }
         }
        },
@@ -40154,6 +40205,41 @@
      }
     },
     {
+     "cond": {
+      "k": "binary",
+      "op": "\u003e",
+      "x": {
+       "k": "ident",
+       "name": "profileCount"
+      },
+      "y": {
+       "k": "binary",
+       "op": "\u003c\u003c",
+       "x": {
+        "k": "int",
+        "value": "1"
+       },
+       "y": {
+        "k": "int",
+        "value": "16"
+       }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "return",
+       "values": [
+        {
+         "k": "bool",
+         "value": false
+        }
+       ]
+      }
+     ]
+    },
+    {
      "k": "define",
      "names": [
       "overrideCount"
@@ -40267,88 +40353,94 @@
          "k": "binary",
          "op": "||",
          "x": {
-          "k": "binary",
-          "op": "\u003e",
+          "k": "unary",
+          "op": "!",
           "x": {
-           "k": "binary",
-           "op": "+",
-           "x": {
-            "k": "field",
-            "name": "OverrideFirst",
-            "x": {
+           "args": [
+            {
+             "k": "field",
+             "name": "OverrideFirst",
+             "x": {
+              "k": "ident",
+              "name": "row"
+             }
+            },
+            {
+             "k": "field",
+             "name": "OverrideCount",
+             "x": {
+              "k": "ident",
+              "name": "row"
+             }
+            },
+            {
              "k": "ident",
-             "name": "row"
+             "name": "overrideCount"
             }
-           },
-           "y": {
-            "k": "field",
-            "name": "OverrideCount",
-            "x": {
-             "k": "ident",
-             "name": "row"
-            }
-           }
-          },
-          "y": {
-           "k": "ident",
-           "name": "overrideCount"
+           ],
+           "fn": "u32SpanWithin",
+           "k": "call"
           }
          },
          "y": {
-          "k": "binary",
-          "op": "\u003e",
+          "k": "unary",
+          "op": "!",
           "x": {
-           "k": "binary",
-           "op": "+",
-           "x": {
-            "k": "field",
-            "name": "AddFirst",
-            "x": {
+           "args": [
+            {
+             "k": "field",
+             "name": "AddFirst",
+             "x": {
+              "k": "ident",
+              "name": "row"
+             }
+            },
+            {
+             "k": "field",
+             "name": "AddCount",
+             "x": {
+              "k": "ident",
+              "name": "row"
+             }
+            },
+            {
              "k": "ident",
-             "name": "row"
+             "name": "addCount"
             }
-           },
-           "y": {
-            "k": "field",
-            "name": "AddCount",
-            "x": {
-             "k": "ident",
-             "name": "row"
-            }
-           }
-          },
-          "y": {
-           "k": "ident",
-           "name": "addCount"
+           ],
+           "fn": "u32SpanWithin",
+           "k": "call"
           }
          }
         },
         "y": {
-         "k": "binary",
-         "op": "\u003e",
+         "k": "unary",
+         "op": "!",
          "x": {
-          "k": "binary",
-          "op": "+",
-          "x": {
-           "k": "field",
-           "name": "RemoveFirst",
-           "x": {
+          "args": [
+           {
+            "k": "field",
+            "name": "RemoveFirst",
+            "x": {
+             "k": "ident",
+             "name": "row"
+            }
+           },
+           {
+            "k": "field",
+            "name": "RemoveCount",
+            "x": {
+             "k": "ident",
+             "name": "row"
+            }
+           },
+           {
             "k": "ident",
-            "name": "row"
+            "name": "removeCount"
            }
-          },
-          "y": {
-           "k": "field",
-           "name": "RemoveCount",
-           "x": {
-            "k": "ident",
-            "name": "row"
-           }
-          }
-         },
-         "y": {
-          "k": "ident",
-          "name": "removeCount"
+          ],
+          "fn": "u32SpanWithin",
+          "k": "call"
          }
         }
        },
@@ -40476,45 +40568,44 @@
      "body": [
       {
        "cond": {
-        "k": "binary",
-        "op": "\u003e=",
+        "k": "unary",
+        "op": "!",
         "x": {
-         "k": "conv",
-         "type": {
-          "k": "named",
-          "name": "int"
-         },
-         "x": {
-          "args": [
-           {
-            "k": "ident",
-            "name": "l"
-           },
-           {
-            "k": "ident",
-            "name": "secTypeNameOffsets"
-           },
-           {
-            "k": "ident",
-            "name": "i"
-           }
-          ],
-          "fn": "u32At",
-          "k": "call"
-         }
-        },
-        "y": {
          "args": [
           {
-           "k": "ident",
-           "name": "l"
+           "args": [
+            {
+             "k": "ident",
+             "name": "l"
+            },
+            {
+             "k": "ident",
+             "name": "secTypeNameOffsets"
+            },
+            {
+             "k": "ident",
+             "name": "i"
+            }
+           ],
+           "fn": "u32At",
+           "k": "call"
           },
           {
-           "k": "ident",
-           "name": "secTypeNames"
+           "args": [
+            {
+             "k": "ident",
+             "name": "l"
+            },
+            {
+             "k": "ident",
+             "name": "secTypeNames"
+            }
+           ],
+           "fn": "sectionLen",
+           "k": "call"
           }
          ],
-         "fn": "sectionLen",
+         "fn": "u32Below",
          "k": "call"
         }
        },
@@ -40743,45 +40834,44 @@
      "body": [
       {
        "cond": {
-        "k": "binary",
-        "op": "\u003e=",
+        "k": "unary",
+        "op": "!",
         "x": {
-         "k": "conv",
-         "type": {
-          "k": "named",
-          "name": "int"
-         },
-         "x": {
-          "args": [
-           {
-            "k": "ident",
-            "name": "l"
-           },
-           {
-            "k": "ident",
-            "name": "secLocaleNameOffsets"
-           },
-           {
-            "k": "ident",
-            "name": "i"
-           }
-          ],
-          "fn": "u32At",
-          "k": "call"
-         }
-        },
-        "y": {
          "args": [
           {
-           "k": "ident",
-           "name": "l"
+           "args": [
+            {
+             "k": "ident",
+             "name": "l"
+            },
+            {
+             "k": "ident",
+             "name": "secLocaleNameOffsets"
+            },
+            {
+             "k": "ident",
+             "name": "i"
+            }
+           ],
+           "fn": "u32At",
+           "k": "call"
           },
           {
-           "k": "ident",
-           "name": "secLocaleNames"
+           "args": [
+            {
+             "k": "ident",
+             "name": "l"
+            },
+            {
+             "k": "ident",
+             "name": "secLocaleNames"
+            }
+           ],
+           "fn": "sectionLen",
+           "k": "call"
           }
          ],
-         "fn": "sectionLen",
+         "fn": "u32Below",
          "k": "call"
         }
        },
@@ -40890,31 +40980,33 @@
          "k": "binary",
          "op": "||",
          "x": {
-          "k": "binary",
-          "op": "\u003e",
+          "k": "unary",
+          "op": "!",
           "x": {
-           "k": "binary",
-           "op": "+",
-           "x": {
-            "k": "field",
-            "name": "TypeFirst",
-            "x": {
+           "args": [
+            {
+             "k": "field",
+             "name": "TypeFirst",
+             "x": {
+              "k": "ident",
+              "name": "row"
+             }
+            },
+            {
+             "k": "field",
+             "name": "TypeCount",
+             "x": {
+              "k": "ident",
+              "name": "row"
+             }
+            },
+            {
              "k": "ident",
-             "name": "row"
+             "name": "typeRowCount"
             }
-           },
-           "y": {
-            "k": "field",
-            "name": "TypeCount",
-            "x": {
-             "k": "ident",
-             "name": "row"
-            }
-           }
-          },
-          "y": {
-           "k": "ident",
-           "name": "typeRowCount"
+           ],
+           "fn": "u32SpanWithin",
+           "k": "call"
           }
          },
          "y": {
@@ -40935,26 +41027,25 @@
          }
         },
         "y": {
-         "k": "binary",
-         "op": "\u003e=",
+         "k": "unary",
+         "op": "!",
          "x": {
-          "k": "conv",
-          "type": {
-           "k": "named",
-           "name": "int"
-          },
-          "x": {
-           "k": "field",
-           "name": "DefaultCollation",
-           "x": {
+          "args": [
+           {
+            "k": "field",
+            "name": "DefaultCollation",
+            "x": {
+             "k": "ident",
+             "name": "row"
+            }
+           },
+           {
             "k": "ident",
-            "name": "row"
+            "name": "profileCount"
            }
-          }
-         },
-         "y": {
-          "k": "ident",
-          "name": "profileCount"
+          ],
+          "fn": "u32Below",
+          "k": "call"
          }
         }
        },
@@ -41345,30 +41436,29 @@
          }
         },
         "y": {
-         "k": "binary",
-         "op": "\u003e=",
+         "k": "unary",
+         "op": "!",
          "x": {
-          "k": "conv",
-          "type": {
-           "k": "named",
-           "name": "int"
-          },
-          "x": {
-           "k": "binary",
-           "op": "-",
-           "x": {
-            "k": "ident",
-            "name": "id"
+          "args": [
+           {
+            "k": "binary",
+            "op": "-",
+            "x": {
+             "k": "ident",
+             "name": "id"
+            },
+            "y": {
+             "k": "ident",
+             "name": "firstSequenceID"
+            }
            },
-           "y": {
+           {
             "k": "ident",
-            "name": "firstSequenceID"
+            "name": "seqCount"
            }
-          }
-         },
-         "y": {
-          "k": "ident",
-          "name": "seqCount"
+          ],
+          "fn": "u32Below",
+          "k": "call"
          }
         }
        },
@@ -41448,6 +41538,146 @@
     },
     {
      "name": "seqCount",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "bool"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "\u003c",
+       "x": {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "uint64"
+        },
+        "x": {
+         "k": "ident",
+         "name": "v"
+        }
+       },
+       "y": {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "uint64"
+        },
+        "x": {
+         "k": "ident",
+         "name": "limit"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "u32Below",
+   "params": [
+    {
+     "name": "v",
+     "type": {
+      "k": "named",
+      "name": "uint32"
+     }
+    },
+    {
+     "name": "limit",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "bool"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "\u003c=",
+       "x": {
+        "k": "binary",
+        "op": "+",
+        "x": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "uint64"
+         },
+         "x": {
+          "k": "ident",
+          "name": "first"
+         }
+        },
+        "y": {
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "uint64"
+         },
+         "x": {
+          "k": "ident",
+          "name": "count"
+         }
+        }
+       },
+       "y": {
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "uint64"
+        },
+        "x": {
+         "k": "ident",
+         "name": "limit"
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "u32SpanWithin",
+   "params": [
+    {
+     "name": "first",
+     "type": {
+      "k": "named",
+      "name": "uint32"
+     }
+    },
+    {
+     "name": "count",
+     "type": {
+      "k": "named",
+      "name": "uint32"
+     }
+    },
+    {
+     "name": "limit",
      "type": {
       "k": "named",
       "name": "int"
@@ -43355,37 +43585,30 @@
       }
      ],
      "value": {
-      "k": "conv",
-      "type": {
-       "k": "named",
-       "name": "int"
-      },
-      "x": {
-       "args": [
-        {
+      "args": [
+       {
+        "k": "ident",
+        "name": "l"
+       },
+       {
+        "k": "ident",
+        "name": "secLocales"
+       },
+       {
+        "k": "binary",
+        "op": "+",
+        "x": {
          "k": "ident",
-         "name": "l"
+         "name": "base"
         },
-        {
-         "k": "ident",
-         "name": "secLocales"
-        },
-        {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "base"
-         },
-         "y": {
-          "k": "int",
-          "value": "1"
-         }
+        "y": {
+         "k": "int",
+         "value": "1"
         }
-       ],
-       "fn": "u32At",
-       "k": "call"
-      }
+       }
+      ],
+      "fn": "u32At",
+      "k": "call"
      }
     },
     {
@@ -43401,37 +43624,30 @@
       }
      ],
      "value": {
-      "k": "conv",
-      "type": {
-       "k": "named",
-       "name": "int"
-      },
-      "x": {
-       "args": [
-        {
+      "args": [
+       {
+        "k": "ident",
+        "name": "l"
+       },
+       {
+        "k": "ident",
+        "name": "secLocales"
+       },
+       {
+        "k": "binary",
+        "op": "+",
+        "x": {
          "k": "ident",
-         "name": "l"
+         "name": "base"
         },
-        {
-         "k": "ident",
-         "name": "secLocales"
-        },
-        {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "base"
-         },
-         "y": {
-          "k": "int",
-          "value": "2"
-         }
+        "y": {
+         "k": "int",
+         "value": "2"
         }
-       ],
-       "fn": "u32At",
-       "k": "call"
-      }
+       }
+      ],
+      "fn": "u32At",
+      "k": "call"
      }
     },
     {
@@ -44559,11 +44775,18 @@
       "low"
      ],
      "value": {
-      "k": "field",
-      "name": "TypeFirst",
+      "k": "conv",
+      "type": {
+       "k": "named",
+       "name": "int"
+      },
       "x": {
-       "k": "ident",
-       "name": "row"
+       "k": "field",
+       "name": "TypeFirst",
+       "x": {
+        "k": "ident",
+        "name": "row"
+       }
       }
      }
     },
@@ -44576,19 +44799,22 @@
       "k": "binary",
       "op": "+",
       "x": {
-       "k": "field",
-       "name": "TypeFirst",
-       "x": {
-        "k": "ident",
-        "name": "row"
-       }
+       "k": "ident",
+       "name": "low"
       },
       "y": {
-       "k": "field",
-       "name": "TypeCount",
+       "k": "conv",
+       "type": {
+        "k": "named",
+        "name": "int"
+       },
        "x": {
-        "k": "ident",
-        "name": "row"
+        "k": "field",
+        "name": "TypeCount",
+        "x": {
+         "k": "ident",
+         "name": "row"
+        }
        }
       }
      }
@@ -49647,29 +49873,22 @@
       }
      ],
      "value": {
-      "k": "conv",
-      "type": {
-       "k": "named",
-       "name": "int"
-      },
-      "x": {
-       "args": [
-        {
-         "k": "ident",
-         "name": "l"
-        },
-        {
-         "k": "ident",
-         "name": "secCollationProfiles"
-        },
-        {
-         "k": "ident",
-         "name": "base"
-        }
-       ],
-       "fn": "u32At",
-       "k": "call"
-      }
+      "args": [
+       {
+        "k": "ident",
+        "name": "l"
+       },
+       {
+        "k": "ident",
+        "name": "secCollationProfiles"
+       },
+       {
+        "k": "ident",
+        "name": "base"
+       }
+      ],
+      "fn": "u32At",
+      "k": "call"
      }
     },
     {
@@ -49685,37 +49904,30 @@
       }
      ],
      "value": {
-      "k": "conv",
-      "type": {
-       "k": "named",
-       "name": "int"
-      },
-      "x": {
-       "args": [
-        {
+      "args": [
+       {
+        "k": "ident",
+        "name": "l"
+       },
+       {
+        "k": "ident",
+        "name": "secCollationProfiles"
+       },
+       {
+        "k": "binary",
+        "op": "+",
+        "x": {
          "k": "ident",
-         "name": "l"
+         "name": "base"
         },
-        {
-         "k": "ident",
-         "name": "secCollationProfiles"
-        },
-        {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "base"
-         },
-         "y": {
-          "k": "int",
-          "value": "1"
-         }
+        "y": {
+         "k": "int",
+         "value": "1"
         }
-       ],
-       "fn": "u32At",
-       "k": "call"
-      }
+       }
+      ],
+      "fn": "u32At",
+      "k": "call"
      }
     },
     {
@@ -49731,37 +49943,30 @@
       }
      ],
      "value": {
-      "k": "conv",
-      "type": {
-       "k": "named",
-       "name": "int"
-      },
-      "x": {
-       "args": [
-        {
+      "args": [
+       {
+        "k": "ident",
+        "name": "l"
+       },
+       {
+        "k": "ident",
+        "name": "secCollationProfiles"
+       },
+       {
+        "k": "binary",
+        "op": "+",
+        "x": {
          "k": "ident",
-         "name": "l"
+         "name": "base"
         },
-        {
-         "k": "ident",
-         "name": "secCollationProfiles"
-        },
-        {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "base"
-         },
-         "y": {
-          "k": "int",
-          "value": "2"
-         }
+        "y": {
+         "k": "int",
+         "value": "2"
         }
-       ],
-       "fn": "u32At",
-       "k": "call"
-      }
+       }
+      ],
+      "fn": "u32At",
+      "k": "call"
      }
     },
     {
@@ -49777,37 +49982,30 @@
       }
      ],
      "value": {
-      "k": "conv",
-      "type": {
-       "k": "named",
-       "name": "int"
-      },
-      "x": {
-       "args": [
-        {
+      "args": [
+       {
+        "k": "ident",
+        "name": "l"
+       },
+       {
+        "k": "ident",
+        "name": "secCollationProfiles"
+       },
+       {
+        "k": "binary",
+        "op": "+",
+        "x": {
          "k": "ident",
-         "name": "l"
+         "name": "base"
         },
-        {
-         "k": "ident",
-         "name": "secCollationProfiles"
-        },
-        {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "base"
-         },
-         "y": {
-          "k": "int",
-          "value": "3"
-         }
+        "y": {
+         "k": "int",
+         "value": "3"
         }
-       ],
-       "fn": "u32At",
-       "k": "call"
-      }
+       }
+      ],
+      "fn": "u32At",
+      "k": "call"
      }
     },
     {
@@ -49823,37 +50021,30 @@
       }
      ],
      "value": {
-      "k": "conv",
-      "type": {
-       "k": "named",
-       "name": "int"
-      },
-      "x": {
-       "args": [
-        {
+      "args": [
+       {
+        "k": "ident",
+        "name": "l"
+       },
+       {
+        "k": "ident",
+        "name": "secCollationProfiles"
+       },
+       {
+        "k": "binary",
+        "op": "+",
+        "x": {
          "k": "ident",
-         "name": "l"
+         "name": "base"
         },
-        {
-         "k": "ident",
-         "name": "secCollationProfiles"
-        },
-        {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "base"
-         },
-         "y": {
-          "k": "int",
-          "value": "4"
-         }
+        "y": {
+         "k": "int",
+         "value": "4"
         }
-       ],
-       "fn": "u32At",
-       "k": "call"
-      }
+       }
+      ],
+      "fn": "u32At",
+      "k": "call"
      }
     },
     {
@@ -49869,37 +50060,30 @@
       }
      ],
      "value": {
-      "k": "conv",
-      "type": {
-       "k": "named",
-       "name": "int"
-      },
-      "x": {
-       "args": [
-        {
+      "args": [
+       {
+        "k": "ident",
+        "name": "l"
+       },
+       {
+        "k": "ident",
+        "name": "secCollationProfiles"
+       },
+       {
+        "k": "binary",
+        "op": "+",
+        "x": {
          "k": "ident",
-         "name": "l"
+         "name": "base"
         },
-        {
-         "k": "ident",
-         "name": "secCollationProfiles"
-        },
-        {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "base"
-         },
-         "y": {
-          "k": "int",
-          "value": "5"
-         }
+        "y": {
+         "k": "int",
+         "value": "5"
         }
-       ],
-       "fn": "u32At",
-       "k": "call"
-      }
+       }
+      ],
+      "fn": "u32At",
+      "k": "call"
      }
     },
     {
@@ -50005,19 +50189,33 @@
         "name": "secContractionAdds"
        },
        {
-        "k": "field",
-        "name": "AddFirst",
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int"
+        },
         "x": {
-         "k": "ident",
-         "name": "row"
+         "k": "field",
+         "name": "AddFirst",
+         "x": {
+          "k": "ident",
+          "name": "row"
+         }
         }
        },
        {
-        "k": "field",
-        "name": "AddCount",
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int"
+        },
         "x": {
-         "k": "ident",
-         "name": "row"
+         "k": "field",
+         "name": "AddCount",
+         "x": {
+          "k": "ident",
+          "name": "row"
+         }
         }
        },
        {
@@ -50132,19 +50330,33 @@
           "name": "secContractionRemoves"
          },
          {
-          "k": "field",
-          "name": "RemoveFirst",
+          "k": "conv",
+          "type": {
+           "k": "named",
+           "name": "int"
+          },
           "x": {
-           "k": "ident",
-           "name": "row"
+           "k": "field",
+           "name": "RemoveFirst",
+           "x": {
+            "k": "ident",
+            "name": "row"
+           }
           }
          },
          {
-          "k": "field",
-          "name": "RemoveCount",
+          "k": "conv",
+          "type": {
+           "k": "named",
+           "name": "int"
+          },
           "x": {
-           "k": "ident",
-           "name": "row"
+           "k": "field",
+           "name": "RemoveCount",
+           "x": {
+            "k": "ident",
+            "name": "row"
+           }
           }
          },
          {
@@ -51012,19 +51224,33 @@
         "name": "secCollationOverrides"
        },
        {
-        "k": "field",
-        "name": "OverrideFirst",
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int"
+        },
         "x": {
-         "k": "ident",
-         "name": "row"
+         "k": "field",
+         "name": "OverrideFirst",
+         "x": {
+          "k": "ident",
+          "name": "row"
+         }
         }
        },
        {
-        "k": "field",
-        "name": "OverrideCount",
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int"
+        },
         "x": {
-         "k": "ident",
-         "name": "row"
+         "k": "field",
+         "name": "OverrideCount",
+         "x": {
+          "k": "ident",
+          "name": "row"
+         }
         }
        },
        {
@@ -51691,19 +51917,33 @@
         "name": "secCollationOverrides"
        },
        {
-        "k": "field",
-        "name": "OverrideFirst",
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int"
+        },
         "x": {
-         "k": "ident",
-         "name": "row"
+         "k": "field",
+         "name": "OverrideFirst",
+         "x": {
+          "k": "ident",
+          "name": "row"
+         }
         }
        },
        {
-        "k": "field",
-        "name": "OverrideCount",
+        "k": "conv",
+        "type": {
+         "k": "named",
+         "name": "int"
+        },
         "x": {
-         "k": "ident",
-         "name": "row"
+         "k": "field",
+         "name": "OverrideCount",
+         "x": {
+          "k": "ident",
+          "name": "row"
+         }
         }
        },
        {
@@ -56669,26 +56909,57 @@
       },
       "y": {
        "k": "binary",
-       "op": "\u003e",
+       "op": "\u0026\u0026",
        "x": {
-        "k": "ident",
-        "name": "span"
+        "k": "binary",
+        "op": "\u003c",
+        "x": {
+         "k": "field",
+         "name": "maxL",
+         "x": {
+          "index": {
+           "k": "ident",
+           "name": "ni"
+          },
+          "k": "index",
+          "x": {
+           "k": "field",
+           "name": "nodes",
+           "x": {
+            "k": "ident",
+            "name": "re"
+           }
+          }
+         }
+        },
+        "y": {
+         "k": "ident",
+         "name": "lenInf"
+        }
        },
        "y": {
-        "k": "field",
-        "name": "maxL",
+        "k": "binary",
+        "op": "\u003e",
         "x": {
-         "index": {
-          "k": "ident",
-          "name": "ni"
-         },
-         "k": "index",
+         "k": "ident",
+         "name": "span"
+        },
+        "y": {
+         "k": "field",
+         "name": "maxL",
          "x": {
-          "k": "field",
-          "name": "nodes",
-          "x": {
+          "index": {
            "k": "ident",
-           "name": "re"
+           "name": "ni"
+          },
+          "k": "index",
+          "x": {
+           "k": "field",
+           "name": "nodes",
+           "x": {
+            "k": "ident",
+            "name": "re"
+           }
           }
          }
         }
@@ -58025,26 +58296,57 @@
             },
             "y": {
              "k": "binary",
-             "op": "\u003e",
+             "op": "\u0026\u0026",
              "x": {
-              "k": "ident",
-              "name": "span"
+              "k": "binary",
+              "op": "\u003c",
+              "x": {
+               "k": "field",
+               "name": "maxL",
+               "x": {
+                "index": {
+                 "k": "ident",
+                 "name": "branch"
+                },
+                "k": "index",
+                "x": {
+                 "k": "field",
+                 "name": "nodes",
+                 "x": {
+                  "k": "ident",
+                  "name": "re"
+                 }
+                }
+               }
+              },
+              "y": {
+               "k": "ident",
+               "name": "lenInf"
+              }
              },
              "y": {
-              "k": "field",
-              "name": "maxL",
+              "k": "binary",
+              "op": "\u003e",
               "x": {
-               "index": {
-                "k": "ident",
-                "name": "branch"
-               },
-               "k": "index",
+               "k": "ident",
+               "name": "span"
+              },
+              "y": {
+               "k": "field",
+               "name": "maxL",
                "x": {
-                "k": "field",
-                "name": "nodes",
-                "x": {
+                "index": {
                  "k": "ident",
-                 "name": "re"
+                 "name": "branch"
+                },
+                "k": "index",
+                "x": {
+                 "k": "field",
+                 "name": "nodes",
+                 "x": {
+                  "k": "ident",
+                  "name": "re"
+                 }
                 }
                }
               }
@@ -67120,33 +67422,40 @@
          "k": "return",
          "values": [
           {
-           "args": [
-            {
-             "k": "ident",
-             "name": "brs"
-            },
-            {
-             "k": "field",
-             "name": "br",
-             "x": {
-              "index": {
-               "k": "ident",
-               "name": "ni"
-              },
-              "k": "index",
+           "k": "conv",
+           "type": {
+            "k": "named",
+            "name": "int64"
+           },
+           "x": {
+            "args": [
+             {
+              "k": "ident",
+              "name": "brs"
+             },
+             {
+              "k": "field",
+              "name": "br",
               "x": {
-               "k": "ident",
-               "name": "nodes"
+               "index": {
+                "k": "ident",
+                "name": "ni"
+               },
+               "k": "index",
+               "x": {
+                "k": "ident",
+                "name": "nodes"
+               }
               }
+             },
+             {
+              "k": "ident",
+              "name": "loc"
              }
-            },
-            {
-             "k": "ident",
-             "name": "loc"
-            }
-           ],
-           "fn": "bracketMinChars",
-           "k": "call"
+            ],
+            "fn": "bracketMinChars",
+            "k": "call"
+           }
           }
          ]
         }
@@ -67239,14 +67548,13 @@
       {
        "body": [
         {
-         "k": "define",
-         "names": [
-          "total"
-         ],
-         "value": {
-          "k": "int",
-          "value": "0"
-         }
+         "k": "var_decl",
+         "name": "total",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "value": null
         },
         {
          "body": [
@@ -67587,17 +67895,24 @@
           "k": "binary",
           "op": "*",
           "x": {
-           "k": "field",
-           "name": "min",
+           "k": "conv",
+           "type": {
+            "k": "named",
+            "name": "int64"
+           },
            "x": {
-            "index": {
-             "k": "ident",
-             "name": "ni"
-            },
-            "k": "index",
+            "k": "field",
+            "name": "min",
             "x": {
-             "k": "ident",
-             "name": "nodes"
+             "index": {
+              "k": "ident",
+              "name": "ni"
+             },
+             "k": "index",
+             "x": {
+              "k": "ident",
+              "name": "nodes"
+             }
             }
            }
           },
@@ -67742,7 +68057,7 @@
    "results": [
     {
      "k": "named",
-     "name": "int"
+     "name": "int64"
     }
    ]
   },
@@ -68341,11 +68656,75 @@
     },
     {
      "cond": {
-      "k": "field",
-      "name": "tooBig",
+      "k": "binary",
+      "op": "||",
       "x": {
-       "k": "ident",
-       "name": "b"
+       "k": "field",
+       "name": "tooBig",
+       "x": {
+        "k": "ident",
+        "name": "b"
+       }
+      },
+      "y": {
+       "k": "binary",
+       "op": "\u0026\u0026",
+       "x": {
+        "k": "binary",
+        "op": "\u003e",
+        "x": {
+         "k": "field",
+         "name": "minSlots",
+         "x": {
+          "k": "ident",
+          "name": "re"
+         }
+        },
+        "y": {
+         "k": "int",
+         "value": "0"
+        }
+       },
+       "y": {
+        "k": "binary",
+        "op": "\u003e",
+        "x": {
+         "args": [
+          {
+           "k": "field",
+           "name": "ins",
+           "x": {
+            "k": "field",
+            "name": "prog",
+            "x": {
+             "k": "ident",
+             "name": "b"
+            }
+           }
+          }
+         ],
+         "fn": "len",
+         "k": "builtin",
+         "spread": false,
+         "type": null
+        },
+        "y": {
+         "k": "binary",
+         "op": "/",
+         "x": {
+          "k": "ident",
+          "name": "maxCounterCells"
+         },
+         "y": {
+          "k": "field",
+          "name": "minSlots",
+          "x": {
+           "k": "ident",
+           "name": "re"
+          }
+         }
+        }
+       }
       }
      },
      "else": [
@@ -68739,16 +69118,23 @@
         "k": "binary",
         "op": "\u003c",
         "x": {
-         "args": [
-          {
-           "k": "ident",
-           "name": "subject"
-          }
-         ],
-         "fn": "len",
-         "k": "builtin",
-         "spread": false,
-         "type": null
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "subject"
+           }
+          ],
+          "fn": "len",
+          "k": "builtin",
+          "spread": false,
+          "type": null
+         }
         },
         "y": {
          "k": "field",
@@ -68783,14 +69169,21 @@
         "k": "binary",
         "op": "\u003c",
         "x": {
-         "args": [
-          {
-           "k": "ident",
-           "name": "subject"
-          }
-         ],
-         "fn": "runeCount",
-         "k": "call"
+         "k": "conv",
+         "type": {
+          "k": "named",
+          "name": "int64"
+         },
+         "x": {
+          "args": [
+           {
+            "k": "ident",
+            "name": "subject"
+           }
+          ],
+          "fn": "runeCount",
+          "k": "call"
+         }
         },
         "y": {
          "k": "field",
@@ -71513,6 +71906,72 @@
   {
    "body": [
     {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "ident",
+        "name": "n"
+       },
+       "y": {
+        "args": [
+         {
+          "k": "binary",
+          "op": "/",
+          "x": {
+           "k": "ident",
+           "name": "n"
+          },
+          "y": {
+           "k": "int",
+           "value": "8"
+          }
+         },
+         {
+          "k": "binary",
+          "op": "-",
+          "x": {
+           "k": "ident",
+           "name": "subjectLimit"
+          },
+          "y": {
+           "k": "ident",
+           "name": "n"
+          }
+         }
+        ],
+        "fn": "min",
+        "k": "builtin",
+        "spread": false,
+        "type": null
+       }
+      }
+     ]
+    }
+   ],
+   "k": "func",
+   "name": "replaceCapacity",
+   "params": [
+    {
+     "name": "n",
+     "type": {
+      "k": "named",
+      "name": "int"
+     }
+    }
+   ],
+   "results": [
+    {
+     "k": "named",
+     "name": "int"
+    }
+   ]
+  },
+  {
+   "body": [
+    {
      "cond": {
       "k": "binary",
       "op": "!=",
@@ -71871,24 +72330,8 @@
             "value": "0"
            },
            {
-            "k": "binary",
-            "op": "+",
-            "x": {
-             "args": [
-              {
-               "k": "ident",
-               "name": "subject"
-              }
-             ],
-             "fn": "len",
-             "k": "builtin",
-             "spread": false,
-             "type": null
-            },
-            "y": {
-             "k": "binary",
-             "op": "/",
-             "x": {
+            "args": [
+             {
               "args": [
                {
                 "k": "ident",
@@ -71899,12 +72342,10 @@
               "k": "builtin",
               "spread": false,
               "type": null
-             },
-             "y": {
-              "k": "int",
-              "value": "8"
              }
-            }
+            ],
+            "fn": "replaceCapacity",
+            "k": "call"
            }
           ],
           "fn": "make",
@@ -77150,31 +77591,54 @@
   {
    "body": [
     {
-     "k": "return",
-     "values": [
+     "cond": {
+      "k": "binary",
+      "op": "\u003e",
+      "x": {
+       "k": "ident",
+       "name": "a"
+      },
+      "y": {
+       "k": "binary",
+       "op": "-",
+       "x": {
+        "k": "ident",
+        "name": "lenInf"
+       },
+       "y": {
+        "k": "ident",
+        "name": "b"
+       }
+      }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
       {
-       "args": [
-        {
-         "k": "binary",
-         "op": "+",
-         "x": {
-          "k": "ident",
-          "name": "a"
-         },
-         "y": {
-          "k": "ident",
-          "name": "b"
-         }
-        },
+       "k": "return",
+       "values": [
         {
          "k": "ident",
          "name": "lenInf"
         }
-       ],
-       "fn": "min",
-       "k": "builtin",
-       "spread": false,
-       "type": null
+       ]
+      }
+     ]
+    },
+    {
+     "k": "return",
+     "values": [
+      {
+       "k": "binary",
+       "op": "+",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       },
+       "y": {
+        "k": "ident",
+        "name": "b"
+       }
       }
      ]
     }
@@ -77207,34 +77671,40 @@
   {
    "body": [
     {
-     "k": "define",
-     "names": [
-      "product"
-     ],
-     "value": {
-      "k": "binary",
-      "op": "*",
-      "x": {
-       "k": "ident",
-       "name": "a"
-      },
-      "y": {
-       "k": "ident",
-       "name": "b"
-      }
-     }
-    },
-    {
      "cond": {
       "k": "binary",
-      "op": "\u003e",
+      "op": "\u0026\u0026",
       "x": {
-       "k": "ident",
-       "name": "product"
+       "k": "binary",
+       "op": "!=",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       },
+       "y": {
+        "k": "int",
+        "value": "0"
+       }
       },
       "y": {
-       "k": "ident",
-       "name": "lenInf"
+       "k": "binary",
+       "op": "\u003e",
+       "x": {
+        "k": "ident",
+        "name": "b"
+       },
+       "y": {
+        "k": "binary",
+        "op": "/",
+        "x": {
+         "k": "ident",
+         "name": "lenInf"
+        },
+        "y": {
+         "k": "ident",
+         "name": "a"
+        }
+       }
       }
      },
      "else": null,
@@ -77255,8 +77725,16 @@
      "k": "return",
      "values": [
       {
-       "k": "ident",
-       "name": "product"
+       "k": "binary",
+       "op": "*",
+       "x": {
+        "k": "ident",
+        "name": "a"
+       },
+       "y": {
+        "k": "ident",
+        "name": "b"
+       }
       }
      ]
     }
@@ -81415,14 +81893,14 @@
      "name": "TypeFirst",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "uint32"
      }
     },
     {
      "name": "TypeCount",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "uint32"
      }
     },
     {
@@ -81523,42 +82001,42 @@
      "name": "OverrideFirst",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "uint32"
      }
     },
     {
      "name": "OverrideCount",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "uint32"
      }
     },
     {
      "name": "AddFirst",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "uint32"
      }
     },
     {
      "name": "AddCount",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "uint32"
      }
     },
     {
      "name": "RemoveFirst",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "uint32"
      }
     },
     {
      "name": "RemoveCount",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "uint32"
      }
     }
    ],
@@ -81974,7 +82452,7 @@
      "name": "minLen",
      "type": {
       "k": "named",
-      "name": "int"
+      "name": "int64"
      }
     },
     {

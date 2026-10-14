@@ -96,11 +96,12 @@
 #define vego_g_7265766572615f656e67x_iJmp ((uint8_t)(7))
 #define vego_g_7265766572615f656e67x_iMatch ((uint8_t)(8))
 #define vego_g_7265766572615f656e67x_iFail ((uint8_t)(9))
-#define vego_g_7265766572615f656e67x_failMinNone ((int64_t)(4611686018427387904LL))
+#define vego_g_7265766572615f656e67x_failMinNone ((int64_t)(1073741825LL))
 #define vego_g_7265766572615f656e67x_maxProgram ((int64_t)(1048576LL))
 #define vego_g_7265766572615f656e67x_maskWidth ((int64_t)(64LL))
 #define vego_g_7265766572615f656e67x_subjectLimit ((int64_t)(2147483647LL))
 #define vego_g_7265766572615f656e67x_lengthCap ((int64_t)(1099511627776LL))
+#define vego_g_7265766572615f656e67x_maxCounterCells ((int64_t)(2147483647LL))
 #define vego_g_7265766572615f656e67x_opChar ((uint8_t)(0))
 #define vego_g_7265766572615f656e67x_opAny ((uint8_t)(1))
 #define vego_g_7265766572615f656e67x_opBracket ((uint8_t)(2))
@@ -444,8 +445,8 @@ struct vego_g_7265766572615f656e67x_Locale {
 };
 
 struct vego_g_7265766572615f656e67x_LocaleRow {
-    int64_t vego_f_TypeFirst;
-    int64_t vego_f_TypeCount;
+    uint32_t vego_f_TypeFirst;
+    uint32_t vego_f_TypeCount;
     uint32_t vego_f_CaseProfile;
     uint32_t vego_f_DefaultCollation;
 };
@@ -471,12 +472,12 @@ struct vego_g_7265766572615f656e67x_preimageBuf {
 };
 
 struct vego_g_7265766572615f656e67x_CollProfile {
-    int64_t vego_f_OverrideFirst;
-    int64_t vego_f_OverrideCount;
-    int64_t vego_f_AddFirst;
-    int64_t vego_f_AddCount;
-    int64_t vego_f_RemoveFirst;
-    int64_t vego_f_RemoveCount;
+    uint32_t vego_f_OverrideFirst;
+    uint32_t vego_f_OverrideCount;
+    uint32_t vego_f_AddFirst;
+    uint32_t vego_f_AddCount;
+    uint32_t vego_f_RemoveFirst;
+    uint32_t vego_f_RemoveCount;
 };
 
 struct vego_g_7265766572615f656e67x_Match {
@@ -2436,6 +2437,8 @@ bool vego_g_7265766572615f656e67x_localeLoad(vego_g_7265766572615f656e67x_Locale
 bool vego_g_7265766572615f656e67x_localeValidate(vego_g_7265766572615f656e67x_Locale *vego_l_l);
 bool vego_g_7265766572615f656e67x_scalarSectionValid(vego_g_7265766572615f656e67x_Locale *vego_l_l, int64_t vego_l_sec);
 bool vego_g_7265766572615f656e67x_contractionIDsValid(vego_g_7265766572615f656e67x_Locale *vego_l_l, int64_t vego_l_sec, int64_t vego_l_seqCount);
+bool vego_g_7265766572615f656e67x_u32Below(uint32_t vego_l_v, int64_t vego_l_limit);
+bool vego_g_7265766572615f656e67x_u32SpanWithin(uint32_t vego_l_first, uint32_t vego_l_count, int64_t vego_l_limit);
 int64_t vego_g_7265766572615f656e67x_localeMaxElementLength(vego_g_7265766572615f656e67x_Locale *vego_l_l);
 bool vego_g_7265766572615f656e67x_validScalar(int32_t vego_l_r);
 uint8_t vego_g_7265766572615f656e67x_asciiLower(uint8_t vego_l_c);
@@ -2521,6 +2524,7 @@ vego_q_7265766572615f656e67x_Tup_bool_t4572726f72x vego_g_7265766572615f656e67x_
 vego_q_7265766572615f656e67x_Tup_t4d6174636849746572x_t4572726f72x vego_g_7265766572615f656e67x_MatchIterInit(vego_g_7265766572615f656e67x_Regexp *vego_l_re, int64_t vego_l_limit);
 vego_q_7265766572615f656e67x_Tup_bool_t4572726f72x vego_g_7265766572615f656e67x_MatchIterNext(vg_arena *mem, vego_g_7265766572615f656e67x_Regexp *vego_l_re, vego_g_7265766572615f656e67x_MatchIter *vego_l_it, vg_str vego_l_subject, uint32_t vego_l_eflags, vego_t_7265766572615f656e67x_st4d61746368x vego_l_pmatch);
 vego_q_7265766572615f656e67x_Tup_st7265706c50617274x_t4572726f72x vego_g_7265766572615f656e67x_parseReplacement(vg_arena *mem, vg_str vego_l_replacement, int64_t vego_l_nsub);
+int64_t vego_g_7265766572615f656e67x_replaceCapacity(int64_t vego_l_n);
 vego_q_7265766572615f656e67x_Tup_Str_t4572726f72x vego_g_7265766572615f656e67x_ReplaceAll(vg_arena *mem, vego_g_7265766572615f656e67x_Regexp *vego_l_re, vg_str vego_l_subject, vg_str vego_l_replacement, int64_t vego_l_limit, uint32_t vego_l_eflags);
 int32_t vego_g_7265766572615f656e67x_fail(vego_g_7265766572615f656e67x_parser *vego_l_p, int32_t vego_l_code, int64_t vego_l_pos);
 int32_t vego_g_7265766572615f656e67x_addNode(vg_arena *mem, vego_g_7265766572615f656e67x_parser *vego_l_p, uint8_t vego_l_op);

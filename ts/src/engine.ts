@@ -138,11 +138,12 @@ export const iSplit: number = 6;
 export const iJmp: number = 7;
 export const iMatch: number = 8;
 export const iFail: number = 9;
-export const failMinNone: number = 4611686018427387904;
+export const failMinNone: number = 1073741825;
 export const maxProgram: number = 1048576;
 export const maskWidth: number = 64;
 export const subjectLimit: number = 2147483647;
-export const lengthCap: number = 1099511627776;
+export const lengthCap: bigint = 1099511627776n;
+export const maxCounterCells: number = 2147483647;
 export const opChar: number = 0;
 export const opAny: number = 1;
 export const opBracket: number = 2;
@@ -881,7 +882,7 @@ export class LocaleRow {
         return a.TypeFirst === b.TypeFirst && a.TypeCount === b.TypeCount && a.CaseProfile === b.CaseProfile && a.DefaultCollation === b.DefaultCollation;
     }
 
-    static readonly elem: vg.Elem<LocaleRow> = vg.structElem(() => new LocaleRow(), 24);
+    static readonly elem: vg.Elem<LocaleRow> = vg.structElem(() => new LocaleRow(), 16);
 }
 
 export class localeRequest {
@@ -996,7 +997,7 @@ export class CollProfile {
         return a.OverrideFirst === b.OverrideFirst && a.OverrideCount === b.OverrideCount && a.AddFirst === b.AddFirst && a.AddCount === b.AddCount && a.RemoveFirst === b.RemoveFirst && a.RemoveCount === b.RemoveCount;
     }
 
-    static readonly elem: vg.Elem<CollProfile> = vg.structElem(() => new CollProfile(), 48);
+    static readonly elem: vg.Elem<CollProfile> = vg.structElem(() => new CollProfile(), 24);
 }
 
 export class Match {
@@ -1245,11 +1246,11 @@ export class Regexp {
     multi: boolean;
     progOK: boolean;
     prog: program;
-    minLen: number;
+    minLen: bigint;
     anchors: boolean;
     onePass: boolean;
 
-    constructor(nodes: vg.Slice<node> = vg.NIL, brackets: vg.Slice<bracketSet> = vg.NIL, root: number = 0, nsub: number = 0, flags: number = 0, loc: Locale = new Locale(), minSlots: number = 0, nested: vg.Slice<vg.Slice<number>> = vg.NIL, multi: boolean = false, progOK: boolean = false, prog: program = new program(), minLen: number = 0, anchors: boolean = false, onePass: boolean = false) {
+    constructor(nodes: vg.Slice<node> = vg.NIL, brackets: vg.Slice<bracketSet> = vg.NIL, root: number = 0, nsub: number = 0, flags: number = 0, loc: Locale = new Locale(), minSlots: number = 0, nested: vg.Slice<vg.Slice<number>> = vg.NIL, multi: boolean = false, progOK: boolean = false, prog: program = new program(), minLen: bigint = 0n, anchors: boolean = false, onePass: boolean = false) {
         this.nodes = nodes;
         this.brackets = brackets;
         this.root = root;
@@ -3562,8 +3563,8 @@ export function paRun(e: phaseAState, ws: engineWS, re: Regexp): void {
         if (e.matched) {
             let pendingWork: boolean = false;
             for (let delta: number = 1; (delta < e.ring); delta = vg.chk(delta + 1)) {
-                const fi: number = vg.rem(vg.chk(e.ci + delta), e.ring);
-                if ((((_t18 = ws.slots, _t18.buf[_t18.off + vg.ix(fi, _t18.len)]).gen === paGen(vg.chk(e.ci + delta))) && ((_t19 = ws.slots, _t19.buf[_t19.off + vg.ix(fi, _t19.len)]).active.len > 0))) {
+                const fi: number = vg.rem(vg.chk(si + delta), e.ring);
+                if ((((_t18 = ws.slots, _t18.buf[_t18.off + vg.ix(fi, _t18.len)]).gen === ((g + (delta >>> 0)) >>> 0)) && ((_t19 = ws.slots, _t19.buf[_t19.off + vg.ix(fi, _t19.len)]).active.len > 0))) {
                     pendingWork = true;
                     break;
                 }
@@ -3808,14 +3809,15 @@ export function localeLoad(l: Locale, blob: vg.Str): boolean {
     l.blob = blob;
     let cursor: number = magic.length;
     for (let i: number = 0; (i < numSections); i = vg.chk(i + 1)) {
-        if ((vg.chk(cursor + 4) > blob.length)) {
+        if ((vg.chk(blob.length - cursor) < 4)) {
             return false;
         }
-        const length: number = u32Raw(blob, cursor);
+        const raw: number = u32Raw(blob, cursor);
         cursor = vg.chk(cursor + 4);
-        if ((vg.chk(cursor + length) > blob.length)) {
+        if ((BigInt(raw) > BigInt.asUintN(64, BigInt(vg.chk(blob.length - cursor))))) {
             return false;
         }
+        const length: number = raw;
         l.sec[vg.ix(i, 23)].Off = cursor;
         l.sec[vg.ix(i, 23)].End = vg.chk(cursor + length);
         cursor = vg.chk(cursor + length);
@@ -3875,7 +3877,7 @@ export function localeValidate(l: Locale): boolean {
     for (let i_2: number = 0; (i_2 < seqCount); i_2 = vg.chk(i_2 + 1)) {
         const off: number = u32At(l, secSequences, vg.chk(2 * i_2));
         const length: number = u32At(l, secSequences, vg.chk(vg.chk(2 * i_2) + 1));
-        if ((((length < 1) || (length > l.maxSeq)) || (vg.chk(off + length) > codepointCount))) {
+        if ((((length < 1) || (length > (l.maxSeq >>> 0))) || (!u32SpanWithin(off, length, codepointCount)))) {
             return false;
         }
     }
@@ -3892,12 +3894,15 @@ export function localeValidate(l: Locale): boolean {
         return false;
     }
     const profileCount: number = vg.div(sectionLen(l, secCollationProfiles), 24);
+    if ((profileCount > 65536)) {
+        return false;
+    }
     const overrideCount: number = vg.div(sectionLen(l, secCollationOverrides), 8);
     const addCount: number = vg.div(sectionLen(l, secContractionAdds), 4);
     const removeCount: number = vg.div(sectionLen(l, secContractionRemoves), 4);
     for (let i_3: number = 0; (i_3 < profileCount); i_3 = vg.chk(i_3 + 1)) {
         const row: CollProfile = collationProfileRow(l, i_3);
-        if ((((vg.chk(row.OverrideFirst + row.OverrideCount) > overrideCount) || (vg.chk(row.AddFirst + row.AddCount) > addCount)) || (vg.chk(row.RemoveFirst + row.RemoveCount) > removeCount))) {
+        if ((((!u32SpanWithin(row.OverrideFirst, row.OverrideCount, overrideCount)) || (!u32SpanWithin(row.AddFirst, row.AddCount, addCount))) || (!u32SpanWithin(row.RemoveFirst, row.RemoveCount, removeCount)))) {
             return false;
         }
     }
@@ -3906,7 +3911,7 @@ export function localeValidate(l: Locale): boolean {
     }
     const typeNameCount: number = vg.div(sectionLen(l, secTypeNameOffsets), 4);
     for (let i_4: number = 0; (i_4 < typeNameCount); i_4 = vg.chk(i_4 + 1)) {
-        if ((u32At(l, secTypeNameOffsets, i_4) >= sectionLen(l, secTypeNames))) {
+        if ((!u32Below(u32At(l, secTypeNameOffsets, i_4), sectionLen(l, secTypeNames)))) {
             return false;
         }
     }
@@ -3918,14 +3923,14 @@ export function localeValidate(l: Locale): boolean {
         return false;
     }
     for (let i_5: number = 0; (i_5 < count); i_5 = vg.chk(i_5 + 1)) {
-        if ((u32At(l, secLocaleNameOffsets, i_5) >= sectionLen(l, secLocaleNames))) {
+        if ((!u32Below(u32At(l, secLocaleNameOffsets, i_5), sectionLen(l, secLocaleNames)))) {
             return false;
         }
     }
     const typeRowCount: number = vg.div(sectionLen(l, secLocaleTypes), 4);
     for (let i_6: number = 0; (i_6 < count); i_6 = vg.chk(i_6 + 1)) {
         const row_2: LocaleRow = localeRowAt(l, i_6);
-        if ((((vg.chk(row_2.TypeFirst + row_2.TypeCount) > typeRowCount) || (row_2.CaseProfile > 1)) || (row_2.DefaultCollation >= profileCount))) {
+        if ((((!u32SpanWithin(row_2.TypeFirst, row_2.TypeCount, typeRowCount)) || (row_2.CaseProfile > 1)) || (!u32Below(row_2.DefaultCollation, profileCount)))) {
             return false;
         }
     }
@@ -3950,11 +3955,19 @@ export function contractionIDsValid(l: Locale, sec: number, seqCount: number): b
     const count: number = vg.div(sectionLen(l, sec), 4);
     for (let i: number = 0; (i < count); i = vg.chk(i + 1)) {
         const id: number = u32At(l, sec, i);
-        if (((id >= firstSequenceID) && (((id - firstSequenceID) >>> 0) >= seqCount))) {
+        if (((id >= firstSequenceID) && (!u32Below(((id - firstSequenceID) >>> 0), seqCount)))) {
             return false;
         }
     }
     return true;
+}
+
+export function u32Below(v: number, limit: number): boolean {
+    return (BigInt(v) < BigInt.asUintN(64, BigInt(limit)));
+}
+
+export function u32SpanWithin(first: number, count: number, limit: number): boolean {
+    return (BigInt.asUintN(64, BigInt(first) + BigInt(count)) <= BigInt.asUintN(64, BigInt(limit)));
 }
 
 export function localeMaxElementLength(l: Locale): number {
@@ -4162,7 +4175,7 @@ export function resolveLocale(data: Locale, req: localeRequest): [Locale, boolea
         return [invalid, false];
     }
     let low: number = row.TypeFirst;
-    let high: number = vg.chk(row.TypeFirst + row.TypeCount);
+    let high: number = vg.chk(low + row.TypeCount);
     while ((low < high)) {
         const middle: number = vg.chk(low + vg.div(vg.chk(high - low), 2));
         const rowTypeID: number = u16At(result, secLocaleTypes, vg.chk(2 * middle));
@@ -4997,64 +5010,66 @@ export function onePassCaps(re: Regexp, d: decoded, ni: number, i: number, j: nu
     let _t1!: vg.Slice<node>;
     let _t2!: vg.Slice<node>;
     let _t3!: vg.Slice<node>;
-    let _t4!: vg.Slice<number>;
+    let _t4!: vg.Slice<node>;
     let _t5!: vg.Slice<number>;
-    let _t6!: vg.Slice<node>;
-    let _t7!: vg.Slice<number>;
-    let _t8!: vg.Slice<node>;
-    let _t9!: vg.Slice<vg.Slice<number>>;
-    let _t11!: vg.Slice<number>;
-    let _t12!: vg.Slice<vg.Slice<number>>;
-    let _t13!: vg.Slice<number>;
-    let _t14!: vg.Slice<node>;
+    let _t6!: vg.Slice<number>;
+    let _t7!: vg.Slice<node>;
+    let _t8!: vg.Slice<number>;
+    let _t9!: vg.Slice<node>;
+    let _t10!: vg.Slice<vg.Slice<number>>;
+    let _t12!: vg.Slice<number>;
+    let _t13!: vg.Slice<vg.Slice<number>>;
+    let _t14!: vg.Slice<number>;
     let _t15!: vg.Slice<node>;
-    let _t17!: vg.Slice<node>;
-    let _t18!: vg.Slice<number>;
-    let _t19!: vg.Slice<node>;
+    let _t16!: vg.Slice<node>;
+    let _t18!: vg.Slice<node>;
+    let _t19!: vg.Slice<number>;
     let _t20!: vg.Slice<node>;
-    let _t22!: vg.Slice<number>;
-    let _t23!: vg.Slice<node>;
+    let _t21!: vg.Slice<node>;
+    let _t23!: vg.Slice<number>;
     let _t24!: vg.Slice<node>;
-    let _t25!: vg.Slice<number>;
-    let _t26!: vg.Slice<node>;
+    let _t25!: vg.Slice<node>;
+    let _t26!: vg.Slice<number>;
     let _t27!: vg.Slice<node>;
     let _t28!: vg.Slice<node>;
     let _t29!: vg.Slice<node>;
     let _t30!: vg.Slice<node>;
-    let _t32!: vg.Slice<node>;
-    let _t34!: vg.Slice<number>;
-    let _t35!: vg.Slice<node>;
+    let _t31!: vg.Slice<node>;
+    let _t33!: vg.Slice<node>;
+    let _t35!: vg.Slice<number>;
     let _t36!: vg.Slice<node>;
     let _t37!: vg.Slice<node>;
     let _t38!: vg.Slice<node>;
     let _t39!: vg.Slice<node>;
+    let _t40!: vg.Slice<node>;
     let _t41!: vg.Slice<node>;
-    let _t42!: vg.Slice<number>;
     let _t43!: vg.Slice<node>;
-    let _t44!: vg.Slice<node>;
-    let _t46!: vg.Slice<vg.Slice<number>>;
-    let _t47!: vg.Slice<node>;
-    let _t48!: vg.Slice<number>;
-    let _t49!: vg.Slice<number>;
-    let _t50!: vg.Slice<node>;
+    let _t44!: vg.Slice<number>;
+    let _t45!: vg.Slice<node>;
+    let _t46!: vg.Slice<node>;
+    let _t48!: vg.Slice<vg.Slice<number>>;
+    let _t49!: vg.Slice<node>;
+    let _t50!: vg.Slice<number>;
+    let _t51!: vg.Slice<number>;
+    let _t52!: vg.Slice<node>;
     const span: number = vg.chk(j - i);
-    if (((span < (_t1 = re.nodes, _t1.buf[_t1.off + vg.ix(ni, _t1.len)]).minL) || (span > (_t2 = re.nodes, _t2.buf[_t2.off + vg.ix(ni, _t2.len)]).maxL))) {
+    if (((span < (_t1 = re.nodes, _t1.buf[_t1.off + vg.ix(ni, _t1.len)]).minL) || (((_t2 = re.nodes, _t2.buf[_t2.off + vg.ix(ni, _t2.len)]).maxL < lenInf) && (span > (_t3 = re.nodes, _t3.buf[_t3.off + vg.ix(ni, _t3.len)]).maxL)))) {
         return false;
     }
-    switch ((_t3 = re.nodes, _t3.buf[_t3.off + vg.ix(ni, _t3.len)]).op) {
+    switch ((_t4 = re.nodes, _t4.buf[_t4.off + vg.ix(ni, _t4.len)]).op) {
         case opChar:
         {
-            return charMatches(re, ni, (_t4 = d.runes, _t4.buf[_t4.off + vg.ix(i, _t4.len)]));
+            return charMatches(re, ni, (_t5 = d.runes, _t5.buf[_t5.off + vg.ix(i, _t5.len)]));
             break;
         }
         case opAny:
         {
-            return anyMatches(re, (_t5 = d.runes, _t5.buf[_t5.off + vg.ix(i, _t5.len)]));
+            return anyMatches(re, (_t6 = d.runes, _t6.buf[_t6.off + vg.ix(i, _t6.len)]));
             break;
         }
         case opBracket:
         {
-            return bracketMatchesOne(re.brackets, (_t6 = re.nodes, _t6.buf[_t6.off + vg.ix(ni, _t6.len)]).br, re.loc, (_t7 = d.runes, _t7.buf[_t7.off + vg.ix(i, _t7.len)]));
+            return bracketMatchesOne(re.brackets, (_t7 = re.nodes, _t7.buf[_t7.off + vg.ix(ni, _t7.len)]).br, re.loc, (_t8 = d.runes, _t8.buf[_t8.off + vg.ix(i, _t8.len)]));
             break;
         }
         case opBOL:
@@ -5069,24 +5084,24 @@ export function onePassCaps(re: Regexp, d: decoded, ni: number, i: number, j: nu
         }
         case opGroup:
         {
-            const gi: number = (_t8 = re.nodes, _t8.buf[_t8.off + vg.ix(ni, _t8.len)]).index;
-            for (let k: number = 0; (k < (_t9 = re.nested, _t9.buf[_t9.off + vg.ix(gi, _t9.len)]).len); k = vg.chk(k + 1)) {
-                setMatch(caps, (_t11 = (_t12 = re.nested, _t12.buf[_t12.off + vg.ix(gi, _t12.len)]), _t11.buf[_t11.off + vg.ix(k, _t11.len)]), (0 - 1), (0 - 1));
+            const gi: number = (_t9 = re.nodes, _t9.buf[_t9.off + vg.ix(ni, _t9.len)]).index;
+            for (let k: number = 0; (k < (_t10 = re.nested, _t10.buf[_t10.off + vg.ix(gi, _t10.len)]).len); k = vg.chk(k + 1)) {
+                setMatch(caps, (_t12 = (_t13 = re.nested, _t13.buf[_t13.off + vg.ix(gi, _t13.len)]), _t12.buf[_t12.off + vg.ix(k, _t12.len)]), (0 - 1), (0 - 1));
             }
             setMatch(caps, gi, i, j);
-            return onePassCaps(re, d, (_t13 = (_t14 = re.nodes, _t14.buf[_t14.off + vg.ix(ni, _t14.len)]).ch, _t13.buf[_t13.off + vg.ix(0, _t13.len)]), i, j, eflags, caps);
+            return onePassCaps(re, d, (_t14 = (_t15 = re.nodes, _t15.buf[_t15.off + vg.ix(ni, _t15.len)]).ch, _t14.buf[_t14.off + vg.ix(0, _t14.len)]), i, j, eflags, caps);
             break;
         }
         case opConcat:
         {
             let rest: number = span;
-            for (let k_2: number = 0; (k_2 < (_t15 = re.nodes, _t15.buf[_t15.off + vg.ix(ni, _t15.len)]).ch.len); k_2 = vg.chk(k_2 + 1)) {
-                rest = vg.chk(rest - (_t17 = re.nodes, _t17.buf[_t17.off + vg.ix((_t18 = (_t19 = re.nodes, _t19.buf[_t19.off + vg.ix(ni, _t19.len)]).ch, _t18.buf[_t18.off + vg.ix(k_2, _t18.len)]), _t17.len)]).minL);
+            for (let k_2: number = 0; (k_2 < (_t16 = re.nodes, _t16.buf[_t16.off + vg.ix(ni, _t16.len)]).ch.len); k_2 = vg.chk(k_2 + 1)) {
+                rest = vg.chk(rest - (_t18 = re.nodes, _t18.buf[_t18.off + vg.ix((_t19 = (_t20 = re.nodes, _t20.buf[_t20.off + vg.ix(ni, _t20.len)]).ch, _t19.buf[_t19.off + vg.ix(k_2, _t19.len)]), _t18.len)]).minL);
             }
             let at: number = i;
-            for (let k_3: number = 0; (k_3 < (_t20 = re.nodes, _t20.buf[_t20.off + vg.ix(ni, _t20.len)]).ch.len); k_3 = vg.chk(k_3 + 1)) {
-                const child: number = (_t22 = (_t23 = re.nodes, _t23.buf[_t23.off + vg.ix(ni, _t23.len)]).ch, _t22.buf[_t22.off + vg.ix(k_3, _t22.len)]);
-                let length: number = (_t24 = re.nodes, _t24.buf[_t24.off + vg.ix(child, _t24.len)]).minL;
+            for (let k_3: number = 0; (k_3 < (_t21 = re.nodes, _t21.buf[_t21.off + vg.ix(ni, _t21.len)]).ch.len); k_3 = vg.chk(k_3 + 1)) {
+                const child: number = (_t23 = (_t24 = re.nodes, _t24.buf[_t24.off + vg.ix(ni, _t24.len)]).ch, _t23.buf[_t23.off + vg.ix(k_3, _t23.len)]);
+                let length: number = (_t25 = re.nodes, _t25.buf[_t25.off + vg.ix(child, _t25.len)]).minL;
                 if ((!fixedLength(re.nodes, child))) {
                     length = vg.chk(length + rest);
                 }
@@ -5103,10 +5118,10 @@ export function onePassCaps(re: Regexp, d: decoded, ni: number, i: number, j: nu
             if ((span === 0)) {
                 return true;
             }
-            const child_2: number = (_t25 = (_t26 = re.nodes, _t26.buf[_t26.off + vg.ix(ni, _t26.len)]).ch, _t25.buf[_t25.off + vg.ix(0, _t25.len)]);
-            const size: number = (_t27 = re.nodes, _t27.buf[_t27.off + vg.ix(child_2, _t27.len)]).minL;
+            const child_2: number = (_t26 = (_t27 = re.nodes, _t27.buf[_t27.off + vg.ix(ni, _t27.len)]).ch, _t26.buf[_t26.off + vg.ix(0, _t26.len)]);
+            const size: number = (_t28 = re.nodes, _t28.buf[_t28.off + vg.ix(child_2, _t28.len)]).minL;
             const count: number = vg.div(span, size);
-            if ((((vg.rem(span, size) !== 0) || (count < (_t28 = re.nodes, _t28.buf[_t28.off + vg.ix(ni, _t28.len)]).min)) || (((_t29 = re.nodes, _t29.buf[_t29.off + vg.ix(ni, _t29.len)]).max !== infinite) && (count > (_t30 = re.nodes, _t30.buf[_t30.off + vg.ix(ni, _t30.len)]).max)))) {
+            if ((((vg.rem(span, size) !== 0) || (count < (_t29 = re.nodes, _t29.buf[_t29.off + vg.ix(ni, _t29.len)]).min)) || (((_t30 = re.nodes, _t30.buf[_t30.off + vg.ix(ni, _t30.len)]).max !== infinite) && (count > (_t31 = re.nodes, _t31.buf[_t31.off + vg.ix(ni, _t31.len)]).max)))) {
                 return false;
             }
             let at_2: number = i;
@@ -5122,9 +5137,9 @@ export function onePassCaps(re: Regexp, d: decoded, ni: number, i: number, j: nu
         case opAlt:
         {
             let chosen: number = (0 - 1);
-            for (let idx: number = 0; (idx < (_t32 = re.nodes, _t32.buf[_t32.off + vg.ix(ni, _t32.len)]).ch.len); idx = vg.chk(idx + 1)) {
-                const branch: number = (_t34 = (_t35 = re.nodes, _t35.buf[_t35.off + vg.ix(ni, _t35.len)]).ch, _t34.buf[_t34.off + vg.ix(idx, _t34.len)]);
-                if (((span < (_t36 = re.nodes, _t36.buf[_t36.off + vg.ix(branch, _t36.len)]).minL) || (span > (_t37 = re.nodes, _t37.buf[_t37.off + vg.ix(branch, _t37.len)]).maxL))) {
+            for (let idx: number = 0; (idx < (_t33 = re.nodes, _t33.buf[_t33.off + vg.ix(ni, _t33.len)]).ch.len); idx = vg.chk(idx + 1)) {
+                const branch: number = (_t35 = (_t36 = re.nodes, _t36.buf[_t36.off + vg.ix(ni, _t36.len)]).ch, _t35.buf[_t35.off + vg.ix(idx, _t35.len)]);
+                if (((span < (_t37 = re.nodes, _t37.buf[_t37.off + vg.ix(branch, _t37.len)]).minL) || (((_t38 = re.nodes, _t38.buf[_t38.off + vg.ix(branch, _t38.len)]).maxL < lenInf) && (span > (_t39 = re.nodes, _t39.buf[_t39.off + vg.ix(branch, _t39.len)]).maxL)))) {
                     continue;
                 }
                 if ((chosen >= 0)) {
@@ -5133,17 +5148,17 @@ export function onePassCaps(re: Regexp, d: decoded, ni: number, i: number, j: nu
                 }
                 chosen = idx;
             }
-            if (((chosen < 0) && ((_t38 = re.nodes, _t38.buf[_t38.off + vg.ix(ni, _t38.len)]).firsts.buf !== null))) {
+            if (((chosen < 0) && ((_t40 = re.nodes, _t40.buf[_t40.off + vg.ix(ni, _t40.len)]).firsts.buf !== null))) {
                 if ((span === 0)) {
-                    for (let idx_2: number = 0; (idx_2 < (_t39 = re.nodes, _t39.buf[_t39.off + vg.ix(ni, _t39.len)]).ch.len); idx_2 = vg.chk(idx_2 + 1)) {
-                        if (((_t41 = re.nodes, _t41.buf[_t41.off + vg.ix((_t42 = (_t43 = re.nodes, _t43.buf[_t43.off + vg.ix(ni, _t43.len)]).ch, _t42.buf[_t42.off + vg.ix(idx_2, _t42.len)]), _t41.len)]).minL === 0)) {
+                    for (let idx_2: number = 0; (idx_2 < (_t41 = re.nodes, _t41.buf[_t41.off + vg.ix(ni, _t41.len)]).ch.len); idx_2 = vg.chk(idx_2 + 1)) {
+                        if (((_t43 = re.nodes, _t43.buf[_t43.off + vg.ix((_t44 = (_t45 = re.nodes, _t45.buf[_t45.off + vg.ix(ni, _t45.len)]).ch, _t44.buf[_t44.off + vg.ix(idx_2, _t44.len)]), _t43.len)]).minL === 0)) {
                             chosen = idx_2;
                             break;
                         }
                     }
                 } else {
-                    for (let idx_3: number = 0; (idx_3 < (_t44 = re.nodes, _t44.buf[_t44.off + vg.ix(ni, _t44.len)]).ch.len); idx_3 = vg.chk(idx_3 + 1)) {
-                        if (runesContain((_t46 = (_t47 = re.nodes, _t47.buf[_t47.off + vg.ix(ni, _t47.len)]).firsts, _t46.buf[_t46.off + vg.ix(idx_3, _t46.len)]), (_t48 = d.runes, _t48.buf[_t48.off + vg.ix(i, _t48.len)]))) {
+                    for (let idx_3: number = 0; (idx_3 < (_t46 = re.nodes, _t46.buf[_t46.off + vg.ix(ni, _t46.len)]).ch.len); idx_3 = vg.chk(idx_3 + 1)) {
+                        if (runesContain((_t48 = (_t49 = re.nodes, _t49.buf[_t49.off + vg.ix(ni, _t49.len)]).firsts, _t48.buf[_t48.off + vg.ix(idx_3, _t48.len)]), (_t50 = d.runes, _t50.buf[_t50.off + vg.ix(i, _t50.len)]))) {
                             chosen = idx_3;
                             break;
                         }
@@ -5153,7 +5168,7 @@ export function onePassCaps(re: Regexp, d: decoded, ni: number, i: number, j: nu
             if ((chosen < 0)) {
                 return false;
             }
-            return onePassCaps(re, d, (_t49 = (_t50 = re.nodes, _t50.buf[_t50.off + vg.ix(ni, _t50.len)]).ch, _t49.buf[_t49.off + vg.ix(chosen, _t49.len)]), i, j, eflags, caps);
+            return onePassCaps(re, d, (_t51 = (_t52 = re.nodes, _t52.buf[_t52.off + vg.ix(ni, _t52.len)]).ch, _t51.buf[_t51.off + vg.ix(chosen, _t51.len)]), i, j, eflags, caps);
             break;
         }
     }
@@ -5749,7 +5764,7 @@ export function collectNested(re: Regexp, ni: number, stack: groupStack): void {
     }
 }
 
-export function minMatchChars(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, loc: Locale, ni: number): number {
+export function minMatchChars(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, loc: Locale, ni: number): bigint {
     let _t1!: vg.Slice<number>;
     let _t3!: vg.Slice<number>;
     let _t5!: vg.Slice<number>;
@@ -5758,18 +5773,18 @@ export function minMatchChars(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, 
         case opChar:
         case opAny:
         {
-            return 1;
+            return 1n;
             break;
         }
         case opBracket:
         {
-            return bracketMinChars(brs, nodes.buf[nodes.off + vg.ix(ni, nodes.len)].br, loc);
+            return BigInt(bracketMinChars(brs, nodes.buf[nodes.off + vg.ix(ni, nodes.len)].br, loc));
             break;
         }
         case opBOL:
         case opEOL:
         {
-            return 0;
+            return 0n;
             break;
         }
         case opGroup:
@@ -5779,11 +5794,11 @@ export function minMatchChars(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, 
         }
         case opConcat:
         {
-            let total: number = 0;
+            let total: bigint = 0n;
             for (let i: number = 0; (i < nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len); i = vg.chk(i + 1)) {
-                total = vg.chk(total + minMatchChars(nodes, brs, loc, (_t3 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t3.buf[_t3.off + vg.ix(i, _t3.len)])));
-                if ((total > lengthCap)) {
-                    return lengthCap;
+                total = BigInt.asIntN(64, total + minMatchChars(nodes, brs, loc, (_t3 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t3.buf[_t3.off + vg.ix(i, _t3.len)])));
+                if ((total > 1099511627776n)) {
+                    return 1099511627776n;
                 }
             }
             return total;
@@ -5791,9 +5806,9 @@ export function minMatchChars(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, 
         }
         case opAlt:
         {
-            let best: number = lengthCap;
+            let best: bigint = 1099511627776n;
             for (let i_2: number = 0; (i_2 < nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len); i_2 = vg.chk(i_2 + 1)) {
-                best = Math.min(best, minMatchChars(nodes, brs, loc, (_t5 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t5.buf[_t5.off + vg.ix(i_2, _t5.len)])));
+                best = vg.minBig(best, minMatchChars(nodes, brs, loc, (_t5 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t5.buf[_t5.off + vg.ix(i_2, _t5.len)])));
             }
             return best;
             break;
@@ -5801,14 +5816,14 @@ export function minMatchChars(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, 
         case opRepeat:
         {
             if ((nodes.buf[nodes.off + vg.ix(ni, nodes.len)].min === 0)) {
-                return 0;
+                return 0n;
             }
-            const product: number = vg.chk(nodes.buf[nodes.off + vg.ix(ni, nodes.len)].min * minMatchChars(nodes, brs, loc, (_t6 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t6.buf[_t6.off + vg.ix(0, _t6.len)])));
-            return Math.min(product, lengthCap);
+            const product: bigint = BigInt.asIntN(64, BigInt(nodes.buf[nodes.off + vg.ix(ni, nodes.len)].min) * minMatchChars(nodes, brs, loc, (_t6 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t6.buf[_t6.off + vg.ix(0, _t6.len)])));
+            return vg.minBig(product, 1099511627776n);
             break;
         }
     }
-    return 0;
+    return 0n;
 }
 
 export function Compile(pattern: vg.Str, loc: Locale, flags: number): [Regexp, Error] {
@@ -5840,7 +5855,7 @@ export function Compile(pattern: vg.Str, loc: Locale, flags: number): [Regexp, E
     if ((b.errCode !== ErrNone)) {
         return [re, compileError(b.errCode, (0 - 1))];
     }
-    if (b.tooBig) {
+    if ((b.tooBig || ((re.minSlots > 0) && (b.prog.ins.len > vg.div(maxCounterCells, re.minSlots))))) {
         re.minLen = minMatchChars(re.nodes, re.brackets, re.loc, root);
     } else {
         re.progOK = true;
@@ -5863,10 +5878,10 @@ export function Exec(re: Regexp, subject: vg.Str, pmatch: vg.Slice<Match>, eflag
         return [false, compileError(ErrESpace, (0 - 1))];
     }
     if ((!re.progOK)) {
-        if ((subject.length < re.minLen)) {
+        if ((BigInt(subject.length) < re.minLen)) {
             return [false, noError()];
         }
-        if ((runeCount(subject) < re.minLen)) {
+        if ((BigInt(runeCount(subject)) < re.minLen)) {
             return [false, noError()];
         }
         if (trivialNullMatch(re, pmatch)) {
@@ -6028,6 +6043,10 @@ export function parseReplacement(replacement: vg.Str, nsub: number): [vg.Slice<r
     return [parts, noError()];
 }
 
+export function replaceCapacity(n: number): number {
+    return vg.chk(n + Math.min(vg.div(n, 8), vg.chk(subjectLimit - n)));
+}
+
 export function ReplaceAll(re: Regexp, subject: vg.Str, replacement: vg.Str, limit: number, eflags: number): [vg.Str, Error] {
     if ((((re.flags & FlagNoSub) >>> 0) !== 0)) {
         return [vg.EMPTY, compileError(ErrENoSub, (0 - 1))];
@@ -6059,7 +6078,7 @@ export function ReplaceAll(re: Regexp, subject: vg.Str, replacement: vg.Str, lim
             break;
         }
         if ((!any_)) {
-            out = vg.make(vg.U8, 0, vg.chk(subject.length + vg.div(subject.length, 8)));
+            out = vg.make(vg.U8, 0, replaceCapacity(subject.length));
             any_ = true;
         }
         out = vg.appendStr(out, vg.strSub(subject, last, pmatch.buf[pmatch.off + vg.ix(0, pmatch.len)].So));
@@ -6453,15 +6472,17 @@ export function parseCount(p: parser): [number, boolean] {
 }
 
 export function satAdd(a: number, b: number): number {
-    return Math.min(vg.chk(a + b), lenInf);
+    if ((a > vg.chk(lenInf - b))) {
+        return lenInf;
+    }
+    return vg.chk(a + b);
 }
 
 export function satMul(a: number, b: number): number {
-    const product: number = vg.chk(a * b);
-    if ((product > lenInf)) {
+    if (((a !== 0) && (b > vg.div(lenInf, a)))) {
         return lenInf;
     }
-    return product;
+    return vg.chk(a * b);
 }
 
 export function computeLengths(nodes: vg.Slice<node>, loc: Locale, brackets: vg.Slice<bracketSet>, ni: number): void {

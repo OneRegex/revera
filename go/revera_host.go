@@ -237,7 +237,7 @@ func (re *Regexp) ReplaceAllStringFunc(subject string, repl func(match string) s
 	any := false
 	err := re.eachMatch(subject, -1, func(pmatch []Match) {
 		if !any {
-			out.Grow(len(subject) + len(subject)/8)
+			out.Grow(replaceCapacity(len(subject)))
 			any = true
 		}
 		out.WriteString(subject[last:pmatch[0].So])

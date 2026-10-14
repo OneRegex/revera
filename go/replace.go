@@ -149,6 +149,13 @@ func parseReplacement(replacement string, nsub int) ([]replPart, Error) {
 	return parts, noError()
 }
 
+// replaceCapacity is the output buffer reserved for a subject of n bytes.
+// It is sized for the common case, where the result stays close to the subject size.
+// The min keeps it from overflowing a 32-bit int.
+func replaceCapacity(n int) int {
+	return n + min(n/8, subjectLimit-n)
+}
+
 // ReplaceAll returns subject with every non-overlapping match replaced by replacement, like the sed s///g command.
 // In replacement, & stands for the whole match and \1 through \9 for one group.
 // A backslash escapes the next character, so \& and \\ are literal.
@@ -182,8 +189,7 @@ func ReplaceAll(re *Regexp, subject string, replacement string, limit int, eflag
 			break
 		}
 		if !any {
-			// One reservation covers the common case, where the result stays near the subject size.
-			out = make([]uint8, 0, len(subject)+len(subject)/8)
+			out = make([]uint8, 0, replaceCapacity(len(subject)))
 			any = true
 		}
 		out = append(out, subject[last:pmatch[0].So]...)

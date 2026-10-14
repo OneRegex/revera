@@ -135,14 +135,15 @@ func localeLoad(l *Locale, blob string) bool {
 	l.blob = blob
 	cursor := len(magic)
 	for i := 0; i < numSections; i++ {
-		if cursor+4 > len(blob) {
+		if len(blob)-cursor < 4 {
 			return false
 		}
-		length := int(u32Raw(blob, cursor))
+		raw := u32Raw(blob, cursor)
 		cursor += 4
-		if cursor+length > len(blob) {
+		if uint64(raw) > uint64(len(blob)-cursor) {
 			return false
 		}
+		length := int(raw)
 		l.sec[i].Off = cursor
 		l.sec[i].End = cursor + length
 		cursor += length
@@ -217,9 +218,9 @@ func localeValidate(l *Locale) bool {
 	codepointCount := sectionLen(l, secSeqCodepoints) / 4
 	seqCount := sectionLen(l, secSequences) / 8
 	for i := 0; i < seqCount; i++ {
-		off := int(u32At(l, secSequences, 2*i))
-		length := int(u32At(l, secSequences, 2*i+1))
-		if length < 1 || length > l.maxSeq || off+length > codepointCount {
+		off := u32At(l, secSequences, 2*i)
+		length := u32At(l, secSequences, 2*i+1)
+		if length < 1 || length > uint32(l.maxSeq) || !u32SpanWithin(off, length, codepointCount) {
 			return false
 		}
 	}
@@ -241,14 +242,18 @@ func localeValidate(l *Locale) bool {
 		return false
 	}
 	profileCount := sectionLen(l, secCollationProfiles) / 24
+	// Profile indexes are stored in 16 bits.
+	if profileCount > 1<<16 {
+		return false
+	}
 	overrideCount := sectionLen(l, secCollationOverrides) / 8
 	addCount := sectionLen(l, secContractionAdds) / 4
 	removeCount := sectionLen(l, secContractionRemoves) / 4
 	for i := 0; i < profileCount; i++ {
 		row := collationProfileRow(l, i)
-		if row.OverrideFirst+row.OverrideCount > overrideCount ||
-			row.AddFirst+row.AddCount > addCount ||
-			row.RemoveFirst+row.RemoveCount > removeCount {
+		if !u32SpanWithin(row.OverrideFirst, row.OverrideCount, overrideCount) ||
+			!u32SpanWithin(row.AddFirst, row.AddCount, addCount) ||
+			!u32SpanWithin(row.RemoveFirst, row.RemoveCount, removeCount) {
 			return false
 		}
 	}
@@ -257,7 +262,7 @@ func localeValidate(l *Locale) bool {
 	}
 	typeNameCount := sectionLen(l, secTypeNameOffsets) / 4
 	for i := 0; i < typeNameCount; i++ {
-		if int(u32At(l, secTypeNameOffsets, i)) >= sectionLen(l, secTypeNames) {
+		if !u32Below(u32At(l, secTypeNameOffsets, i), sectionLen(l, secTypeNames)) {
 			return false
 		}
 	}
@@ -271,16 +276,16 @@ func localeValidate(l *Locale) bool {
 		return false
 	}
 	for i := 0; i < count; i++ {
-		if int(u32At(l, secLocaleNameOffsets, i)) >= sectionLen(l, secLocaleNames) {
+		if !u32Below(u32At(l, secLocaleNameOffsets, i), sectionLen(l, secLocaleNames)) {
 			return false
 		}
 	}
 	typeRowCount := sectionLen(l, secLocaleTypes) / 4
 	for i := 0; i < count; i++ {
 		row := localeRowAt(l, i)
-		if row.TypeFirst+row.TypeCount > typeRowCount ||
+		if !u32SpanWithin(row.TypeFirst, row.TypeCount, typeRowCount) ||
 			row.CaseProfile > 1 ||
-			int(row.DefaultCollation) >= profileCount {
+			!u32Below(row.DefaultCollation, profileCount) {
 			return false
 		}
 	}
@@ -307,11 +312,21 @@ func contractionIDsValid(l *Locale, sec int, seqCount int) bool {
 	count := sectionLen(l, sec) / 4
 	for i := 0; i < count; i++ {
 		id := u32At(l, sec, i)
-		if id >= firstSequenceID && int(id-firstSequenceID) >= seqCount {
+		if id >= firstSequenceID && !u32Below(id-firstSequenceID, seqCount) {
 			return false
 		}
 	}
 	return true
+}
+
+// u32Below and u32SpanWithin check blob fields before they become ints.
+// On a 32-bit platform, converting first could turn a large value negative.
+func u32Below(v uint32, limit int) bool {
+	return uint64(v) < uint64(limit)
+}
+
+func u32SpanWithin(first uint32, count uint32, limit int) bool {
+	return uint64(first)+uint64(count) <= uint64(limit)
 }
 
 // localeMaxElementLength returns the largest character count of any multi-character collating element in the data.
@@ -446,8 +461,8 @@ func localesCount(l *Locale) int {
 // The row on disk holds five u32 values: name_id, type_first, type_count, case_profile and default_collation.
 // Nothing needs name_id after the name search, so this type omits it.
 type LocaleRow struct {
-	TypeFirst        int
-	TypeCount        int
+	TypeFirst        uint32
+	TypeCount        uint32
 	CaseProfile      uint32
 	DefaultCollation uint32
 }
@@ -455,8 +470,8 @@ type LocaleRow struct {
 func localeRowAt(l *Locale, index int) LocaleRow {
 	base := 5 * index
 	var row LocaleRow
-	row.TypeFirst = int(u32At(l, secLocales, base+1))
-	row.TypeCount = int(u32At(l, secLocales, base+2))
+	row.TypeFirst = u32At(l, secLocales, base+1)
+	row.TypeCount = u32At(l, secLocales, base+2)
 	row.CaseProfile = u32At(l, secLocales, base+3)
 	row.DefaultCollation = u32At(l, secLocales, base+4)
 	return row
@@ -545,8 +560,8 @@ func resolveLocale(data *Locale, req localeRequest) (Locale, bool) {
 	if typeID < 0 {
 		return invalid, false
 	}
-	low := row.TypeFirst
-	high := row.TypeFirst + row.TypeCount
+	low := int(row.TypeFirst)
+	high := low + int(row.TypeCount)
 	for low < high {
 		middle := low + (high-low)/2
 		rowTypeID := int(u16At(&result, secLocaleTypes, 2*middle))
@@ -929,23 +944,23 @@ func u32Contains(l *Locale, sec int, first int, count int, needle uint32) bool {
 
 // CollProfile mirrors one row of the collation profiles section.
 type CollProfile struct {
-	OverrideFirst int
-	OverrideCount int
-	AddFirst      int
-	AddCount      int
-	RemoveFirst   int
-	RemoveCount   int
+	OverrideFirst uint32
+	OverrideCount uint32
+	AddFirst      uint32
+	AddCount      uint32
+	RemoveFirst   uint32
+	RemoveCount   uint32
 }
 
 func collationProfileRow(l *Locale, index int) CollProfile {
 	base := 6 * index
 	var row CollProfile
-	row.OverrideFirst = int(u32At(l, secCollationProfiles, base))
-	row.OverrideCount = int(u32At(l, secCollationProfiles, base+1))
-	row.AddFirst = int(u32At(l, secCollationProfiles, base+2))
-	row.AddCount = int(u32At(l, secCollationProfiles, base+3))
-	row.RemoveFirst = int(u32At(l, secCollationProfiles, base+4))
-	row.RemoveCount = int(u32At(l, secCollationProfiles, base+5))
+	row.OverrideFirst = u32At(l, secCollationProfiles, base)
+	row.OverrideCount = u32At(l, secCollationProfiles, base+1)
+	row.AddFirst = u32At(l, secCollationProfiles, base+2)
+	row.AddCount = u32At(l, secCollationProfiles, base+3)
+	row.RemoveFirst = u32At(l, secCollationProfiles, base+4)
+	row.RemoveCount = u32At(l, secCollationProfiles, base+5)
 	return row
 }
 
@@ -954,15 +969,15 @@ func isContraction(l *Locale, element uint32) bool {
 		return false
 	}
 	row := collationProfileRow(l, int(l.collationProfile))
-	if u32Contains(l, secContractionAdds, row.AddFirst, row.AddCount, element) {
+	if u32Contains(l, secContractionAdds, int(row.AddFirst), int(row.AddCount), element) {
 		return true
 	}
 	rootCount := sectionLen(l, secRootContractions) / 4
 	if !u32Contains(l, secRootContractions, 0, rootCount, element) {
 		return false
 	}
-	return !u32Contains(l, secContractionRemoves, row.RemoveFirst,
-		row.RemoveCount, element)
+	return !u32Contains(l, secContractionRemoves, int(row.RemoveFirst),
+		int(row.RemoveCount), element)
 }
 
 // collatingElementID maps seq to its element ID when seq is one collating element in this locale.
@@ -1025,8 +1040,8 @@ func findPair(l *Locale, sec int, first int, count int, element uint32) (uint32,
 
 func primaryToken(l *Locale, element uint32) uint64 {
 	row := collationProfileRow(l, int(l.collationProfile))
-	rep, ok := findPair(l, secCollationOverrides, row.OverrideFirst,
-		row.OverrideCount, element)
+	rep, ok := findPair(l, secCollationOverrides, int(row.OverrideFirst),
+		int(row.OverrideCount), element)
 	if ok {
 		return 0x2_0000_0000 | uint64(rep)
 	}
@@ -1081,8 +1096,8 @@ func localeMinEquivLength(l *Locale, seq []int32) int {
 	token := primaryToken(l, element)
 	best := len(seq)
 	row := collationProfileRow(l, int(l.collationProfile))
-	best = minTokenLength(l, secCollationOverrides, row.OverrideFirst,
-		row.OverrideCount, token, best)
+	best = minTokenLength(l, secCollationOverrides, int(row.OverrideFirst),
+		int(row.OverrideCount), token, best)
 	if best == 1 {
 		return 1
 	}

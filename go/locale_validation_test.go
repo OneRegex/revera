@@ -2,6 +2,7 @@ package revera
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 )
 
@@ -79,21 +80,62 @@ func TestLocaleRejectsUnderstatedSequenceMaximum(t *testing.T) {
 	}
 }
 
-func TestLocaleRejectsOutOfRangeRowFields(t *testing.T) {
+func TestLocaleRejectsOutOfRangeFields(t *testing.T) {
 	base, ok := LocaleLoad(EmbeddedLocaleData())
 	if !ok {
 		t.Fatal("embedded locale failed to load")
 	}
-	// Fields 3 and 4 of row 0 hold the case profile and the default collation.
-	// The values below keep their low bits valid, so only a check of the full stored value catches them.
+	// Some values keep their low bits valid, so only a check of the whole stored value catches them.
+	// Values with the top bit set would turn negative as a 32-bit int.
+	profile := base.sec[secCollationProfiles].Off
+	locale := base.sec[secLocales].Off
 	for _, tc := range []struct {
-		field int
+		name  string
+		off   int
 		value uint32
-	}{{3, 2}, {3, 0x101}, {4, 0x10000}} {
+	}{
+		{"first section length", len("RVLOC001"), 0x80000000},
+		{"sequence offset", base.sec[secSequences].Off, 0x80000000},
+		{"contraction sequence ID", base.sec[secRootContractions].Off, firstSequenceID + 0x80000000},
+		{"profile override first", profile, 0xffffffff},
+		{"profile add first", profile + 8, 0x80000000},
+		{"profile remove count", profile + 20, 0xffffffff},
+		{"type name offset", base.sec[secTypeNameOffsets].Off, 0x80000000},
+		{"locale name offset", base.sec[secLocaleNameOffsets].Off, 0x80000000},
+		{"locale type first", locale + 4, 0xffffffff},
+		{"locale case profile", locale + 12, 2},
+		{"locale case profile", locale + 12, 0x101},
+		{"locale default collation", locale + 16, 0x10000},
+		{"locale default collation", locale + 16, 0x80000000},
+	} {
 		raw := []byte(EmbeddedLocaleData())
-		binary.LittleEndian.PutUint32(raw[base.sec[secLocales].Off+4*tc.field:], tc.value)
+		binary.LittleEndian.PutUint32(raw[tc.off:], tc.value)
 		if _, accepted := LocaleLoad(string(raw)); accepted {
-			t.Errorf("locale row field %d accepted %#x", tc.field, tc.value)
+			t.Errorf("%s accepted %#x", tc.name, tc.value)
 		}
+	}
+}
+
+func TestLocaleRejectsProfilesPastSixteenBits(t *testing.T) {
+	base, ok := LocaleLoad(EmbeddedLocaleData())
+	if !ok {
+		t.Fatal("embedded locale failed to load")
+	}
+	profiles := sectionLen(&base, secCollationProfiles) / 24
+	// grow adds empty profile rows and makes the last one the default of the first locale.
+	grow := func(rows int) string {
+		blob := EmbeddedLocaleData()
+		end := base.sec[secCollationProfiles].End
+		raw := []byte(blob[:end] + strings.Repeat("\x00", 24*rows) + blob[end:])
+		lengthAt := base.sec[secCollationProfiles].Off - 4
+		binary.LittleEndian.PutUint32(raw[lengthAt:], uint32(24*(profiles+rows)))
+		binary.LittleEndian.PutUint32(raw[base.sec[secLocales].Off+24*rows+16:], uint32(profiles+rows-1))
+		return string(raw)
+	}
+	if _, accepted := LocaleLoad(grow(1<<16 - profiles)); !accepted {
+		t.Fatal("rejected exactly 65,536 profiles")
+	}
+	if _, accepted := LocaleLoad(grow(1<<16 - profiles + 1)); accepted {
+		t.Fatal("accepted a default collation of 65,536, which a 16-bit index wraps to 0")
 	}
 }

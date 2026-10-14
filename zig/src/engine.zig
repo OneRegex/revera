@@ -112,11 +112,12 @@ pub const iSplit: u8 = 6;
 pub const iJmp: u8 = 7;
 pub const iMatch: u8 = 8;
 pub const iFail: u8 = 9;
-pub const failMinNone = (vg.cv(i64, 1) << 62);
+pub const failMinNone = (lenInf +% 1);
 pub const maxProgram = (1 << 20);
 pub const maskWidth = 64;
 pub const subjectLimit = ((1 << 31) -% 1);
 pub const lengthCap = (vg.cv(i64, 1) << 40);
+pub const maxCounterCells = ((1 << 31) -% 1);
 pub const opChar: u8 = 0;
 pub const opAny: u8 = 1;
 pub const opBracket: u8 = 2;
@@ -304,8 +305,8 @@ pub const Locale = struct {
 };
 
 pub const LocaleRow = struct {
-    TypeFirst: i64 = 0,
-    TypeCount: i64 = 0,
+    TypeFirst: u32 = 0,
+    TypeCount: u32 = 0,
     CaseProfile: u32 = 0,
     DefaultCollation: u32 = 0,
 };
@@ -327,12 +328,12 @@ pub const preimageBuf = struct {
 };
 
 pub const CollProfile = struct {
-    OverrideFirst: i64 = 0,
-    OverrideCount: i64 = 0,
-    AddFirst: i64 = 0,
-    AddCount: i64 = 0,
-    RemoveFirst: i64 = 0,
-    RemoveCount: i64 = 0,
+    OverrideFirst: u32 = 0,
+    OverrideCount: u32 = 0,
+    AddFirst: u32 = 0,
+    AddCount: u32 = 0,
+    RemoveFirst: u32 = 0,
+    RemoveCount: u32 = 0,
 };
 
 pub const Match = struct {
@@ -1714,8 +1715,8 @@ pub fn localeLookupCosts(l: *Locale) lookupCosts {
     }
     lc.sequenceSearch = searchSteps(vg.divT(sectionLen(l, secSequences), 8));
     const row: CollProfile = collationProfileRow(l, vg.cv(i64, l.collationProfile));
-    lc.contraction = (((((1 +% profileRowCost) +% u32ContainsCost(row.AddCount)) +% 1) +% u32ContainsCost(vg.divT(sectionLen(l, secRootContractions), 4))) +% u32ContainsCost(row.RemoveCount));
-    lc.primaryToken = ((((1 +% profileRowCost) +% findPairCost(row.OverrideCount)) +% 1) +% findPairCost(vg.divT(sectionLen(l, secRootEquivalences), 8)));
+    lc.contraction = (((((1 +% profileRowCost) +% u32ContainsCost(vg.cv(i64, row.AddCount))) +% 1) +% u32ContainsCost(vg.divT(sectionLen(l, secRootContractions), 4))) +% u32ContainsCost(vg.cv(i64, row.RemoveCount)));
+    lc.primaryToken = ((((1 +% profileRowCost) +% findPairCost(vg.cv(i64, row.OverrideCount))) +% 1) +% findPairCost(vg.divT(sectionLen(l, secRootEquivalences), 8)));
     lc.classMask = 4;
     lc.preimages = vg.cv(i64, localeMaxPreimages(l));
     lc.caseConvert = (2 +% findCaseCost(vg.divT(sectionLen(l, secCaseDefault), 12)));
@@ -2371,8 +2372,8 @@ pub fn paRun(mem: vg.Allocator, e: *phaseAState, ws: *engineWS, re: *Regexp) vg.
             {
                 var delta: i64 = 1;
                 while ((delta < e.ring)) : (delta +%= 1) {
-                    const fi: i64 = vg.remT((e.ci +% delta), e.ring);
-                    if (((ws.slots.at(fi).*.gen == paGen((e.ci +% delta))) and (ws.slots.at(fi).*.active.len > 0))) {
+                    const fi: i64 = vg.remT((si +% delta), e.ring);
+                    if (((ws.slots.at(fi).*.gen == (g +% vg.cv(u32, delta))) and (ws.slots.at(fi).*.active.len > 0))) {
                         pendingWork = true;
                         break;
                     }
@@ -2575,14 +2576,15 @@ pub fn localeLoad(l: *Locale, blob: vg.Str) bool {
     {
         var i: i64 = 0;
         while ((i < numSections)) : (i +%= 1) {
-            if (((cursor +% 4) > blob.len)) {
+            if (((blob.len -% cursor) < 4)) {
                 return false;
             }
-            const length: i64 = vg.cv(i64, u32Raw(blob, cursor));
+            const raw: u32 = u32Raw(blob, cursor);
             cursor +%= 4;
-            if (((cursor +% length) > blob.len)) {
+            if ((vg.cv(u64, raw) > vg.cv(u64, (blob.len -% cursor)))) {
                 return false;
             }
+            const length: i64 = vg.cv(i64, raw);
             l.sec[vg.arrayIndex(23, i)].Off = cursor;
             l.sec[vg.arrayIndex(23, i)].End = (cursor +% length);
             cursor +%= length;
@@ -2646,9 +2648,9 @@ pub fn localeValidate(l: *Locale) bool {
     {
         var i_2: i64 = 0;
         while ((i_2 < seqCount)) : (i_2 +%= 1) {
-            const off: i64 = vg.cv(i64, u32At(l, secSequences, (2 *% i_2)));
-            const length: i64 = vg.cv(i64, u32At(l, secSequences, ((2 *% i_2) +% 1)));
-            if ((((length < 1) or (length > l.maxSeq)) or ((off +% length) > codepointCount))) {
+            const off: u32 = u32At(l, secSequences, (2 *% i_2));
+            const length: u32 = u32At(l, secSequences, ((2 *% i_2) +% 1));
+            if ((((length < 1) or (length > vg.cv(u32, l.maxSeq))) or (!u32SpanWithin(off, length, codepointCount)))) {
                 return false;
             }
         }
@@ -2666,6 +2668,9 @@ pub fn localeValidate(l: *Locale) bool {
         return false;
     }
     const profileCount: i64 = vg.divT(sectionLen(l, secCollationProfiles), 24);
+    if ((profileCount > (1 << 16))) {
+        return false;
+    }
     const overrideCount: i64 = vg.divT(sectionLen(l, secCollationOverrides), 8);
     const addCount: i64 = vg.divT(sectionLen(l, secContractionAdds), 4);
     const removeCount: i64 = vg.divT(sectionLen(l, secContractionRemoves), 4);
@@ -2673,7 +2678,7 @@ pub fn localeValidate(l: *Locale) bool {
         var i_3: i64 = 0;
         while ((i_3 < profileCount)) : (i_3 +%= 1) {
             const row: CollProfile = collationProfileRow(l, i_3);
-            if (((((row.OverrideFirst +% row.OverrideCount) > overrideCount) or ((row.AddFirst +% row.AddCount) > addCount)) or ((row.RemoveFirst +% row.RemoveCount) > removeCount))) {
+            if ((((!u32SpanWithin(row.OverrideFirst, row.OverrideCount, overrideCount)) or (!u32SpanWithin(row.AddFirst, row.AddCount, addCount))) or (!u32SpanWithin(row.RemoveFirst, row.RemoveCount, removeCount)))) {
                 return false;
             }
         }
@@ -2685,7 +2690,7 @@ pub fn localeValidate(l: *Locale) bool {
     {
         var i_4: i64 = 0;
         while ((i_4 < typeNameCount)) : (i_4 +%= 1) {
-            if ((vg.cv(i64, u32At(l, secTypeNameOffsets, i_4)) >= sectionLen(l, secTypeNames))) {
+            if ((!u32Below(u32At(l, secTypeNameOffsets, i_4), sectionLen(l, secTypeNames)))) {
                 return false;
             }
         }
@@ -2700,7 +2705,7 @@ pub fn localeValidate(l: *Locale) bool {
     {
         var i_5: i64 = 0;
         while ((i_5 < count)) : (i_5 +%= 1) {
-            if ((vg.cv(i64, u32At(l, secLocaleNameOffsets, i_5)) >= sectionLen(l, secLocaleNames))) {
+            if ((!u32Below(u32At(l, secLocaleNameOffsets, i_5), sectionLen(l, secLocaleNames)))) {
                 return false;
             }
         }
@@ -2710,7 +2715,7 @@ pub fn localeValidate(l: *Locale) bool {
         var i_6: i64 = 0;
         while ((i_6 < count)) : (i_6 +%= 1) {
             const row_2: LocaleRow = localeRowAt(l, i_6);
-            if (((((row_2.TypeFirst +% row_2.TypeCount) > typeRowCount) or (row_2.CaseProfile > 1)) or (vg.cv(i64, row_2.DefaultCollation) >= profileCount))) {
+            if ((((!u32SpanWithin(row_2.TypeFirst, row_2.TypeCount, typeRowCount)) or (row_2.CaseProfile > 1)) or (!u32Below(row_2.DefaultCollation, profileCount)))) {
                 return false;
             }
         }
@@ -2744,12 +2749,20 @@ pub fn contractionIDsValid(l: *Locale, sec: i64, seqCount: i64) bool {
         var i: i64 = 0;
         while ((i < count)) : (i +%= 1) {
             const id: u32 = u32At(l, sec, i);
-            if (((id >= firstSequenceID) and (vg.cv(i64, (id -% firstSequenceID)) >= seqCount))) {
+            if (((id >= firstSequenceID) and (!u32Below((id -% firstSequenceID), seqCount)))) {
                 return false;
             }
         }
     }
     return true;
+}
+
+pub fn u32Below(v: u32, limit: i64) bool {
+    return (vg.cv(u64, v) < vg.cv(u64, limit));
+}
+
+pub fn u32SpanWithin(first: u32, count: u32, limit: i64) bool {
+    return ((vg.cv(u64, first) +% vg.cv(u64, count)) <= vg.cv(u64, limit));
 }
 
 pub fn localeMaxElementLength(l: *Locale) i64 {
@@ -2881,8 +2894,8 @@ pub fn localesCount(l: *Locale) i64 {
 pub fn localeRowAt(l: *Locale, index: i64) LocaleRow {
     const base: i64 = (5 *% index);
     var row: LocaleRow = .{};
-    row.TypeFirst = vg.cv(i64, u32At(l, secLocales, (base +% 1)));
-    row.TypeCount = vg.cv(i64, u32At(l, secLocales, (base +% 2)));
+    row.TypeFirst = u32At(l, secLocales, (base +% 1));
+    row.TypeCount = u32At(l, secLocales, (base +% 2));
     row.CaseProfile = u32At(l, secLocales, (base +% 3));
     row.DefaultCollation = u32At(l, secLocales, (base +% 4));
     return row;
@@ -2962,8 +2975,8 @@ pub fn resolveLocale(data: *Locale, req: localeRequest) Tup_t4c6f63616c65x_bool 
     if ((typeID < 0)) {
         return .{ invalid, false };
     }
-    var low: i64 = row.TypeFirst;
-    var high: i64 = (row.TypeFirst +% row.TypeCount);
+    var low: i64 = vg.cv(i64, row.TypeFirst);
+    var high: i64 = (low +% vg.cv(i64, row.TypeCount));
     while ((low < high)) {
         const middle: i64 = (low +% vg.divT((high -% low), 2));
         const rowTypeID: i64 = vg.cv(i64, u16At(&result, secLocaleTypes, (2 *% middle)));
@@ -3323,12 +3336,12 @@ pub fn u32Contains(l: *Locale, sec: i64, first: i64, count: i64, needle: u32) bo
 pub fn collationProfileRow(l: *Locale, index: i64) CollProfile {
     const base: i64 = (6 *% index);
     var row: CollProfile = .{};
-    row.OverrideFirst = vg.cv(i64, u32At(l, secCollationProfiles, base));
-    row.OverrideCount = vg.cv(i64, u32At(l, secCollationProfiles, (base +% 1)));
-    row.AddFirst = vg.cv(i64, u32At(l, secCollationProfiles, (base +% 2)));
-    row.AddCount = vg.cv(i64, u32At(l, secCollationProfiles, (base +% 3)));
-    row.RemoveFirst = vg.cv(i64, u32At(l, secCollationProfiles, (base +% 4)));
-    row.RemoveCount = vg.cv(i64, u32At(l, secCollationProfiles, (base +% 5)));
+    row.OverrideFirst = u32At(l, secCollationProfiles, base);
+    row.OverrideCount = u32At(l, secCollationProfiles, (base +% 1));
+    row.AddFirst = u32At(l, secCollationProfiles, (base +% 2));
+    row.AddCount = u32At(l, secCollationProfiles, (base +% 3));
+    row.RemoveFirst = u32At(l, secCollationProfiles, (base +% 4));
+    row.RemoveCount = u32At(l, secCollationProfiles, (base +% 5));
     return row;
 }
 
@@ -3337,14 +3350,14 @@ pub fn isContraction(l: *Locale, element: u32) bool {
         return false;
     }
     const row: CollProfile = collationProfileRow(l, vg.cv(i64, l.collationProfile));
-    if (u32Contains(l, secContractionAdds, row.AddFirst, row.AddCount, element)) {
+    if (u32Contains(l, secContractionAdds, vg.cv(i64, row.AddFirst), vg.cv(i64, row.AddCount), element)) {
         return true;
     }
     const rootCount: i64 = vg.divT(sectionLen(l, secRootContractions), 4);
     if ((!u32Contains(l, secRootContractions, 0, rootCount, element))) {
         return false;
     }
-    return (!u32Contains(l, secContractionRemoves, row.RemoveFirst, row.RemoveCount, element));
+    return (!u32Contains(l, secContractionRemoves, vg.cv(i64, row.RemoveFirst), vg.cv(i64, row.RemoveCount), element));
 }
 
 pub fn collatingElementID(l: *Locale, seq: vg.Slice(i32)) Tup_u32_bool {
@@ -3408,7 +3421,7 @@ pub fn findPair(l: *Locale, sec: i64, first: i64, count: i64, element: u32) Tup_
 
 pub fn primaryToken(l: *Locale, element: u32) u64 {
     const row: CollProfile = collationProfileRow(l, vg.cv(i64, l.collationProfile));
-    const _t1 = findPair(l, secCollationOverrides, row.OverrideFirst, row.OverrideCount, element);
+    const _t1 = findPair(l, secCollationOverrides, vg.cv(i64, row.OverrideFirst), vg.cv(i64, row.OverrideCount), element);
     var rep: u32 = _t1[0];
     var ok: bool = _t1[1];
     if (ok) {
@@ -3470,7 +3483,7 @@ pub fn localeMinEquivLength(l: *Locale, seq: vg.Slice(i32)) i64 {
     const token: u64 = primaryToken(l, element);
     var best: i64 = seq.len;
     const row: CollProfile = collationProfileRow(l, vg.cv(i64, l.collationProfile));
-    best = minTokenLength(l, secCollationOverrides, row.OverrideFirst, row.OverrideCount, token, best);
+    best = minTokenLength(l, secCollationOverrides, vg.cv(i64, row.OverrideFirst), vg.cv(i64, row.OverrideCount), token, best);
     if ((best == 1)) {
         return 1;
     }
@@ -3816,7 +3829,7 @@ pub fn disjointFirsts(mem: vg.Allocator, nodes: vg.Slice(node), ni: i32) vg.Allo
 
 pub fn onePassCaps(re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64, eflags: u32, caps: vg.Slice(Match)) bool {
     const span: i64 = (j -% i);
-    if (((span < re.nodes.at(ni).*.minL) or (span > re.nodes.at(ni).*.maxL))) {
+    if (((span < re.nodes.at(ni).*.minL) or ((re.nodes.at(ni).*.maxL < lenInf) and (span > re.nodes.at(ni).*.maxL)))) {
         return false;
     }
     switch (re.nodes.at(ni).*.op) {
@@ -3899,7 +3912,7 @@ pub fn onePassCaps(re: *Regexp, d: *decoded, ni: i32, i: i64, j: i64, eflags: u3
                 var idx: i64 = 0;
                 while ((idx < re.nodes.at(ni).*.ch.len)) : (idx +%= 1) {
                     const branch: i32 = re.nodes.at(ni).*.ch.at(idx).*;
-                    if (((span < re.nodes.at(branch).*.minL) or (span > re.nodes.at(branch).*.maxL))) {
+                    if (((span < re.nodes.at(branch).*.minL) or ((re.nodes.at(branch).*.maxL < lenInf) and (span > re.nodes.at(branch).*.maxL)))) {
                         continue;
                     }
                     if ((chosen >= 0)) {
@@ -4487,7 +4500,7 @@ pub fn minMatchChars(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), loc: *Loc
             return 1;
         },
         opBracket => {
-            return bracketMinChars(brs, nodes.at(ni).*.br, loc);
+            return vg.cv(i64, bracketMinChars(brs, nodes.at(ni).*.br, loc));
         },
         opBOL, opEOL => {
             return 0;
@@ -4522,7 +4535,7 @@ pub fn minMatchChars(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), loc: *Loc
             if ((nodes.at(ni).*.min == 0)) {
                 return 0;
             }
-            const product: i64 = (nodes.at(ni).*.min *% minMatchChars(nodes, brs, loc, nodes.at(ni).*.ch.at(0).*));
+            const product: i64 = (vg.cv(i64, nodes.at(ni).*.min) *% minMatchChars(nodes, brs, loc, nodes.at(ni).*.ch.at(0).*));
             return vg.min(product, lengthCap);
         },
         else => {},
@@ -4559,7 +4572,7 @@ pub fn Compile(mem: vg.Allocator, pattern: vg.Str, loc: Locale, flags: u32) vg.A
     if ((b.errCode != ErrNone)) {
         return .{ re, compileError(b.errCode, (-%1)) };
     }
-    if (b.tooBig) {
+    if ((b.tooBig or ((re.minSlots > 0) and (b.prog.ins.len > vg.divT(@as(i64, maxCounterCells), re.minSlots))))) {
         re.minLen = minMatchChars(re.nodes, re.brackets, &re.loc, root);
     } else {
         re.progOK = true;
@@ -4581,10 +4594,10 @@ pub fn Exec(mem: vg.Allocator, re: *Regexp, subject: vg.Str, pmatch: vg.Slice(Ma
         return .{ false, compileError(ErrESpace, (-%1)) };
     }
     if ((!re.progOK)) {
-        if ((subject.len < re.minLen)) {
+        if ((vg.cv(i64, subject.len) < re.minLen)) {
             return .{ false, noError() };
         }
-        if ((runeCount(subject) < re.minLen)) {
+        if ((vg.cv(i64, runeCount(subject)) < re.minLen)) {
             return .{ false, noError() };
         }
         if (trivialNullMatch(re, pmatch)) {
@@ -4755,6 +4768,10 @@ pub fn parseReplacement(mem: vg.Allocator, replacement: vg.Str, nsub: i64) vg.Al
     return .{ parts, noError() };
 }
 
+pub fn replaceCapacity(n: i64) i64 {
+    return (n +% vg.min(vg.divT(n, 8), (subjectLimit -% n)));
+}
+
 pub fn ReplaceAll(mem: vg.Allocator, re: *Regexp, subject: vg.Str, replacement: vg.Str, limit: i64, eflags: u32) vg.Allocator.Error!Tup_Str_t4572726f72x {
     if (((re.flags & FlagNoSub) != 0)) {
         return .{ vg.lit(""), compileError(ErrENoSub, (-%1)) };
@@ -4786,7 +4803,7 @@ pub fn ReplaceAll(mem: vg.Allocator, re: *Regexp, subject: vg.Str, replacement: 
             break;
         }
         if ((!any)) {
-            out = try vg.makeCap(mem, u8, 0, (subject.len +% vg.divT(subject.len, 8)));
+            out = try vg.makeCap(mem, u8, 0, replaceCapacity(subject.len));
             any = true;
         }
         out = try vg.appendStr(mem, out, subject.sub(last, pmatch.at(0).*.So));
@@ -5144,15 +5161,17 @@ pub fn parseCount(p: *parser) Tup_i64_bool {
 }
 
 pub fn satAdd(a: i64, b: i64) i64 {
-    return vg.min((a +% b), lenInf);
+    if ((a > (lenInf -% b))) {
+        return lenInf;
+    }
+    return (a +% b);
 }
 
 pub fn satMul(a: i64, b: i64) i64 {
-    const product: i64 = (a *% b);
-    if ((product > lenInf)) {
+    if (((a != 0) and (b > vg.divT(@as(i64, lenInf), a)))) {
         return lenInf;
     }
-    return product;
+    return (a *% b);
 }
 
 pub fn computeLengths(mem: vg.Allocator, nodes: vg.Slice(node), loc: *Locale, brackets: vg.Slice(bracketSet), ni: i32) vg.Allocator.Error!void {

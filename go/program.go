@@ -63,7 +63,7 @@ type program struct {
 }
 
 // failMinNone marks a program with no pruned subtree.
-const failMinNone = int(1) << 62
+const failMinNone = lenInf + 1
 
 // maxProgram caps the expanded program size, because interval expansion can multiply nested counts.
 // Compilation still succeeds past the cap.

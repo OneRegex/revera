@@ -33,6 +33,9 @@ jobs:
           go-version-file: go/go.mod
       - name: Engine module without the workspace
         run: cd go && GOWORK=off go build ./... && GOWORK=off go test ./...
+      - name: Engine module with a 32-bit int
+        # The runner can run 386 binaries directly. For arm we only check that it builds.
+        run: cd go && GOWORK=off GOARCH=386 go test ./... && GOWORK=off GOOS=linux GOARCH=arm go vet ./...
       - name: Vego module without the workspace
         run: cd vego && GOWORK=off go build ./... && GOWORK=off go test ./...
       - name: Development module
@@ -54,6 +57,13 @@ jobs:
         with:
           components: clippy
       - run: cd rust && cargo build --workspace && cargo test --workspace
+      - name: Library tests on a 32-bit target
+        # The runner can run i686 binaries directly, and rust-lld links them without a cross compiler.
+        run: |
+          rustup target add i686-unknown-linux-musl
+          cd rust && CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER=rust-lld \
+            RUSTFLAGS="-C linker-flavor=ld.lld -C link-self-contained=yes" \
+            cargo test --target i686-unknown-linux-musl --lib
       - run: cd rust && cargo clippy --workspace --all-targets -- -D warnings
       - name: The crate packages with only the library and the licenses
         run: cd rust && cargo package && cargo package --list

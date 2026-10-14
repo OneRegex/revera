@@ -412,17 +412,20 @@ func parseCount(p *parser) (int, bool) {
 	return value, true
 }
 
+// satAdd and satMul clamp their result to lenInf, for operands in [0, lenInf].
+// They check before computing, so the raw result never overflows a 32-bit int.
 func satAdd(a int, b int) int {
-	// Both operands stay at or below lenInf, so 64-bit addition cannot overflow before the clamp.
-	return min(a+b, lenInf)
+	if a > lenInf-b {
+		return lenInf
+	}
+	return a + b
 }
 
 func satMul(a int, b int) int {
-	product := a * b
-	if product > lenInf {
+	if a != 0 && b > lenInf/a {
 		return lenInf
 	}
-	return product
+	return a * b
 }
 
 // computeLengths fills minL, maxL, and the concatenation suffix bounds, from the bottom up.

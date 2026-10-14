@@ -505,10 +505,11 @@ func paRun(e *phaseAState, ws *engineWS, re *Regexp) {
 
 		// Stop when nothing is in flight and spawning has stopped.
 		if e.matched {
+			// Use si and g, because e.ci+delta can overflow a 32-bit int at the end of a huge subject.
 			pendingWork := false
 			for delta := 1; delta < e.ring; delta++ {
-				fi := (e.ci + delta) % e.ring
-				if ws.slots[fi].gen == paGen(e.ci+delta) &&
+				fi := (si + delta) % e.ring
+				if ws.slots[fi].gen == g+uint32(delta) &&
 					len(ws.slots[fi].active) > 0 {
 					pendingWork = true
 					break

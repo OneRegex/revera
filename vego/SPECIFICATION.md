@@ -63,8 +63,11 @@ It can still discard a value in assignments, two-result short declarations, and 
 | int    | signed integer, exactly 64 bits wide      |
 
 `int` is the index type: `len`, `cap`, and index expressions use it.
-A Vego program must only run on targets where `int` is 64 bits, and translators must map it to a 64-bit signed type.
-Rust translators cast to `usize` at index sites.
+Translators must map it to a 64-bit signed type.
+Rust translators convert it to `usize` with a range check at index sites.
+
+Vego programs are also plain Go, where `int` is only 32 bits on platforms such as 386 and arm.
+A program that wants to run there as Go code must keep its `int` values within 32 bits and use `int64` for anything larger.
 
 The TypeScript printer is narrower for `int`.
 It maps `int` and the types of 32 bits or less to checked JavaScript `number` values, while `int64` and `uint64` use `bigint`.

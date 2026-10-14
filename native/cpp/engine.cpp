@@ -1160,8 +1160,8 @@ lookupCosts localeLookupCosts(Locale& l) {
     }
     lc.sequenceSearch = searchSteps(vg::sdiv<int64_t>(sectionLen(l, secSequences), 8LL));
     CollProfile row = collationProfileRow(l, int64_t(l.collationProfile));
-    lc.contraction = ([&]{ auto _t1 = ([&]{ auto _t3 = ((14LL + u32ContainsCost(row.AddCount)) + 1LL); auto _t4 = u32ContainsCost(vg::sdiv<int64_t>(sectionLen(l, secRootContractions), 4LL)); return (_t3 + _t4); }()); auto _t2 = u32ContainsCost(row.RemoveCount); return (_t1 + _t2); }());
-    lc.primaryToken = ([&]{ auto _t5 = ((14LL + findPairCost(row.OverrideCount)) + 1LL); auto _t6 = findPairCost(vg::sdiv<int64_t>(sectionLen(l, secRootEquivalences), 8LL)); return (_t5 + _t6); }());
+    lc.contraction = ([&]{ auto _t1 = ([&]{ auto _t3 = ((14LL + u32ContainsCost(int64_t(row.AddCount))) + 1LL); auto _t4 = u32ContainsCost(vg::sdiv<int64_t>(sectionLen(l, secRootContractions), 4LL)); return (_t3 + _t4); }()); auto _t2 = u32ContainsCost(int64_t(row.RemoveCount)); return (_t1 + _t2); }());
+    lc.primaryToken = ([&]{ auto _t5 = ((14LL + findPairCost(int64_t(row.OverrideCount))) + 1LL); auto _t6 = findPairCost(vg::sdiv<int64_t>(sectionLen(l, secRootEquivalences), 8LL)); return (_t5 + _t6); }());
     lc.classMask = 4LL;
     lc.preimages = int64_t(localeMaxPreimages(l));
     lc.caseConvert = (2LL + findCaseCost(vg::sdiv<int64_t>(sectionLen(l, secCaseDefault), 12LL)));
@@ -1758,8 +1758,8 @@ void paRun(vg::Arena& mem, phaseAState& e, engineWS& ws, Regexp& re) {
         if (e.matched) {
             bool pendingWork = false;
             for (int64_t delta = 1LL; (delta < e.ring); delta += 1LL) {
-                int64_t fi = vg::srem<int64_t>((e.ci + delta), e.ring);
-                if ((([&]{ auto _t2 = ws.slots[fi].gen; auto _t3 = paGen((e.ci + delta)); return (_t2 == _t3); }()) && (vg::len(ws.slots[fi].active) > 0LL))) {
+                int64_t fi = vg::srem<int64_t>((si + delta), e.ring);
+                if (((ws.slots[fi].gen == uint32_t(g + uint32_t(delta))) && (vg::len(ws.slots[fi].active) > 0LL))) {
                     pendingWork = true;
                     break;
                 }
@@ -1956,14 +1956,15 @@ bool localeLoad(Locale& l, vg::Str blob) {
     l.blob = blob;
     int64_t cursor = vg::len(magic);
     for (int64_t i = 0LL; (i < numSections); i += 1LL) {
-        if (((cursor + 4LL) > vg::len(blob))) {
+        if (((vg::len(blob) - cursor) < 4LL)) {
             return false;
         }
-        int64_t length = int64_t(u32Raw(blob, cursor));
+        uint32_t raw = u32Raw(blob, cursor);
         cursor += 4LL;
-        if (((cursor + length) > vg::len(blob))) {
+        if ((uint64_t(raw) > uint64_t((vg::len(blob) - cursor)))) {
             return false;
         }
+        int64_t length = int64_t(raw);
         vg::at(l.sec, i).Off = cursor;
         vg::at(l.sec, i).End = (cursor + length);
         cursor += length;
@@ -2021,9 +2022,9 @@ bool localeValidate(Locale& l) {
     int64_t codepointCount = vg::sdiv<int64_t>(sectionLen(l, secSeqCodepoints), 4LL);
     int64_t seqCount = vg::sdiv<int64_t>(sectionLen(l, secSequences), 8LL);
     for (int64_t i_2 = 0LL; (i_2 < seqCount); i_2 += 1LL) {
-        int64_t off = int64_t(u32At(l, secSequences, (2LL * i_2)));
-        int64_t length = int64_t(u32At(l, secSequences, ((2LL * i_2) + 1LL)));
-        if ((((length < 1LL) || (length > l.maxSeq)) || ((off + length) > codepointCount))) {
+        uint32_t off = u32At(l, secSequences, (2LL * i_2));
+        uint32_t length = u32At(l, secSequences, ((2LL * i_2) + 1LL));
+        if ((((length < 1U) || (length > uint32_t(l.maxSeq))) || (!u32SpanWithin(off, length, codepointCount)))) {
             return false;
         }
     }
@@ -2040,12 +2041,15 @@ bool localeValidate(Locale& l) {
         return false;
     }
     int64_t profileCount = vg::sdiv<int64_t>(sectionLen(l, secCollationProfiles), 24LL);
+    if ((profileCount > 65536LL)) {
+        return false;
+    }
     int64_t overrideCount = vg::sdiv<int64_t>(sectionLen(l, secCollationOverrides), 8LL);
     int64_t addCount = vg::sdiv<int64_t>(sectionLen(l, secContractionAdds), 4LL);
     int64_t removeCount = vg::sdiv<int64_t>(sectionLen(l, secContractionRemoves), 4LL);
     for (int64_t i_3 = 0LL; (i_3 < profileCount); i_3 += 1LL) {
         CollProfile row = collationProfileRow(l, i_3);
-        if (((((row.OverrideFirst + row.OverrideCount) > overrideCount) || ((row.AddFirst + row.AddCount) > addCount)) || ((row.RemoveFirst + row.RemoveCount) > removeCount))) {
+        if ((((!u32SpanWithin(row.OverrideFirst, row.OverrideCount, overrideCount)) || (!u32SpanWithin(row.AddFirst, row.AddCount, addCount))) || (!u32SpanWithin(row.RemoveFirst, row.RemoveCount, removeCount)))) {
             return false;
         }
     }
@@ -2054,7 +2058,7 @@ bool localeValidate(Locale& l) {
     }
     int64_t typeNameCount = vg::sdiv<int64_t>(sectionLen(l, secTypeNameOffsets), 4LL);
     for (int64_t i_4 = 0LL; (i_4 < typeNameCount); i_4 += 1LL) {
-        if (([&]{ auto _t1 = int64_t(u32At(l, secTypeNameOffsets, i_4)); auto _t2 = sectionLen(l, secTypeNames); return (_t1 >= _t2); }())) {
+        if ((!([&]{ auto _t1 = u32At(l, secTypeNameOffsets, i_4); auto _t2 = sectionLen(l, secTypeNames); return u32Below(_t1, _t2); }()))) {
             return false;
         }
     }
@@ -2066,14 +2070,14 @@ bool localeValidate(Locale& l) {
         return false;
     }
     for (int64_t i_5 = 0LL; (i_5 < count); i_5 += 1LL) {
-        if (([&]{ auto _t5 = int64_t(u32At(l, secLocaleNameOffsets, i_5)); auto _t6 = sectionLen(l, secLocaleNames); return (_t5 >= _t6); }())) {
+        if ((!([&]{ auto _t5 = u32At(l, secLocaleNameOffsets, i_5); auto _t6 = sectionLen(l, secLocaleNames); return u32Below(_t5, _t6); }()))) {
             return false;
         }
     }
     int64_t typeRowCount = vg::sdiv<int64_t>(sectionLen(l, secLocaleTypes), 4LL);
     for (int64_t i_6 = 0LL; (i_6 < count); i_6 += 1LL) {
         LocaleRow row_2 = localeRowAt(l, i_6);
-        if (((((row_2.TypeFirst + row_2.TypeCount) > typeRowCount) || (row_2.CaseProfile > 1U)) || (int64_t(row_2.DefaultCollation) >= profileCount))) {
+        if ((((!u32SpanWithin(row_2.TypeFirst, row_2.TypeCount, typeRowCount)) || (row_2.CaseProfile > 1U)) || (!u32Below(row_2.DefaultCollation, profileCount)))) {
             return false;
         }
     }
@@ -2098,11 +2102,19 @@ bool contractionIDsValid(Locale& l, int64_t sec, int64_t seqCount) {
     int64_t count = vg::sdiv<int64_t>(sectionLen(l, sec), 4LL);
     for (int64_t i = 0LL; (i < count); i += 1LL) {
         uint32_t id = u32At(l, sec, i);
-        if (((id >= firstSequenceID) && (int64_t(uint32_t(id - firstSequenceID)) >= seqCount))) {
+        if (((id >= firstSequenceID) && (!u32Below(uint32_t(id - firstSequenceID), seqCount)))) {
             return false;
         }
     }
     return true;
+}
+
+bool u32Below(uint32_t v, int64_t limit) {
+    return (uint64_t(v) < uint64_t(limit));
+}
+
+bool u32SpanWithin(uint32_t first, uint32_t count, int64_t limit) {
+    return ((uint64_t(first) + uint64_t(count)) <= uint64_t(limit));
 }
 
 int64_t localeMaxElementLength(Locale& l) {
@@ -2228,8 +2240,8 @@ int64_t localesCount(Locale& l) {
 LocaleRow localeRowAt(Locale& l, int64_t vego_index) {
     int64_t base = (5LL * vego_index);
     LocaleRow row{};
-    row.TypeFirst = int64_t(u32At(l, secLocales, (base + 1LL)));
-    row.TypeCount = int64_t(u32At(l, secLocales, (base + 2LL)));
+    row.TypeFirst = u32At(l, secLocales, (base + 1LL));
+    row.TypeCount = u32At(l, secLocales, (base + 2LL));
     row.CaseProfile = u32At(l, secLocales, (base + 3LL));
     row.DefaultCollation = u32At(l, secLocales, (base + 4LL));
     return row;
@@ -2309,8 +2321,8 @@ Tup_t4c6f63616c65x_bool resolveLocale(Locale& data, localeRequest req) {
     if ((typeID < 0LL)) {
         return Tup_t4c6f63616c65x_bool{invalid, false};
     }
-    int64_t low = row.TypeFirst;
-    int64_t high = (row.TypeFirst + row.TypeCount);
+    int64_t low = int64_t(row.TypeFirst);
+    int64_t high = (low + int64_t(row.TypeCount));
     while ((low < high)) {
         int64_t middle = (low + vg::sdiv<int64_t>((high - low), 2LL));
         int64_t rowTypeID = int64_t(u16At(result, secLocaleTypes, (2LL * middle)));
@@ -2655,12 +2667,12 @@ bool u32Contains(Locale& l, int64_t sec, int64_t first, int64_t count, uint32_t 
 CollProfile collationProfileRow(Locale& l, int64_t vego_index) {
     int64_t base = (6LL * vego_index);
     CollProfile row{};
-    row.OverrideFirst = int64_t(u32At(l, secCollationProfiles, base));
-    row.OverrideCount = int64_t(u32At(l, secCollationProfiles, (base + 1LL)));
-    row.AddFirst = int64_t(u32At(l, secCollationProfiles, (base + 2LL)));
-    row.AddCount = int64_t(u32At(l, secCollationProfiles, (base + 3LL)));
-    row.RemoveFirst = int64_t(u32At(l, secCollationProfiles, (base + 4LL)));
-    row.RemoveCount = int64_t(u32At(l, secCollationProfiles, (base + 5LL)));
+    row.OverrideFirst = u32At(l, secCollationProfiles, base);
+    row.OverrideCount = u32At(l, secCollationProfiles, (base + 1LL));
+    row.AddFirst = u32At(l, secCollationProfiles, (base + 2LL));
+    row.AddCount = u32At(l, secCollationProfiles, (base + 3LL));
+    row.RemoveFirst = u32At(l, secCollationProfiles, (base + 4LL));
+    row.RemoveCount = u32At(l, secCollationProfiles, (base + 5LL));
     return row;
 }
 
@@ -2669,14 +2681,14 @@ bool isContraction(Locale& l, uint32_t element) {
         return false;
     }
     CollProfile row = collationProfileRow(l, int64_t(l.collationProfile));
-    if (u32Contains(l, secContractionAdds, row.AddFirst, row.AddCount, element)) {
+    if (u32Contains(l, secContractionAdds, int64_t(row.AddFirst), int64_t(row.AddCount), element)) {
         return true;
     }
     int64_t rootCount = vg::sdiv<int64_t>(sectionLen(l, secRootContractions), 4LL);
     if ((!u32Contains(l, secRootContractions, 0LL, rootCount, element))) {
         return false;
     }
-    return (!u32Contains(l, secContractionRemoves, row.RemoveFirst, row.RemoveCount, element));
+    return (!u32Contains(l, secContractionRemoves, int64_t(row.RemoveFirst), int64_t(row.RemoveCount), element));
 }
 
 Tup_u32_bool collatingElementID(Locale& l, vg::Slice<int32_t> seq) {
@@ -2737,7 +2749,7 @@ Tup_u32_bool findPair(Locale& l, int64_t sec, int64_t first, int64_t count, uint
 
 uint64_t primaryToken(Locale& l, uint32_t element) {
     CollProfile row = collationProfileRow(l, int64_t(l.collationProfile));
-    auto _t1 = findPair(l, secCollationOverrides, row.OverrideFirst, row.OverrideCount, element);
+    auto _t1 = findPair(l, secCollationOverrides, int64_t(row.OverrideFirst), int64_t(row.OverrideCount), element);
     uint32_t rep = _t1.r0;
     bool ok = _t1.r1;
     if (ok) {
@@ -2799,7 +2811,7 @@ int64_t localeMinEquivLength(Locale& l, vg::Slice<int32_t> seq) {
     uint64_t token = primaryToken(l, element);
     int64_t best = vg::len(seq);
     CollProfile row = collationProfileRow(l, int64_t(l.collationProfile));
-    best = minTokenLength(l, secCollationOverrides, row.OverrideFirst, row.OverrideCount, token, best);
+    best = minTokenLength(l, secCollationOverrides, int64_t(row.OverrideFirst), int64_t(row.OverrideCount), token, best);
     if ((best == 1LL)) {
         return 1LL;
     }
@@ -3097,7 +3109,7 @@ bool disjointFirsts(vg::Arena& mem, vg::Slice<node> nodes, int32_t ni) {
 
 bool onePassCaps(Regexp& re, decoded& d, int32_t ni, int64_t i, int64_t j, uint32_t eflags, vg::Slice<Match> caps) {
     int64_t span = (j - i);
-    if (((span < re.nodes[ni].minL) || (span > re.nodes[ni].maxL))) {
+    if (((span < re.nodes[ni].minL) || ((re.nodes[ni].maxL < lenInf) && (span > re.nodes[ni].maxL)))) {
         return false;
     }
     switch (re.nodes[ni].op) {
@@ -3166,7 +3178,7 @@ bool onePassCaps(Regexp& re, decoded& d, int32_t ni, int64_t i, int64_t j, uint3
         int64_t chosen = int64_t(0ULL - uint64_t(1LL));
         for (int64_t idx = 0LL; (idx < vg::len(re.nodes[ni].ch)); idx += 1LL) {
             int32_t branch = re.nodes[ni].ch[idx];
-            if (((span < re.nodes[branch].minL) || (span > re.nodes[branch].maxL))) {
+            if (((span < re.nodes[branch].minL) || ((re.nodes[branch].maxL < lenInf) && (span > re.nodes[branch].maxL)))) {
                 continue;
             }
             if ((chosen >= 0LL)) {
@@ -3699,7 +3711,7 @@ int64_t minMatchChars(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, Locale& 
         return 1LL;
     } break;
     case opBracket: {
-        return bracketMinChars(brs, nodes[ni].br, loc);
+        return int64_t(bracketMinChars(brs, nodes[ni].br, loc));
     } break;
     case opBOL: case opEOL: {
         return 0LL;
@@ -3708,7 +3720,7 @@ int64_t minMatchChars(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, Locale& 
         return minMatchChars(nodes, brs, loc, nodes[ni].ch[0LL]);
     } break;
     case opConcat: {
-        int64_t total = 0LL;
+        int64_t total{};
         for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
             total += minMatchChars(nodes, brs, loc, nodes[ni].ch[i]);
             if ((total > lengthCap)) {
@@ -3728,7 +3740,7 @@ int64_t minMatchChars(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, Locale& 
         if ((nodes[ni].min == 0LL)) {
             return 0LL;
         }
-        int64_t product = ([&]{ auto _t3 = nodes[ni].min; auto _t4 = minMatchChars(nodes, brs, loc, nodes[ni].ch[0LL]); return (_t3 * _t4); }());
+        int64_t product = ([&]{ auto _t3 = int64_t(nodes[ni].min); auto _t4 = minMatchChars(nodes, brs, loc, nodes[ni].ch[0LL]); return (_t3 * _t4); }());
         return std::min<int64_t>(product, lengthCap);
     } break;
     default: break;
@@ -3765,7 +3777,7 @@ Tup_t526567657870x_t4572726f72x Compile(vg::Arena& mem, vg::Str pattern, Locale 
     if ((b.errCode != ErrNone)) {
         return Tup_t526567657870x_t4572726f72x{re, compileError(b.errCode, int64_t(0ULL - uint64_t(1LL)))};
     }
-    if (b.tooBig) {
+    if ((b.tooBig || ((re.minSlots > 0LL) && (vg::len(b.prog.ins) > vg::sdiv<int64_t>(maxCounterCells, re.minSlots))))) {
         re.minLen = minMatchChars(re.nodes, re.brackets, re.loc, root);
     } else {
         re.progOK = true;
@@ -3787,10 +3799,10 @@ Tup_bool_t4572726f72x Exec(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Slic
         return Tup_bool_t4572726f72x{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
     }
     if ((!re.progOK)) {
-        if ((vg::len(subject) < re.minLen)) {
+        if ((int64_t(vg::len(subject)) < re.minLen)) {
             return Tup_bool_t4572726f72x{false, noError()};
         }
-        if (([&]{ auto _t1 = runeCount(subject); auto _t2 = re.minLen; return (_t1 < _t2); }())) {
+        if (([&]{ auto _t1 = int64_t(runeCount(subject)); auto _t2 = re.minLen; return (_t1 < _t2); }())) {
             return Tup_bool_t4572726f72x{false, noError()};
         }
         if (trivialNullMatch(re, pmatch)) {
@@ -3952,6 +3964,10 @@ Tup_st7265706c50617274x_t4572726f72x parseReplacement(vg::Arena& mem, vg::Str re
     return Tup_st7265706c50617274x_t4572726f72x{parts, noError()};
 }
 
+int64_t replaceCapacity(int64_t n) {
+    return (n + std::min<int64_t>(vg::sdiv<int64_t>(n, 8LL), (subjectLimit - n)));
+}
+
 Tup_Str_t4572726f72x ReplaceAll(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Str replacement, int64_t limit, uint32_t eflags) {
     if ((uint32_t(re.flags & FlagNoSub) != 0U)) {
         return Tup_Str_t4572726f72x{vg::lit(""), compileError(ErrENoSub, int64_t(0ULL - uint64_t(1LL)))};
@@ -3983,7 +3999,7 @@ Tup_Str_t4572726f72x ReplaceAll(vg::Arena& mem, Regexp& re, vg::Str subject, vg:
             break;
         }
         if ((!any)) {
-            out = vg::make_cap<uint8_t>(mem, 0LL, (vg::len(subject) + vg::sdiv<int64_t>(vg::len(subject), 8LL)));
+            out = vg::make_cap<uint8_t>(mem, 0LL, replaceCapacity(vg::len(subject)));
             any = true;
         }
         out = vg::append_str(mem, out, subject.sub(last, pmatch[0LL].So));
@@ -4335,15 +4351,17 @@ Tup_i64_bool parseCount(parser& p) {
 }
 
 int64_t satAdd(int64_t a, int64_t b) {
-    return std::min<int64_t>((a + b), lenInf);
+    if ((a > (lenInf - b))) {
+        return lenInf;
+    }
+    return (a + b);
 }
 
 int64_t satMul(int64_t a, int64_t b) {
-    int64_t product = (a * b);
-    if ((product > lenInf)) {
+    if (((a != 0LL) && (b > vg::sdiv<int64_t>(lenInf, a)))) {
         return lenInf;
     }
-    return product;
+    return (a * b);
 }
 
 void computeLengths(vg::Arena& mem, vg::Slice<node> nodes, Locale& loc, vg::Slice<bracketSet> brackets, int32_t ni) {

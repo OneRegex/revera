@@ -18,7 +18,7 @@ pub struct Counter {
 
 #[derive(Clone, Copy)]
 pub struct Tagged {
-    pub Tags: [vg::Str; (2) as usize],
+    pub Tags: [vg::Str; vg::array_len((2) as i64)],
     pub N: i32,
 }
 
@@ -148,19 +148,19 @@ pub fn RangeIntProbe(n: i64) -> i64 {
 }
 
 pub fn PartialArray() -> i64 {
-    let a: [i64; (5) as usize] = [7i64, 9i64, vg::zero::<i64>(), vg::zero::<i64>(), vg::zero::<i64>()];
-    let names: [vg::Str; (3) as usize] = [vg::lit(b"a"), vg::zero::<vg::Str>(), vg::zero::<vg::Str>()];
+    let a: [i64; vg::array_len((5) as i64)] = [7i64, 9i64, vg::zero::<i64>(), vg::zero::<i64>(), vg::zero::<i64>()];
+    let names: [vg::Str; vg::array_len((3) as i64)] = [vg::lit(b"a"), vg::zero::<vg::Str>(), vg::zero::<vg::Str>()];
     let mut t: i64 = 0i64;
     {
         let mut i: i64 = 0i64;
         '_b1: while (i < 5i64) {
             '_c1: {
-                t = ((t).wrapping_mul(10i64)).wrapping_add(a[(i) as usize]);
+                t = ((t).wrapping_mul(10i64)).wrapping_add(a[vg::array_index(i, ((5) as usize))]);
             }
             i = (i).wrapping_add(1i64);
         }
     }
-    return (((t).wrapping_mul(10i64)).wrapping_add(((names[(1i64) as usize].len) as i64))).wrapping_add(((names[(0i64) as usize].len) as i64));
+    return (((t).wrapping_mul(10i64)).wrapping_add(((names[vg::array_index(1i64, ((3) as usize))].len) as i64))).wrapping_add(((names[vg::array_index(0i64, ((3) as usize))].len) as i64));
 }
 
 pub fn TaggedEq(a: Tagged, b: Tagged) -> bool {
@@ -291,7 +291,7 @@ pub fn AndNotOrder(mem: &vg::Arena, c: &mut Counter) -> i64 {
 }
 
 pub fn ZeroArray() -> i64 {
-    let mut a: [i32; (0) as usize] = vg::zero();
+    let mut a: [i32; vg::array_len((0) as i64)] = vg::zero();
     let mut t: i64 = 0i64;
     if (!vg::arr_slice(&raw mut a, 0i64, ((0) as i64)).p.is_null()) {
         t = (t).wrapping_add(1i64);
@@ -305,16 +305,16 @@ pub fn MakeU64(mem: &vg::Arena, n: u64) -> i64 {
     return ((s.len) as i64);
 }
 
-pub fn mkTriple(x: i64) -> [i64; (3) as usize] {
-    let mut a: [i64; (3) as usize] = vg::zero();
-    a[(0i64) as usize] = x;
-    a[(1i64) as usize] = (x).wrapping_add(1i64);
-    a[(2i64) as usize] = (x).wrapping_add(2i64);
+pub fn mkTriple(x: i64) -> [i64; vg::array_len((3) as i64)] {
+    let mut a: [i64; vg::array_len((3) as i64)] = vg::zero();
+    a[vg::array_index(0i64, ((3) as usize))] = x;
+    a[vg::array_index(1i64, ((3) as usize))] = (x).wrapping_add(1i64);
+    a[vg::array_index(2i64, ((3) as usize))] = (x).wrapping_add(2i64);
     return a;
 }
 
 pub fn PickArray(mem: &vg::Arena, c: &mut Counter) -> i64 {
-    let v: i64 = mkTriple(40i64)[({ let _t1 = 2i32; bump(mem, c, _t1) }) as usize];
+    let v: i64 = mkTriple(40i64)[vg::array_index({ let _t1 = 2i32; bump(mem, c, _t1) }, ((3) as usize))];
     return ((v).wrapping_mul(10000i64)).wrapping_add(logCode(c));
 }
 

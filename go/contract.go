@@ -160,7 +160,7 @@ func ContractFor(re *Regexp, maxInput int) Contract {
 func matcherContract(re *Regexp, length int64, atom int64) BackendContract {
 	var b BackendContract
 	if !re.progOK {
-		// The expanded program passed the size cap.
+		// The program passed maxProgram or maxCounterCells.
 		// Exec then only counts the subject characters against the minimum length, once in bytes and once in characters.
 		// It allocates nothing.
 		// On top of the count, it pays for its own call, the trivialNullMatch call, and the error it returns.
@@ -423,10 +423,10 @@ func localeLookupCosts(l *Locale) lookupCosts {
 	}
 	lc.sequenceSearch = searchSteps(sectionLen(l, secSequences) / 8)
 	row := collationProfileRow(l, int(l.collationProfile))
-	lc.contraction = 1 + profileRowCost + u32ContainsCost(row.AddCount) + 1 +
+	lc.contraction = 1 + profileRowCost + u32ContainsCost(int(row.AddCount)) + 1 +
 		u32ContainsCost(sectionLen(l, secRootContractions)/4) +
-		u32ContainsCost(row.RemoveCount)
-	lc.primaryToken = 1 + profileRowCost + findPairCost(row.OverrideCount) + 1 +
+		u32ContainsCost(int(row.RemoveCount))
+	lc.primaryToken = 1 + profileRowCost + findPairCost(int(row.OverrideCount)) + 1 +
 		findPairCost(sectionLen(l, secRootEquivalences)/8)
 	lc.classMask = 4
 	lc.preimages = int64(localeMaxPreimages(l))

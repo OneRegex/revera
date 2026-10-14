@@ -139,8 +139,8 @@ private def opOf (n : Int) : Except String Op :=
   | 5 => pure .eol | 6 => pure .split | 7 => pure .jmp | 8 => pure .accept | 9 => pure .fail
   | _ => throw "bad opcode"
 
-/-- The `failMin` sentinel of a program with no pruned subtree. -/
-def failMinNone : Int := 4611686018427387904
+/-- The `failMin` sentinel of a program with no pruned subtree, `lenInf + 1` in `go/program.go`. -/
+def failMinNone : Int := 1073741825
 
 /-- Why a pattern is outside the link. -/
 inductive Outside where
