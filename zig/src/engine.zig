@@ -111,12 +111,9 @@ pub const iEOL: u8 = 5;
 pub const iSplit: u8 = 6;
 pub const iJmp: u8 = 7;
 pub const iMatch: u8 = 8;
-pub const iFail: u8 = 9;
-pub const failMinNone = (lenInf +% 1);
 pub const maxProgram = (1 << 20);
 pub const maskWidth = 64;
 pub const subjectLimit = ((1 << 31) -% 1);
-pub const lengthCap = (vg.cv(i64, 1) << 40);
 pub const maxCounterCells = ((1 << 31) -% 1);
 pub const opChar: u8 = 0;
 pub const opAny: u8 = 1;
@@ -371,7 +368,6 @@ pub const program = struct {
     start: u32 = 0,
     foldSets: vg.Slice(vg.Slice(i32)) = .{},
     multi: bool = false,
-    failMin: i64 = 0,
     scan: scanFilter = .{},
     depth: i64 = 0,
 };
@@ -389,7 +385,6 @@ pub const frag = struct {
 pub const progBuilder = struct {
     prog: program = .{},
     tooBig: bool = false,
-    failMin: i64 = 0,
     errCode: i32 = 0,
     icase: bool = false,
 };
@@ -404,10 +399,7 @@ pub const Regexp = struct {
     minSlots: i64 = 0,
     nested: vg.Slice(vg.Slice(i32)) = .{},
     multi: bool = false,
-    progOK: bool = false,
     prog: program = .{},
-    minLen: i64 = 0,
-    anchors: bool = false,
     onePass: bool = false,
 };
 
@@ -1490,7 +1482,7 @@ pub fn ContractFor(re: *Regexp, maxInput: i64) Contract {
     var c: Contract = .{};
     c.MaxInput = vg.cv(i64, length);
     c.Matcher = matcherContract(re, length, atom);
-    if ((((re.progOK and (re.prog.failMin != 0)) and (re.nsub > 0)) and ((re.flags & FlagNoSub) == 0))) {
+    if (((re.nsub > 0) and ((re.flags & FlagNoSub) == 0))) {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length);
             c.HasOnePass = true;
@@ -1504,11 +1496,6 @@ pub fn ContractFor(re: *Regexp, maxInput: i64) Contract {
 
 pub fn matcherContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     var b: BackendContract = .{};
-    if ((!re.progOK)) {
-        b.StackBytes = matcherStackBytes;
-        b.Steps = cAdd(runeCountSteps(length), 3);
-        return b;
-    }
     const n: i64 = vg.cv(i64, re.prog.ins.len);
     const k: i64 = vg.cv(i64, re.minSlots);
     var ring: i64 = vg.cv(i64, 2);
@@ -1525,10 +1512,7 @@ pub fn matcherContract(re: *Regexp, length: i64, atom: i64) BackendContract {
     if ((re.prog.depth >= 0)) {
         boundaries = vg.min(boundaries, (vg.cv(i64, re.prog.depth) +% 3));
     }
-    var steps: i64 = cAdd(cAdd((24 +% ring), length), cMul(boundaries, perBoundary));
-    if ((re.prog.failMin != failMinNone)) {
-        steps = cAdd(steps, cAdd(runeCountSteps(length), 1));
-    }
+    const steps: i64 = cAdd(cAdd((24 +% ring), length), cMul(boundaries, perBoundary));
     const stack: i64 = (vg.cv(i64, matcherStackBytes) +% (multiLookupFrames *% frameBytes));
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -3982,8 +3966,6 @@ pub fn buildScanFilter(mem: vg.Allocator, pr: *program, newlineMode: bool) vg.Al
             iMatch => {
                 matchReachable = true;
             },
-            iFail => {
-            },
             iRune => {
                 pr.scan.stop[vg.arrayIndex(256, utf8LeadByte(vg.cv(i32, pr.ins.at(pc).*.arg)))] = true;
             },
@@ -4024,52 +4006,40 @@ pub fn buildScanFilter(mem: vg.Allocator, pr: *program, newlineMode: bool) vg.Al
     return count;
 }
 
-pub fn instrEstimate(nodes: vg.Slice(node), ni: i32) i64 {
-    const estimateCap: i64 = (vg.cv(i64, maxProgram) *% 4);
+pub fn instrCount(nodes: vg.Slice(node), ni: i32) i64 {
     var total: i64 = 0;
     switch (nodes.at(ni).*.op) {
         opGroup => {
-            return instrEstimate(nodes, nodes.at(ni).*.ch.at(0).*);
+            return instrCount(nodes, nodes.at(ni).*.ch.at(0).*);
         },
-        opConcat => {
+        opConcat, opAlt => {
+            if ((nodes.at(ni).*.op == opAlt)) {
+                total = (nodes.at(ni).*.ch.len -% 1);
+            }
             {
                 var i: i64 = 0;
                 while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-                    total +%= instrEstimate(nodes, nodes.at(ni).*.ch.at(i).*);
-                    if ((total > estimateCap)) {
-                        return estimateCap;
-                    }
-                }
-            }
-            return total;
-        },
-        opAlt => {
-            total = nodes.at(ni).*.ch.len;
-            {
-                var i_2: i64 = 0;
-                while ((i_2 < nodes.at(ni).*.ch.len)) : (i_2 +%= 1) {
-                    total +%= instrEstimate(nodes, nodes.at(ni).*.ch.at(i_2).*);
-                    if ((total > estimateCap)) {
-                        return estimateCap;
+                    total +%= instrCount(nodes, nodes.at(ni).*.ch.at(i).*);
+                    if ((total > maxProgram)) {
+                        return (maxProgram +% 1);
                     }
                 }
             }
             return total;
         },
         opRepeat => {
-            var copies: i64 = nodes.at(ni).*.max;
-            if ((nodes.at(ni).*.max == infinite)) {
-                copies = (nodes.at(ni).*.min +% 1);
-            }
-            if ((copies == 0)) {
+            const lo: i64 = nodes.at(ni).*.min;
+            const hi: i64 = nodes.at(ni).*.max;
+            if ((hi == 0)) {
                 return 1;
             }
-            const child: i64 = instrEstimate(nodes, nodes.at(ni).*.ch.at(0).*);
-            total = (((copies *% child) +% copies) +% 2);
-            if (((total > estimateCap) or (total < 0))) {
-                return estimateCap;
+            const child: i64 = instrCount(nodes, nodes.at(ni).*.ch.at(0).*);
+            if ((hi == infinite)) {
+                total = ((vg.max(lo, 1) *% child) +% 1);
+            } else {
+                total = ((lo *% child) +% ((hi -% lo) *% (child +% 1)));
             }
-            return total;
+            return vg.min(total, (maxProgram +% 1));
         },
         else => {},
     }
@@ -4077,7 +4047,10 @@ pub fn instrEstimate(nodes: vg.Slice(node), ni: i32) i64 {
 }
 
 pub fn compileProgram(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), root: i32, multi: bool, newlineMode: bool) vg.Allocator.Error!void {
-    b.failMin = failMinNone;
+    if ((instrCount(nodes, root) >= maxProgram)) {
+        b.tooBig = true;
+        return;
+    }
     const body: frag = try emit(mem, b, nodes, root, 0, @as(vg.Slice(u32), .{}));
     if ((b.errCode != ErrNone)) {
         return;
@@ -4091,7 +4064,6 @@ pub fn compileProgram(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node),
     patch(b, body.out, match);
     b.prog.start = body.start;
     b.prog.multi = multi;
-    b.prog.failMin = b.failMin;
     const stops: i64 = try buildScanFilter(mem, &b.prog, newlineMode);
     b.prog.depth = (-%1);
     if ((((!newlineMode) and b.prog.scan.enabled) and (stops == 0))) {
@@ -4105,7 +4077,7 @@ pub fn consumingOp(op: u8) bool {
 
 pub fn progEdge(pr: *program, pc: u32, i: i64) Tup_u32_bool {
     const op: u8 = pr.ins.at(pc).*.op;
-    if (((op == iMatch) or (op == iFail))) {
+    if ((op == iMatch)) {
         return .{ 0, false };
     }
     if ((i == 0)) {
@@ -4333,15 +4305,6 @@ pub fn emitRepeat(mem: vg.Allocator, b: *progBuilder, nodes: vg.Slice(node), ni:
     var mask_v: u64 = mask;
     var extra_v: vg.Slice(u32) = extra;
     const none: frag = .{};
-    if ((instrEstimate(nodes, ni) > (maxProgram -% b.prog.ins.len))) {
-        var fi: instr = .{};
-        fi.op = iFail;
-        const idx: u32 = try addInstr(mem, b, fi);
-        b.failMin = vg.min(b.failMin, nodes.at(ni).*.minL);
-        var f: frag = .{};
-        f.start = idx;
-        return f;
-    }
     if (nodes.at(ni).*.minimal) {
         const slot: i64 = nodes.at(ni).*.index;
         if ((slot < maskWidth)) {
@@ -4457,9 +4420,6 @@ pub fn compileScan(re: *Regexp, ni: i32) void {
                 re.multi = true;
             }
         },
-        opBOL, opEOL => {
-            re.anchors = true;
-        },
         else => {},
     }
     {
@@ -4494,55 +4454,6 @@ pub fn collectNested(mem: vg.Allocator, re: *Regexp, ni: i32, stack: *groupStack
     }
 }
 
-pub fn minMatchChars(nodes: vg.Slice(node), brs: vg.Slice(bracketSet), loc: *Locale, ni: i32) i64 {
-    switch (nodes.at(ni).*.op) {
-        opChar, opAny => {
-            return 1;
-        },
-        opBracket => {
-            return vg.cv(i64, bracketMinChars(brs, nodes.at(ni).*.br, loc));
-        },
-        opBOL, opEOL => {
-            return 0;
-        },
-        opGroup => {
-            return minMatchChars(nodes, brs, loc, nodes.at(ni).*.ch.at(0).*);
-        },
-        opConcat => {
-            var total: i64 = 0;
-            {
-                var i: i64 = 0;
-                while ((i < nodes.at(ni).*.ch.len)) : (i +%= 1) {
-                    total +%= minMatchChars(nodes, brs, loc, nodes.at(ni).*.ch.at(i).*);
-                    if ((total > lengthCap)) {
-                        return lengthCap;
-                    }
-                }
-            }
-            return total;
-        },
-        opAlt => {
-            var best: i64 = lengthCap;
-            {
-                var i_2: i64 = 0;
-                while ((i_2 < nodes.at(ni).*.ch.len)) : (i_2 +%= 1) {
-                    best = vg.min(best, minMatchChars(nodes, brs, loc, nodes.at(ni).*.ch.at(i_2).*));
-                }
-            }
-            return best;
-        },
-        opRepeat => {
-            if ((nodes.at(ni).*.min == 0)) {
-                return 0;
-            }
-            const product: i64 = (vg.cv(i64, nodes.at(ni).*.min) *% minMatchChars(nodes, brs, loc, nodes.at(ni).*.ch.at(0).*));
-            return vg.min(product, lengthCap);
-        },
-        else => {},
-    }
-    return 0;
-}
-
 pub fn Compile(mem: vg.Allocator, pattern: vg.Str, loc: Locale, flags: u32) vg.Allocator.Error!Tup_t526567657870x_t4572726f72x {
     var loc_v: Locale = loc;
     var re: Regexp = .{};
@@ -4573,11 +4484,9 @@ pub fn Compile(mem: vg.Allocator, pattern: vg.Str, loc: Locale, flags: u32) vg.A
         return .{ re, compileError(b.errCode, (-%1)) };
     }
     if ((b.tooBig or ((re.minSlots > 0) and (b.prog.ins.len > vg.divT(@as(i64, maxCounterCells), re.minSlots))))) {
-        re.minLen = minMatchChars(re.nodes, re.brackets, &re.loc, root);
-    } else {
-        re.progOK = true;
-        re.prog = b.prog;
+        return .{ re, compileError(ErrESpace, (-%1)) };
     }
+    re.prog = b.prog;
     return .{ re, noError() };
 }
 
@@ -4585,36 +4494,8 @@ pub fn NumSub(re: *Regexp) i64 {
     return re.nsub;
 }
 
-pub fn trivialNullMatch(re: *Regexp, pmatch: vg.Slice(Match)) bool {
-    return (((re.nodes.at(re.root).*.minL == 0) and (!re.anchors)) and (((re.flags & FlagNoSub) != 0) or (pmatch.len == 0)));
-}
-
 pub fn Exec(mem: vg.Allocator, re: *Regexp, subject: vg.Str, pmatch: vg.Slice(Match), eflags: u32) vg.Allocator.Error!Tup_bool_t4572726f72x {
     if ((subject.len > subjectLimit)) {
-        return .{ false, compileError(ErrESpace, (-%1)) };
-    }
-    if ((!re.progOK)) {
-        if ((vg.cv(i64, subject.len) < re.minLen)) {
-            return .{ false, noError() };
-        }
-        if ((vg.cv(i64, runeCount(subject)) < re.minLen)) {
-            return .{ false, noError() };
-        }
-        if (trivialNullMatch(re, pmatch)) {
-            return .{ true, noError() };
-        }
-        return .{ false, compileError(ErrESpace, (-%1)) };
-    }
-    if ((((re.prog.failMin != failMinNone) and (subject.len >= re.prog.failMin)) and (runeCount(subject) >= re.prog.failMin))) {
-        if (trivialNullMatch(re, pmatch)) {
-            return .{ true, noError() };
-        }
-        if ((((re.flags & FlagNoSub) != 0) or (pmatch.len == 0))) {
-            const probe: engineResult = try runPhaseA(mem, re, subject, eflags);
-            if (probe.matched) {
-                return .{ true, noError() };
-            }
-        }
         return .{ false, compileError(ErrESpace, (-%1)) };
     }
     const result: engineResult = try runPhaseA(mem, re, subject, eflags);

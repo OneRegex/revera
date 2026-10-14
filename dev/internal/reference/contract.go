@@ -151,7 +151,7 @@ func (re *Regexp) newContract(maxInput int) *Contract {
 	atom := atomCost(re.root)
 	c := &Contract{MaxInput: int(length)}
 	c.Matcher = re.matcherContract(length, atom)
-	if re.prog != nil && re.nsub > 0 && re.flags&NoSub == 0 {
+	if re.nsub > 0 && re.flags&NoSub == 0 {
 		if re.onePass {
 			walk := re.onePassContract(length, atom)
 			c.OnePass = &walk
@@ -166,14 +166,6 @@ func (re *Regexp) newContract(maxInput int) *Contract {
 // matcherContract bounds phase A.
 // length is the subject bound in bytes, and it also bounds the character count.
 func (re *Regexp) matcherContract(length, atom int64) BackendContract {
-	if re.prog == nil {
-		// The expanded program passed the size cap.
-		// Exec then only counts the subject characters against the minimum length, once in bytes and once in characters.
-		// It can allocate one error value.
-		return BackendContract{HeapBytes: errorBytes,
-			StackBytes: matcherStackBytes,
-			Steps:      cAdd(cMul(2, length), 2)}
-	}
 	n := int64(len(re.prog.ins))
 	k := int64(re.minSlots)
 	ring := int64(2)

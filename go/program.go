@@ -15,7 +15,6 @@ const (
 	iSplit    uint8 = 6 // continue at next and at alt
 	iJmp      uint8 = 7 // continue at next
 	iMatch    uint8 = 8 // accept
-	iFail     uint8 = 9 // dead end for a pruned oversized subtree
 )
 
 type instr struct {
@@ -47,13 +46,7 @@ type program struct {
 	foldSets [][]int32
 	// multi is true when some bracket can consume several characters.
 	multi bool
-	// failMin is the smallest minimum match length over every subtree that size pruning replaced with iFail.
-	// The program stays exact for any subject with fewer characters.
-	// A pruned subtree cannot take part in such a match.
-	// failMinNone means that nothing was pruned.
-	// The saturated minimum of a pruned subtree can legitimately reach lenInf, so lenInf cannot be the sentinel.
-	failMin int
-	scan    scanFilter
+	scan  scanFilter
 	// depth is the most consuming instructions on any path through a program whose scan filter is enabled
 	// with an empty stop set, or -1 when the filter stops on some byte or a consuming cycle leaves the paths
 	// unbounded.
@@ -62,13 +55,8 @@ type program struct {
 	depth int
 }
 
-// failMinNone marks a program with no pruned subtree.
-const failMinNone = lenInf + 1
-
 // maxProgram caps the expanded program size, because interval expansion can multiply nested counts.
-// Compilation still succeeds past the cap.
-// The expression then answers through the minimum-length fallback.
-// Only a subject long enough to need the huge program reports ESpace.
+// A pattern past the cap fails to compile with ESpace.
 const maxProgram = 1 << 20
 
 // maskWidth is the number of counter slots one mask word covers.
@@ -87,7 +75,6 @@ type frag struct {
 type progBuilder struct {
 	prog    program
 	tooBig  bool
-	failMin int
 	errCode int32
 	icase   bool
 }
@@ -122,8 +109,6 @@ func buildScanFilter(pr *program, newlineMode bool) int {
 			// Same as iBOL.
 		case iMatch:
 			matchReachable = true
-		case iFail:
-			// A pruned dead end reaches nothing.
 		case iRune:
 			pr.scan.stop[utf8LeadByte(int32(pr.ins[pc].arg))] = true
 		case iRuneFold:
@@ -156,53 +141,52 @@ func buildScanFilter(pr *program, newlineMode bool) int {
 	return count
 }
 
-// instrEstimate bounds the instruction count one node expands into.
-func instrEstimate(nodes []node, ni int32) int {
-	estimateCap := int(maxProgram) * 4
+// instrCount returns how many instructions emit produces for a node, or maxProgram+1 when that is more.
+func instrCount(nodes []node, ni int32) int {
 	total := 0
 	switch nodes[ni].op {
 	case opGroup:
-		return instrEstimate(nodes, nodes[ni].ch[0])
-	case opConcat:
-		for i := 0; i < len(nodes[ni].ch); i++ {
-			total += instrEstimate(nodes, nodes[ni].ch[i])
-			if total > estimateCap {
-				return estimateCap
-			}
+		return instrCount(nodes, nodes[ni].ch[0])
+	case opConcat, opAlt:
+		if nodes[ni].op == opAlt {
+			// Every branch but the last starts with a split.
+			total = len(nodes[ni].ch) - 1
 		}
-		return total
-	case opAlt:
-		total = len(nodes[ni].ch)
 		for i := 0; i < len(nodes[ni].ch); i++ {
-			total += instrEstimate(nodes, nodes[ni].ch[i])
-			if total > estimateCap {
-				return estimateCap
+			total += instrCount(nodes, nodes[ni].ch[i])
+			if total > maxProgram {
+				return maxProgram + 1
 			}
 		}
 		return total
 	case opRepeat:
-		copies := nodes[ni].max
-		if nodes[ni].max == infinite {
-			copies = nodes[ni].min + 1
-		}
-		if copies == 0 {
+		lo := nodes[ni].min
+		hi := nodes[ni].max
+		if hi == 0 {
 			return 1
 		}
-		child := instrEstimate(nodes, nodes[ni].ch[0])
-		total = copies*child + copies + 2
-		if total > estimateCap || total < 0 {
-			return estimateCap
+		child := instrCount(nodes, nodes[ni].ch[0])
+		if hi == infinite {
+			// The last copy loops back through a split.
+			total = max(lo, 1)*child + 1
+		} else {
+			// Every optional copy starts with a split.
+			total = lo*child + (hi-lo)*(child+1)
 		}
-		return total
+		return min(total, maxProgram+1)
 	}
 	return 1
 }
 
 // compileProgram lowers the AST into b.prog.
 // The caller sets icase before the call, and reads tooBig and errCode after it.
-// tooBig with a zero code means the expansion passed the size cap, and execution then uses the minimum-length fallback.
+// tooBig with a zero code means the expansion passed the size cap.
 func compileProgram(b *progBuilder, nodes []node, root int32, multi bool, newlineMode bool) {
-	b.failMin = failMinNone
+	// The final match instruction needs one more slot.
+	if instrCount(nodes, root) >= maxProgram {
+		b.tooBig = true
+		return
+	}
 	body := emit(b, nodes, root, 0, nil)
 	if b.errCode != ErrNone {
 		return
@@ -216,7 +200,6 @@ func compileProgram(b *progBuilder, nodes []node, root int32, multi bool, newlin
 	patch(b, body.out, match)
 	b.prog.start = body.start
 	b.prog.multi = multi
-	b.prog.failMin = b.failMin
 	stops := buildScanFilter(&b.prog, newlineMode)
 	b.prog.depth = -1
 	if !newlineMode && b.prog.scan.enabled && stops == 0 {
@@ -231,10 +214,10 @@ func consumingOp(op uint8) bool {
 }
 
 // progEdge returns the i-th successor of one instruction.
-// An accept or a dead end has none, a split has two, and every other instruction has one.
+// An accept has none, a split has two, and every other instruction has one.
 func progEdge(pr *program, pc uint32, i int) (uint32, bool) {
 	op := pr.ins[pc].op
-	if op == iMatch || op == iFail {
+	if op == iMatch {
 		return 0, false
 	}
 	if i == 0 {
@@ -442,17 +425,6 @@ func fragAppend(b *progBuilder, result *frag, have bool, f frag) bool {
 
 func emitRepeat(b *progBuilder, nodes []node, ni int32, mask uint64, extra []uint32) frag {
 	var none frag
-	if instrEstimate(nodes, ni) > maxProgram-len(b.prog.ins) {
-		// The oversized expansion becomes a dead end.
-		// The program stays exact for subjects shorter than the minimum match length of this subtree, and Exec checks that bound.
-		var fi instr
-		fi.op = iFail
-		idx := addInstr(b, fi)
-		b.failMin = min(b.failMin, nodes[ni].minL)
-		var f frag
-		f.start = idx
-		return f
-	}
 	if nodes[ni].minimal {
 		slot := nodes[ni].index
 		if slot < maskWidth {

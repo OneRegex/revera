@@ -106,6 +106,8 @@ test("compilation errors carry a kind and an offset", () => {
     kind("[z-a]", "range");
     kind("a{3,1}", "interval");
     kind("*a", "repeat");
+    // A pattern that is too big must fail here, not when searched.
+    assert.throws(() => new Regex("^b$|^((a{0,255}){0,255}){0,255}c$"), (e: unknown) => e instanceof RegexError && e.kind === "capacity" && e.offset === null);
     assert.throws(() => new Regex("a("), (e: unknown) => e instanceof RegexError && e.kind === "pattern" && e.offset === 2);
     try {
         new Regex("a\\");

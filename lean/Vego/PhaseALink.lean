@@ -8,8 +8,7 @@ against the model's step figure.
 Such executions run phase A and nothing else, so the interpreter's figures are phase A's figures plus the
 fixed work of `Exec` around it.
 
-The link covers the POSIX locale, where a bracket consumes one character, and programs that were not
-pruned by the size cap. The rest is counted.
+The link covers the POSIX locale, where a bracket consumes one character. The rest is counted.
 -/
 
 import Vego.PhaseA
@@ -26,12 +25,10 @@ structure Layout where
   reFlags : Nat
   reMinSlots : Nat
   reNsub : Nat
-  reProgOK : Nat
   reProg : Nat
   progIns : Nat
   progStart : Nat
   progFoldSets : Nat
-  progFailMin : Nat
   progScan : Nat
   progDepth : Nat
   insOp : Nat
@@ -68,9 +65,9 @@ def resolveLayout (m : Machine) : Except String Layout := do
   pure { reBrackets := ← fld "Regexp" "brackets", reMulti := ← fld "Regexp" "multi",
          reFlags := ← fld "Regexp" "flags",
          reMinSlots := ← fld "Regexp" "minSlots", reNsub := ← fld "Regexp" "nsub",
-         reProgOK := ← fld "Regexp" "progOK", reProg := ← fld "Regexp" "prog",
+         reProg := ← fld "Regexp" "prog",
          progIns := ← fld "program" "ins", progStart := ← fld "program" "start",
-         progFoldSets := ← fld "program" "foldSets", progFailMin := ← fld "program" "failMin",
+         progFoldSets := ← fld "program" "foldSets",
          progScan := ← fld "program" "scan", progDepth := ← fld "program" "depth",
          insOp := ← fld "instr" "op", insNext := ← fld "instr" "next", insAlt := ← fld "instr" "alt",
          insArg := ← fld "instr" "arg", insMask := ← fld "instr" "mask", insExtra := ← fld "instr" "extra",
@@ -136,16 +133,12 @@ private def maskBits (mask : Nat) : List Nat :=
 private def opOf (n : Int) : Except String Op :=
   match n with
   | 0 => pure .rune | 1 => pure .runeFold | 2 => pure .any | 3 => pure .bracket | 4 => pure .bol
-  | 5 => pure .eol | 6 => pure .split | 7 => pure .jmp | 8 => pure .accept | 9 => pure .fail
+  | 5 => pure .eol | 6 => pure .split | 7 => pure .jmp | 8 => pure .accept
   | _ => throw "bad opcode"
-
-/-- The `failMin` sentinel of a program with no pruned subtree, `lenInf + 1` in `go/program.go`. -/
-def failMinNone : Int := 1073741825
 
 /-- Why a pattern is outside the link. -/
 inductive Outside where
   | captures
-  | pruned
   | multi
 
 /-- Read the program of the current pattern, or say why the link leaves it out. -/
@@ -153,12 +146,9 @@ def extract (m : Machine) (L : Layout) (reCell : Nat) : Except String (Outside �
   let re := m.readCell reCell
   let flags ← asI (← field re L.reFlags)
   let nsub ← asI (← field re L.reNsub)
-  let progOK ← asB (← field re L.reProgOK)
   let prog ← field re L.reProg
-  let failMin ← asI (← field prog L.progFailMin)
   let depth ← asI (← field prog L.progDepth)
   let nosub := (flags / 4) % 2 == 1
-  if !progOK || failMin != failMinNone then return (.inl .pruned)
   if !nosub && nsub != 0 then return (.inl .captures)
   let k := (← asI (← field re L.reMinSlots)).toNat
   let multi ← asB (← field re L.reMulti)
@@ -353,7 +343,7 @@ structure LinkCoverage where
   execsChecked : Nat := 0
   execsCaptures : Nat := 0
   execsNonPosix : Nat := 0
-  execsPruned : Nat := 0
+  execsMulti : Nat := 0
   contractsChecked : Nat := 0
   contractsAnchored : Nat := 0
   programsWf : Nat := 0
@@ -410,7 +400,6 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
   let mut posix := true
   let mut cur : Option Extracted := none
   let mut nonPosixPattern := false
-  let mut prunedPattern := false
   let mut multiPattern := false
   let mut atom : Nat := 0
   let mut idx := 0
@@ -427,12 +416,10 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
       else if kind == 'C' then
         cur := none
         nonPosixPattern := !posix
-        prunedPattern := false
         multiPattern := false
         if s.valid && posix then
           match extract s.m L s.reCell with
           | .error e => return { rep with failure := some s!"command {idx} '{cmd}': extract: {e}" }
-          | .ok (.inl .pruned) => prunedPattern := true
           | .ok (.inl .multi) => multiPattern := true
           | .ok (.inl .captures) => pure ()
           | .ok (.inr x) =>
@@ -472,7 +459,7 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
         match cur with
         | none =>
           if nonPosixPattern then rep := { rep with cov := { rep.cov with execsNonPosix := rep.cov.execsNonPosix + 1 } }
-          else if prunedPattern || multiPattern then rep := { rep with cov := { rep.cov with execsPruned := rep.cov.execsPruned + 1 } }
+          else if multiPattern then rep := { rep with cov := { rep.cov with execsMulti := rep.cov.execsMulti + 1 } }
           else rep := { rep with cov := { rep.cov with execsCaptures := rep.cov.execsCaptures + 1 } }
         | some x =>
           match (cmd.splitOn " ").filter (· ≠ ""), parseX got with
@@ -504,7 +491,7 @@ def walk (tp : TProgram) (pairs : List (String × String)) : LinkReport := Id.ru
 
 /-- The coverage the theorem pins down. -/
 def linkCoverage : LinkCoverage :=
-  { execsChecked := 49682, execsCaptures := 26854, execsNonPosix := 1700, execsPruned := 0, contractsChecked := 56,
+  { execsChecked := 49682, execsCaptures := 26854, execsNonPosix := 1700, execsMulti := 0, contractsChecked := 56,
     contractsAnchored := 10, programsWf := 6913 }
 
 /--

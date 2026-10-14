@@ -95,7 +95,7 @@ func GenSubject(rng *rand.Rand, alphabet string, maxLen int) string {
 const HeavyPattern = "((a*){250}){250}b"
 
 // FixedPatterns drives a corpus of interesting patterns.
-// It includes the spec section 16 shapes and the capacity fallbacks.
+// It includes the spec section 16 shapes, chained intervals that must fail, and the heavy pattern.
 var FixedPatterns = []string{
 	"(a|ab)(c|bcd)(d*)",
 	"(a*)(a*?)c",

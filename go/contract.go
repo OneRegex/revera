@@ -142,8 +142,7 @@ func ContractFor(re *Regexp, maxInput int) Contract {
 	var c Contract
 	c.MaxInput = int(length)
 	c.Matcher = matcherContract(re, length, atom)
-	// When a subtree was pruned with a zero minimum length, every offset request falls back to ESpace in Exec, so no capture backend can run.
-	if re.progOK && re.prog.failMin != 0 && re.nsub > 0 && re.flags&FlagNoSub == 0 {
+	if re.nsub > 0 && re.flags&FlagNoSub == 0 {
 		if re.onePass {
 			c.OnePass = onePassContract(re, length)
 			c.HasOnePass = true
@@ -159,15 +158,6 @@ func ContractFor(re *Regexp, maxInput int) Contract {
 // length is the subject bound in bytes, and it also bounds the character count.
 func matcherContract(re *Regexp, length int64, atom int64) BackendContract {
 	var b BackendContract
-	if !re.progOK {
-		// The program passed maxProgram or maxCounterCells.
-		// Exec then only counts the subject characters against the minimum length, once in bytes and once in characters.
-		// It allocates nothing.
-		// On top of the count, it pays for its own call, the trivialNullMatch call, and the error it returns.
-		b.StackBytes = matcherStackBytes
-		b.Steps = cAdd(runeCountSteps(length), 3)
-		return b
-	}
 	n := int64(len(re.prog.ins))
 	k := int64(re.minSlots)
 	ring := int64(2)
@@ -197,11 +187,6 @@ func matcherContract(re *Regexp, length int64, atom int64) BackendContract {
 		boundaries = min(boundaries, int64(re.prog.depth)+3)
 	}
 	steps := cAdd(cAdd(24+ring, length), cMul(boundaries, perBoundary))
-	if re.prog.failMin != failMinNone {
-		// Before phase A, Exec counts the characters of any subject long enough to reach the pruned subtree, then tests for a trivial null match.
-		// When the pattern is anchored, the figure above only covers a few boundaries, so it can't absorb that count.
-		steps = cAdd(steps, cAdd(runeCountSteps(length), 1))
-	}
 
 	// A bracket probe can start the deepest lookup below the fixed frames.
 	stack := int64(matcherStackBytes) + multiLookupFrames*frameBytes

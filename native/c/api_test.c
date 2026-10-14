@@ -230,6 +230,11 @@ static void errors_and_contract(void) {
     check(error.offset == 2, "failure offset");
     bad = revera_compile("[[:bogus:]]", 11, NULL, &error);
     check(bad == NULL && error.status == REVERA_CHARACTER_CLASS, "class failure kind");
+    // A pattern that is too big must fail here, not when searched.
+    const char *huge = "^b$|^((a{0,255}){0,255}){0,255}c$";
+    bad = revera_compile(huge, strlen(huge), NULL, &error);
+    check(bad == NULL && error.status == REVERA_CAPACITY && error.offset == REVERA_NO_OFFSET,
+          "capacity failure kind");
 
     revera_regex *regex = compile("(a|ab)(c|bcd)(d*)", NULL);
     if (regex == NULL) {

@@ -947,7 +947,7 @@ Contract ContractFor(Regexp& re, int64_t maxInput) {
     Contract c{};
     c.MaxInput = int64_t(length);
     c.Matcher = matcherContract(re, length, atom);
-    if ((((re.progOK && (re.prog.failMin != 0LL)) && (re.nsub > 0LL)) && (uint32_t(re.flags & FlagNoSub) == 0U))) {
+    if (((re.nsub > 0LL) && (uint32_t(re.flags & FlagNoSub) == 0U))) {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length);
             c.HasOnePass = true;
@@ -961,11 +961,6 @@ Contract ContractFor(Regexp& re, int64_t maxInput) {
 
 BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
     BackendContract b{};
-    if ((!re.progOK)) {
-        b.StackBytes = matcherStackBytes;
-        b.Steps = cAdd(runeCountSteps(length), 3LL);
-        return b;
-    }
     int64_t n = int64_t(vg::len(re.prog.ins));
     int64_t k = int64_t(re.minSlots);
     int64_t ring = 2LL;
@@ -983,9 +978,6 @@ BackendContract matcherContract(Regexp& re, int64_t length, int64_t atom) {
         boundaries = std::min<int64_t>(boundaries, (int64_t(re.prog.depth) + 3LL));
     }
     int64_t steps = ([&]{ auto _t15 = cAdd((24LL + ring), length); auto _t16 = cMul(boundaries, perBoundary); return cAdd(_t15, _t16); }());
-    if ((re.prog.failMin != failMinNone)) {
-        steps = ([&]{ auto _t17 = steps; auto _t18 = cAdd(runeCountSteps(length), 1LL); return cAdd(_t17, _t18); }());
-    }
     int64_t stack = 6144LL;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -3241,8 +3233,6 @@ int64_t buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
         case iMatch: {
             matchReachable = true;
         } break;
-        case iFail: {
-        } break;
         case iRune: {
             { auto&& _t1 = ([&]() -> decltype(auto) { auto&& _t2 = pr.scan.stop; auto _t3 = utf8LeadByte(int32_t(pr.ins[pc].arg)); return vg::at(_t2, _t3); }()); _t1 = true; }
         } break;
@@ -3277,46 +3267,37 @@ int64_t buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode) {
     return count;
 }
 
-int64_t instrEstimate(vg::Slice<node> nodes, int32_t ni) {
-    int64_t estimateCap = 4194304LL;
+int64_t instrCount(vg::Slice<node> nodes, int32_t ni) {
     int64_t total = 0LL;
     switch (nodes[ni].op) {
     case opGroup: {
-        return instrEstimate(nodes, nodes[ni].ch[0LL]);
+        return instrCount(nodes, nodes[ni].ch[0LL]);
     } break;
-    case opConcat: {
-        for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
-            total += instrEstimate(nodes, nodes[ni].ch[i]);
-            if ((total > estimateCap)) {
-                return estimateCap;
-            }
+    case opConcat: case opAlt: {
+        if ((nodes[ni].op == opAlt)) {
+            total = (vg::len(nodes[ni].ch) - 1LL);
         }
-        return total;
-    } break;
-    case opAlt: {
-        total = vg::len(nodes[ni].ch);
-        for (int64_t i_2 = 0LL; (i_2 < vg::len(nodes[ni].ch)); i_2 += 1LL) {
-            total += instrEstimate(nodes, nodes[ni].ch[i_2]);
-            if ((total > estimateCap)) {
-                return estimateCap;
+        for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
+            total += instrCount(nodes, nodes[ni].ch[i]);
+            if ((total > maxProgram)) {
+                return 1048577LL;
             }
         }
         return total;
     } break;
     case opRepeat: {
-        int64_t copies = nodes[ni].max;
-        if ((nodes[ni].max == infinite)) {
-            copies = (nodes[ni].min + 1LL);
-        }
-        if ((copies == 0LL)) {
+        int64_t lo = nodes[ni].min;
+        int64_t hi = nodes[ni].max;
+        if ((hi == 0LL)) {
             return 1LL;
         }
-        int64_t child = instrEstimate(nodes, nodes[ni].ch[0LL]);
-        total = (((copies * child) + copies) + 2LL);
-        if (((total > estimateCap) || (total < 0LL))) {
-            return estimateCap;
+        int64_t child = instrCount(nodes, nodes[ni].ch[0LL]);
+        if ((hi == infinite)) {
+            total = ((std::max<int64_t>(lo, 1LL) * child) + 1LL);
+        } else {
+            total = ((lo * child) + ((hi - lo) * (child + 1LL)));
         }
-        return total;
+        return std::min<int64_t>(total, 1048577LL);
     } break;
     default: break;
     }
@@ -3324,7 +3305,10 @@ int64_t instrEstimate(vg::Slice<node> nodes, int32_t ni) {
 }
 
 void compileProgram(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t root, bool multi, bool newlineMode) {
-    b.failMin = failMinNone;
+    if ((instrCount(nodes, root) >= maxProgram)) {
+        b.tooBig = true;
+        return;
+    }
     frag body = emit(mem, b, nodes, root, 0ULL, vg::Slice<uint32_t>{});
     if ((b.errCode != ErrNone)) {
         return;
@@ -3338,7 +3322,6 @@ void compileProgram(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32
     patch(b, body.out, match);
     b.prog.start = body.start;
     b.prog.multi = multi;
-    b.prog.failMin = b.failMin;
     int64_t stops = buildScanFilter(mem, b.prog, newlineMode);
     b.prog.depth = int64_t(0ULL - uint64_t(1LL));
     if ((((!newlineMode) && b.prog.scan.enabled) && (stops == 0LL))) {
@@ -3352,7 +3335,7 @@ bool consumingOp(uint8_t op) {
 
 Tup_u32_bool progEdge(program& pr, uint32_t pc, int64_t i) {
     uint8_t op = pr.ins[pc].op;
-    if (((op == iMatch) || (op == iFail))) {
+    if ((op == iMatch)) {
         return Tup_u32_bool{0U, false};
     }
     if ((i == 0LL)) {
@@ -3559,15 +3542,6 @@ frag emitRepeat(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t n
     uint64_t mask_v = mask;
     vg::Slice<uint32_t> extra_v = extra;
     frag none{};
-    if (([&]{ auto _t1 = instrEstimate(nodes, ni); auto _t2 = (maxProgram - vg::len(b.prog.ins)); return (_t1 > _t2); }())) {
-        instr fi{};
-        fi.op = iFail;
-        uint32_t idx = addInstr(mem, b, fi);
-        b.failMin = std::min<int64_t>(b.failMin, nodes[ni].minL);
-        frag f{};
-        f.start = idx;
-        return f;
-    }
     if (nodes[ni].minimal) {
         int64_t slot = nodes[ni].vego_index;
         if ((slot < maskWidth)) {
@@ -3592,13 +3566,13 @@ frag emitRepeat(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t n
             return none;
         }
         if (((i == (lo - 1LL)) && (hi == infinite))) {
-            (void)(([&]{ auto _t3 = haveResult; auto _t4 = emitPlus(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t3, _t4); }()));
+            (void)(([&]{ auto _t1 = haveResult; auto _t2 = emitPlus(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t1, _t2); }()));
             return result;
         }
-        haveResult = ([&]{ auto _t5 = haveResult; auto _t6 = emit(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t5, _t6); }());
+        haveResult = ([&]{ auto _t3 = haveResult; auto _t4 = emit(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t3, _t4); }());
     }
     if ((hi == infinite)) {
-        (void)(([&]{ auto _t7 = haveResult; auto _t8 = emitStar(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t7, _t8); }()));
+        (void)(([&]{ auto _t5 = haveResult; auto _t6 = emitStar(mem, b, nodes, child, mask_v, extra_v); return fragAppend(b, result, _t5, _t6); }()));
         return result;
     }
     vg::Slice<patchSlot> skips = vg::make_cap<patchSlot>(mem, 0LL, std::max<int64_t>((hi - lo), 1LL));
@@ -3677,9 +3651,6 @@ void compileScan(Regexp& re, int32_t ni) {
             re.multi = true;
         }
     } break;
-    case opBOL: case opEOL: {
-        re.anchors = true;
-    } break;
     default: break;
     }
     for (int64_t i = 0LL; (i < vg::len(re.nodes[ni].ch)); i += 1LL) {
@@ -3703,49 +3674,6 @@ void collectNested(vg::Arena& mem, Regexp& re, int32_t ni, groupStack& stack) {
     if (isGroup) {
         stack.g = stack.g.head((vg::len(stack.g) - 1LL));
     }
-}
-
-int64_t minMatchChars(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, Locale& loc, int32_t ni) {
-    switch (nodes[ni].op) {
-    case opChar: case opAny: {
-        return 1LL;
-    } break;
-    case opBracket: {
-        return int64_t(bracketMinChars(brs, nodes[ni].br, loc));
-    } break;
-    case opBOL: case opEOL: {
-        return 0LL;
-    } break;
-    case opGroup: {
-        return minMatchChars(nodes, brs, loc, nodes[ni].ch[0LL]);
-    } break;
-    case opConcat: {
-        int64_t total{};
-        for (int64_t i = 0LL; (i < vg::len(nodes[ni].ch)); i += 1LL) {
-            total += minMatchChars(nodes, brs, loc, nodes[ni].ch[i]);
-            if ((total > lengthCap)) {
-                return lengthCap;
-            }
-        }
-        return total;
-    } break;
-    case opAlt: {
-        int64_t best = lengthCap;
-        for (int64_t i_2 = 0LL; (i_2 < vg::len(nodes[ni].ch)); i_2 += 1LL) {
-            best = ([&]{ auto _t1 = best; auto _t2 = minMatchChars(nodes, brs, loc, nodes[ni].ch[i_2]); return std::min<int64_t>(_t1, _t2); }());
-        }
-        return best;
-    } break;
-    case opRepeat: {
-        if ((nodes[ni].min == 0LL)) {
-            return 0LL;
-        }
-        int64_t product = ([&]{ auto _t3 = int64_t(nodes[ni].min); auto _t4 = minMatchChars(nodes, brs, loc, nodes[ni].ch[0LL]); return (_t3 * _t4); }());
-        return std::min<int64_t>(product, lengthCap);
-    } break;
-    default: break;
-    }
-    return 0LL;
 }
 
 Tup_t526567657870x_t4572726f72x Compile(vg::Arena& mem, vg::Str pattern, Locale loc, uint32_t flags) {
@@ -3778,11 +3706,9 @@ Tup_t526567657870x_t4572726f72x Compile(vg::Arena& mem, vg::Str pattern, Locale 
         return Tup_t526567657870x_t4572726f72x{re, compileError(b.errCode, int64_t(0ULL - uint64_t(1LL)))};
     }
     if ((b.tooBig || ((re.minSlots > 0LL) && (vg::len(b.prog.ins) > vg::sdiv<int64_t>(maxCounterCells, re.minSlots))))) {
-        re.minLen = minMatchChars(re.nodes, re.brackets, re.loc, root);
-    } else {
-        re.progOK = true;
-        re.prog = b.prog;
+        return Tup_t526567657870x_t4572726f72x{re, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
     }
+    re.prog = b.prog;
     return Tup_t526567657870x_t4572726f72x{re, noError()};
 }
 
@@ -3790,36 +3716,8 @@ int64_t NumSub(Regexp& re) {
     return re.nsub;
 }
 
-bool trivialNullMatch(Regexp& re, vg::Slice<Match> pmatch) {
-    return (((re.nodes[re.root].minL == 0LL) && (!re.anchors)) && ((uint32_t(re.flags & FlagNoSub) != 0U) || (vg::len(pmatch) == 0LL)));
-}
-
 Tup_bool_t4572726f72x Exec(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Slice<Match> pmatch, uint32_t eflags) {
     if ((vg::len(subject) > subjectLimit)) {
-        return Tup_bool_t4572726f72x{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
-    }
-    if ((!re.progOK)) {
-        if ((int64_t(vg::len(subject)) < re.minLen)) {
-            return Tup_bool_t4572726f72x{false, noError()};
-        }
-        if (([&]{ auto _t1 = int64_t(runeCount(subject)); auto _t2 = re.minLen; return (_t1 < _t2); }())) {
-            return Tup_bool_t4572726f72x{false, noError()};
-        }
-        if (trivialNullMatch(re, pmatch)) {
-            return Tup_bool_t4572726f72x{true, noError()};
-        }
-        return Tup_bool_t4572726f72x{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
-    }
-    if ((((re.prog.failMin != failMinNone) && (vg::len(subject) >= re.prog.failMin)) && ([&]{ auto _t3 = runeCount(subject); auto _t4 = re.prog.failMin; return (_t3 >= _t4); }()))) {
-        if (trivialNullMatch(re, pmatch)) {
-            return Tup_bool_t4572726f72x{true, noError()};
-        }
-        if (((uint32_t(re.flags & FlagNoSub) != 0U) || (vg::len(pmatch) == 0LL))) {
-            engineResult probe = runPhaseA(mem, re, subject, eflags);
-            if (probe.matched) {
-                return Tup_bool_t4572726f72x{true, noError()};
-            }
-        }
         return Tup_bool_t4572726f72x{false, compileError(ErrESpace, int64_t(0ULL - uint64_t(1LL)))};
     }
     engineResult result = runPhaseA(mem, re, subject, eflags);

@@ -137,12 +137,9 @@ export const iEOL: number = 5;
 export const iSplit: number = 6;
 export const iJmp: number = 7;
 export const iMatch: number = 8;
-export const iFail: number = 9;
-export const failMinNone: number = 1073741825;
 export const maxProgram: number = 1048576;
 export const maskWidth: number = 64;
 export const subjectLimit: number = 2147483647;
-export const lengthCap: bigint = 1099511627776n;
 export const maxCounterCells: number = 2147483647;
 export const opChar: number = 0;
 export const opAny: number = 1;
@@ -1127,22 +1124,20 @@ export class program {
     start: number;
     foldSets: vg.Slice<vg.Slice<number>>;
     multi: boolean;
-    failMin: number;
     scan: scanFilter;
     depth: number;
 
-    constructor(ins: vg.Slice<instr> = vg.NIL, start: number = 0, foldSets: vg.Slice<vg.Slice<number>> = vg.NIL, multi: boolean = false, failMin: number = 0, scan: scanFilter = new scanFilter(), depth: number = 0) {
+    constructor(ins: vg.Slice<instr> = vg.NIL, start: number = 0, foldSets: vg.Slice<vg.Slice<number>> = vg.NIL, multi: boolean = false, scan: scanFilter = new scanFilter(), depth: number = 0) {
         this.ins = ins;
         this.start = start;
         this.foldSets = foldSets;
         this.multi = multi;
-        this.failMin = failMin;
         this.scan = scan;
         this.depth = depth;
     }
 
     clone(): program {
-        return new program(this.ins, this.start, this.foldSets, this.multi, this.failMin, this.scan.clone(), this.depth);
+        return new program(this.ins, this.start, this.foldSets, this.multi, this.scan.clone(), this.depth);
     }
 
     set(src_: program): void {
@@ -1150,12 +1145,11 @@ export class program {
         this.start = src_.start;
         this.foldSets = src_.foldSets;
         this.multi = src_.multi;
-        this.failMin = src_.failMin;
         this.scan.set(src_.scan);
         this.depth = src_.depth;
     }
 
-    static readonly elem: vg.Elem<program> = vg.structElem(() => new program(), 344);
+    static readonly elem: vg.Elem<program> = vg.structElem(() => new program(), 336);
 }
 
 export class patchSlot {
@@ -1207,31 +1201,28 @@ export class frag {
 export class progBuilder {
     prog: program;
     tooBig: boolean;
-    failMin: number;
     errCode: number;
     icase: boolean;
 
-    constructor(prog: program = new program(), tooBig: boolean = false, failMin: number = 0, errCode: number = 0, icase: boolean = false) {
+    constructor(prog: program = new program(), tooBig: boolean = false, errCode: number = 0, icase: boolean = false) {
         this.prog = prog;
         this.tooBig = tooBig;
-        this.failMin = failMin;
         this.errCode = errCode;
         this.icase = icase;
     }
 
     clone(): progBuilder {
-        return new progBuilder(this.prog.clone(), this.tooBig, this.failMin, this.errCode, this.icase);
+        return new progBuilder(this.prog.clone(), this.tooBig, this.errCode, this.icase);
     }
 
     set(src_: progBuilder): void {
         this.prog.set(src_.prog);
         this.tooBig = src_.tooBig;
-        this.failMin = src_.failMin;
         this.errCode = src_.errCode;
         this.icase = src_.icase;
     }
 
-    static readonly elem: vg.Elem<progBuilder> = vg.structElem(() => new progBuilder(), 358);
+    static readonly elem: vg.Elem<progBuilder> = vg.structElem(() => new progBuilder(), 342);
 }
 
 export class Regexp {
@@ -1244,13 +1235,10 @@ export class Regexp {
     minSlots: number;
     nested: vg.Slice<vg.Slice<number>>;
     multi: boolean;
-    progOK: boolean;
     prog: program;
-    minLen: bigint;
-    anchors: boolean;
     onePass: boolean;
 
-    constructor(nodes: vg.Slice<node> = vg.NIL, brackets: vg.Slice<bracketSet> = vg.NIL, root: number = 0, nsub: number = 0, flags: number = 0, loc: Locale = new Locale(), minSlots: number = 0, nested: vg.Slice<vg.Slice<number>> = vg.NIL, multi: boolean = false, progOK: boolean = false, prog: program = new program(), minLen: bigint = 0n, anchors: boolean = false, onePass: boolean = false) {
+    constructor(nodes: vg.Slice<node> = vg.NIL, brackets: vg.Slice<bracketSet> = vg.NIL, root: number = 0, nsub: number = 0, flags: number = 0, loc: Locale = new Locale(), minSlots: number = 0, nested: vg.Slice<vg.Slice<number>> = vg.NIL, multi: boolean = false, prog: program = new program(), onePass: boolean = false) {
         this.nodes = nodes;
         this.brackets = brackets;
         this.root = root;
@@ -1260,15 +1248,12 @@ export class Regexp {
         this.minSlots = minSlots;
         this.nested = nested;
         this.multi = multi;
-        this.progOK = progOK;
         this.prog = prog;
-        this.minLen = minLen;
-        this.anchors = anchors;
         this.onePass = onePass;
     }
 
     clone(): Regexp {
-        return new Regexp(this.nodes, this.brackets, this.root, this.nsub, this.flags, this.loc.clone(), this.minSlots, this.nested, this.multi, this.progOK, this.prog.clone(), this.minLen, this.anchors, this.onePass);
+        return new Regexp(this.nodes, this.brackets, this.root, this.nsub, this.flags, this.loc.clone(), this.minSlots, this.nested, this.multi, this.prog.clone(), this.onePass);
     }
 
     set(src_: Regexp): void {
@@ -1281,14 +1266,11 @@ export class Regexp {
         this.minSlots = src_.minSlots;
         this.nested = src_.nested;
         this.multi = src_.multi;
-        this.progOK = src_.progOK;
         this.prog.set(src_.prog);
-        this.minLen = src_.minLen;
-        this.anchors = src_.anchors;
         this.onePass = src_.onePass;
     }
 
-    static readonly elem: vg.Elem<Regexp> = vg.structElem(() => new Regexp(), 889);
+    static readonly elem: vg.Elem<Regexp> = vg.structElem(() => new Regexp(), 871);
 }
 
 export class groupStack {
@@ -2596,7 +2578,7 @@ export function ContractFor(re: Regexp, maxInput: number): Contract {
     let c: Contract = new Contract();
     c.MaxInput = vg.intOf(length);
     c.Matcher = matcherContract(re, length, atom);
-    if ((((re.progOK && (re.prog.failMin !== 0)) && (re.nsub > 0)) && (((re.flags & FlagNoSub) >>> 0) === 0))) {
+    if (((re.nsub > 0) && (((re.flags & FlagNoSub) >>> 0) === 0))) {
         if (re.onePass) {
             c.OnePass = onePassContract(re, length);
             c.HasOnePass = true;
@@ -2610,11 +2592,6 @@ export function ContractFor(re: Regexp, maxInput: number): Contract {
 
 export function matcherContract(re: Regexp, length: bigint, atom: bigint): BackendContract {
     let b: BackendContract = new BackendContract();
-    if ((!re.progOK)) {
-        b.StackBytes = 2048n;
-        b.Steps = cAdd(runeCountSteps(length), 3n);
-        return b;
-    }
     const n: bigint = BigInt(re.prog.ins.len);
     const k: bigint = BigInt(re.minSlots);
     let ring: bigint = 2n;
@@ -2631,10 +2608,7 @@ export function matcherContract(re: Regexp, length: bigint, atom: bigint): Backe
     if ((re.prog.depth >= 0)) {
         boundaries = vg.minBig(boundaries, BigInt.asIntN(64, BigInt(re.prog.depth) + 3n));
     }
-    let steps: bigint = cAdd(cAdd(BigInt.asIntN(64, 24n + ring), length), cMul(boundaries, perBoundary));
-    if ((re.prog.failMin !== failMinNone)) {
-        steps = cAdd(steps, cAdd(runeCountSteps(length), 1n));
-    }
+    const steps: bigint = cAdd(cAdd(BigInt.asIntN(64, 24n + ring), length), cMul(boundaries, perBoundary));
     const stack: bigint = 6144n;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -5225,10 +5199,6 @@ export function buildScanFilter(pr: program, newlineMode: boolean): number {
                 matchReachable = true;
                 break;
             }
-            case iFail:
-            {
-                break;
-            }
             case iRune:
             {
                 (_t6 = pr.scan.stop, _t7 = vg.ix(utf8LeadByte(((_t8 = pr.ins, _t8.buf[_t8.off + vg.ix(pc, _t8.len)]).arg | 0)), 256), _t6[_t7] = true);
@@ -5269,37 +5239,27 @@ export function buildScanFilter(pr: program, newlineMode: boolean): number {
     return count;
 }
 
-export function instrEstimate(nodes: vg.Slice<node>, ni: number): number {
+export function instrCount(nodes: vg.Slice<node>, ni: number): number {
     let _t1!: vg.Slice<number>;
     let _t3!: vg.Slice<number>;
-    let _t5!: vg.Slice<number>;
-    let _t6!: vg.Slice<number>;
-    const estimateCap: number = 4194304;
+    let _t4!: vg.Slice<number>;
     let total: number = 0;
     switch (nodes.buf[nodes.off + vg.ix(ni, nodes.len)].op) {
         case opGroup:
         {
-            return instrEstimate(nodes, (_t1 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t1.buf[_t1.off + vg.ix(0, _t1.len)]));
+            return instrCount(nodes, (_t1 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t1.buf[_t1.off + vg.ix(0, _t1.len)]));
             break;
         }
         case opConcat:
-        {
-            for (let i: number = 0; (i < nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len); i = vg.chk(i + 1)) {
-                total = vg.chk(total + instrEstimate(nodes, (_t3 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t3.buf[_t3.off + vg.ix(i, _t3.len)])));
-                if ((total > estimateCap)) {
-                    return estimateCap;
-                }
-            }
-            return total;
-            break;
-        }
         case opAlt:
         {
-            total = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len;
-            for (let i_2: number = 0; (i_2 < nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len); i_2 = vg.chk(i_2 + 1)) {
-                total = vg.chk(total + instrEstimate(nodes, (_t5 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t5.buf[_t5.off + vg.ix(i_2, _t5.len)])));
-                if ((total > estimateCap)) {
-                    return estimateCap;
+            if ((nodes.buf[nodes.off + vg.ix(ni, nodes.len)].op === opAlt)) {
+                total = vg.chk(nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len - 1);
+            }
+            for (let i: number = 0; (i < nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len); i = vg.chk(i + 1)) {
+                total = vg.chk(total + instrCount(nodes, (_t3 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t3.buf[_t3.off + vg.ix(i, _t3.len)])));
+                if ((total > maxProgram)) {
+                    return 1048577;
                 }
             }
             return total;
@@ -5307,19 +5267,18 @@ export function instrEstimate(nodes: vg.Slice<node>, ni: number): number {
         }
         case opRepeat:
         {
-            let copies: number = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].max;
-            if ((nodes.buf[nodes.off + vg.ix(ni, nodes.len)].max === infinite)) {
-                copies = vg.chk(nodes.buf[nodes.off + vg.ix(ni, nodes.len)].min + 1);
-            }
-            if ((copies === 0)) {
+            const lo: number = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].min;
+            const hi: number = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].max;
+            if ((hi === 0)) {
                 return 1;
             }
-            const child: number = instrEstimate(nodes, (_t6 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t6.buf[_t6.off + vg.ix(0, _t6.len)]));
-            total = vg.chk(vg.chk(vg.chk(copies * child) + copies) + 2);
-            if (((total > estimateCap) || (total < 0))) {
-                return estimateCap;
+            const child: number = instrCount(nodes, (_t4 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t4.buf[_t4.off + vg.ix(0, _t4.len)]));
+            if ((hi === infinite)) {
+                total = vg.chk(vg.chk(Math.max(lo, 1) * child) + 1);
+            } else {
+                total = vg.chk(vg.chk(lo * child) + vg.chk(vg.chk(hi - lo) * vg.chk(child + 1)));
             }
-            return total;
+            return Math.min(total, 1048577);
             break;
         }
     }
@@ -5327,7 +5286,10 @@ export function instrEstimate(nodes: vg.Slice<node>, ni: number): number {
 }
 
 export function compileProgram(b: progBuilder, nodes: vg.Slice<node>, root: number, multi: boolean, newlineMode: boolean): void {
-    b.failMin = failMinNone;
+    if ((instrCount(nodes, root) >= maxProgram)) {
+        b.tooBig = true;
+        return;
+    }
     const body: frag = emit(b, nodes, root, 0n, vg.NIL);
     if ((b.errCode !== ErrNone)) {
         return;
@@ -5341,7 +5303,6 @@ export function compileProgram(b: progBuilder, nodes: vg.Slice<node>, root: numb
     patch(b, body.out, match);
     b.prog.start = body.start;
     b.prog.multi = multi;
-    b.prog.failMin = b.failMin;
     const stops: number = buildScanFilter(b.prog, newlineMode);
     b.prog.depth = (0 - 1);
     if ((((!newlineMode) && b.prog.scan.enabled) && (stops === 0))) {
@@ -5358,7 +5319,7 @@ export function progEdge(pr: program, pc: number, i: number): [number, boolean] 
     let _t2!: vg.Slice<instr>;
     let _t3!: vg.Slice<instr>;
     const op: number = (_t1 = pr.ins, _t1.buf[_t1.off + vg.ix(pc, _t1.len)]).op;
-    if (((op === iMatch) || (op === iFail))) {
+    if ((op === iMatch)) {
         return [0, false];
     }
     if ((i === 0)) {
@@ -5594,15 +5555,6 @@ export function emitRepeat(b: progBuilder, nodes: vg.Slice<node>, ni: number, ma
     let mask_v: bigint = mask;
     let extra_v: vg.Slice<number> = extra;
     const none: frag = new frag();
-    if ((instrEstimate(nodes, ni) > vg.chk(maxProgram - b.prog.ins.len))) {
-        let fi: instr = new instr();
-        fi.op = iFail;
-        const idx: number = addInstr(b, fi);
-        b.failMin = Math.min(b.failMin, nodes.buf[nodes.off + vg.ix(ni, nodes.len)].minL);
-        let f: frag = new frag();
-        f.start = idx;
-        return f;
-    }
     if (nodes.buf[nodes.off + vg.ix(ni, nodes.len)].minimal) {
         const slot: number = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].index;
         if ((slot < maskWidth)) {
@@ -5725,12 +5677,6 @@ export function compileScan(re: Regexp, ni: number): void {
             }
             break;
         }
-        case opBOL:
-        case opEOL:
-        {
-            re.anchors = true;
-            break;
-        }
     }
     for (let i: number = 0; (i < (_t5 = re.nodes, _t5.buf[_t5.off + vg.ix(ni, _t5.len)]).ch.len); i = vg.chk(i + 1)) {
         compileScan(re, (_t7 = (_t8 = re.nodes, _t8.buf[_t8.off + vg.ix(ni, _t8.len)]).ch, _t7.buf[_t7.off + vg.ix(i, _t7.len)]));
@@ -5764,68 +5710,6 @@ export function collectNested(re: Regexp, ni: number, stack: groupStack): void {
     }
 }
 
-export function minMatchChars(nodes: vg.Slice<node>, brs: vg.Slice<bracketSet>, loc: Locale, ni: number): bigint {
-    let _t1!: vg.Slice<number>;
-    let _t3!: vg.Slice<number>;
-    let _t5!: vg.Slice<number>;
-    let _t6!: vg.Slice<number>;
-    switch (nodes.buf[nodes.off + vg.ix(ni, nodes.len)].op) {
-        case opChar:
-        case opAny:
-        {
-            return 1n;
-            break;
-        }
-        case opBracket:
-        {
-            return BigInt(bracketMinChars(brs, nodes.buf[nodes.off + vg.ix(ni, nodes.len)].br, loc));
-            break;
-        }
-        case opBOL:
-        case opEOL:
-        {
-            return 0n;
-            break;
-        }
-        case opGroup:
-        {
-            return minMatchChars(nodes, brs, loc, (_t1 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t1.buf[_t1.off + vg.ix(0, _t1.len)]));
-            break;
-        }
-        case opConcat:
-        {
-            let total: bigint = 0n;
-            for (let i: number = 0; (i < nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len); i = vg.chk(i + 1)) {
-                total = BigInt.asIntN(64, total + minMatchChars(nodes, brs, loc, (_t3 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t3.buf[_t3.off + vg.ix(i, _t3.len)])));
-                if ((total > 1099511627776n)) {
-                    return 1099511627776n;
-                }
-            }
-            return total;
-            break;
-        }
-        case opAlt:
-        {
-            let best: bigint = 1099511627776n;
-            for (let i_2: number = 0; (i_2 < nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch.len); i_2 = vg.chk(i_2 + 1)) {
-                best = vg.minBig(best, minMatchChars(nodes, brs, loc, (_t5 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t5.buf[_t5.off + vg.ix(i_2, _t5.len)])));
-            }
-            return best;
-            break;
-        }
-        case opRepeat:
-        {
-            if ((nodes.buf[nodes.off + vg.ix(ni, nodes.len)].min === 0)) {
-                return 0n;
-            }
-            const product: bigint = BigInt.asIntN(64, BigInt(nodes.buf[nodes.off + vg.ix(ni, nodes.len)].min) * minMatchChars(nodes, brs, loc, (_t6 = nodes.buf[nodes.off + vg.ix(ni, nodes.len)].ch, _t6.buf[_t6.off + vg.ix(0, _t6.len)])));
-            return vg.minBig(product, 1099511627776n);
-            break;
-        }
-    }
-    return 0n;
-}
-
 export function Compile(pattern: vg.Str, loc: Locale, flags: number): [Regexp, Error] {
     let loc_v: Locale = loc.clone();
     let re: Regexp = new Regexp();
@@ -5856,11 +5740,9 @@ export function Compile(pattern: vg.Str, loc: Locale, flags: number): [Regexp, E
         return [re, compileError(b.errCode, (0 - 1))];
     }
     if ((b.tooBig || ((re.minSlots > 0) && (b.prog.ins.len > vg.div(maxCounterCells, re.minSlots))))) {
-        re.minLen = minMatchChars(re.nodes, re.brackets, re.loc, root);
-    } else {
-        re.progOK = true;
-        re.prog = b.prog.clone();
+        return [re, compileError(ErrESpace, (0 - 1))];
     }
+    re.prog = b.prog.clone();
     return [re, noError()];
 }
 
@@ -5868,37 +5750,8 @@ export function NumSub(re: Regexp): number {
     return re.nsub;
 }
 
-export function trivialNullMatch(re: Regexp, pmatch: vg.Slice<Match>): boolean {
-    let _t1!: vg.Slice<node>;
-    return ((((_t1 = re.nodes, _t1.buf[_t1.off + vg.ix(re.root, _t1.len)]).minL === 0) && (!re.anchors)) && ((((re.flags & FlagNoSub) >>> 0) !== 0) || (pmatch.len === 0)));
-}
-
 export function Exec(re: Regexp, subject: vg.Str, pmatch: vg.Slice<Match>, eflags: number): [boolean, Error] {
     if ((subject.length > subjectLimit)) {
-        return [false, compileError(ErrESpace, (0 - 1))];
-    }
-    if ((!re.progOK)) {
-        if ((BigInt(subject.length) < re.minLen)) {
-            return [false, noError()];
-        }
-        if ((BigInt(runeCount(subject)) < re.minLen)) {
-            return [false, noError()];
-        }
-        if (trivialNullMatch(re, pmatch)) {
-            return [true, noError()];
-        }
-        return [false, compileError(ErrESpace, (0 - 1))];
-    }
-    if ((((re.prog.failMin !== failMinNone) && (subject.length >= re.prog.failMin)) && (runeCount(subject) >= re.prog.failMin))) {
-        if (trivialNullMatch(re, pmatch)) {
-            return [true, noError()];
-        }
-        if (((((re.flags & FlagNoSub) >>> 0) !== 0) || (pmatch.len === 0))) {
-            const probe: engineResult = runPhaseA(re, subject, eflags);
-            if (probe.matched) {
-                return [true, noError()];
-            }
-        }
         return [false, compileError(ErrESpace, (0 - 1))];
     }
     const result: engineResult = runPhaseA(re, subject, eflags);

@@ -95,12 +95,9 @@
 #define vego_g_7265766572615f656e67x_iSplit ((uint8_t)(6))
 #define vego_g_7265766572615f656e67x_iJmp ((uint8_t)(7))
 #define vego_g_7265766572615f656e67x_iMatch ((uint8_t)(8))
-#define vego_g_7265766572615f656e67x_iFail ((uint8_t)(9))
-#define vego_g_7265766572615f656e67x_failMinNone ((int64_t)(1073741825LL))
 #define vego_g_7265766572615f656e67x_maxProgram ((int64_t)(1048576LL))
 #define vego_g_7265766572615f656e67x_maskWidth ((int64_t)(64LL))
 #define vego_g_7265766572615f656e67x_subjectLimit ((int64_t)(2147483647LL))
-#define vego_g_7265766572615f656e67x_lengthCap ((int64_t)(1099511627776LL))
 #define vego_g_7265766572615f656e67x_maxCounterCells ((int64_t)(2147483647LL))
 #define vego_g_7265766572615f656e67x_opChar ((uint8_t)(0))
 #define vego_g_7265766572615f656e67x_opAny ((uint8_t)(1))
@@ -519,7 +516,6 @@ struct vego_g_7265766572615f656e67x_program {
     uint32_t vego_f_start;
     vego_t_7265766572615f656e67x_ssi32 vego_f_foldSets;
     bool vego_f_multi;
-    int64_t vego_f_failMin;
     vego_g_7265766572615f656e67x_scanFilter vego_f_scan;
     int64_t vego_f_depth;
 };
@@ -537,7 +533,6 @@ struct vego_g_7265766572615f656e67x_frag {
 struct vego_g_7265766572615f656e67x_progBuilder {
     vego_g_7265766572615f656e67x_program vego_f_prog;
     bool vego_f_tooBig;
-    int64_t vego_f_failMin;
     int32_t vego_f_errCode;
     bool vego_f_icase;
 };
@@ -552,10 +547,7 @@ struct vego_g_7265766572615f656e67x_Regexp {
     int64_t vego_f_minSlots;
     vego_t_7265766572615f656e67x_ssi32 vego_f_nested;
     bool vego_f_multi;
-    bool vego_f_progOK;
     vego_g_7265766572615f656e67x_program vego_f_prog;
-    int64_t vego_f_minLen;
-    bool vego_f_anchors;
     bool vego_f_onePass;
 };
 
@@ -2497,7 +2489,7 @@ vego_q_7265766572615f656e67x_Tup_si32_bool vego_g_7265766572615f656e67x_firstSet
 bool vego_g_7265766572615f656e67x_disjointFirsts(vg_arena *mem, vego_t_7265766572615f656e67x_st6e6f6465x vego_l_nodes, int32_t vego_l_ni);
 bool vego_g_7265766572615f656e67x_onePassCaps(vego_g_7265766572615f656e67x_Regexp *vego_l_re, vego_g_7265766572615f656e67x_decoded *vego_l_d, int32_t vego_l_ni, int64_t vego_l_i, int64_t vego_l_j, uint32_t vego_l_eflags, vego_t_7265766572615f656e67x_st4d61746368x vego_l_caps);
 int64_t vego_g_7265766572615f656e67x_buildScanFilter(vg_arena *mem, vego_g_7265766572615f656e67x_program *vego_l_pr, bool vego_l_newlineMode);
-int64_t vego_g_7265766572615f656e67x_instrEstimate(vego_t_7265766572615f656e67x_st6e6f6465x vego_l_nodes, int32_t vego_l_ni);
+int64_t vego_g_7265766572615f656e67x_instrCount(vego_t_7265766572615f656e67x_st6e6f6465x vego_l_nodes, int32_t vego_l_ni);
 void vego_g_7265766572615f656e67x_compileProgram(vg_arena *mem, vego_g_7265766572615f656e67x_progBuilder *vego_l_b, vego_t_7265766572615f656e67x_st6e6f6465x vego_l_nodes, int32_t vego_l_root, bool vego_l_multi, bool vego_l_newlineMode);
 bool vego_g_7265766572615f656e67x_consumingOp(uint8_t vego_l_op);
 vego_q_7265766572615f656e67x_Tup_u32_bool vego_g_7265766572615f656e67x_progEdge(vego_g_7265766572615f656e67x_program *vego_l_pr, uint32_t vego_l_pc, int64_t vego_l_i);
@@ -2516,10 +2508,8 @@ vego_g_7265766572615f656e67x_frag vego_g_7265766572615f656e67x_emitStar(vg_arena
 vego_g_7265766572615f656e67x_frag vego_g_7265766572615f656e67x_emitPlus(vg_arena *mem, vego_g_7265766572615f656e67x_progBuilder *vego_l_b, vego_t_7265766572615f656e67x_st6e6f6465x vego_l_nodes, int32_t vego_l_child, uint64_t vego_l_mask, vego_t_7265766572615f656e67x_su32 vego_l_extra);
 void vego_g_7265766572615f656e67x_compileScan(vego_g_7265766572615f656e67x_Regexp *vego_l_re, int32_t vego_l_ni);
 void vego_g_7265766572615f656e67x_collectNested(vg_arena *mem, vego_g_7265766572615f656e67x_Regexp *vego_l_re, int32_t vego_l_ni, vego_g_7265766572615f656e67x_groupStack *vego_l_stack);
-int64_t vego_g_7265766572615f656e67x_minMatchChars(vego_t_7265766572615f656e67x_st6e6f6465x vego_l_nodes, vego_t_7265766572615f656e67x_st627261636b6574536574x vego_l_brs, vego_g_7265766572615f656e67x_Locale *vego_l_loc, int32_t vego_l_ni);
 vego_q_7265766572615f656e67x_Tup_t526567657870x_t4572726f72x vego_g_7265766572615f656e67x_Compile(vg_arena *mem, vg_str vego_l_pattern, vego_g_7265766572615f656e67x_Locale vego_l_loc, uint32_t vego_l_flags);
 int64_t vego_g_7265766572615f656e67x_NumSub(vego_g_7265766572615f656e67x_Regexp *vego_l_re);
-bool vego_g_7265766572615f656e67x_trivialNullMatch(vego_g_7265766572615f656e67x_Regexp *vego_l_re, vego_t_7265766572615f656e67x_st4d61746368x vego_l_pmatch);
 vego_q_7265766572615f656e67x_Tup_bool_t4572726f72x vego_g_7265766572615f656e67x_Exec(vg_arena *mem, vego_g_7265766572615f656e67x_Regexp *vego_l_re, vg_str vego_l_subject, vego_t_7265766572615f656e67x_st4d61746368x vego_l_pmatch, uint32_t vego_l_eflags);
 vego_q_7265766572615f656e67x_Tup_t4d6174636849746572x_t4572726f72x vego_g_7265766572615f656e67x_MatchIterInit(vego_g_7265766572615f656e67x_Regexp *vego_l_re, int64_t vego_l_limit);
 vego_q_7265766572615f656e67x_Tup_bool_t4572726f72x vego_g_7265766572615f656e67x_MatchIterNext(vg_arena *mem, vego_g_7265766572615f656e67x_Regexp *vego_l_re, vego_g_7265766572615f656e67x_MatchIter *vego_l_it, vg_str vego_l_subject, uint32_t vego_l_eflags, vego_t_7265766572615f656e67x_st4d61746368x vego_l_pmatch);

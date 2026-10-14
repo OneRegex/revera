@@ -264,6 +264,7 @@ Escape and backreference errors produced while parsing replacement text refer to
 
 A search usually fails with a `"capacity"` error when its subject exceeds the engine's capacity for that pattern.
 Compilation throws it for a pattern that nests parentheses more than 256 deep.
+It also throws it for a pattern that goes past the engine's size limits, such as `((a{0,255}){0,255}){0,255}`.
 The same error is used to fail closed if a compile-time-selected one-pass capture walk detects an internal inconsistency.
 
 Numeric arguments such as a replacement limit or contract size throw `RangeError` when they are not integers.

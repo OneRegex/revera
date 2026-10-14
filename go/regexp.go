@@ -31,13 +31,7 @@ type Regexp struct {
 	nested [][]int32
 	// multi is true when some bracket can consume several characters.
 	multi bool
-	// progOK is false when the program would pass maxProgram or maxCounterCells.
-	// minLen then holds the smallest possible match length in characters, for the fallback in Exec.
-	progOK bool
-	prog   program
-	minLen int64
-	// anchors is true when the pattern contains ^ or $ anywhere.
-	anchors bool
+	prog  program
 	// onePass is true when every span has at most one parse.
 	// The capture walk in onepass.go then replaces the phase B solver.
 	onePass bool
@@ -48,16 +42,12 @@ type Regexp struct {
 // The resource contract clamps its input bound to this value.
 const subjectLimit = 1<<31 - 1
 
-// lengthCap caps minimum-length arithmetic above subjectLimit, so the length check in Exec stays exact.
-// It needs int64 because it does not fit a 32-bit int.
-const lengthCap = int64(1) << 40
-
 // maxCounterCells limits the phase A counter table, instructions times counter slots, so its indexes fit a 32-bit int.
-// A bigger program uses the minimum-length fallback, like one past maxProgram.
+// A pattern that needs a bigger table fails to compile with ESpace.
 const maxCounterCells = 1<<31 - 1
 
 // compileScan walks the pattern in pre-order and fills the tree-derived Regexp fields.
-// Those fields are the minimal counter slots, the multi-character flag, and the anchor flag.
+// Those fields are the minimal counter slots and the multi-character flag.
 func compileScan(re *Regexp, ni int32) {
 	switch re.nodes[ni].op {
 	case opRepeat:
@@ -69,8 +59,6 @@ func compileScan(re *Regexp, ni int32) {
 		if bracketHasMultiMembers(re.brackets, re.nodes[ni].br) {
 			re.multi = true
 		}
-	case opBOL, opEOL:
-		re.anchors = true
 	}
 	for i := 0; i < len(re.nodes[ni].ch); i++ {
 		compileScan(re, re.nodes[ni].ch[i])
@@ -99,43 +87,6 @@ func collectNested(re *Regexp, ni int32, stack *groupStack) {
 	if isGroup {
 		stack.g = stack.g[:len(stack.g)-1]
 	}
-}
-
-// minMatchChars returns the smallest character count the node can consume.
-// The result saturates at lengthCap.
-func minMatchChars(nodes []node, brs []bracketSet, loc *Locale, ni int32) int64 {
-	switch nodes[ni].op {
-	case opChar, opAny:
-		return 1
-	case opBracket:
-		return int64(bracketMinChars(brs, nodes[ni].br, loc))
-	case opBOL, opEOL:
-		return 0
-	case opGroup:
-		return minMatchChars(nodes, brs, loc, nodes[ni].ch[0])
-	case opConcat:
-		var total int64
-		for i := 0; i < len(nodes[ni].ch); i++ {
-			total += minMatchChars(nodes, brs, loc, nodes[ni].ch[i])
-			if total > lengthCap {
-				return lengthCap
-			}
-		}
-		return total
-	case opAlt:
-		best := lengthCap
-		for i := 0; i < len(nodes[ni].ch); i++ {
-			best = min(best, minMatchChars(nodes, brs, loc, nodes[ni].ch[i]))
-		}
-		return best
-	case opRepeat:
-		if nodes[ni].min == 0 {
-			return 0
-		}
-		product := int64(nodes[ni].min) * minMatchChars(nodes, brs, loc, nodes[ni].ch[0])
-		return min(product, lengthCap)
-	}
-	return 0
 }
 
 // Compile parses and compiles pattern in the given locale.
@@ -170,25 +121,15 @@ func Compile(pattern string, loc Locale, flags uint32) (Regexp, Error) {
 		return re, compileError(b.errCode, -1)
 	}
 	if b.tooBig || re.minSlots > 0 && len(b.prog.ins) > maxCounterCells/re.minSlots {
-		re.minLen = minMatchChars(re.nodes, re.brackets, &re.loc, root)
-	} else {
-		re.progOK = true
-		re.prog = b.prog
+		return re, compileError(ErrESpace, -1)
 	}
+	re.prog = b.prog
 	return re, noError()
 }
 
 // NumSub returns the number of parenthesized subexpressions, like re_nsub.
 func NumSub(re *Regexp) int {
 	return re.nsub
-}
-
-// trivialNullMatch reports whether existence alone answers an Exec call.
-// A nullable, anchor-free pattern matches the null string at the start of any subject.
-// The call also has to ask for no offsets.
-func trivialNullMatch(re *Regexp, pmatch []Match) bool {
-	return re.nodes[re.root].minL == 0 && !re.anchors &&
-		(re.flags&FlagNoSub != 0 || len(pmatch) == 0)
 }
 
 // Exec searches subject for the POSIX-selected match.
@@ -199,41 +140,6 @@ func trivialNullMatch(re *Regexp, pmatch []Match) bool {
 // Exec returns false when no match exists, and the Error code is then ErrNone for a plain mismatch.
 func Exec(re *Regexp, subject string, pmatch []Match, eflags uint32) (bool, Error) {
 	if len(subject) > subjectLimit {
-		return false, compileError(ErrESpace, -1)
-	}
-	if !re.progOK {
-		// The program passed maxProgram or maxCounterCells.
-		// A subject with fewer bytes than the minimum match length cannot match.
-		// A longer one would really need the full program.
-		// The matcherContract fallback branch mirrors the cost of this path.
-		if int64(len(subject)) < re.minLen {
-			return false, noError()
-		}
-		if int64(runeCount(subject)) < re.minLen {
-			// The byte count passed, but lengths compare in characters.
-			return false, noError()
-		}
-		if trivialNullMatch(re, pmatch) {
-			return true, noError()
-		}
-		return false, compileError(ErrESpace, -1)
-	}
-	if re.prog.failMin != failMinNone &&
-		len(subject) >= re.prog.failMin &&
-		runeCount(subject) >= re.prog.failMin {
-		// An oversized subtree was pruned, and this subject is long enough to reach it.
-		// The program may therefore miss matches or pick the wrong spans.
-		// Pruning removes possibilities and adds none, so a match the program still finds proves existence.
-		// A miss proves nothing, and offsets would need the full program.
-		if trivialNullMatch(re, pmatch) {
-			return true, noError()
-		}
-		if re.flags&FlagNoSub != 0 || len(pmatch) == 0 {
-			probe := runPhaseA(re, subject, eflags)
-			if probe.matched {
-				return true, noError()
-			}
-		}
 		return false, compileError(ErrESpace, -1)
 	}
 	result := runPhaseA(re, subject, eflags)

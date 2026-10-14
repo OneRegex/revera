@@ -19,34 +19,38 @@ func TestPmatchTruncation(t *testing.T) {
 	}
 }
 
-func TestHugeExpansionFallback(t *testing.T) {
-	// 20 bytes of pattern give 255^3 characters of minimum match length.
-	// Section 3.4 requires compilation to succeed.
-	// Execution answers correctly for every subject shorter than the minimum length.
-	re, err := Compile("((a{255}){255}){255}", locale.POSIX(), 0)
-	if err != nil {
-		t.Fatalf("Compile failed: %v", err)
+func TestProgramLimit(t *testing.T) {
+	// The second pattern fills the program exactly, and the third needs one more instruction.
+	nested := "((a{0,255}){0,255}){8}"
+	for _, tc := range []struct {
+		pattern string
+		flags   CompileFlags
+		fits    bool
+	}{
+		{"^b$|^((a{0,255}){0,255}){0,255}c$", 0, false},
+		{strings.Repeat("a", 6135) + nested, 0, true},
+		{strings.Repeat("a", 6136) + nested, 0, false},
+		{"((a{255}){255}){8}" + strings.Repeat("b*", 4096), Minimal, false},
+	} {
+		_, err := Compile(tc.pattern, locale.POSIX(), tc.flags)
+		e, ok := err.(*Error)
+		if tc.fits && err != nil || !tc.fits && (!ok || e.Code != ESpace || e.Pos != -1) {
+			t.Errorf("%.30q: got %v", tc.pattern, err)
+		}
 	}
-	pmatch := make([]Match, re.NumSub()+1)
-	ok, err := re.Exec(strings.Repeat("a", 100000), pmatch, 0)
-	if err != nil {
-		t.Fatalf("Exec failed: %v", err)
-	}
-	if ok {
-		t.Fatal("matched a subject shorter than the minimum length")
-	}
+}
 
-	// A moderate expansion still runs normally.
-	re = compileOK(t, "(a{100}){100}", 0)
-	subject := strings.Repeat("a", 10000)
-	ok, err = re.Exec(subject, pmatch[:1], 0)
+func TestModerateExpansion(t *testing.T) {
+	re := compileOK(t, "(a{100}){100}", 0)
+	pmatch := make([]Match, 1)
+	ok, err := re.Exec(strings.Repeat("a", 10000), pmatch, 0)
 	if err != nil || !ok {
 		t.Fatalf("(a{100}){100}: %v %v", ok, err)
 	}
 	if pmatch[0] != (Match{0, 10000}) {
 		t.Fatalf("(a{100}){100} span = %v", pmatch[0])
 	}
-	ok, err = re.Exec(strings.Repeat("a", 9999), pmatch[:1], 0)
+	ok, err = re.Exec(strings.Repeat("a", 9999), pmatch, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,133 +71,6 @@ func TestEquivalenceStarNoPanic(t *testing.T) {
 	}
 	if pmatch[0] != (Match{0, 9}) || pmatch[1] != (Match{0, 9}) {
 		t.Fatalf("pmatch = %v", pmatch)
-	}
-}
-
-func TestHugeExpansionMultiElementFallback(t *testing.T) {
-	cs, ok := locale.Open("cs", "")
-	if !ok {
-		t.Fatal("cs locale missing")
-	}
-	// The minimum match length counts two characters per [[.ch.]].
-	// A shorter subject therefore answers no-match instead of ESpace.
-	re, err := Compile("(([[.ch.]]{255}){255}){255}", cs, 0)
-	if err != nil {
-		t.Fatalf("Compile failed: %v", err)
-	}
-	matched, err := re.Exec(strings.Repeat("ch", 500_000), nil, 0)
-	if err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
-	if matched {
-		t.Fatal("matched below the minimum length")
-	}
-}
-
-func TestHugeNullableExistence(t *testing.T) {
-	// A nullable oversized pattern still answers existence questions.
-	re, err := Compile("((a{0,255}){255}){255}", locale.POSIX(), NoSub)
-	if err != nil {
-		t.Fatalf("Compile failed: %v", err)
-	}
-	matched, err := re.Exec("anything", nil, 0)
-	if err != nil || !matched {
-		t.Fatalf("NoSub existence: %v %v", matched, err)
-	}
-
-	// Asking for offsets would need the oversized program.
-	re, err = Compile("((a{0,255}){255}){255}", locale.POSIX(), 0)
-	if err != nil {
-		t.Fatalf("Compile failed: %v", err)
-	}
-	pmatch := make([]Match, 1)
-	_, err = re.Exec("anything", pmatch, 0)
-	if err == nil || err.(*Error).Code != ESpace {
-		t.Fatalf("offset request: err = %v, want ESpace", err)
-	}
-}
-
-func TestPrunedBranchStillMatches(t *testing.T) {
-	// One oversized branch must not break the reachable branch.
-	// The program prunes the huge subtree.
-	// It stays exact for any subject shorter than the minimum match length of that subtree.
-	re, err := Compile("(x|((a{255}){255}){255})", locale.POSIX(), 0)
-	if err != nil {
-		t.Fatalf("Compile failed: %v", err)
-	}
-	pmatch := make([]Match, re.NumSub()+1)
-	matched, err := re.Exec("zzxq", pmatch, 0)
-	if err != nil || !matched {
-		t.Fatalf("Exec: %v %v", matched, err)
-	}
-	if pmatch[0] != (Match{2, 3}) || pmatch[1] != (Match{2, 3}) {
-		t.Fatalf("pmatch = %v", pmatch)
-	}
-	if matched, err = re.Exec("zzzz", pmatch, 0); err != nil || matched {
-		t.Fatalf("no-match case: %v %v", matched, err)
-	}
-}
-
-func TestPrunedBranchExistencePastFailMin(t *testing.T) {
-	// The huge branch prunes with a minimum match length of two.
-	// A subject at least that long may reach the pruned subtree.
-	// A match through the surviving branch still proves existence.
-	re, err := Compile("x|(a((b{0,255}){255}){255}){2}", locale.POSIX(), 0)
-	if err != nil {
-		t.Fatalf("Compile failed: %v", err)
-	}
-	if re.prog == nil || re.prog.failMin != 2 {
-		t.Fatalf("expected a pruned program with failMin 2, got %+v", re.prog)
-	}
-	matched, err := re.Exec("xx", nil, 0)
-	if err != nil || !matched {
-		t.Fatalf("existence: %v %v", matched, err)
-	}
-
-	// A miss proves nothing, because the pruned subtree could have matched.
-	if _, err = re.Exec("zz", nil, 0); err == nil ||
-		err.(*Error).Code != ESpace {
-		t.Fatalf("miss past failMin: err = %v, want ESpace", err)
-	}
-
-	// Offsets would need the full program.
-	// The spans that the pruned program selects could be wrong.
-	pmatch := make([]Match, 1)
-	if _, err = re.Exec("xx", pmatch, 0); err == nil ||
-		err.(*Error).Code != ESpace {
-		t.Fatalf("offset request past failMin: err = %v, want ESpace", err)
-	}
-
-	// Below the minimum length of the pruned subtree, the program is exact.
-	matched, err = re.Exec("x", pmatch, 0)
-	if err != nil || !matched || pmatch[0] != (Match{0, 1}) {
-		t.Fatalf("exact case: %v %v %v", matched, err, pmatch)
-	}
-}
-
-func TestHugeExpansionEquivMinLength(t *testing.T) {
-	cs, ok := locale.Open("cs", "")
-	if !ok {
-		t.Fatal("cs locale missing")
-	}
-	// No single character is primary equal to Czech ch.
-	// The minimum match length therefore counts two characters per [[=ch=]].
-	// A subject below that bound answers no-match instead of ESpace.
-	re, err := Compile("(([[=ch=]]{255}){255}){255}", cs, 0)
-	if err != nil {
-		t.Fatalf("Compile failed: %v", err)
-	}
-	const wantMin = 2 * 255 * 255 * 255
-	if re.prog == nil || re.prog.failMin != wantMin {
-		t.Fatalf("expected a pruned program with failMin %d, got %+v",
-			wantMin, re.prog)
-	}
-	matched, err := re.Exec(strings.Repeat("ch", 10_000_000), nil, 0)
-	if err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
-	if matched {
-		t.Fatal("matched below the minimum length")
 	}
 }
 

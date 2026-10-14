@@ -62,24 +62,6 @@ func TestContractBackendSelection(t *testing.T) {
 	}
 }
 
-func TestContractOversizedProgram(t *testing.T) {
-	pattern := strings.Repeat("a", 1<<20+2)
-	re, c := compileContract(t, pattern, 0, 1000)
-	if re.prog != nil {
-		t.Fatal("the pattern must pass the program size cap")
-	}
-	if c.Solver != nil || c.OnePass != nil {
-		t.Error("without a program, Exec never reaches phase B")
-	}
-	if c.Matcher.HeapBytes != errorBytes {
-		t.Errorf("fallback heap = %d, want %d", c.Matcher.HeapBytes,
-			int64(errorBytes))
-	}
-	if c.Matcher.Steps != 2002 {
-		t.Errorf("fallback steps = %d, want 2002", c.Matcher.Steps)
-	}
-}
-
 func TestContractMonotone(t *testing.T) {
 	patterns := []string{
 		"abc",

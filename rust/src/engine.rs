@@ -97,12 +97,9 @@ pub const iEOL: u8 = 5u8;
 pub const iSplit: u8 = 6u8;
 pub const iJmp: u8 = 7u8;
 pub const iMatch: u8 = 8u8;
-pub const iFail: u8 = 9u8;
-pub const failMinNone: i64 = 1073741825i64;
 pub const maxProgram: i64 = 1048576i64;
 pub const maskWidth: i64 = 64i64;
 pub const subjectLimit: i64 = 2147483647i64;
-pub const lengthCap: i64 = 1099511627776i64;
 pub const maxCounterCells: i64 = 2147483647i64;
 pub const opChar: u8 = 0u8;
 pub const opAny: u8 = 1u8;
@@ -388,7 +385,6 @@ pub struct program {
     pub start: u32,
     pub foldSets: vg::Slice<vg::Slice<i32>>,
     pub multi: bool,
-    pub failMin: i64,
     pub scan: scanFilter,
     pub depth: i64,
 }
@@ -409,7 +405,6 @@ pub struct frag {
 pub struct progBuilder {
     pub prog: program,
     pub tooBig: bool,
-    pub failMin: i64,
     pub errCode: i32,
     pub icase: bool,
 }
@@ -425,10 +420,7 @@ pub struct Regexp {
     pub minSlots: i64,
     pub nested: vg::Slice<vg::Slice<i32>>,
     pub multi: bool,
-    pub progOK: bool,
     pub prog: program,
-    pub minLen: i64,
-    pub anchors: bool,
     pub onePass: bool,
 }
 
@@ -1596,7 +1588,7 @@ pub fn ContractFor(re: &mut Regexp, maxInput: i64) -> Contract {
     let mut c: Contract = vg::zero();
     c.MaxInput = ((length) as i64);
     c.Matcher = { let _t1 = length; let _t2 = atom; matcherContract(re, _t1, _t2) };
-    if (((re.progOK && (re.prog.failMin != 0i64)) && (re.nsub > 0i64)) && ((re.flags & FlagNoSub) == 0u32)) {
+    if ((re.nsub > 0i64) && ((re.flags & FlagNoSub) == 0u32)) {
         if re.onePass {
             c.OnePass = { let _t3 = length; onePassContract(re, _t3) };
             c.HasOnePass = true;
@@ -1610,11 +1602,6 @@ pub fn ContractFor(re: &mut Regexp, maxInput: i64) -> Contract {
 
 pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContract {
     let mut b: BackendContract = vg::zero();
-    if (!re.progOK) {
-        b.StackBytes = matcherStackBytes;
-        b.Steps = cAdd(runeCountSteps(length), 3i64);
-        return b;
-    }
     let n: i64 = ((re.prog.ins.len) as i64);
     let k: i64 = ((re.minSlots) as i64);
     let mut ring: i64 = 2i64;
@@ -1631,10 +1618,7 @@ pub fn matcherContract(re: &mut Regexp, length: i64, atom: i64) -> BackendContra
     if (re.prog.depth >= 0i64) {
         boundaries = std::cmp::min(boundaries, (((re.prog.depth) as i64)).wrapping_add(3i64));
     }
-    let mut steps: i64 = cAdd(cAdd((24i64).wrapping_add(ring), length), cMul(boundaries, perBoundary));
-    if (re.prog.failMin != failMinNone) {
-        steps = cAdd(steps, cAdd(runeCountSteps(length), 1i64));
-    }
+    let steps: i64 = cAdd(cAdd((24i64).wrapping_add(ring), length), cMul(boundaries, perBoundary));
     let stack: i64 = 6144i64;
     b.HeapBytes = heap;
     b.StackBytes = stack;
@@ -4237,7 +4221,6 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) -> 
             } else if _t1 == iEOL {
             } else if _t1 == iMatch {
                 matchReachable = true;
-            } else if _t1 == iFail {
             } else if _t1 == iRune {
                 {
                     let _t2 = vg::array_index(((utf8LeadByte(((pr.ins.get(((pc) as i64)).arg) as i32))) as i64), ((256) as usize));
@@ -4290,63 +4273,52 @@ pub fn buildScanFilter(mem: &vg::Arena, pr: &mut program, newlineMode: bool) -> 
     return count;
 }
 
-pub fn instrEstimate(nodes: vg::Slice<node>, ni: i32) -> i64 {
-    let estimateCap: i64 = 4194304i64;
+pub fn instrCount(nodes: vg::Slice<node>, ni: i32) -> i64 {
     let mut total: i64 = 0i64;
     {
         let _t1 = nodes.get(((ni) as i64)).op;
         if _t1 == opGroup {
-            return instrEstimate(nodes, nodes.get(((ni) as i64)).ch.get(0i64));
-        } else if _t1 == opConcat {
+            return instrCount(nodes, nodes.get(((ni) as i64)).ch.get(0i64));
+        } else if _t1 == opConcat || _t1 == opAlt {
+            if (nodes.get(((ni) as i64)).op == opAlt) {
+                total = (nodes.get(((ni) as i64)).ch.len).wrapping_sub(1i64);
+            }
             {
                 let mut i: i64 = 0i64;
                 '_b2: while (i < nodes.get(((ni) as i64)).ch.len) {
                     '_c2: {
-                        total = (total).wrapping_add(instrEstimate(nodes, nodes.get(((ni) as i64)).ch.get(i)));
-                        if (total > estimateCap) {
-                            return estimateCap;
+                        total = (total).wrapping_add(instrCount(nodes, nodes.get(((ni) as i64)).ch.get(i)));
+                        if (total > maxProgram) {
+                            return 1048577i64;
                         }
                     }
                     i = (i).wrapping_add(1i64);
                 }
             }
             return total;
-        } else if _t1 == opAlt {
-            total = nodes.get(((ni) as i64)).ch.len;
-            {
-                let mut i_2: i64 = 0i64;
-                '_b3: while (i_2 < nodes.get(((ni) as i64)).ch.len) {
-                    '_c3: {
-                        total = (total).wrapping_add(instrEstimate(nodes, nodes.get(((ni) as i64)).ch.get(i_2)));
-                        if (total > estimateCap) {
-                            return estimateCap;
-                        }
-                    }
-                    i_2 = (i_2).wrapping_add(1i64);
-                }
-            }
-            return total;
         } else if _t1 == opRepeat {
-            let mut copies: i64 = nodes.get(((ni) as i64)).max;
-            if (nodes.get(((ni) as i64)).max == infinite) {
-                copies = (nodes.get(((ni) as i64)).min).wrapping_add(1i64);
-            }
-            if (copies == 0i64) {
+            let lo: i64 = nodes.get(((ni) as i64)).min;
+            let hi: i64 = nodes.get(((ni) as i64)).max;
+            if (hi == 0i64) {
                 return 1i64;
             }
-            let child: i64 = instrEstimate(nodes, nodes.get(((ni) as i64)).ch.get(0i64));
-            total = (((copies).wrapping_mul(child)).wrapping_add(copies)).wrapping_add(2i64);
-            if ((total > estimateCap) || (total < 0i64)) {
-                return estimateCap;
+            let child: i64 = instrCount(nodes, nodes.get(((ni) as i64)).ch.get(0i64));
+            if (hi == infinite) {
+                total = ((std::cmp::max(lo, 1i64)).wrapping_mul(child)).wrapping_add(1i64);
+            } else {
+                total = ((lo).wrapping_mul(child)).wrapping_add(((hi).wrapping_sub(lo)).wrapping_mul((child).wrapping_add(1i64)));
             }
-            return total;
+            return std::cmp::min(total, 1048577i64);
         }
     }
     return 1i64;
 }
 
 pub fn compileProgram(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, root: i32, multi: bool, newlineMode: bool) {
-    b.failMin = failMinNone;
+    if (instrCount(nodes, root) >= maxProgram) {
+        b.tooBig = true;
+        return;
+    }
     let body: frag = { let _t1 = nodes; let _t2 = root; let _t3 = 0u64; let _t4 = vg::zero::<vg::Slice<u32>>(); emit(mem, b, _t1, _t2, _t3, _t4) };
     if (b.errCode != ErrNone) {
         return;
@@ -4360,7 +4332,6 @@ pub fn compileProgram(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<nod
     { let _t6 = body.out; let _t7 = r#match; patch(b, _t6, _t7) };
     b.prog.start = body.start;
     b.prog.multi = multi;
-    b.prog.failMin = b.failMin;
     let stops: i64 = { let _t8 = newlineMode; buildScanFilter(mem, &mut b.prog, _t8) };
     b.prog.depth = (1i64).wrapping_neg();
     if (((!newlineMode) && b.prog.scan.enabled) && (stops == 0i64)) {
@@ -4374,7 +4345,7 @@ pub fn consumingOp(op: u8) -> bool {
 
 pub fn progEdge(pr: &mut program, pc: u32, i: i64) -> (u32, bool) {
     let op: u8 = pr.ins.get(((pc) as i64)).op;
-    if ((op == iMatch) || (op == iFail)) {
+    if (op == iMatch) {
         return (0u32, false);
     }
     if (i == 0i64) {
@@ -4615,15 +4586,6 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
     let mut mask_v: u64 = mask;
     let mut extra_v: vg::Slice<u32> = extra;
     let none: frag = vg::zero();
-    if (instrEstimate(nodes, ni) > (maxProgram).wrapping_sub(b.prog.ins.len)) {
-        let mut fi: instr = vg::zero();
-        fi.op = iFail;
-        let idx: u32 = { let _t1 = fi; addInstr(mem, b, _t1) };
-        b.failMin = std::cmp::min(b.failMin, nodes.get(((ni) as i64)).minL);
-        let mut f: frag = vg::zero();
-        f.start = idx;
-        return f;
-    }
     if nodes.get(((ni) as i64)).minimal {
         let slot: i64 = nodes.get(((ni) as i64)).index;
         if (slot < maskWidth) {
@@ -4645,40 +4607,40 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
     let mut haveResult: bool = false;
     {
         let mut i: i64 = 0i64;
-        '_b2: while (i < lo) {
-            '_c2: {
+        '_b1: while (i < lo) {
+            '_c1: {
                 if ((b.errCode != ErrNone) || b.tooBig) {
                     return none;
                 }
                 if ((i == (lo).wrapping_sub(1i64)) && (hi == infinite)) {
-                    let _ = { let _t3 = haveResult; let _t4 = { let _t5 = nodes; let _t6 = child; let _t7 = mask_v; let _t8 = extra_v; emitPlus(mem, b, _t5, _t6, _t7, _t8) }; fragAppend(b, &mut result, _t3, _t4) };
+                    let _ = { let _t2 = haveResult; let _t3 = { let _t4 = nodes; let _t5 = child; let _t6 = mask_v; let _t7 = extra_v; emitPlus(mem, b, _t4, _t5, _t6, _t7) }; fragAppend(b, &mut result, _t2, _t3) };
                     return result;
                 }
-                haveResult = { let _t9 = haveResult; let _t10 = { let _t11 = nodes; let _t12 = child; let _t13 = mask_v; let _t14 = extra_v; emit(mem, b, _t11, _t12, _t13, _t14) }; fragAppend(b, &mut result, _t9, _t10) };
+                haveResult = { let _t8 = haveResult; let _t9 = { let _t10 = nodes; let _t11 = child; let _t12 = mask_v; let _t13 = extra_v; emit(mem, b, _t10, _t11, _t12, _t13) }; fragAppend(b, &mut result, _t8, _t9) };
             }
             i = (i).wrapping_add(1i64);
         }
     }
     if (hi == infinite) {
-        let _ = { let _t15 = haveResult; let _t16 = { let _t17 = nodes; let _t18 = child; let _t19 = mask_v; let _t20 = extra_v; emitStar(mem, b, _t17, _t18, _t19, _t20) }; fragAppend(b, &mut result, _t15, _t16) };
+        let _ = { let _t14 = haveResult; let _t15 = { let _t16 = nodes; let _t17 = child; let _t18 = mask_v; let _t19 = extra_v; emitStar(mem, b, _t16, _t17, _t18, _t19) }; fragAppend(b, &mut result, _t14, _t15) };
         return result;
     }
     let mut skips: vg::Slice<patchSlot> = vg::make_cap::<patchSlot>(mem, 0i64, std::cmp::max((hi).wrapping_sub(lo), 1i64));
     {
         let mut i_2: i64 = lo;
-        '_b21: while (i_2 < hi) {
-            '_c21: {
+        '_b20: while (i_2 < hi) {
+            '_c20: {
                 if ((b.errCode != ErrNone) || b.tooBig) {
                     return none;
                 }
                 let mut s: instr = vg::zero();
                 s.op = iSplit;
-                let split: u32 = { let _t22 = s; addInstr(mem, b, _t22) };
-                let sub: frag = { let _t23 = nodes; let _t24 = child; let _t25 = mask_v; let _t26 = extra_v; emit(mem, b, _t23, _t24, _t25, _t26) };
+                let split: u32 = { let _t21 = s; addInstr(mem, b, _t21) };
+                let sub: frag = { let _t22 = nodes; let _t23 = child; let _t24 = mask_v; let _t25 = extra_v; emit(mem, b, _t22, _t23, _t24, _t25) };
                 if ((b.errCode != ErrNone) || b.tooBig) {
                     return none;
                 }
-                b.prog.ins.update(((split) as i64), sub.start, |mut _t28, _t27| { _t28.next = _t27; _t28 });
+                b.prog.ins.update(((split) as i64), sub.start, |mut _t27, _t26| { _t27.next = _t26; _t27 });
                 let mut slot_2: patchSlot = vg::zero();
                 slot_2.idx = split;
                 slot_2.alt = true;
@@ -4686,7 +4648,7 @@ pub fn emitRepeat(mem: &vg::Arena, b: &mut progBuilder, nodes: vg::Slice<node>, 
                 let mut piece: frag = vg::zero();
                 piece.start = split;
                 piece.out = sub.out;
-                haveResult = { let _t29 = haveResult; let _t30 = piece; fragAppend(b, &mut result, _t29, _t30) };
+                haveResult = { let _t28 = haveResult; let _t29 = piece; fragAppend(b, &mut result, _t28, _t29) };
             }
             i_2 = (i_2).wrapping_add(1i64);
         }
@@ -4744,8 +4706,6 @@ pub fn compileScan(re: &mut Regexp, ni: i32) {
             if bracketHasMultiMembers(re.brackets, re.nodes.get(((ni) as i64)).br) {
                 re.multi = true;
             }
-        } else if _t1 == opBOL || _t1 == opEOL {
-            re.anchors = true;
         }
     }
     {
@@ -4789,55 +4749,6 @@ pub fn collectNested(mem: &vg::Arena, re: &mut Regexp, ni: i32, stack: &mut grou
     }
 }
 
-pub fn minMatchChars(nodes: vg::Slice<node>, brs: vg::Slice<bracketSet>, loc: &mut Locale, ni: i32) -> i64 {
-    {
-        let _t1 = nodes.get(((ni) as i64)).op;
-        if _t1 == opChar || _t1 == opAny {
-            return 1i64;
-        } else if _t1 == opBracket {
-            return (({ let _t2 = brs; let _t3 = nodes.get(((ni) as i64)).br; bracketMinChars(_t2, _t3, loc) }) as i64);
-        } else if _t1 == opBOL || _t1 == opEOL {
-            return 0i64;
-        } else if _t1 == opGroup {
-            return { let _t4 = nodes; let _t5 = brs; let _t6 = nodes.get(((ni) as i64)).ch.get(0i64); minMatchChars(_t4, _t5, loc, _t6) };
-        } else if _t1 == opConcat {
-            let mut total: i64 = vg::zero();
-            {
-                let mut i: i64 = 0i64;
-                '_b7: while (i < nodes.get(((ni) as i64)).ch.len) {
-                    '_c7: {
-                        total = (total).wrapping_add({ let _t8 = nodes; let _t9 = brs; let _t10 = nodes.get(((ni) as i64)).ch.get(i); minMatchChars(_t8, _t9, loc, _t10) });
-                        if (total > lengthCap) {
-                            return lengthCap;
-                        }
-                    }
-                    i = (i).wrapping_add(1i64);
-                }
-            }
-            return total;
-        } else if _t1 == opAlt {
-            let mut best: i64 = lengthCap;
-            {
-                let mut i_2: i64 = 0i64;
-                '_b11: while (i_2 < nodes.get(((ni) as i64)).ch.len) {
-                    '_c11: {
-                        best = std::cmp::min(best, { let _t12 = nodes; let _t13 = brs; let _t14 = nodes.get(((ni) as i64)).ch.get(i_2); minMatchChars(_t12, _t13, loc, _t14) });
-                    }
-                    i_2 = (i_2).wrapping_add(1i64);
-                }
-            }
-            return best;
-        } else if _t1 == opRepeat {
-            if (nodes.get(((ni) as i64)).min == 0i64) {
-                return 0i64;
-            }
-            let product: i64 = (((nodes.get(((ni) as i64)).min) as i64)).wrapping_mul({ let _t15 = nodes; let _t16 = brs; let _t17 = nodes.get(((ni) as i64)).ch.get(0i64); minMatchChars(_t15, _t16, loc, _t17) });
-            return std::cmp::min(product, lengthCap);
-        }
-    }
-    return 0i64;
-}
-
 pub fn Compile(mem: &vg::Arena, pattern: vg::Str, loc: Locale, flags: u32) -> (Regexp, Error) {
     let mut loc_v: Locale = loc;
     let mut re: Regexp = vg::zero();
@@ -4868,11 +4779,9 @@ pub fn Compile(mem: &vg::Arena, pattern: vg::Str, loc: Locale, flags: u32) -> (R
         return (re, compileError(b.errCode, (1i64).wrapping_neg()));
     }
     if (b.tooBig || ((re.minSlots > 0i64) && (b.prog.ins.len > (maxCounterCells).wrapping_div(re.minSlots)))) {
-        re.minLen = { let _t12 = re.nodes; let _t13 = re.brackets; let _t14 = root; minMatchChars(_t12, _t13, &mut re.loc, _t14) };
-    } else {
-        re.progOK = true;
-        re.prog = b.prog;
+        return (re, compileError(ErrESpace, (1i64).wrapping_neg()));
     }
+    re.prog = b.prog;
     return (re, noError());
 }
 
@@ -4880,39 +4789,11 @@ pub fn NumSub(re: &mut Regexp) -> i64 {
     return re.nsub;
 }
 
-pub fn trivialNullMatch(re: &mut Regexp, pmatch: vg::Slice<Match>) -> bool {
-    return (((re.nodes.get(((re.root) as i64)).minL == 0i64) && (!re.anchors)) && (((re.flags & FlagNoSub) != 0u32) || (pmatch.len == 0i64)));
-}
-
 pub fn Exec(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, pmatch: vg::Slice<Match>, eflags: u32) -> (bool, Error) {
     if (subject.len > subjectLimit) {
         return (false, compileError(ErrESpace, (1i64).wrapping_neg()));
     }
-    if (!re.progOK) {
-        if (((subject.len) as i64) < re.minLen) {
-            return (false, noError());
-        }
-        if (((runeCount(subject)) as i64) < re.minLen) {
-            return (false, noError());
-        }
-        if { let _t1 = pmatch; trivialNullMatch(re, _t1) } {
-            return (true, noError());
-        }
-        return (false, compileError(ErrESpace, (1i64).wrapping_neg()));
-    }
-    if (((re.prog.failMin != failMinNone) && (subject.len >= re.prog.failMin)) && (runeCount(subject) >= re.prog.failMin)) {
-        if { let _t2 = pmatch; trivialNullMatch(re, _t2) } {
-            return (true, noError());
-        }
-        if (((re.flags & FlagNoSub) != 0u32) || (pmatch.len == 0i64)) {
-            let probe: engineResult = { let _t3 = subject; let _t4 = eflags; runPhaseA(mem, re, _t3, _t4) };
-            if probe.matched {
-                return (true, noError());
-            }
-        }
-        return (false, compileError(ErrESpace, (1i64).wrapping_neg()));
-    }
-    let result: engineResult = { let _t5 = subject; let _t6 = eflags; runPhaseA(mem, re, _t5, _t6) };
+    let result: engineResult = { let _t1 = subject; let _t2 = eflags; runPhaseA(mem, re, _t1, _t2) };
     if (!result.matched) {
         return (false, noError());
     }
@@ -4922,8 +4803,8 @@ pub fn Exec(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, pmatch: vg::Slic
     setMatch(pmatch, 0i64, result.so, result.eo);
     {
         let mut idx: i64 = 1i64;
-        '_b7: while (idx < pmatch.len) {
-            '_c7: {
+        '_b3: while (idx < pmatch.len) {
+            '_c3: {
                 setMatch(pmatch, idx, (1i64).wrapping_neg(), (1i64).wrapping_neg());
             }
             idx = (idx).wrapping_add(1i64);
@@ -4934,11 +4815,11 @@ pub fn Exec(mem: &vg::Arena, re: &mut Regexp, subject: vg::Str, pmatch: vg::Slic
     }
     let mut d: decoded = decodeWindow(mem, subject, result.so, result.eo);
     let caps: vg::Slice<Match> = vg::make::<Match>(mem, (re.nsub).wrapping_add(1i64));
-    let serr: Error = { let _t8 = 0i64; let _t9 = d.runes.len; let _t10 = eflags; let _t11 = caps; solveCaptures(mem, re, &mut d, _t8, _t9, _t10, _t11) };
+    let serr: Error = { let _t4 = 0i64; let _t5 = d.runes.len; let _t6 = eflags; let _t7 = caps; solveCaptures(mem, re, &mut d, _t4, _t5, _t6, _t7) };
     if (serr.Code != ErrNone) {
         return (false, serr);
     }
-    { let _t12 = caps; let _t13 = pmatch; fillMatches(re, &mut d, _t12, _t13) };
+    { let _t8 = caps; let _t9 = pmatch; fillMatches(re, &mut d, _t8, _t9) };
     return (true, noError());
 }
 

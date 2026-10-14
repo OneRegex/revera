@@ -180,6 +180,12 @@ test "compile failure reports a position" {
         error.InvalidCharacterClass,
         revera.Regex.compile(gpa, "[[:bogus:]]", .{}),
     );
+
+    // A pattern that is too big must fail here, not when searched.
+    try testing.expectError(
+        error.OutOfCapacity,
+        revera.Regex.compile(gpa, "^b$|^((a{0,255}){0,255}){0,255}c$", .{}),
+    );
 }
 
 test "contract grows with the input bound" {

@@ -122,11 +122,10 @@ Shortest-preferring repetitions ride along as small counter vectors in phase A.
 ## Capacity
 
 - `DupMax` is 255, the POSIX minimum for `RE_DUP_MAX`.
-- Nested intervals multiply.
-  Compilation still succeeds when the expanded program passes an internal cap.
-  Execution then answers from the minimum match length of the pattern.
-  A shorter subject reports no match, and a nullable anchor-free pattern still answers existence questions.
-  Only a subject that could really need the oversized program reports `ESpace`.
+- Nested intervals multiply, so a short pattern can expand into a huge program.
+  For example, `((a{0,255}){0,255}){0,255}` is 26 bytes long but would need tens of millions of instructions.
+  Compilation reports `ESpace` past 2^20 instructions, which section 14.1 allows when resources run out.
+  It does the same when instructions times shortest-preferring repetitions pass 2^31-1.
 - A subject must be shorter than 2 GiB, and a longer one reports `ESpace`.
 
 ## Conformance testing

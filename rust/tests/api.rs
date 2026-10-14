@@ -132,6 +132,11 @@ fn errors_carry_a_kind_and_a_position() {
 
     let err = Regex::new("[[:bogus:]]").unwrap_err();
     assert_eq!(err.kind(), ErrorKind::CharacterClass);
+
+    // A pattern that is too big must fail here, not when searched.
+    let err = Regex::new("^b$|^((a{0,255}){0,255}){0,255}c$").unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::Capacity);
+    assert_eq!(err.offset(), None);
 }
 
 #[test]

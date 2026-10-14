@@ -5,7 +5,6 @@ package reference
 // Groups compile to nothing here.
 
 import (
-	"math"
 	"slices"
 	"unicode/utf8"
 )
@@ -22,7 +21,6 @@ const (
 	iSplit               // continue at next and at alt
 	iJmp                 // continue at next
 	iMatch               // accept
-	iFail                // dead end for a pruned oversized subtree
 )
 
 type instr struct {
@@ -44,13 +42,7 @@ type program struct {
 	brackets []*bracketSet
 	// multi is true when some bracket can consume several characters.
 	multi bool
-	// failMin is the smallest minimum match length over every subtree that size pruning replaced with iFail.
-	// The program stays exact for any subject with fewer characters.
-	// A pruned subtree cannot take part in such a match.
-	// failMinNone means that nothing was pruned.
-	// The saturated minimum of a pruned subtree can legitimately reach lenInf, so lenInf cannot be the sentinel.
-	failMin int
-	scan    scanFilter
+	scan  scanFilter
 }
 
 // scanFilter speeds up positions where no thread is live.
@@ -93,8 +85,6 @@ func (p *program) closureScan(bol, eol bool, visit func(pc uint32)) (matchReacha
 			}
 		case iMatch:
 			matchReachable = true
-		case iFail:
-			// A pruned dead end reaches nothing.
 		default:
 			visit(pc)
 		}
@@ -142,14 +132,12 @@ func (p *program) buildScanFilter(newlineMode bool) {
 	p.scan.single = count == 1
 }
 
-// failMinNone marks a program with no pruned subtree.
-const failMinNone = math.MaxInt
-
 // maxProgram caps the expanded program size, because interval expansion can multiply nested counts.
-// Compilation still succeeds past the cap.
-// The expression then answers through the minimum-length fallback.
-// Only a subject long enough to need the huge program reports ESpace.
+// A pattern past the cap fails to compile with ESpace.
 const maxProgram = 1 << 20
+
+// maxCounterCells is the Go engine's cap on instructions times counter slots.
+const maxCounterCells = 1<<31 - 1
 
 // maskWidth is the number of counter slots one mask word covers.
 const maskWidth = 64
@@ -167,58 +155,52 @@ type frag struct {
 type progBuilder struct {
 	re      *Regexp
 	prog    *program
-	tooBig  bool
-	failMin int
-	err     *Error
+	tooBig bool
+	err    *Error
 }
 
-// instrEstimate bounds the instruction count one node expands into.
-func instrEstimate(n *node) int64 {
-	const estimateCap = int64(maxProgram) * 4
-	var total int64
+// instrCount returns how many instructions emit produces for a node, or maxProgram+1 when that is more.
+func instrCount(n *node) int {
+	total := 0
 	switch n.op {
 	case opGroup:
-		return instrEstimate(n.ch[0])
-	case opConcat:
-		for _, child := range n.ch {
-			total += instrEstimate(child)
-			if total > estimateCap {
-				return estimateCap
-			}
+		return instrCount(n.ch[0])
+	case opConcat, opAlt:
+		if n.op == opAlt {
+			// Every branch but the last starts with a split.
+			total = len(n.ch) - 1
 		}
-		return total
-	case opAlt:
-		total = int64(len(n.ch))
 		for _, child := range n.ch {
-			total += instrEstimate(child)
-			if total > estimateCap {
-				return estimateCap
+			total += instrCount(child)
+			if total > maxProgram {
+				return maxProgram + 1
 			}
 		}
 		return total
 	case opRepeat:
-		copies := int64(n.max)
-		if n.max == infinite {
-			copies = int64(n.min) + 1
-		}
-		if copies == 0 {
+		if n.max == 0 {
 			return 1
 		}
-		child := instrEstimate(n.ch[0])
-		total = copies*child + copies + 2
-		if total > estimateCap || total < 0 {
-			return estimateCap
+		child := instrCount(n.ch[0])
+		if n.max == infinite {
+			// The last copy loops back through a split.
+			total = max(n.min, 1)*child + 1
+		} else {
+			// Every optional copy starts with a split.
+			total = n.min*child + (n.max-n.min)*(child+1)
 		}
-		return total
+		return min(total, maxProgram+1)
 	}
 	return 1
 }
 
 // compileProgram lowers the AST.
-// A nil program with a nil error means the expansion passed the size cap.
-// Execution then uses the minimum-length fallback.
 func compileProgram(re *Regexp) (*program, *Error) {
-	b := &progBuilder{re: re, prog: &program{}, failMin: failMinNone}
+	// The final match instruction needs one more slot.
+	if instrCount(re.root) >= maxProgram {
+		return nil, compileError(ESpace, -1)
+	}
+	b := &progBuilder{re: re, prog: &program{}}
 	body := b.emit(re.root, 0, nil)
 	if b.err != nil {
 		return nil, b.err
@@ -227,13 +209,12 @@ func compileProgram(re *Regexp) (*program, *Error) {
 	if b.err != nil {
 		return nil, b.err
 	}
-	if b.tooBig {
-		return nil, nil
+	if b.tooBig || re.minSlots > 0 && len(b.prog.ins) > maxCounterCells/re.minSlots {
+		return nil, compileError(ESpace, -1)
 	}
 	b.patch(body.out, match)
 	b.prog.start = body.start
 	b.prog.multi = re.multi
-	b.prog.failMin = b.failMin
 	b.prog.buildScanFilter(re.flags&Newline != 0)
 	return b.prog, nil
 }
@@ -344,13 +325,6 @@ func (b *progBuilder) emitAlt(n *node, mask uint64, extra []uint32) frag {
 }
 
 func (b *progBuilder) emitRepeat(n *node, mask uint64, extra []uint32) frag {
-	if instrEstimate(n) > int64(maxProgram-len(b.prog.ins)) {
-		// The oversized expansion becomes a dead end.
-		// The program stays exact for subjects shorter than the minimum match length of this subtree, and Exec checks that bound.
-		idx := b.add(instr{op: iFail})
-		b.failMin = min(b.failMin, n.minL)
-		return frag{start: idx}
-	}
 	if n.minimal {
 		if n.index < maskWidth {
 			mask |= 1 << uint(n.index)

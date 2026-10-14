@@ -10,7 +10,6 @@ package reference
 
 import (
 	"sync"
-	"unicode/utf8"
 
 	"github.com/oneregex/revera/dev/internal/reference/locale"
 )
@@ -36,12 +35,7 @@ type Regexp struct {
 	nested [][]int
 	// multi is true when some bracket can consume several characters.
 	multi bool
-	// prog is nil when interval expansion passed the program size cap.
-	// minLen then holds the smallest possible match length in characters, for the fallback in Exec.
-	prog   *program
-	minLen int64
-	// anchors is true when the pattern contains ^ or $ anywhere.
-	anchors bool
+	prog  *program
 	// onePass is true when every span has at most one parse.
 	// The capture walk in onepass.go then replaces the phase B solver.
 	onePass bool
@@ -73,8 +67,6 @@ func Compile(pattern string, loc locale.Locale, flags CompileFlags) (*Regexp, er
 			if n.br.hasMultiMembers() {
 				re.multi = true
 			}
-		case opBOL, opEOL:
-			re.anchors = true
 		}
 	})
 	collectNested(root, &groupStack, re.nested)
@@ -85,9 +77,6 @@ func Compile(pattern string, loc locale.Locale, flags CompileFlags) (*Regexp, er
 		return nil, cerr
 	}
 	re.prog = prog
-	if prog == nil {
-		re.minLen = minMatchChars(root)
-	}
 	return re, nil
 }
 
@@ -95,46 +84,6 @@ func Compile(pattern string, loc locale.Locale, flags CompileFlags) (*Regexp, er
 // Thread payloads store match starts as int32, so a longer subject reports ESpace.
 // The resource contract clamps its input bound to this value.
 const subjectLimit = int64(1)<<31 - 1
-
-// lengthCap saturates minimum-length arithmetic well above any real subject size.
-const lengthCap = int64(1) << 40
-
-// minMatchChars returns the smallest character count the node can consume.
-// The result saturates at lengthCap.
-func minMatchChars(n *node) int64 {
-	switch n.op {
-	case opChar, opAny:
-		return 1
-	case opBracket:
-		return bracketMinChars(n.br)
-	case opBOL, opEOL:
-		return 0
-	case opGroup:
-		return minMatchChars(n.ch[0])
-	case opConcat:
-		var total int64
-		for _, child := range n.ch {
-			total += minMatchChars(child)
-			if total > lengthCap {
-				return lengthCap
-			}
-		}
-		return total
-	case opAlt:
-		best := lengthCap
-		for _, child := range n.ch {
-			best = min(best, minMatchChars(child))
-		}
-		return best
-	case opRepeat:
-		if n.min == 0 {
-			return 0
-		}
-		product := int64(n.min) * minMatchChars(n.ch[0])
-		return min(product, lengthCap)
-	}
-	return 0
-}
 
 // bracketMinChars returns the smallest character count one bracket match can consume.
 // Only a positive list of nothing but multi-character collating symbols and equivalence classes can need more than one character.
@@ -184,14 +133,6 @@ func (re *Regexp) NumSub() int {
 	return re.nsub
 }
 
-// trivialNullMatch reports whether existence alone answers an Exec call.
-// A nullable, anchor-free pattern matches the null string at the start of any subject.
-// The call also has to ask for no offsets.
-func (re *Regexp) trivialNullMatch(pmatch []Match) bool {
-	return re.root.minL == 0 && !re.anchors &&
-		(re.flags&NoSub != 0 || len(pmatch) == 0)
-}
-
 // Exec searches subject for the POSIX-selected match.
 //
 // On success it returns true and fills pmatch like regexec().
@@ -200,39 +141,6 @@ func (re *Regexp) trivialNullMatch(pmatch []Match) bool {
 // Exec returns false when no match exists.
 func (re *Regexp) Exec(subject string, pmatch []Match, eflags ExecFlags) (bool, error) {
 	if int64(len(subject)) > subjectLimit {
-		return false, compileError(ESpace, -1)
-	}
-	if re.prog == nil {
-		// The expanded program passed the size cap.
-		// A subject with fewer bytes than the minimum match length cannot match.
-		// A longer one would really need the huge program.
-		// The nil-prog branch of matcherContract mirrors the cost of this fallback.
-		if int64(len(subject)) < re.minLen {
-			return false, nil
-		}
-		if int64(utf8.RuneCountInString(subject)) < re.minLen {
-			// The byte count passed, but lengths compare in characters.
-			return false, nil
-		}
-		if re.trivialNullMatch(pmatch) {
-			return true, nil
-		}
-		return false, compileError(ESpace, -1)
-	}
-	if re.prog.failMin != failMinNone &&
-		int64(len(subject)) >= int64(re.prog.failMin) &&
-		utf8.RuneCountInString(subject) >= re.prog.failMin {
-		// An oversized subtree was pruned, and this subject is long enough to reach it.
-		// The program may therefore miss matches or pick the wrong spans.
-		// Pruning removes possibilities and adds none, so a match the program still finds proves existence.
-		// A miss proves nothing, and offsets would need the full program.
-		if re.trivialNullMatch(pmatch) {
-			return true, nil
-		}
-		if (re.flags&NoSub != 0 || len(pmatch) == 0) &&
-			re.runPhaseA(subject, eflags).matched {
-			return true, nil
-		}
 		return false, compileError(ESpace, -1)
 	}
 	result := re.runPhaseA(subject, eflags)

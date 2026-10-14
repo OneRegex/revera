@@ -175,6 +175,30 @@ func TestAPINestingLimit(t *testing.T) {
 	}
 }
 
+func TestAPIProgramLimit(t *testing.T) {
+	// Patterns that are too big must fail here, not later when searched.
+	// nested needs 1,042,440 instructions, so a prefix of 6,135 bytes plus the final match fills the program exactly.
+	nested := "((a{0,255}){0,255}){8}"
+	counters := "((a{255}){255}){8}" + strings.Repeat("b*", 4096)
+	for _, tc := range []struct {
+		pattern string
+		opts    []Option
+		fits    bool
+	}{
+		{"^b$|^((a{0,255}){0,255}){0,255}c$", nil, false},
+		{strings.Repeat("a", 6135) + nested, nil, true},
+		{strings.Repeat("a", 6136) + nested, nil, false},
+		{counters, []Option{ShortestMatch()}, false},
+		{counters, nil, true},
+	} {
+		_, err := New(tc.pattern, tc.opts...)
+		e, ok := err.(Error)
+		if tc.fits && err != nil || !tc.fits && (!ok || e.Code != ErrESpace || e.Pos != -1) {
+			t.Errorf("%.30q: got %v", tc.pattern, err)
+		}
+	}
+}
+
 func TestAPIConcurrentSearch(t *testing.T) {
 	re := MustNew("[0-9]+")
 	var wg sync.WaitGroup

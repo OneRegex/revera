@@ -96,13 +96,9 @@ inline constexpr uint8_t iEOL = 5;
 inline constexpr uint8_t iSplit = 6;
 inline constexpr uint8_t iJmp = 7;
 inline constexpr uint8_t iMatch = 8;
-inline constexpr uint8_t iFail = 9;
-inline constexpr int64_t lenInf = 1073741824LL;
-inline constexpr int64_t failMinNone = 1073741825LL;
 inline constexpr int64_t maxProgram = 1048576LL;
 inline constexpr int64_t maskWidth = 64LL;
 inline constexpr int64_t subjectLimit = 2147483647LL;
-inline constexpr int64_t lengthCap = 1099511627776LL;
 inline constexpr int64_t maxCounterCells = 2147483647LL;
 inline constexpr uint8_t opChar = 0;
 inline constexpr uint8_t opAny = 1;
@@ -114,6 +110,7 @@ inline constexpr uint8_t opAlt = 6;
 inline constexpr uint8_t opRepeat = 7;
 inline constexpr uint8_t opGroup = 8;
 inline constexpr int64_t infinite = int64_t(0ULL - uint64_t(1LL));
+inline constexpr int64_t lenInf = 1073741824LL;
 inline constexpr int64_t maxNesting = 256LL;
 inline constexpr int32_t invalidRune = int32_t(0ULL - uint64_t(1));
 
@@ -418,7 +415,6 @@ struct program {
     uint32_t start = {};
     vg::Slice<vg::Slice<int32_t>> foldSets = {};
     bool multi = {};
-    int64_t failMin = {};
     scanFilter scan = {};
     int64_t depth = {};
 };
@@ -437,7 +433,6 @@ struct frag {
 struct progBuilder {
     program prog = {};
     bool tooBig = {};
-    int64_t failMin = {};
     int32_t errCode = {};
     bool icase = {};
 };
@@ -452,10 +447,7 @@ struct Regexp {
     int64_t minSlots = {};
     vg::Slice<vg::Slice<int32_t>> nested = {};
     bool multi = {};
-    bool progOK = {};
     program prog = {};
-    int64_t minLen = {};
-    bool anchors = {};
     bool onePass = {};
 };
 
@@ -698,7 +690,7 @@ Tup_si32_bool firstSet(vg::Arena& mem, vg::Slice<node> nodes, int32_t ni);
 bool disjointFirsts(vg::Arena& mem, vg::Slice<node> nodes, int32_t ni);
 bool onePassCaps(Regexp& re, decoded& d, int32_t ni, int64_t i, int64_t j, uint32_t eflags, vg::Slice<Match> caps);
 int64_t buildScanFilter(vg::Arena& mem, program& pr, bool newlineMode);
-int64_t instrEstimate(vg::Slice<node> nodes, int32_t ni);
+int64_t instrCount(vg::Slice<node> nodes, int32_t ni);
 void compileProgram(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t root, bool multi, bool newlineMode);
 bool consumingOp(uint8_t op);
 Tup_u32_bool progEdge(program& pr, uint32_t pc, int64_t i);
@@ -717,10 +709,8 @@ frag emitStar(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t chi
 frag emitPlus(vg::Arena& mem, progBuilder& b, vg::Slice<node> nodes, int32_t child, uint64_t mask, vg::Slice<uint32_t> extra);
 void compileScan(Regexp& re, int32_t ni);
 void collectNested(vg::Arena& mem, Regexp& re, int32_t ni, groupStack& stack);
-int64_t minMatchChars(vg::Slice<node> nodes, vg::Slice<bracketSet> brs, Locale& loc, int32_t ni);
 Tup_t526567657870x_t4572726f72x Compile(vg::Arena& mem, vg::Str pattern, Locale loc, uint32_t flags);
 int64_t NumSub(Regexp& re);
-bool trivialNullMatch(Regexp& re, vg::Slice<Match> pmatch);
 Tup_bool_t4572726f72x Exec(vg::Arena& mem, Regexp& re, vg::Str subject, vg::Slice<Match> pmatch, uint32_t eflags);
 Tup_t4d6174636849746572x_t4572726f72x MatchIterInit(Regexp& re, int64_t limit);
 Tup_bool_t4572726f72x MatchIterNext(vg::Arena& mem, Regexp& re, MatchIter& it, vg::Str subject, uint32_t eflags, vg::Slice<Match> pmatch);

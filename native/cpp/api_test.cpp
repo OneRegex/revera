@@ -160,6 +160,13 @@ static void errors_carry_a_kind_and_a_position() {
     } catch (const revera::Error& e) {
         check(e.failure() == revera::Failure::CharacterClass, "class failure kind");
     }
+    // A pattern that is too big must fail here, not when searched.
+    try {
+        revera::Regex re("^b$|^((a{0,255}){0,255}){0,255}c$");
+        check(false, "expected a capacity failure");
+    } catch (const revera::Error& e) {
+        check(e.failure() == revera::Failure::Capacity && !e.offset(), "capacity failure kind");
+    }
 }
 
 static void contract_grows_with_the_input_bound() {

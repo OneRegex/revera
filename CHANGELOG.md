@@ -7,6 +7,15 @@ The Vego toolchain has its own version, which `vegoc version` prints.
 
 ## Unreleased
 
+### Changed
+
+- A pattern that is too big for the engine now fails to compile with a capacity error.
+  Such patterns used to compile, and then searches failed with that error, sometimes on every subject.
+  For example, `^b$|^((a{0,255}){0,255}){0,255}c$` failed even on `c`.
+
+  The limits are 2^20 program instructions, and 2^31-1 entries in the counter table of shortest-match repetitions.
+  With captures turned off, a search can now only fail on a subject of 2 GiB or more.
+
 ### Fixed
 
 - The Go module no longer fails to build on 32-bit platforms such as `linux/386` and `linux/arm`.
@@ -14,8 +23,6 @@ The Vego toolchain has its own version, which `vegoc version` prints.
   For example, on 386 the captures of `(a*)(b*)` on `ab` failed with a capacity error.
   The locale loader also checks its 32-bit fields before converting them, so a broken locale file can no longer slip through and crash a later lookup.
   CI now runs the Go tests on `linux/386`.
-- Patterns whose phase A counter table would need more than 2^31-1 entries now use the minimum-length fallback, like patterns past the size cap.
-  Such a table needs at least 8 GiB, and its size overflowed on 32-bit platforms.
 - On 32-bit targets, the Rust runtime no longer truncates allocation sizes that do not fit `usize`.
   A slice growing past 2^32 elements could get a buffer that was too small, and later writes went past its end.
   It now panics instead, like the Zig, C and C++ runtimes.

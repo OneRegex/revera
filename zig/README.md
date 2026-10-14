@@ -236,6 +236,7 @@ UnknownFailure
 
 `OutOfCapacity` usually means an engine capacity limit was exceeded.
 Compilation reports it for a pattern that nests parentheses more than 256 deep.
+It also reports it for a pattern that goes past the engine's size limits, such as `((a{0,255}){0,255}){0,255}`.
 It is also the fail-closed result if a compile-time-selected one-pass capture walk detects an internal inconsistency.
 It is distinct from allocator exhaustion.
 

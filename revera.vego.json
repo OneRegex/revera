@@ -981,35 +981,6 @@
   },
   {
    "k": "const",
-   "name": "iFail",
-   "type": {
-    "k": "named",
-    "name": "uint8"
-   },
-   "value": {
-    "k": "int",
-    "value": "9"
-   }
-  },
-  {
-   "k": "const",
-   "name": "failMinNone",
-   "type": null,
-   "value": {
-    "k": "binary",
-    "op": "+",
-    "x": {
-     "k": "ident",
-     "name": "lenInf"
-    },
-    "y": {
-     "k": "int",
-     "value": "1"
-    }
-   }
-  },
-  {
-   "k": "const",
    "name": "maxProgram",
    "type": null,
    "value": {
@@ -1056,30 +1027,6 @@
     "y": {
      "k": "int",
      "value": "1"
-    }
-   }
-  },
-  {
-   "k": "const",
-   "name": "lengthCap",
-   "type": null,
-   "value": {
-    "k": "binary",
-    "op": "\u003c\u003c",
-    "x": {
-     "k": "conv",
-     "type": {
-      "k": "named",
-      "name": "int64"
-     },
-     "x": {
-      "k": "int",
-      "value": "1"
-     }
-    },
-    "y": {
-     "k": "int",
-     "value": "40"
     }
    }
   },
@@ -19324,54 +19271,18 @@
       "op": "\u0026\u0026",
       "x": {
        "k": "binary",
-       "op": "\u0026\u0026",
+       "op": "\u003e",
        "x": {
-        "k": "binary",
-        "op": "\u0026\u0026",
+        "k": "field",
+        "name": "nsub",
         "x": {
-         "k": "field",
-         "name": "progOK",
-         "x": {
-          "k": "ident",
-          "name": "re"
-         }
-        },
-        "y": {
-         "k": "binary",
-         "op": "!=",
-         "x": {
-          "k": "field",
-          "name": "failMin",
-          "x": {
-           "k": "field",
-           "name": "prog",
-           "x": {
-            "k": "ident",
-            "name": "re"
-           }
-          }
-         },
-         "y": {
-          "k": "int",
-          "value": "0"
-         }
+         "k": "ident",
+         "name": "re"
         }
        },
        "y": {
-        "k": "binary",
-        "op": "\u003e",
-        "x": {
-         "k": "field",
-         "name": "nsub",
-         "x": {
-          "k": "ident",
-          "name": "re"
-         }
-        },
-        "y": {
-         "k": "int",
-         "value": "0"
-        }
+        "k": "int",
+        "value": "0"
        }
       },
       "y": {
@@ -19556,83 +19467,6 @@
       "name": "BackendContract"
      },
      "value": null
-    },
-    {
-     "cond": {
-      "k": "unary",
-      "op": "!",
-      "x": {
-       "k": "field",
-       "name": "progOK",
-       "x": {
-        "k": "ident",
-        "name": "re"
-       }
-      }
-     },
-     "else": null,
-     "k": "if",
-     "then": [
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "field",
-         "name": "StackBytes",
-         "x": {
-          "k": "ident",
-          "name": "b"
-         }
-        }
-       ],
-       "value": {
-        "k": "ident",
-        "name": "matcherStackBytes"
-       }
-      },
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "field",
-         "name": "Steps",
-         "x": {
-          "k": "ident",
-          "name": "b"
-         }
-        }
-       ],
-       "value": {
-        "args": [
-         {
-          "args": [
-           {
-            "k": "ident",
-            "name": "length"
-           }
-          ],
-          "fn": "runeCountSteps",
-          "k": "call"
-         },
-         {
-          "k": "int",
-          "value": "3"
-         }
-        ],
-        "fn": "cAdd",
-        "k": "call"
-       }
-      },
-      {
-       "k": "return",
-       "values": [
-        {
-         "k": "ident",
-         "name": "b"
-        }
-       ]
-      }
-     ]
     },
     {
      "k": "define",
@@ -20159,71 +19993,6 @@
       "fn": "cAdd",
       "k": "call"
      }
-    },
-    {
-     "cond": {
-      "k": "binary",
-      "op": "!=",
-      "x": {
-       "k": "field",
-       "name": "failMin",
-       "x": {
-        "k": "field",
-        "name": "prog",
-        "x": {
-         "k": "ident",
-         "name": "re"
-        }
-       }
-      },
-      "y": {
-       "k": "ident",
-       "name": "failMinNone"
-      }
-     },
-     "else": null,
-     "k": "if",
-     "then": [
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "ident",
-         "name": "steps"
-        }
-       ],
-       "value": {
-        "args": [
-         {
-          "k": "ident",
-          "name": "steps"
-         },
-         {
-          "args": [
-           {
-            "args": [
-             {
-              "k": "ident",
-              "name": "length"
-             }
-            ],
-            "fn": "runeCountSteps",
-            "k": "call"
-           },
-           {
-            "k": "int",
-            "value": "1"
-           }
-          ],
-          "fn": "cAdd",
-          "k": "call"
-         }
-        ],
-        "fn": "cAdd",
-        "k": "call"
-       }
-      }
-     ]
     },
     {
      "k": "define",
@@ -59374,15 +59143,6 @@
          ]
         },
         {
-         "body": [],
-         "values": [
-          {
-           "k": "ident",
-           "name": "iFail"
-          }
-         ]
-        },
-        {
          "body": [
           {
            "k": "assign",
@@ -59954,31 +59714,6 @@
     {
      "k": "define",
      "names": [
-      "estimateCap"
-     ],
-     "value": {
-      "k": "binary",
-      "op": "*",
-      "x": {
-       "k": "conv",
-       "type": {
-        "k": "named",
-        "name": "int"
-       },
-       "x": {
-        "k": "ident",
-        "name": "maxProgram"
-       }
-      },
-      "y": {
-       "k": "int",
-       "value": "4"
-      }
-     }
-    },
-    {
-     "k": "define",
-     "names": [
       "total"
      ],
      "value": {
@@ -60022,7 +59757,7 @@
              }
             }
            ],
-           "fn": "instrEstimate",
+           "fn": "instrCount",
            "k": "call"
           }
          ]
@@ -60037,6 +59772,75 @@
       },
       {
        "body": [
+        {
+         "cond": {
+          "k": "binary",
+          "op": "==",
+          "x": {
+           "k": "field",
+           "name": "op",
+           "x": {
+            "index": {
+             "k": "ident",
+             "name": "ni"
+            },
+            "k": "index",
+            "x": {
+             "k": "ident",
+             "name": "nodes"
+            }
+           }
+          },
+          "y": {
+           "k": "ident",
+           "name": "opAlt"
+          }
+         },
+         "else": null,
+         "k": "if",
+         "then": [
+          {
+           "k": "assign",
+           "lhs": [
+            {
+             "k": "ident",
+             "name": "total"
+            }
+           ],
+           "value": {
+            "k": "binary",
+            "op": "-",
+            "x": {
+             "args": [
+              {
+               "k": "field",
+               "name": "ch",
+               "x": {
+                "index": {
+                 "k": "ident",
+                 "name": "ni"
+                },
+                "k": "index",
+                "x": {
+                 "k": "ident",
+                 "name": "nodes"
+                }
+               }
+              }
+             ],
+             "fn": "len",
+             "k": "builtin",
+             "spread": false,
+             "type": null
+            },
+            "y": {
+             "k": "int",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
         {
          "body": [
           {
@@ -60075,7 +59879,7 @@
               }
              }
             ],
-            "fn": "instrEstimate",
+            "fn": "instrCount",
             "k": "call"
            }
           },
@@ -60089,7 +59893,7 @@
             },
             "y": {
              "k": "ident",
-             "name": "estimateCap"
+             "name": "maxProgram"
             }
            },
            "else": null,
@@ -60099,8 +59903,16 @@
              "k": "return",
              "values": [
               {
-               "k": "ident",
-               "name": "estimateCap"
+               "k": "binary",
+               "op": "+",
+               "x": {
+                "k": "ident",
+                "name": "maxProgram"
+               },
+               "y": {
+                "k": "int",
+                "value": "1"
+               }
               }
              ]
             }
@@ -60172,175 +59984,7 @@
         {
          "k": "ident",
          "name": "opConcat"
-        }
-       ]
-      },
-      {
-       "body": [
-        {
-         "k": "assign",
-         "lhs": [
-          {
-           "k": "ident",
-           "name": "total"
-          }
-         ],
-         "value": {
-          "args": [
-           {
-            "k": "field",
-            "name": "ch",
-            "x": {
-             "index": {
-              "k": "ident",
-              "name": "ni"
-             },
-             "k": "index",
-             "x": {
-              "k": "ident",
-              "name": "nodes"
-             }
-            }
-           }
-          ],
-          "fn": "len",
-          "k": "builtin",
-          "spread": false,
-          "type": null
-         }
         },
-        {
-         "body": [
-          {
-           "k": "op_assign",
-           "lhs": {
-            "k": "ident",
-            "name": "total"
-           },
-           "op": "+=",
-           "value": {
-            "args": [
-             {
-              "k": "ident",
-              "name": "nodes"
-             },
-             {
-              "index": {
-               "k": "ident",
-               "name": "i"
-              },
-              "k": "index",
-              "x": {
-               "k": "field",
-               "name": "ch",
-               "x": {
-                "index": {
-                 "k": "ident",
-                 "name": "ni"
-                },
-                "k": "index",
-                "x": {
-                 "k": "ident",
-                 "name": "nodes"
-                }
-               }
-              }
-             }
-            ],
-            "fn": "instrEstimate",
-            "k": "call"
-           }
-          },
-          {
-           "cond": {
-            "k": "binary",
-            "op": "\u003e",
-            "x": {
-             "k": "ident",
-             "name": "total"
-            },
-            "y": {
-             "k": "ident",
-             "name": "estimateCap"
-            }
-           },
-           "else": null,
-           "k": "if",
-           "then": [
-            {
-             "k": "return",
-             "values": [
-              {
-               "k": "ident",
-               "name": "estimateCap"
-              }
-             ]
-            }
-           ]
-          }
-         ],
-         "cond": {
-          "k": "binary",
-          "op": "\u003c",
-          "x": {
-           "k": "ident",
-           "name": "i"
-          },
-          "y": {
-           "args": [
-            {
-             "k": "field",
-             "name": "ch",
-             "x": {
-              "index": {
-               "k": "ident",
-               "name": "ni"
-              },
-              "k": "index",
-              "x": {
-               "k": "ident",
-               "name": "nodes"
-              }
-             }
-            }
-           ],
-           "fn": "len",
-           "k": "builtin",
-           "spread": false,
-           "type": null
-          }
-         },
-         "init": {
-          "k": "define",
-          "names": [
-           "i"
-          ],
-          "value": {
-           "k": "int",
-           "value": "0"
-          }
-         },
-         "k": "for",
-         "post": {
-          "k": "incdec",
-          "lhs": {
-           "k": "ident",
-           "name": "i"
-          },
-          "op": "++"
-         }
-        },
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "ident",
-           "name": "total"
-          }
-         ]
-        }
-       ],
-       "values": [
         {
          "k": "ident",
          "name": "opAlt"
@@ -60352,7 +59996,28 @@
         {
          "k": "define",
          "names": [
-          "copies"
+          "lo"
+         ],
+         "value": {
+          "k": "field",
+          "name": "min",
+          "x": {
+           "index": {
+            "k": "ident",
+            "name": "ni"
+           },
+           "k": "index",
+           "x": {
+            "k": "ident",
+            "name": "nodes"
+           }
+          }
+         }
+        },
+        {
+         "k": "define",
+         "names": [
+          "hi"
          ],
          "value": {
           "k": "field",
@@ -60375,69 +60040,8 @@
           "k": "binary",
           "op": "==",
           "x": {
-           "k": "field",
-           "name": "max",
-           "x": {
-            "index": {
-             "k": "ident",
-             "name": "ni"
-            },
-            "k": "index",
-            "x": {
-             "k": "ident",
-             "name": "nodes"
-            }
-           }
-          },
-          "y": {
            "k": "ident",
-           "name": "infinite"
-          }
-         },
-         "else": null,
-         "k": "if",
-         "then": [
-          {
-           "k": "assign",
-           "lhs": [
-            {
-             "k": "ident",
-             "name": "copies"
-            }
-           ],
-           "value": {
-            "k": "binary",
-            "op": "+",
-            "x": {
-             "k": "field",
-             "name": "min",
-             "x": {
-              "index": {
-               "k": "ident",
-               "name": "ni"
-              },
-              "k": "index",
-              "x": {
-               "k": "ident",
-               "name": "nodes"
-              }
-             }
-            },
-            "y": {
-             "k": "int",
-             "value": "1"
-            }
-           }
-          }
-         ]
-        },
-        {
-         "cond": {
-          "k": "binary",
-          "op": "==",
-          "x": {
-           "k": "ident",
-           "name": "copies"
+           "name": "hi"
           },
           "y": {
            "k": "int",
@@ -60492,87 +60096,120 @@
             }
            }
           ],
-          "fn": "instrEstimate",
+          "fn": "instrCount",
           "k": "call"
-         }
-        },
-        {
-         "k": "assign",
-         "lhs": [
-          {
-           "k": "ident",
-           "name": "total"
-          }
-         ],
-         "value": {
-          "k": "binary",
-          "op": "+",
-          "x": {
-           "k": "binary",
-           "op": "+",
-           "x": {
-            "k": "binary",
-            "op": "*",
-            "x": {
-             "k": "ident",
-             "name": "copies"
-            },
-            "y": {
-             "k": "ident",
-             "name": "child"
-            }
-           },
-           "y": {
-            "k": "ident",
-            "name": "copies"
-           }
-          },
-          "y": {
-           "k": "int",
-           "value": "2"
-          }
          }
         },
         {
          "cond": {
           "k": "binary",
-          "op": "||",
+          "op": "==",
           "x": {
-           "k": "binary",
-           "op": "\u003e",
-           "x": {
-            "k": "ident",
-            "name": "total"
-           },
-           "y": {
-            "k": "ident",
-            "name": "estimateCap"
-           }
+           "k": "ident",
+           "name": "hi"
           },
           "y": {
-           "k": "binary",
-           "op": "\u003c",
-           "x": {
-            "k": "ident",
-            "name": "total"
-           },
-           "y": {
-            "k": "int",
-            "value": "0"
-           }
+           "k": "ident",
+           "name": "infinite"
           }
          },
-         "else": null,
+         "else": [
+          {
+           "k": "assign",
+           "lhs": [
+            {
+             "k": "ident",
+             "name": "total"
+            }
+           ],
+           "value": {
+            "k": "binary",
+            "op": "+",
+            "x": {
+             "k": "binary",
+             "op": "*",
+             "x": {
+              "k": "ident",
+              "name": "lo"
+             },
+             "y": {
+              "k": "ident",
+              "name": "child"
+             }
+            },
+            "y": {
+             "k": "binary",
+             "op": "*",
+             "x": {
+              "k": "binary",
+              "op": "-",
+              "x": {
+               "k": "ident",
+               "name": "hi"
+              },
+              "y": {
+               "k": "ident",
+               "name": "lo"
+              }
+             },
+             "y": {
+              "k": "binary",
+              "op": "+",
+              "x": {
+               "k": "ident",
+               "name": "child"
+              },
+              "y": {
+               "k": "int",
+               "value": "1"
+              }
+             }
+            }
+           }
+          }
+         ],
          "k": "if",
          "then": [
           {
-           "k": "return",
-           "values": [
+           "k": "assign",
+           "lhs": [
             {
              "k": "ident",
-             "name": "estimateCap"
+             "name": "total"
             }
-           ]
+           ],
+           "value": {
+            "k": "binary",
+            "op": "+",
+            "x": {
+             "k": "binary",
+             "op": "*",
+             "x": {
+              "args": [
+               {
+                "k": "ident",
+                "name": "lo"
+               },
+               {
+                "k": "int",
+                "value": "1"
+               }
+              ],
+              "fn": "max",
+              "k": "builtin",
+              "spread": false,
+              "type": null
+             },
+             "y": {
+              "k": "ident",
+              "name": "child"
+             }
+            },
+            "y": {
+             "k": "int",
+             "value": "1"
+            }
+           }
           }
          ]
         },
@@ -60580,8 +60217,28 @@
          "k": "return",
          "values": [
           {
-           "k": "ident",
-           "name": "total"
+           "args": [
+            {
+             "k": "ident",
+             "name": "total"
+            },
+            {
+             "k": "binary",
+             "op": "+",
+             "x": {
+              "k": "ident",
+              "name": "maxProgram"
+             },
+             "y": {
+              "k": "int",
+              "value": "1"
+             }
+            }
+           ],
+           "fn": "min",
+           "k": "builtin",
+           "spread": false,
+           "type": null
           }
          ]
         }
@@ -60623,7 +60280,7 @@
     }
    ],
    "k": "func",
-   "name": "instrEstimate",
+   "name": "instrCount",
    "params": [
     {
      "name": "nodes",
@@ -60653,21 +60310,53 @@
   {
    "body": [
     {
-     "k": "assign",
-     "lhs": [
-      {
-       "k": "field",
-       "name": "failMin",
-       "x": {
-        "k": "ident",
-        "name": "b"
-       }
+     "cond": {
+      "k": "binary",
+      "op": "\u003e=",
+      "x": {
+       "args": [
+        {
+         "k": "ident",
+         "name": "nodes"
+        },
+        {
+         "k": "ident",
+         "name": "root"
+        }
+       ],
+       "fn": "instrCount",
+       "k": "call"
+      },
+      "y": {
+       "k": "ident",
+       "name": "maxProgram"
       }
-     ],
-     "value": {
-      "k": "ident",
-      "name": "failMinNone"
-     }
+     },
+     "else": null,
+     "k": "if",
+     "then": [
+      {
+       "k": "assign",
+       "lhs": [
+        {
+         "k": "field",
+         "name": "tooBig",
+         "x": {
+          "k": "ident",
+          "name": "b"
+         }
+        }
+       ],
+       "value": {
+        "k": "bool",
+        "value": true
+       }
+      },
+      {
+       "k": "return",
+       "values": []
+      }
+     ]
     },
     {
      "k": "define",
@@ -60880,31 +60569,6 @@
      "value": {
       "k": "ident",
       "name": "multi"
-     }
-    },
-    {
-     "k": "assign",
-     "lhs": [
-      {
-       "k": "field",
-       "name": "failMin",
-       "x": {
-        "k": "field",
-        "name": "prog",
-        "x": {
-         "k": "ident",
-         "name": "b"
-        }
-       }
-      }
-     ],
-     "value": {
-      "k": "field",
-      "name": "failMin",
-      "x": {
-       "k": "ident",
-       "name": "b"
-      }
      }
     },
     {
@@ -61158,30 +60822,14 @@
     {
      "cond": {
       "k": "binary",
-      "op": "||",
+      "op": "==",
       "x": {
-       "k": "binary",
-       "op": "==",
-       "x": {
-        "k": "ident",
-        "name": "op"
-       },
-       "y": {
-        "k": "ident",
-        "name": "iMatch"
-       }
+       "k": "ident",
+       "name": "op"
       },
       "y": {
-       "k": "binary",
-       "op": "==",
-       "x": {
-        "k": "ident",
-        "name": "op"
-       },
-       "y": {
-        "k": "ident",
-        "name": "iFail"
-       }
+       "k": "ident",
+       "name": "iMatch"
       }
      },
      "else": null,
@@ -64655,183 +64303,6 @@
     },
     {
      "cond": {
-      "k": "binary",
-      "op": "\u003e",
-      "x": {
-       "args": [
-        {
-         "k": "ident",
-         "name": "nodes"
-        },
-        {
-         "k": "ident",
-         "name": "ni"
-        }
-       ],
-       "fn": "instrEstimate",
-       "k": "call"
-      },
-      "y": {
-       "k": "binary",
-       "op": "-",
-       "x": {
-        "k": "ident",
-        "name": "maxProgram"
-       },
-       "y": {
-        "args": [
-         {
-          "k": "field",
-          "name": "ins",
-          "x": {
-           "k": "field",
-           "name": "prog",
-           "x": {
-            "k": "ident",
-            "name": "b"
-           }
-          }
-         }
-        ],
-        "fn": "len",
-        "k": "builtin",
-        "spread": false,
-        "type": null
-       }
-      }
-     },
-     "else": null,
-     "k": "if",
-     "then": [
-      {
-       "k": "var_decl",
-       "name": "fi",
-       "type": {
-        "k": "struct_ref",
-        "name": "instr"
-       },
-       "value": null
-      },
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "field",
-         "name": "op",
-         "x": {
-          "k": "ident",
-          "name": "fi"
-         }
-        }
-       ],
-       "value": {
-        "k": "ident",
-        "name": "iFail"
-       }
-      },
-      {
-       "k": "define",
-       "names": [
-        "idx"
-       ],
-       "value": {
-        "args": [
-         {
-          "k": "ident",
-          "name": "b"
-         },
-         {
-          "k": "ident",
-          "name": "fi"
-         }
-        ],
-        "fn": "addInstr",
-        "k": "call"
-       }
-      },
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "field",
-         "name": "failMin",
-         "x": {
-          "k": "ident",
-          "name": "b"
-         }
-        }
-       ],
-       "value": {
-        "args": [
-         {
-          "k": "field",
-          "name": "failMin",
-          "x": {
-           "k": "ident",
-           "name": "b"
-          }
-         },
-         {
-          "k": "field",
-          "name": "minL",
-          "x": {
-           "index": {
-            "k": "ident",
-            "name": "ni"
-           },
-           "k": "index",
-           "x": {
-            "k": "ident",
-            "name": "nodes"
-           }
-          }
-         }
-        ],
-        "fn": "min",
-        "k": "builtin",
-        "spread": false,
-        "type": null
-       }
-      },
-      {
-       "k": "var_decl",
-       "name": "f",
-       "type": {
-        "k": "struct_ref",
-        "name": "frag"
-       },
-       "value": null
-      },
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "field",
-         "name": "start",
-         "x": {
-          "k": "ident",
-          "name": "f"
-         }
-        }
-       ],
-       "value": {
-        "k": "ident",
-        "name": "idx"
-       }
-      },
-      {
-       "k": "return",
-       "values": [
-        {
-         "k": "ident",
-         "name": "f"
-        }
-       ]
-      }
-     ]
-    },
-    {
-     "cond": {
       "k": "field",
       "name": "minimal",
       "x": {
@@ -66803,37 +66274,6 @@
          "name": "opBracket"
         }
        ]
-      },
-      {
-       "body": [
-        {
-         "k": "assign",
-         "lhs": [
-          {
-           "k": "field",
-           "name": "anchors",
-           "x": {
-            "k": "ident",
-            "name": "re"
-           }
-          }
-         ],
-         "value": {
-          "k": "bool",
-          "value": true
-         }
-        }
-       ],
-       "values": [
-        {
-         "k": "ident",
-         "name": "opBOL"
-        },
-        {
-         "k": "ident",
-         "name": "opEOL"
-        }
-       ]
       }
      ],
      "default": null,
@@ -67388,678 +66828,6 @@
     }
    ],
    "results": []
-  },
-  {
-   "body": [
-    {
-     "cases": [
-      {
-       "body": [
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "int",
-           "value": "1"
-          }
-         ]
-        }
-       ],
-       "values": [
-        {
-         "k": "ident",
-         "name": "opChar"
-        },
-        {
-         "k": "ident",
-         "name": "opAny"
-        }
-       ]
-      },
-      {
-       "body": [
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "conv",
-           "type": {
-            "k": "named",
-            "name": "int64"
-           },
-           "x": {
-            "args": [
-             {
-              "k": "ident",
-              "name": "brs"
-             },
-             {
-              "k": "field",
-              "name": "br",
-              "x": {
-               "index": {
-                "k": "ident",
-                "name": "ni"
-               },
-               "k": "index",
-               "x": {
-                "k": "ident",
-                "name": "nodes"
-               }
-              }
-             },
-             {
-              "k": "ident",
-              "name": "loc"
-             }
-            ],
-            "fn": "bracketMinChars",
-            "k": "call"
-           }
-          }
-         ]
-        }
-       ],
-       "values": [
-        {
-         "k": "ident",
-         "name": "opBracket"
-        }
-       ]
-      },
-      {
-       "body": [
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "int",
-           "value": "0"
-          }
-         ]
-        }
-       ],
-       "values": [
-        {
-         "k": "ident",
-         "name": "opBOL"
-        },
-        {
-         "k": "ident",
-         "name": "opEOL"
-        }
-       ]
-      },
-      {
-       "body": [
-        {
-         "k": "return",
-         "values": [
-          {
-           "args": [
-            {
-             "k": "ident",
-             "name": "nodes"
-            },
-            {
-             "k": "ident",
-             "name": "brs"
-            },
-            {
-             "k": "ident",
-             "name": "loc"
-            },
-            {
-             "index": {
-              "k": "int",
-              "value": "0"
-             },
-             "k": "index",
-             "x": {
-              "k": "field",
-              "name": "ch",
-              "x": {
-               "index": {
-                "k": "ident",
-                "name": "ni"
-               },
-               "k": "index",
-               "x": {
-                "k": "ident",
-                "name": "nodes"
-               }
-              }
-             }
-            }
-           ],
-           "fn": "minMatchChars",
-           "k": "call"
-          }
-         ]
-        }
-       ],
-       "values": [
-        {
-         "k": "ident",
-         "name": "opGroup"
-        }
-       ]
-      },
-      {
-       "body": [
-        {
-         "k": "var_decl",
-         "name": "total",
-         "type": {
-          "k": "named",
-          "name": "int64"
-         },
-         "value": null
-        },
-        {
-         "body": [
-          {
-           "k": "op_assign",
-           "lhs": {
-            "k": "ident",
-            "name": "total"
-           },
-           "op": "+=",
-           "value": {
-            "args": [
-             {
-              "k": "ident",
-              "name": "nodes"
-             },
-             {
-              "k": "ident",
-              "name": "brs"
-             },
-             {
-              "k": "ident",
-              "name": "loc"
-             },
-             {
-              "index": {
-               "k": "ident",
-               "name": "i"
-              },
-              "k": "index",
-              "x": {
-               "k": "field",
-               "name": "ch",
-               "x": {
-                "index": {
-                 "k": "ident",
-                 "name": "ni"
-                },
-                "k": "index",
-                "x": {
-                 "k": "ident",
-                 "name": "nodes"
-                }
-               }
-              }
-             }
-            ],
-            "fn": "minMatchChars",
-            "k": "call"
-           }
-          },
-          {
-           "cond": {
-            "k": "binary",
-            "op": "\u003e",
-            "x": {
-             "k": "ident",
-             "name": "total"
-            },
-            "y": {
-             "k": "ident",
-             "name": "lengthCap"
-            }
-           },
-           "else": null,
-           "k": "if",
-           "then": [
-            {
-             "k": "return",
-             "values": [
-              {
-               "k": "ident",
-               "name": "lengthCap"
-              }
-             ]
-            }
-           ]
-          }
-         ],
-         "cond": {
-          "k": "binary",
-          "op": "\u003c",
-          "x": {
-           "k": "ident",
-           "name": "i"
-          },
-          "y": {
-           "args": [
-            {
-             "k": "field",
-             "name": "ch",
-             "x": {
-              "index": {
-               "k": "ident",
-               "name": "ni"
-              },
-              "k": "index",
-              "x": {
-               "k": "ident",
-               "name": "nodes"
-              }
-             }
-            }
-           ],
-           "fn": "len",
-           "k": "builtin",
-           "spread": false,
-           "type": null
-          }
-         },
-         "init": {
-          "k": "define",
-          "names": [
-           "i"
-          ],
-          "value": {
-           "k": "int",
-           "value": "0"
-          }
-         },
-         "k": "for",
-         "post": {
-          "k": "incdec",
-          "lhs": {
-           "k": "ident",
-           "name": "i"
-          },
-          "op": "++"
-         }
-        },
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "ident",
-           "name": "total"
-          }
-         ]
-        }
-       ],
-       "values": [
-        {
-         "k": "ident",
-         "name": "opConcat"
-        }
-       ]
-      },
-      {
-       "body": [
-        {
-         "k": "define",
-         "names": [
-          "best"
-         ],
-         "value": {
-          "k": "ident",
-          "name": "lengthCap"
-         }
-        },
-        {
-         "body": [
-          {
-           "k": "assign",
-           "lhs": [
-            {
-             "k": "ident",
-             "name": "best"
-            }
-           ],
-           "value": {
-            "args": [
-             {
-              "k": "ident",
-              "name": "best"
-             },
-             {
-              "args": [
-               {
-                "k": "ident",
-                "name": "nodes"
-               },
-               {
-                "k": "ident",
-                "name": "brs"
-               },
-               {
-                "k": "ident",
-                "name": "loc"
-               },
-               {
-                "index": {
-                 "k": "ident",
-                 "name": "i"
-                },
-                "k": "index",
-                "x": {
-                 "k": "field",
-                 "name": "ch",
-                 "x": {
-                  "index": {
-                   "k": "ident",
-                   "name": "ni"
-                  },
-                  "k": "index",
-                  "x": {
-                   "k": "ident",
-                   "name": "nodes"
-                  }
-                 }
-                }
-               }
-              ],
-              "fn": "minMatchChars",
-              "k": "call"
-             }
-            ],
-            "fn": "min",
-            "k": "builtin",
-            "spread": false,
-            "type": null
-           }
-          }
-         ],
-         "cond": {
-          "k": "binary",
-          "op": "\u003c",
-          "x": {
-           "k": "ident",
-           "name": "i"
-          },
-          "y": {
-           "args": [
-            {
-             "k": "field",
-             "name": "ch",
-             "x": {
-              "index": {
-               "k": "ident",
-               "name": "ni"
-              },
-              "k": "index",
-              "x": {
-               "k": "ident",
-               "name": "nodes"
-              }
-             }
-            }
-           ],
-           "fn": "len",
-           "k": "builtin",
-           "spread": false,
-           "type": null
-          }
-         },
-         "init": {
-          "k": "define",
-          "names": [
-           "i"
-          ],
-          "value": {
-           "k": "int",
-           "value": "0"
-          }
-         },
-         "k": "for",
-         "post": {
-          "k": "incdec",
-          "lhs": {
-           "k": "ident",
-           "name": "i"
-          },
-          "op": "++"
-         }
-        },
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "ident",
-           "name": "best"
-          }
-         ]
-        }
-       ],
-       "values": [
-        {
-         "k": "ident",
-         "name": "opAlt"
-        }
-       ]
-      },
-      {
-       "body": [
-        {
-         "cond": {
-          "k": "binary",
-          "op": "==",
-          "x": {
-           "k": "field",
-           "name": "min",
-           "x": {
-            "index": {
-             "k": "ident",
-             "name": "ni"
-            },
-            "k": "index",
-            "x": {
-             "k": "ident",
-             "name": "nodes"
-            }
-           }
-          },
-          "y": {
-           "k": "int",
-           "value": "0"
-          }
-         },
-         "else": null,
-         "k": "if",
-         "then": [
-          {
-           "k": "return",
-           "values": [
-            {
-             "k": "int",
-             "value": "0"
-            }
-           ]
-          }
-         ]
-        },
-        {
-         "k": "define",
-         "names": [
-          "product"
-         ],
-         "value": {
-          "k": "binary",
-          "op": "*",
-          "x": {
-           "k": "conv",
-           "type": {
-            "k": "named",
-            "name": "int64"
-           },
-           "x": {
-            "k": "field",
-            "name": "min",
-            "x": {
-             "index": {
-              "k": "ident",
-              "name": "ni"
-             },
-             "k": "index",
-             "x": {
-              "k": "ident",
-              "name": "nodes"
-             }
-            }
-           }
-          },
-          "y": {
-           "args": [
-            {
-             "k": "ident",
-             "name": "nodes"
-            },
-            {
-             "k": "ident",
-             "name": "brs"
-            },
-            {
-             "k": "ident",
-             "name": "loc"
-            },
-            {
-             "index": {
-              "k": "int",
-              "value": "0"
-             },
-             "k": "index",
-             "x": {
-              "k": "field",
-              "name": "ch",
-              "x": {
-               "index": {
-                "k": "ident",
-                "name": "ni"
-               },
-               "k": "index",
-               "x": {
-                "k": "ident",
-                "name": "nodes"
-               }
-              }
-             }
-            }
-           ],
-           "fn": "minMatchChars",
-           "k": "call"
-          }
-         }
-        },
-        {
-         "k": "return",
-         "values": [
-          {
-           "args": [
-            {
-             "k": "ident",
-             "name": "product"
-            },
-            {
-             "k": "ident",
-             "name": "lengthCap"
-            }
-           ],
-           "fn": "min",
-           "k": "builtin",
-           "spread": false,
-           "type": null
-          }
-         ]
-        }
-       ],
-       "values": [
-        {
-         "k": "ident",
-         "name": "opRepeat"
-        }
-       ]
-      }
-     ],
-     "default": null,
-     "k": "switch",
-     "tag": {
-      "k": "field",
-      "name": "op",
-      "x": {
-       "index": {
-        "k": "ident",
-        "name": "ni"
-       },
-       "k": "index",
-       "x": {
-        "k": "ident",
-        "name": "nodes"
-       }
-      }
-     }
-    },
-    {
-     "k": "return",
-     "values": [
-      {
-       "k": "int",
-       "value": "0"
-      }
-     ]
-    }
-   ],
-   "k": "func",
-   "name": "minMatchChars",
-   "params": [
-    {
-     "name": "nodes",
-     "type": {
-      "elem": {
-       "k": "struct_ref",
-       "name": "node"
-      },
-      "k": "slice"
-     }
-    },
-    {
-     "name": "brs",
-     "type": {
-      "elem": {
-       "k": "struct_ref",
-       "name": "bracketSet"
-      },
-      "k": "slice"
-     }
-    },
-    {
-     "name": "loc",
-     "type": {
-      "k": "ptr",
-      "name": "Locale"
-     }
-    },
-    {
-     "name": "ni",
-     "type": {
-      "k": "named",
-      "name": "int32"
-     }
-    }
-   ],
-   "results": [
-    {
-     "k": "named",
-     "name": "int64"
-    }
-   ]
   },
   {
    "body": [
@@ -68727,100 +67495,58 @@
        }
       }
      },
-     "else": [
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "field",
-         "name": "progOK",
-         "x": {
-          "k": "ident",
-          "name": "re"
-         }
-        }
-       ],
-       "value": {
-        "k": "bool",
-        "value": true
-       }
-      },
-      {
-       "k": "assign",
-       "lhs": [
-        {
-         "k": "field",
-         "name": "prog",
-         "x": {
-          "k": "ident",
-          "name": "re"
-         }
-        }
-       ],
-       "value": {
-        "k": "field",
-        "name": "prog",
-        "x": {
-         "k": "ident",
-         "name": "b"
-        }
-       }
-      }
-     ],
+     "else": null,
      "k": "if",
      "then": [
       {
-       "k": "assign",
-       "lhs": [
+       "k": "return",
+       "values": [
         {
-         "k": "field",
-         "name": "minLen",
-         "x": {
-          "k": "ident",
-          "name": "re"
-         }
-        }
-       ],
-       "value": {
-        "args": [
-         {
-          "k": "field",
-          "name": "nodes",
-          "x": {
+         "k": "ident",
+         "name": "re"
+        },
+        {
+         "args": [
+          {
            "k": "ident",
-           "name": "re"
-          }
-         },
-         {
-          "k": "field",
-          "name": "brackets",
-          "x": {
-           "k": "ident",
-           "name": "re"
-          }
-         },
-         {
-          "k": "unary",
-          "op": "\u0026",
-          "x": {
-           "k": "field",
-           "name": "loc",
+           "name": "ErrESpace"
+          },
+          {
+           "k": "unary",
+           "op": "-",
            "x": {
-            "k": "ident",
-            "name": "re"
+            "k": "int",
+            "value": "1"
            }
           }
-         },
-         {
-          "k": "ident",
-          "name": "root"
-         }
-        ],
-        "fn": "minMatchChars",
-        "k": "call"
-       }
+         ],
+         "fn": "compileError",
+         "k": "call"
+        }
+       ]
       }
      ]
+    },
+    {
+     "k": "assign",
+     "lhs": [
+      {
+       "k": "field",
+       "name": "prog",
+       "x": {
+        "k": "ident",
+        "name": "re"
+       }
+      }
+     ],
+     "value": {
+      "k": "field",
+      "name": "prog",
+      "x": {
+       "k": "ident",
+       "name": "b"
+      }
+     }
     },
     {
      "k": "return",
@@ -68910,141 +67636,6 @@
   {
    "body": [
     {
-     "k": "return",
-     "values": [
-      {
-       "k": "binary",
-       "op": "\u0026\u0026",
-       "x": {
-        "k": "binary",
-        "op": "\u0026\u0026",
-        "x": {
-         "k": "binary",
-         "op": "==",
-         "x": {
-          "k": "field",
-          "name": "minL",
-          "x": {
-           "index": {
-            "k": "field",
-            "name": "root",
-            "x": {
-             "k": "ident",
-             "name": "re"
-            }
-           },
-           "k": "index",
-           "x": {
-            "k": "field",
-            "name": "nodes",
-            "x": {
-             "k": "ident",
-             "name": "re"
-            }
-           }
-          }
-         },
-         "y": {
-          "k": "int",
-          "value": "0"
-         }
-        },
-        "y": {
-         "k": "unary",
-         "op": "!",
-         "x": {
-          "k": "field",
-          "name": "anchors",
-          "x": {
-           "k": "ident",
-           "name": "re"
-          }
-         }
-        }
-       },
-       "y": {
-        "k": "binary",
-        "op": "||",
-        "x": {
-         "k": "binary",
-         "op": "!=",
-         "x": {
-          "k": "binary",
-          "op": "\u0026",
-          "x": {
-           "k": "field",
-           "name": "flags",
-           "x": {
-            "k": "ident",
-            "name": "re"
-           }
-          },
-          "y": {
-           "k": "ident",
-           "name": "FlagNoSub"
-          }
-         },
-         "y": {
-          "k": "int",
-          "value": "0"
-         }
-        },
-        "y": {
-         "k": "binary",
-         "op": "==",
-         "x": {
-          "args": [
-           {
-            "k": "ident",
-            "name": "pmatch"
-           }
-          ],
-          "fn": "len",
-          "k": "builtin",
-          "spread": false,
-          "type": null
-         },
-         "y": {
-          "k": "int",
-          "value": "0"
-         }
-        }
-       }
-      }
-     ]
-    }
-   ],
-   "k": "func",
-   "name": "trivialNullMatch",
-   "params": [
-    {
-     "name": "re",
-     "type": {
-      "k": "ptr",
-      "name": "Regexp"
-     }
-    },
-    {
-     "name": "pmatch",
-     "type": {
-      "elem": {
-       "k": "struct_ref",
-       "name": "Match"
-      },
-      "k": "slice"
-     }
-    }
-   ],
-   "results": [
-    {
-     "k": "named",
-     "name": "bool"
-    }
-   ]
-  },
-  {
-   "body": [
-    {
      "cond": {
       "k": "binary",
       "op": "\u003e",
@@ -69068,440 +67659,6 @@
      "else": null,
      "k": "if",
      "then": [
-      {
-       "k": "return",
-       "values": [
-        {
-         "k": "bool",
-         "value": false
-        },
-        {
-         "args": [
-          {
-           "k": "ident",
-           "name": "ErrESpace"
-          },
-          {
-           "k": "unary",
-           "op": "-",
-           "x": {
-            "k": "int",
-            "value": "1"
-           }
-          }
-         ],
-         "fn": "compileError",
-         "k": "call"
-        }
-       ]
-      }
-     ]
-    },
-    {
-     "cond": {
-      "k": "unary",
-      "op": "!",
-      "x": {
-       "k": "field",
-       "name": "progOK",
-       "x": {
-        "k": "ident",
-        "name": "re"
-       }
-      }
-     },
-     "else": null,
-     "k": "if",
-     "then": [
-      {
-       "cond": {
-        "k": "binary",
-        "op": "\u003c",
-        "x": {
-         "k": "conv",
-         "type": {
-          "k": "named",
-          "name": "int64"
-         },
-         "x": {
-          "args": [
-           {
-            "k": "ident",
-            "name": "subject"
-           }
-          ],
-          "fn": "len",
-          "k": "builtin",
-          "spread": false,
-          "type": null
-         }
-        },
-        "y": {
-         "k": "field",
-         "name": "minLen",
-         "x": {
-          "k": "ident",
-          "name": "re"
-         }
-        }
-       },
-       "else": null,
-       "k": "if",
-       "then": [
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "bool",
-           "value": false
-          },
-          {
-           "args": [],
-           "fn": "noError",
-           "k": "call"
-          }
-         ]
-        }
-       ]
-      },
-      {
-       "cond": {
-        "k": "binary",
-        "op": "\u003c",
-        "x": {
-         "k": "conv",
-         "type": {
-          "k": "named",
-          "name": "int64"
-         },
-         "x": {
-          "args": [
-           {
-            "k": "ident",
-            "name": "subject"
-           }
-          ],
-          "fn": "runeCount",
-          "k": "call"
-         }
-        },
-        "y": {
-         "k": "field",
-         "name": "minLen",
-         "x": {
-          "k": "ident",
-          "name": "re"
-         }
-        }
-       },
-       "else": null,
-       "k": "if",
-       "then": [
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "bool",
-           "value": false
-          },
-          {
-           "args": [],
-           "fn": "noError",
-           "k": "call"
-          }
-         ]
-        }
-       ]
-      },
-      {
-       "cond": {
-        "args": [
-         {
-          "k": "ident",
-          "name": "re"
-         },
-         {
-          "k": "ident",
-          "name": "pmatch"
-         }
-        ],
-        "fn": "trivialNullMatch",
-        "k": "call"
-       },
-       "else": null,
-       "k": "if",
-       "then": [
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "bool",
-           "value": true
-          },
-          {
-           "args": [],
-           "fn": "noError",
-           "k": "call"
-          }
-         ]
-        }
-       ]
-      },
-      {
-       "k": "return",
-       "values": [
-        {
-         "k": "bool",
-         "value": false
-        },
-        {
-         "args": [
-          {
-           "k": "ident",
-           "name": "ErrESpace"
-          },
-          {
-           "k": "unary",
-           "op": "-",
-           "x": {
-            "k": "int",
-            "value": "1"
-           }
-          }
-         ],
-         "fn": "compileError",
-         "k": "call"
-        }
-       ]
-      }
-     ]
-    },
-    {
-     "cond": {
-      "k": "binary",
-      "op": "\u0026\u0026",
-      "x": {
-       "k": "binary",
-       "op": "\u0026\u0026",
-       "x": {
-        "k": "binary",
-        "op": "!=",
-        "x": {
-         "k": "field",
-         "name": "failMin",
-         "x": {
-          "k": "field",
-          "name": "prog",
-          "x": {
-           "k": "ident",
-           "name": "re"
-          }
-         }
-        },
-        "y": {
-         "k": "ident",
-         "name": "failMinNone"
-        }
-       },
-       "y": {
-        "k": "binary",
-        "op": "\u003e=",
-        "x": {
-         "args": [
-          {
-           "k": "ident",
-           "name": "subject"
-          }
-         ],
-         "fn": "len",
-         "k": "builtin",
-         "spread": false,
-         "type": null
-        },
-        "y": {
-         "k": "field",
-         "name": "failMin",
-         "x": {
-          "k": "field",
-          "name": "prog",
-          "x": {
-           "k": "ident",
-           "name": "re"
-          }
-         }
-        }
-       }
-      },
-      "y": {
-       "k": "binary",
-       "op": "\u003e=",
-       "x": {
-        "args": [
-         {
-          "k": "ident",
-          "name": "subject"
-         }
-        ],
-        "fn": "runeCount",
-        "k": "call"
-       },
-       "y": {
-        "k": "field",
-        "name": "failMin",
-        "x": {
-         "k": "field",
-         "name": "prog",
-         "x": {
-          "k": "ident",
-          "name": "re"
-         }
-        }
-       }
-      }
-     },
-     "else": null,
-     "k": "if",
-     "then": [
-      {
-       "cond": {
-        "args": [
-         {
-          "k": "ident",
-          "name": "re"
-         },
-         {
-          "k": "ident",
-          "name": "pmatch"
-         }
-        ],
-        "fn": "trivialNullMatch",
-        "k": "call"
-       },
-       "else": null,
-       "k": "if",
-       "then": [
-        {
-         "k": "return",
-         "values": [
-          {
-           "k": "bool",
-           "value": true
-          },
-          {
-           "args": [],
-           "fn": "noError",
-           "k": "call"
-          }
-         ]
-        }
-       ]
-      },
-      {
-       "cond": {
-        "k": "binary",
-        "op": "||",
-        "x": {
-         "k": "binary",
-         "op": "!=",
-         "x": {
-          "k": "binary",
-          "op": "\u0026",
-          "x": {
-           "k": "field",
-           "name": "flags",
-           "x": {
-            "k": "ident",
-            "name": "re"
-           }
-          },
-          "y": {
-           "k": "ident",
-           "name": "FlagNoSub"
-          }
-         },
-         "y": {
-          "k": "int",
-          "value": "0"
-         }
-        },
-        "y": {
-         "k": "binary",
-         "op": "==",
-         "x": {
-          "args": [
-           {
-            "k": "ident",
-            "name": "pmatch"
-           }
-          ],
-          "fn": "len",
-          "k": "builtin",
-          "spread": false,
-          "type": null
-         },
-         "y": {
-          "k": "int",
-          "value": "0"
-         }
-        }
-       },
-       "else": null,
-       "k": "if",
-       "then": [
-        {
-         "k": "define",
-         "names": [
-          "probe"
-         ],
-         "value": {
-          "args": [
-           {
-            "k": "ident",
-            "name": "re"
-           },
-           {
-            "k": "ident",
-            "name": "subject"
-           },
-           {
-            "k": "ident",
-            "name": "eflags"
-           }
-          ],
-          "fn": "runPhaseA",
-          "k": "call"
-         }
-        },
-        {
-         "cond": {
-          "k": "field",
-          "name": "matched",
-          "x": {
-           "k": "ident",
-           "name": "probe"
-          }
-         },
-         "else": null,
-         "k": "if",
-         "then": [
-          {
-           "k": "return",
-           "values": [
-            {
-             "k": "bool",
-             "value": true
-            },
-            {
-             "args": [],
-             "fn": "noError",
-             "k": "call"
-            }
-           ]
-          }
-         ]
-        }
-       ]
-      },
       {
        "k": "return",
        "values": [
@@ -82249,13 +80406,6 @@
      }
     },
     {
-     "name": "failMin",
-     "type": {
-      "k": "named",
-      "name": "int"
-     }
-    },
-    {
      "name": "scan",
      "type": {
       "k": "struct_ref",
@@ -82330,13 +80480,6 @@
      "type": {
       "k": "named",
       "name": "bool"
-     }
-    },
-    {
-     "name": "failMin",
-     "type": {
-      "k": "named",
-      "name": "int"
      }
     },
     {
@@ -82435,31 +80578,10 @@
      }
     },
     {
-     "name": "progOK",
-     "type": {
-      "k": "named",
-      "name": "bool"
-     }
-    },
-    {
      "name": "prog",
      "type": {
       "k": "struct_ref",
       "name": "program"
-     }
-    },
-    {
-     "name": "minLen",
-     "type": {
-      "k": "named",
-      "name": "int64"
-     }
-    },
-    {
-     "name": "anchors",
-     "type": {
-      "k": "named",
-      "name": "bool"
      }
     },
     {

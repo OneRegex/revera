@@ -73,6 +73,11 @@ Consequently, below the host file, the engine has a different shape from an ordi
 Parentheses nest at most 256 deep, which covers every pattern of 256 bytes or fewer.
 A deeper pattern reports `ESpace` at compile time instead of exhausting the stack.
 
+Nested intervals multiply, so a short pattern such as `((a{0,255}){0,255}){0,255}` can expand into tens of millions of instructions.
+Compilation reports `ESpace` when a pattern goes past the engine's size limits.
+
+Once a pattern compiles, a search without captures can only fail on a subject of 2 GiB or more.
+
 The arenas of the capture solver are capped.
 An input that would need tens of gigabytes reports `ESpace` early, with bounded memory.
 
